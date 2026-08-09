@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Deploy this from the Firebase Console → Firestore Database → Rules tab,
+// or with `firebase deploy --only firestore:rules` if you use the CLI.
+//
+// NOTE: this is a different kind of "rules" from the admin dashboard's
+// "Aturan & Harga" tab. This file is Firestore's own security layer
+// (who is allowed to read/write which documents). The admin dashboard's
+// rules are application/business settings (price per email, min withdraw,
+// etc.) stored in the settings/rules document and read dynamically by the
+// app — both are needed, and both are now wired up.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ---- users/{uid} ----
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+
+      // Self-registration: a signed-in user may create ONLY their own
+      // profile, and only as an unprivileged, unapproved worker — they
+      // cannot grant themselves admin, approved status, tier, or balance.
+      allow create: if isAdmin() || (
+        isSelf(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role == 'worker' &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.tier == 1 &&
+        request.resource.data.balance == 0
+      );
+
+      // Admin can update anything (approvals, tier, balance adjustments).
+      // A worker may touch their own contact info and may DECREASE (never
+      // increase) their own balance — that's what the withdraw-request
+      // transaction does client-side. Role, status and tier are always
+      // admin-controlled. A worker can never self-credit their balance.
+      allow update: if isAdmin() || (
+        isSelf(uid) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.tier == resource.data.tier &&
+        request.resource.data.balance >= 0 &&
+        request.resource.data.balance <= resource.data.balance
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ---- emailSubmissions/{id} ----
+    match /emailSubmissions/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // Only an admin resolves a submission (approve/reject); this is what
+      // credits the worker's balance, done atomically in application code.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---- withdrawals/{id} ----
+    match /withdrawals/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+
+      // A worker may request a withdrawal for themselves only. The paired
+      // debit to users/{workerId}.balance happens in the same client
+      // transaction and is allowed by the users/update rule above (which
+      // permits a self-decrease but never a self-increase) — so a worker
+      // can request withdrawals but can never credit their own balance.
+      allow create: if isSignedIn() &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0;
+
+      // Only an admin resolves a withdrawal (process/success/reject).
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---- settings/{name} ---- (dynamic rules, payment methods, pricing)
+    match /settings/{name} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
