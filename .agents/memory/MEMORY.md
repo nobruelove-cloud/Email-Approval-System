@@ -1,0 +1,1 @@
+- [Firebase browser configuration](firebase-config.md) — shared secrets use unprefixed names and need a Vite build-time bridge for browser configuration.
