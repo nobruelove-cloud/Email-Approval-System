@@ -120,14 +120,23 @@ export default function LoginPage() {
         {!firebaseConfigured && (
           <Card className="mb-4 border-red-200 bg-red-50">
             <CardContent className="pt-6 flex gap-3 text-red-700 text-sm">
-              <ShieldAlert className="w-5 h-5 shrink-0" />
+              <ShieldAlert className="w-5 h-5 shrink-0 text-red-600" />
               <div>
-                <p className="font-semibold">Firebase belum dikonfigurasi</p>
-                <p className="text-red-600 mt-1">
-                  Tambahkan VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
-                  VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, dan VITE_FIREBASE_APP_ID
-                  di Secrets Replit, lalu jalankan ulang.
+                <p className="font-bold text-red-800">Firebase belum dikonfigurasi</p>
+                <p className="text-red-600 mt-1 leading-relaxed">
+                  Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
                 </p>
+                <p className="text-red-600 mt-2 text-xs">
+                  Semua input form dinonaktifkan demi keamanan. Silakan tambahkan variabel berikut pada environment Anda:
+                </p>
+                <ul className="font-mono list-disc list-inside mt-1.5 text-xs text-red-700 space-y-0.5">
+                  <li>VITE_FIREBASE_API_KEY</li>
+                  <li>VITE_FIREBASE_AUTH_DOMAIN</li>
+                  <li>VITE_FIREBASE_PROJECT_ID</li>
+                  <li>VITE_FIREBASE_STORAGE_BUCKET</li>
+                  <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
+                  <li>VITE_FIREBASE_APP_ID</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
