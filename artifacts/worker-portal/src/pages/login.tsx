@@ -126,8 +126,8 @@ export default function LoginPage() {
                 <p className="text-red-600 mt-1 leading-relaxed">
                   Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
                 </p>
-                <p className="text-red-600 mt-2 text-xs">
-                  Semua input form dinonaktifkan demi keamanan. Silakan tambahkan variabel berikut pada environment Anda:
+                <p className="text-red-600 mt-2 text-xs leading-relaxed">
+                  Semua input form dinonaktifkan demi keamanan. Silakan konfigurasikan variabel berikut:
                 </p>
                 <ul className="font-mono list-disc list-inside mt-1.5 text-xs text-red-700 space-y-0.5">
                   <li>VITE_FIREBASE_API_KEY</li>
