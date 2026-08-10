@@ -151,12 +151,12 @@ export default function LoginPage() {
                   <div>
                     <Label htmlFor="login-email">Email</Label>
                     <div className="relative mt-1.5">
-                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <Input
                         id="login-email"
                         type="email"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
                         placeholder="nama@email.com"
@@ -167,12 +167,12 @@ export default function LoginPage() {
                   <div>
                     <Label htmlFor="login-password">Kata Sandi</Label>
                     <div className="relative mt-1.5">
-                      <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <Input
                         id="login-password"
                         type="password"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••"
@@ -203,11 +203,11 @@ export default function LoginPage() {
                   <div>
                     <Label htmlFor="reg-name">Nama Lengkap</Label>
                     <div className="relative mt-1.5">
-                      <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <Input
                         id="reg-name"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nama Anda"
@@ -218,10 +218,10 @@ export default function LoginPage() {
                   <div>
                     <Label htmlFor="reg-phone">Nomor HP (opsional)</Label>
                     <div className="relative mt-1.5">
-                      <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <Input
                         id="reg-phone"
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="08xxxxxxxxxx"
@@ -232,12 +232,12 @@ export default function LoginPage() {
                   <div>
                     <Label htmlFor="reg-email">Email</Label>
                     <div className="relative mt-1.5">
-                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <Input
                         id="reg-email"
                         type="email"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="nama@email.com"
@@ -252,7 +252,7 @@ export default function LoginPage() {
                         id="reg-password"
                         type="password"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="Min. 6 karakter"
@@ -265,7 +265,7 @@ export default function LoginPage() {
                         id="reg-confirm"
                         type="password"
                         required
-                        disabled={!firebaseConfigured}
+                        disabled={busy}
                         value={regConfirm}
                         onChange={(e) => setRegConfirm(e.target.value)}
                         placeholder="Ulangi kata sandi"

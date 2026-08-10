@@ -1,7 +1,7 @@
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -27,35 +27,48 @@ if (!basePath) {
   );
 }
 
-export default defineConfig({
-  base: basePath,
-  define: {
-    'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
-      process.env.FIREBASE_API_KEY ?? process.env.VITE_FIREBASE_API_KEY ?? '',
-    ),
-    'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(
-      process.env.FIREBASE_AUTH_DOMAIN ??
-        process.env.VITE_FIREBASE_AUTH_DOMAIN ??
-        '',
-    ),
-    'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(
-      process.env.FIREBASE_PROJECT_ID ?? process.env.VITE_FIREBASE_PROJECT_ID ?? '',
-    ),
-    'import.meta.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(
-      process.env.FIREBASE_STORAGE_BUCKET ??
-        process.env.VITE_FIREBASE_STORAGE_BUCKET ??
-        '',
-    ),
-    'import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(
-      process.env.FIREBASE_MESSAGING_SENDER_ID ??
-        process.env.VITE_FIREBASE_MESSAGING_SENDER_ID ??
-        '',
-    ),
-    'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
-      process.env.FIREBASE_APP_ID ?? process.env.VITE_FIREBASE_APP_ID ?? '',
-    ),
-  },
-  plugins: [
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, path.resolve(import.meta.dirname), '');
+
+  return {
+    base: basePath,
+    define: {
+      'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
+        env.FIREBASE_API_KEY ?? env.VITE_FIREBASE_API_KEY ?? process.env.FIREBASE_API_KEY ?? process.env.VITE_FIREBASE_API_KEY ?? '',
+      ),
+      'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(
+        env.FIREBASE_AUTH_DOMAIN ??
+          env.VITE_FIREBASE_AUTH_DOMAIN ??
+          process.env.FIREBASE_AUTH_DOMAIN ??
+          process.env.VITE_FIREBASE_AUTH_DOMAIN ??
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(
+        env.FIREBASE_PROJECT_ID ??
+          env.VITE_FIREBASE_PROJECT_ID ??
+          process.env.FIREBASE_PROJECT_ID ??
+          process.env.VITE_FIREBASE_PROJECT_ID ??
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(
+        env.FIREBASE_STORAGE_BUCKET ??
+          env.VITE_FIREBASE_STORAGE_BUCKET ??
+          process.env.FIREBASE_STORAGE_BUCKET ??
+          process.env.VITE_FIREBASE_STORAGE_BUCKET ??
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(
+        env.FIREBASE_MESSAGING_SENDER_ID ??
+          env.VITE_FIREBASE_MESSAGING_SENDER_ID ??
+          process.env.FIREBASE_MESSAGING_SENDER_ID ??
+          process.env.VITE_FIREBASE_MESSAGING_SENDER_ID ??
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
+        env.FIREBASE_APP_ID ?? env.VITE_FIREBASE_APP_ID ?? process.env.FIREBASE_APP_ID ?? process.env.VITE_FIREBASE_APP_ID ?? '',
+      ),
+    },
+    plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
@@ -104,4 +117,5 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
   },
+  };
 });
