@@ -26,7 +26,7 @@ function friendlyAuthError(code: string) {
     "auth/too-many-requests": "Terlalu banyak percobaan. Coba lagi beberapa saat lagi.",
     "auth/network-request-failed": "Gagal terhubung ke server. Periksa koneksi internet Anda.",
   };
-  return map[code] ?? "Terjadi kesalahan. Silakan coba lagi.";
+  return map[code] ?? `Terjadi kesalahan (${code || "unknown_error"}). Silakan coba lagi.`;
 }
 
 export default function LoginPage() {
