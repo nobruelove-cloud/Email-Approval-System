@@ -51,8 +51,10 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
     } catch (err) {
+      console.error("Firebase Login Error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const message = (err as { message?: string }).message ?? "";
+      toast.error(`${friendlyAuthError(code)} Detail: ${code || "unknown"} - ${message}`);
     } finally {
       setBusy(false);
     }
@@ -87,8 +89,10 @@ export default function LoginPage() {
       });
       toast.success("Pendaftaran berhasil! Menunggu persetujuan admin.");
     } catch (err) {
+      console.error("Firebase Register Error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const message = (err as { message?: string }).message ?? "";
+      toast.error(`${friendlyAuthError(code)} Detail: ${code || "unknown"} - ${message}`);
     } finally {
       setBusy(false);
     }
@@ -104,8 +108,10 @@ export default function LoginPage() {
       await sendPasswordResetEmail(auth, loginEmail.trim());
       toast.success("Tautan reset kata sandi telah dikirim ke email Anda.");
     } catch (err) {
+      console.error("Firebase Forgot Password Error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const message = (err as { message?: string }).message ?? "";
+      toast.error(`${friendlyAuthError(code)} Detail: ${code || "unknown"} - ${message}`);
     }
   }
 
