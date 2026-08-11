@@ -3,19 +3,24 @@ import { getAuth, createUserWithEmailAndPassword, signOut, type Auth } from "fir
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || (import.meta.env.FIREBASE_API_KEY as string | undefined),
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (import.meta.env.FIREBASE_AUTH_DOMAIN as string | undefined),
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (import.meta.env.FIREBASE_PROJECT_ID as string | undefined),
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (import.meta.env.FIREBASE_STORAGE_BUCKET as string | undefined),
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (import.meta.env.FIREBASE_MESSAGING_SENDER_ID as string | undefined),
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || (import.meta.env.FIREBASE_APP_ID as string | undefined),
 };
 
 // The app only works once real Firebase project credentials are supplied via
 // env vars (see vite.config.ts). Without them we still want the UI to render
 // instead of crashing, so we track whether Firebase is usable.
 export const firebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId,
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.storageBucket &&
+    firebaseConfig.messagingSenderId &&
+    firebaseConfig.appId,
 );
 
 let app: FirebaseApp | undefined;
