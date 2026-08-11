@@ -124,7 +124,7 @@ export default function LoginPage() {
               <div>
                 <p className="font-semibold">Firebase belum dikonfigurasi</p>
                 <p className="text-red-600 mt-1">
-                  Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
+                  Pastikan environment variables Firebase tersedia pada deployment environment.
                 </p>
               </div>
             </CardContent>
