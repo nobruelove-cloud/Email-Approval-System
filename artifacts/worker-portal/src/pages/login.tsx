@@ -51,8 +51,10 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
     } catch (err) {
+      console.error("Login error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const baseMessage = friendlyAuthError(code);
+      toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {
       setBusy(false);
     }
@@ -87,8 +89,10 @@ export default function LoginPage() {
       });
       toast.success("Pendaftaran berhasil! Menunggu persetujuan admin.");
     } catch (err) {
+      console.error("Register error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const baseMessage = friendlyAuthError(code);
+      toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {
       setBusy(false);
     }
@@ -104,8 +108,10 @@ export default function LoginPage() {
       await sendPasswordResetEmail(auth, loginEmail.trim());
       toast.success("Tautan reset kata sandi telah dikirim ke email Anda.");
     } catch (err) {
+      console.error("Forgot password error:", err);
       const code = (err as { code?: string }).code ?? "";
-      toast.error(friendlyAuthError(code));
+      const baseMessage = friendlyAuthError(code);
+      toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     }
   }
 
