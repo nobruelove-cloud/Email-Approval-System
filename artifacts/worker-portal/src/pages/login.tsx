@@ -124,9 +124,7 @@ export default function LoginPage() {
               <div>
                 <p className="font-semibold">Firebase belum dikonfigurasi</p>
                 <p className="text-red-600 mt-1">
-                  Tambahkan VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
-                  VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, dan VITE_FIREBASE_APP_ID
-                  di Secrets Replit, lalu jalankan ulang.
+                  Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
                 </p>
               </div>
             </CardContent>
