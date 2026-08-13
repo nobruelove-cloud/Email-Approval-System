@@ -15,6 +15,31 @@ export default defineConfig(async ({ mode }) => {
     ...process.env,
   };
 
+  // Safe build-time diagnostics for Vercel production build analysis
+  const diagnosticVars = [
+    'VITE_FIREBASE_API_KEY', 'FIREBASE_API_KEY',
+    'VITE_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN',
+    'VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET',
+    'VITE_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID',
+    'VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID'
+  ];
+
+  console.log('=== Vercel Build-time Environment Diagnostics ===');
+  diagnosticVars.forEach((varName) => {
+    const val = mergedEnv[varName];
+    if (val !== undefined) {
+      const typeOfVal = typeof val;
+      const len = String(val).length;
+      const hasContent = len > 0;
+      const prefix = len > 4 ? String(val).slice(0, 4) : '...';
+      console.log(`[Diagnostic] ${varName}: Present (Type: ${typeOfVal}, Length: ${len}, HasContent: ${hasContent}, Prefix: ${prefix}***)`);
+    } else {
+      console.log(`[Diagnostic] ${varName}: Missing/Undefined`);
+    }
+  });
+  console.log('==================================================');
+
   // Safe fallbacks for PORT and BASE_PATH to prevent failures on non-interactive / Vercel build systems
   const rawPort = mergedEnv.PORT || '3000';
   const port = Number(rawPort);
@@ -26,6 +51,34 @@ export default defineConfig(async ({ mode }) => {
 
   return {
     base: basePath,
+    define: {
+      'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_API_KEY || mergedEnv.FIREBASE_API_KEY || '',
+      ),
+      'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_AUTH_DOMAIN ||
+          mergedEnv.FIREBASE_AUTH_DOMAIN ||
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_PROJECT_ID ||
+          mergedEnv.FIREBASE_PROJECT_ID ||
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_STORAGE_BUCKET ||
+          mergedEnv.FIREBASE_STORAGE_BUCKET ||
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_MESSAGING_SENDER_ID ||
+          mergedEnv.FIREBASE_MESSAGING_SENDER_ID ||
+          '',
+      ),
+      'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
+        mergedEnv.VITE_FIREBASE_APP_ID || mergedEnv.FIREBASE_APP_ID || '',
+      ),
+    },
     envPrefix: ['VITE_', 'FIREBASE_'],
     plugins: [
       react(),
