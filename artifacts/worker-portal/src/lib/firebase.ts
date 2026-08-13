@@ -11,16 +11,29 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || (import.meta.env.FIREBASE_APP_ID as string | undefined),
 };
 
+// Defensive validation to ensure placeholder/dummy values are treated as unconfigured
+function isValidConfigValue(val: string | undefined): boolean {
+  if (!val) return false;
+  const lower = val.trim().toLowerCase();
+  return (
+    lower.length > 0 &&
+    !lower.startsWith("nilai") &&
+    !lower.includes("placeholder") &&
+    !lower.includes("your-") &&
+    !lower.includes("your_")
+  );
+}
+
 // The app only works once real Firebase project credentials are supplied via
 // env vars (see vite.config.ts). Without them we still want the UI to render
 // instead of crashing, so we track whether Firebase is usable.
 export const firebaseConfigured = Boolean(
-  firebaseConfig.apiKey &&
-    firebaseConfig.authDomain &&
-    firebaseConfig.projectId &&
-    firebaseConfig.storageBucket &&
-    firebaseConfig.messagingSenderId &&
-    firebaseConfig.appId,
+  isValidConfigValue(firebaseConfig.apiKey) &&
+    isValidConfigValue(firebaseConfig.authDomain) &&
+    isValidConfigValue(firebaseConfig.projectId) &&
+    isValidConfigValue(firebaseConfig.storageBucket) &&
+    isValidConfigValue(firebaseConfig.messagingSenderId) &&
+    isValidConfigValue(firebaseConfig.appId),
 );
 
 let app: FirebaseApp | undefined;
