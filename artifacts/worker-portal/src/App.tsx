@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { Loader2, Clock, ShieldOff, ShieldAlert } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
@@ -36,6 +37,17 @@ function FullScreenMessage({
 
 function PortalGate() {
   const { firebaseUser, profile, loading, error, configured, logout } = usePortalAuth();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!profile) return;
+    const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
+    if (userRole === "admin" && location === "/dashboard") {
+      setLocation("/admin");
+    } else if (userRole === "worker" && location === "/admin") {
+      setLocation("/dashboard");
+    }
+  }, [profile, location, setLocation]);
 
   if (!configured) {
     return <LoginPage />;
@@ -117,11 +129,13 @@ function PortalGate() {
     );
   }
 
-  if (profile.role === "admin") {
+  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
+
+  if (userRole === "admin") {
     return <AdminDashboard profile={profile} onLogout={() => logout()} />;
   }
 
-  if (profile.role === "worker") {
+  if (userRole === "worker") {
     return <WorkerDashboard profile={profile} onLogout={() => logout()} />;
   }
 

@@ -102,7 +102,8 @@ export function usePortalAuth() {
           if (snapshot.exists()) {
             const data = snapshot.data();
             console.log("[PortalAuth] User profile retrieved successfully:", data);
-            setProfile({ uid: user.uid, ...data } as PortalUser);
+            const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
+            setProfile({ uid: user.uid, ...data, role: normalizedRole } as PortalUser);
             setError("");
           } else {
             console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore.`);
