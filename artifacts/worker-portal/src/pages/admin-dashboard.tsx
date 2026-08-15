@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -261,14 +262,46 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }
 
   // --- Rules editor ---
-  const [rulesDraft, setRulesDraft] = useState<typeof rules.data | null>(null);
-  const activeRules = rulesDraft ?? rules.data;
+  const [rulesDraft, setRulesDraft] = useState<{
+    pricePerEmail: number;
+    withdrawFeePercent: number;
+    minWithdraw: number;
+    maxWithdraw: number;
+    paymentMethodsStr: string;
+    submissionNotesText: string;
+  } | null>(null);
+
+  const activePricePerEmail = rulesDraft !== null ? rulesDraft.pricePerEmail : rules.data.pricePerEmail;
+  const activeWithdrawFeePercent = rulesDraft !== null ? rulesDraft.withdrawFeePercent : rules.data.withdrawFeePercent;
+  const activeMinWithdraw = rulesDraft !== null ? rulesDraft.minWithdraw : rules.data.minWithdraw;
+  const activeMaxWithdraw = rulesDraft !== null ? rulesDraft.maxWithdraw : rules.data.maxWithdraw;
+  const activePaymentMethodsStr = rulesDraft !== null ? rulesDraft.paymentMethodsStr : rules.data.paymentMethods.join(", ");
+  const activeSubmissionNotesText = rulesDraft !== null ? rulesDraft.submissionNotesText : rules.data.submissionNotes.join("\n");
+
   const [savingRules, setSavingRules] = useState(false);
 
   async function handleSaveRules() {
     setSavingRules(true);
     try {
-      await saveSettings("rules", activeRules);
+      const parsedPaymentMethods = activePaymentMethodsStr
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean);
+
+      const parsedSubmissionNotes = activeSubmissionNotesText
+        .split("\n")
+        .filter((line) => line !== undefined && line !== null);
+
+      const updatedRules = {
+        pricePerEmail: Number(activePricePerEmail) || 0,
+        withdrawFeePercent: Number(activeWithdrawFeePercent) || 0,
+        minWithdraw: Number(activeMinWithdraw) || 0,
+        maxWithdraw: Number(activeMaxWithdraw) || 0,
+        paymentMethods: parsedPaymentMethods,
+        submissionNotes: parsedSubmissionNotes,
+      };
+
+      await saveSettings("rules", updatedRules);
       toast.success("Aturan berhasil diperbarui dan langsung berlaku untuk semua pekerja.");
       setRulesDraft(null);
     } catch (err) {
@@ -689,10 +722,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Harga per Email (Rp)</Label>
-                    <Input
-                      type="number"
-                      value={activeRules.pricePerEmail}
-                      onChange={(e) => setRulesDraft({ ...activeRules, pricePerEmail: Number(e.target.value) })}
+                    <FormattedNumberInput
+                      value={activePricePerEmail}
+                      onChange={(val) =>
+                        setRulesDraft({
+                          pricePerEmail: val,
+                          withdrawFeePercent: activeWithdrawFeePercent,
+                          minWithdraw: activeMinWithdraw,
+                          maxWithdraw: activeMaxWithdraw,
+                          paymentMethodsStr: activePaymentMethodsStr,
+                          submissionNotesText: activeSubmissionNotesText,
+                        })
+                      }
                       className="mt-1.5"
                     />
                   </div>
@@ -700,26 +741,51 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <Label>Biaya Penarikan (%)</Label>
                     <Input
                       type="number"
-                      value={activeRules.withdrawFeePercent}
-                      onChange={(e) => setRulesDraft({ ...activeRules, withdrawFeePercent: Number(e.target.value) })}
+                      value={activeWithdrawFeePercent}
+                      onChange={(e) =>
+                        setRulesDraft({
+                          pricePerEmail: activePricePerEmail,
+                          withdrawFeePercent: Number(e.target.value),
+                          minWithdraw: activeMinWithdraw,
+                          maxWithdraw: activeMaxWithdraw,
+                          paymentMethodsStr: activePaymentMethodsStr,
+                          submissionNotesText: activeSubmissionNotesText,
+                        })
+                      }
                       className="mt-1.5"
                     />
                   </div>
                   <div>
                     <Label>Minimal Penarikan (Rp)</Label>
-                    <Input
-                      type="number"
-                      value={activeRules.minWithdraw}
-                      onChange={(e) => setRulesDraft({ ...activeRules, minWithdraw: Number(e.target.value) })}
+                    <FormattedNumberInput
+                      value={activeMinWithdraw}
+                      onChange={(val) =>
+                        setRulesDraft({
+                          pricePerEmail: activePricePerEmail,
+                          withdrawFeePercent: activeWithdrawFeePercent,
+                          minWithdraw: val,
+                          maxWithdraw: activeMaxWithdraw,
+                          paymentMethodsStr: activePaymentMethodsStr,
+                          submissionNotesText: activeSubmissionNotesText,
+                        })
+                      }
                       className="mt-1.5"
                     />
                   </div>
                   <div>
                     <Label>Maksimal Penarikan (Rp)</Label>
-                    <Input
-                      type="number"
-                      value={activeRules.maxWithdraw}
-                      onChange={(e) => setRulesDraft({ ...activeRules, maxWithdraw: Number(e.target.value) })}
+                    <FormattedNumberInput
+                      value={activeMaxWithdraw}
+                      onChange={(val) =>
+                        setRulesDraft({
+                          pricePerEmail: activePricePerEmail,
+                          withdrawFeePercent: activeWithdrawFeePercent,
+                          minWithdraw: activeMinWithdraw,
+                          maxWithdraw: val,
+                          paymentMethodsStr: activePaymentMethodsStr,
+                          submissionNotesText: activeSubmissionNotesText,
+                        })
+                      }
                       className="mt-1.5"
                     />
                   </div>
@@ -727,27 +793,36 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <div>
                   <Label>Metode Pembayaran (pisahkan dengan koma)</Label>
                   <Input
-                    value={activeRules.paymentMethods.join(", ")}
+                    value={activePaymentMethodsStr}
                     onChange={(e) =>
                       setRulesDraft({
-                        ...activeRules,
-                        paymentMethods: e.target.value.split(",").map((m) => m.trim()).filter(Boolean),
+                        pricePerEmail: activePricePerEmail,
+                        withdrawFeePercent: activeWithdrawFeePercent,
+                        minWithdraw: activeMinWithdraw,
+                        maxWithdraw: activeMaxWithdraw,
+                        paymentMethodsStr: e.target.value,
+                        submissionNotesText: activeSubmissionNotesText,
                       })
                     }
                     className="mt-1.5"
                   />
                 </div>
                 <div>
-                  <Label>Aturan Setor Email (satu aturan per baris)</Label>
+                  <Label>Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
                   <Textarea
-                    rows={4}
-                    value={activeRules.submissionNotes.join("\n")}
+                    rows={6}
+                    value={activeSubmissionNotesText}
                     onChange={(e) =>
                       setRulesDraft({
-                        ...activeRules,
-                        submissionNotes: e.target.value.split("\n").map((n) => n.trim()).filter(Boolean),
+                        pricePerEmail: activePricePerEmail,
+                        withdrawFeePercent: activeWithdrawFeePercent,
+                        minWithdraw: activeMinWithdraw,
+                        maxWithdraw: activeMaxWithdraw,
+                        paymentMethodsStr: activePaymentMethodsStr,
+                        submissionNotesText: e.target.value,
                       })
                     }
+                    placeholder="Tuliskan aturan setoran di sini..."
                     className="mt-1.5"
                   />
                 </div>
