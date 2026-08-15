@@ -41,6 +41,10 @@ function PortalGate() {
     return <LoginPage />;
   }
 
+  if (!firebaseUser) {
+    return <LoginPage />;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -62,10 +66,6 @@ function PortalGate() {
         }
       />
     );
-  }
-
-  if (!firebaseUser) {
-    return <LoginPage />;
   }
 
   if (!profile) {
