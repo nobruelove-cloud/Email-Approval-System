@@ -267,7 +267,10 @@ export async function updatePortalUser(uid: string, data: Partial<PortalUser>) {
 
 export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid">) {
   if (!db) throw new Error("Firebase is not configured.");
-  return setDoc(doc(db, "users", uid), { uid, ...data, createdAt: serverTimestamp() });
+  const cleanData = Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
+  return setDoc(doc(db, "users", uid), { uid, ...cleanData, createdAt: serverTimestamp() });
 }
 
 export async function createWorkerAccount(data: {
