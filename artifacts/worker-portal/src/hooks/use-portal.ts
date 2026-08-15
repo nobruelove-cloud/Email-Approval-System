@@ -29,18 +29,29 @@ export function usePortalAuth() {
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
 
+  // Keep a reference to the active profile snapshot unsubscribe function
+  const activeUnsubscribeProfile = useMemo(() => ({ current: null as (() => void) | null }), []);
+
   useEffect(() => {
     if (!auth || !db) {
       setLoading(false);
       return;
     }
     const firestore = db;
-    let unsubscribeProfile: (() => void) | null = null;
+    let profileTimer: ReturnType<typeof setTimeout> | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = null;
+      console.log("[PortalAuth] Auth state changed:", user ? `UID: ${user.uid} (${user.email})` : "Null user");
+
+      if (profileTimer) {
+        clearTimeout(profileTimer);
+        profileTimer = null;
+      }
+
+      if (activeUnsubscribeProfile.current) {
+        console.log("[PortalAuth] Cleaning up previous profile listener.");
+        activeUnsubscribeProfile.current();
+        activeUnsubscribeProfile.current = null;
       }
 
       setFirebaseUser(user);
@@ -54,50 +65,103 @@ export function usePortalAuth() {
       setLoading(true);
       setError("");
 
-      unsubscribeProfile = onSnapshot(
+      console.log(`[PortalAuth] Registering Firestore snapshot listener for users/${user.uid}`);
+
+      // Set a 10-second safety fallback timeout in case Firestore listener hangs
+      profileTimer = setTimeout(() => {
+        console.warn("[PortalAuth] Profile listener timeout reached (10s).");
+        setLoading((prevLoading) => {
+          if (prevLoading) {
+            setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
+            return false;
+          }
+          return prevLoading;
+        });
+      }, 10000);
+
+      const unsubscribe = onSnapshot(
         doc(firestore, "users", user.uid),
         (snapshot) => {
-          if (!auth?.currentUser) {
+          if (profileTimer) {
+            clearTimeout(profileTimer);
+            profileTimer = null;
+          }
+
+          console.log(
+            `[PortalAuth] Profile snapshot fired for users/${user.uid}: exists=${snapshot.exists()}`,
+          );
+
+          if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
+            console.warn("[PortalAuth] Snapshot fired but user is no longer active.");
             setProfile(null);
             setError("");
             setLoading(false);
             return;
           }
-          setProfile(snapshot.exists() ? ({ uid: user.uid, ...snapshot.data() } as PortalUser) : null);
-          setError("");
+
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            console.log("[PortalAuth] User profile retrieved successfully:", data);
+            setProfile({ uid: user.uid, ...data } as PortalUser);
+            setError("");
+          } else {
+            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore.`);
+            setProfile(null);
+            setError("Profil pengguna tidak ditemukan di database.");
+          }
           setLoading(false);
         },
         (reason) => {
-          if (!auth?.currentUser) {
+          if (profileTimer) {
+            clearTimeout(profileTimer);
+            profileTimer = null;
+          }
+
+          console.error("[PortalAuth] Profile snapshot error:", reason);
+          if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             setProfile(null);
             setError("");
             setLoading(false);
             return;
           }
-          setError(reason instanceof Error ? reason.message : "Tidak bisa memuat profil Anda.");
+
+          const msg = reason instanceof Error ? reason.message : "Tidak bisa memuat profil Anda.";
+          setError(msg);
           setLoading(false);
         },
       );
+
+      activeUnsubscribeProfile.current = unsubscribe;
     });
 
     return () => {
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = null;
+      if (profileTimer) clearTimeout(profileTimer);
+      if (activeUnsubscribeProfile.current) {
+        activeUnsubscribeProfile.current();
+        activeUnsubscribeProfile.current = null;
       }
       unsubscribeAuth();
     };
-  }, []);
+  }, [activeUnsubscribeProfile]);
 
   const logout = async () => {
+    console.log("[PortalAuth] Initiating logout...");
     setLoading(true);
     setError("");
+
+    // Unsubscribe Firestore profile listener BEFORE signing out to avoid permission errors
+    if (activeUnsubscribeProfile.current) {
+      console.log("[PortalAuth] Unsubscribing profile listener before signOut.");
+      activeUnsubscribeProfile.current();
+      activeUnsubscribeProfile.current = null;
+    }
+
     try {
       if (auth) {
         await signOut(auth);
       }
     } catch (err) {
-      console.error("SignOut error:", err);
+      console.error("[PortalAuth] SignOut error:", err);
     } finally {
       setFirebaseUser(null);
       setProfile(null);

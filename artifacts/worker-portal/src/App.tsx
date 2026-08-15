@@ -71,9 +71,9 @@ function PortalGate() {
   if (!profile) {
     return (
       <FullScreenMessage
-        icon={<Loader2 className="w-8 h-8 text-amber-600 animate-spin" />}
-        title="Menyiapkan Profil"
-        description="Profil Anda sedang dimuat. Jika ini berlangsung lama, coba keluar dan masuk kembali."
+        icon={<ShieldAlert className="w-8 h-8 text-amber-600" />}
+        title="Profil Tidak Ditemukan"
+        description="Data profil pengguna tidak ditemukan di database Firestore. Silakan hubungi admin atau keluar dan coba masuk kembali."
         action={
           <Button variant="outline" onClick={() => logout()}>
             Keluar
@@ -121,7 +121,22 @@ function PortalGate() {
     return <AdminDashboard profile={profile} onLogout={() => logout()} />;
   }
 
-  return <WorkerDashboard profile={profile} onLogout={() => logout()} />;
+  if (profile.role === "worker") {
+    return <WorkerDashboard profile={profile} onLogout={() => logout()} />;
+  }
+
+  return (
+    <FullScreenMessage
+      icon={<ShieldAlert className="w-8 h-8 text-red-600" />}
+      title="Peran Akun Tidak Valid"
+      description="Peran akun Anda tidak dikenal oleh sistem. Silakan hubungi administrator."
+      action={
+        <Button variant="outline" onClick={() => logout()}>
+          Keluar
+        </Button>
+      }
+    />
+  );
 }
 
 export default function App() {
