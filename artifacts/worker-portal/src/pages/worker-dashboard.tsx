@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { useWorkerData, useSettings, createSubmission, createWithdrawal } from "@/hooks/use-portal";
 import { DEFAULT_RULES, type PortalUser } from "@/lib/portal-types";
-import { formatDateTime, formatMoney, shortId } from "@/lib/portal-utils";
+import { formatDateTime, formatMoney, shortId, validatePasswordAgainstRules } from "@/lib/portal-utils";
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string; icon: React.JSX.Element }> = {
@@ -71,14 +72,21 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       toast.error("Masukkan minimal satu alamat email.");
       return;
     }
-    if (!password.trim()) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emailList.filter((email) => !emailPattern.test(email));
+    if (invalidEmails.length > 0) {
+      toast.error(`Format email tidak valid: ${invalidEmails.slice(0, 3).join(", ")}${invalidEmails.length > 3 ? ", ..." : ""}`);
+      return;
+    }
+
+    if (!password || password.trim().length === 0) {
       toast.error("Kata sandi akun wajib diisi.");
       return;
     }
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalid = emailList.filter((email) => !emailPattern.test(email));
-    if (invalid.length > 0) {
-      toast.error(`Format email tidak valid: ${invalid.slice(0, 3).join(", ")}${invalid.length > 3 ? ", ..." : ""}`);
+
+    const passwordError = validatePasswordAgainstRules(password, rules.data.submissionNotes);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
@@ -104,14 +112,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   }
 
   // --- Withdraw ---
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState(rules.data.paymentMethods[0] ?? "DANA");
   const [account, setAccount] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
   async function handleWithdraw(e: React.FormEvent) {
     e.preventDefault();
-    const value = Number(amount);
+    const value = amount;
     if (!value || value <= 0) {
       toast.error("Masukkan jumlah penarikan yang valid.");
       return;
@@ -137,7 +145,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     try {
       await createWithdrawal({ workerId: profile.uid, amount: value, method, account: account.trim() });
       toast.success("Permintaan penarikan berhasil dikirim!");
-      setAmount("");
+      setAmount(0);
       setAccount("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim permintaan penarikan.");
@@ -191,9 +199,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <ShieldAlert className="w-4 h-4" />
                   Aturan Setor Email
                 </div>
-                <ul className="space-y-1 text-xs text-amber-800 list-disc list-inside">
+                <ul className="space-y-1 text-xs text-amber-800 list-disc list-inside whitespace-pre-wrap">
                   {rules.data.submissionNotes.map((note, idx) => (
-                    <li key={idx}>{note}</li>
+                    <li key={idx} className="whitespace-pre-wrap">{note}</li>
                   ))}
                   <li>Harga per email disetujui: {formatMoney(rules.data.pricePerEmail)}</li>
                 </ul>
@@ -226,6 +234,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <Label htmlFor="password">Kata Sandi Akun</Label>
                     <Input
                       id="password"
+                      type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Kata sandi untuk seluruh email di atas"
@@ -287,13 +296,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <form onSubmit={handleWithdraw} className="space-y-4">
                   <div>
                     <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
-                    <Input
+                    <FormattedNumberInput
                       id="amount"
-                      type="number"
-                      min={0}
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Contoh: 100000"
+                      onChange={(val) => setAmount(val)}
+                      placeholder="Contoh: 100.000"
                       className="mt-1.5"
                       required
                     />
