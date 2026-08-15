@@ -14,17 +14,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { auth, firebaseConfigured } from "@/lib/firebase";
 import { createPortalUser } from "@/hooks/use-portal";
 
-function friendlyAuthError(code: string) {
+function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
     "auth/invalid-email": "Format email tidak valid.",
     "auth/user-disabled": "Akun ini telah dinonaktifkan.",
-    "auth/user-not-found": "Email atau kata sandi salah.",
+    "auth/user-not-found": context === "reset" ? "Email tidak terdaftar." : "Email atau kata sandi salah.",
     "auth/wrong-password": "Email atau kata sandi salah.",
     "auth/invalid-credential": "Email atau kata sandi salah.",
     "auth/email-already-in-use": "Email ini sudah terdaftar. Silakan masuk.",
     "auth/weak-password": "Kata sandi minimal 6 karakter.",
     "auth/too-many-requests": "Terlalu banyak percobaan. Coba lagi beberapa saat lagi.",
     "auth/network-request-failed": "Gagal terhubung ke server. Periksa koneksi internet Anda.",
+    "auth/unauthorized-domain": "Domain ini belum diizinkan di Firebase Console (Authentication > Settings > Authorized domains).",
+    "auth/operation-not-allowed": "Metode atau fitur autentikasi ini belum diaktifkan di Firebase Console.",
+    "auth/missing-email": "Alamat email wajib diisi.",
   };
   return map[code] ?? "Terjadi kesalahan. Silakan coba lagi.";
 }
@@ -32,6 +35,7 @@ function friendlyAuthError(code: string) {
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -49,11 +53,13 @@ export default function LoginPage() {
     if (!auth) return;
     setBusy(true);
     try {
+      console.log(`[Auth] Attempting login for email: ${loginEmail.trim()}`);
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      console.log(`[Auth] Firebase Auth login successful for: ${loginEmail.trim()}`);
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("[Auth] Login error:", err);
       const code = (err as { code?: string }).code ?? "";
-      const baseMessage = friendlyAuthError(code);
+      const baseMessage = friendlyAuthError(code, "login");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {
       setBusy(false);
@@ -77,7 +83,9 @@ export default function LoginPage() {
     }
     setBusy(true);
     try {
+      console.log(`[Auth] Registering user: ${regEmail.trim()}`);
       const credential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
+      console.log(`[Auth] Firebase Auth account created. UID: ${credential.user.uid}. Creating Firestore profile...`);
       await createPortalUser(credential.user.uid, {
         name: name.trim(),
         email: regEmail.trim(),
@@ -87,11 +95,12 @@ export default function LoginPage() {
         tier: 1,
         balance: 0,
       });
+      console.log(`[Auth] Firestore profile created for UID: ${credential.user.uid}`);
       toast.success("Pendaftaran berhasil! Menunggu persetujuan admin.");
     } catch (err) {
-      console.error("Register error:", err);
+      console.error("[Auth] Register error:", err);
       const code = (err as { code?: string }).code ?? "";
-      const baseMessage = friendlyAuthError(code);
+      const baseMessage = friendlyAuthError(code, "register");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {
       setBusy(false);
@@ -99,19 +108,29 @@ export default function LoginPage() {
   }
 
   async function handleForgotPassword() {
-    if (!auth) return;
-    if (!loginEmail.trim()) {
+    if (!auth) {
+      toast.error("Firebase belum dikonfigurasi.");
+      return;
+    }
+    const email = loginEmail.trim();
+    if (!email) {
       toast.error("Masukkan email Anda terlebih dahulu, lalu klik lupa kata sandi.");
       return;
     }
+
+    setResetBusy(true);
+    console.log(`[ForgotPassword] Sending reset email request for: ${email}`);
     try {
-      await sendPasswordResetEmail(auth, loginEmail.trim());
-      toast.success("Tautan reset kata sandi telah dikirim ke email Anda.");
+      await sendPasswordResetEmail(auth, email);
+      console.log(`[ForgotPassword] Password reset email successfully sent for: ${email}`);
+      toast.success("Tautan reset kata sandi telah dikirim ke email Anda. Periksa kotak masuk / folder Spam.");
     } catch (err) {
-      console.error("Forgot password error:", err);
+      console.error("[ForgotPassword] Error sending password reset email:", err);
       const code = (err as { code?: string }).code ?? "";
-      const baseMessage = friendlyAuthError(code);
+      const baseMessage = friendlyAuthError(code, "reset");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -186,10 +205,11 @@ export default function LoginPage() {
                   </div>
                   <button
                     type="button"
+                    disabled={resetBusy || busy || !firebaseConfigured}
                     onClick={handleForgotPassword}
-                    className="text-xs text-amber-700 hover:underline"
+                    className="text-xs text-amber-700 hover:underline disabled:opacity-50"
                   >
-                    Lupa kata sandi?
+                    {resetBusy ? "Mengirim tautan reset..." : "Lupa kata sandi?"}
                   </button>
                   <Button type="submit" disabled={busy || !firebaseConfigured} className="w-full bg-amber-600 hover:bg-amber-700">
                     {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
