@@ -1,7 +1,7 @@
 export type Role = "admin" | "worker";
 export type UserStatus = "pending" | "approved" | "rejected" | "inactive";
 export type UserTier = 1 | 2 | 3;
-export type SubmissionStatus = "pending" | "approved" | "rejected";
+export type SubmissionStatus = "pending" | "approved" | "available" | "sold" | "rejected";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "rejected";
 
 export type PortalUser = {
@@ -25,6 +25,8 @@ export type EmailSubmission = {
   submittedAt?: unknown;
   reviewedAt?: unknown;
   reviewNote?: string;
+  soldAt?: unknown;
+  updatedAt?: unknown;
 };
 
 export type Withdrawal = {
@@ -33,6 +35,7 @@ export type Withdrawal = {
   amount: number;
   method: string;
   account: string;
+  accountName?: string;
   status: WithdrawalStatus;
   requestedAt?: unknown;
   processedAt?: unknown;
