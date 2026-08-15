@@ -51,6 +51,7 @@ import {
   useAdminData,
   useSettings,
   reviewSubmission,
+  updateEmailStockStatus,
   reviewWithdrawal,
   updatePortalUser,
   deletePortalUser,
@@ -86,6 +87,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Filter states
+  const [submissionSearch, setSubmissionSearch] = useState("");
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState("all");
+
   const workerMap = useMemo(() => {
     const map = new Map<string, PortalUser>();
     users.data.forEach((u) => map.set(u.uid, u));
@@ -95,28 +100,82 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const workerName = (id: string) => workerMap.get(id)?.name ?? shortId(id);
 
   const stats = useMemo(() => {
+    const totalWorkers = users.data.filter((u) => u.role === "worker").length;
+    const pendingWorkers = users.data.filter((u) => u.role === "worker" && u.status === "pending").length;
     const activeWorkers = users.data.filter((u) => u.role === "worker" && u.status === "approved").length;
     const totalBalance = users.data.reduce((sum, u) => sum + (u.balance ?? 0), 0);
+    const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
+    const availableStock = submissions.data.filter((s) => s.status === "available" || s.status === "approved").length;
+    const soldStock = submissions.data.filter((s) => s.status === "sold").length;
     const pendingWithdrawals = withdrawals.data.filter((w) => w.status === "pending" || w.status === "processing").length;
-    const approvedEmails = submissions.data.filter((s) => s.status === "approved").length;
+    const pendingWithdrawalAmount = withdrawals.data
+      .filter((w) => w.status === "pending" || w.status === "processing")
+      .reduce((sum, w) => sum + w.amount, 0);
     const totalPaidOut = withdrawals.data
       .filter((w) => w.status === "success")
       .reduce((sum, w) => sum + w.amount, 0);
-    return { activeWorkers, totalBalance, pendingSubmissions, pendingWithdrawals, approvedEmails, totalPaidOut };
+    return {
+      totalWorkers,
+      pendingWorkers,
+      activeWorkers,
+      totalBalance,
+      totalSubmissions,
+      pendingSubmissions,
+      availableStock,
+      soldStock,
+      pendingWithdrawals,
+      pendingWithdrawalAmount,
+      totalPaidOut,
+    };
   }, [users.data, submissions.data, withdrawals.data]);
 
   async function handleSubmissionDecision(id: string, decision: "approved" | "rejected") {
     setBusyId(id);
     try {
       await reviewSubmission(id, decision, notes[id] ?? "", rules.data.pricePerEmail);
-      toast.success(decision === "approved" ? "Setoran disetujui, saldo pekerja bertambah." : "Setoran ditolak.");
+      toast.success(decision === "approved" ? "Setoran disetujui, masuk stok 'Tersedia' dan saldo pekerja bertambah." : "Setoran ditolak.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses setoran.");
     } finally {
       setBusyId(null);
     }
   }
+
+  async function handleStockStatusChange(id: string, status: "available" | "sold" | "rejected") {
+    setBusyId(id);
+    try {
+      await updateEmailStockStatus(id, status, notes[id] ?? undefined);
+      toast.success(`Status stok email berhasil diubah menjadi '${status}'.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengubah status stok.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const filteredSubmissions = useMemo(() => {
+    return submissions.data.filter((item) => {
+      const wName = workerName(item.workerId).toLowerCase();
+      const search = submissionSearch.toLowerCase().trim();
+      const matchesSearch =
+        !search ||
+        item.email.toLowerCase().includes(search) ||
+        item.workerId.toLowerCase().includes(search) ||
+        wName.includes(search);
+
+      let matchesStatus = true;
+      if (submissionStatusFilter !== "all") {
+        if (submissionStatusFilter === "available") {
+          matchesStatus = item.status === "available" || item.status === "approved";
+        } else {
+          matchesStatus = item.status === submissionStatusFilter;
+        }
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [submissions.data, submissionSearch, submissionStatusFilter, workerName]);
 
   async function handleWithdrawalDecision(id: string, status: "processing" | "success" | "rejected") {
     setBusyId(id);
@@ -238,53 +297,78 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           <TabsList className="grid grid-cols-5 w-full mb-6">
             <TabsTrigger value="overview">Ringkasan</TabsTrigger>
             <TabsTrigger value="submissions" className="gap-1">
-              <FileText className="w-3.5 h-3.5" />
+              <FileText className="w-3.5 h-3.5" /> Email & Stok
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="withdrawals" className="gap-1">
-              <Wallet className="w-3.5 h-3.5" />
+              <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="workers">
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
             <TabsTrigger value="rules">
-              <SettingsIcon className="w-3.5 h-3.5" />
+              <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
 
           {/* RINGKASAN */}
           <TabsContent value="overview">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: "Pekerja Aktif", value: stats.activeWorkers },
+                { label: "Total Pekerja", value: stats.totalWorkers },
+                { label: "Pekerja Menunggu", value: stats.pendingWorkers },
+                { label: "Pekerja Disetujui", value: stats.activeWorkers },
                 { label: "Total Saldo Beredar", value: formatMoney(stats.totalBalance) },
+                { label: "Total Setoran Email", value: stats.totalSubmissions },
                 { label: "Setoran Menunggu", value: stats.pendingSubmissions },
-                { label: "Penarikan Menunggu", value: stats.pendingWithdrawals },
-                { label: "Email Disetujui", value: stats.approvedEmails },
-                { label: "Total Sudah Dicairkan", value: formatMoney(stats.totalPaidOut) },
+                { label: "Stok Email Tersedia", value: stats.availableStock },
+                { label: "Stok Email Terjual", value: stats.soldStock },
+                { label: "Penarikan Menunggu", value: `${stats.pendingWithdrawals} (${formatMoney(stats.pendingWithdrawalAmount)})` },
+                { label: "Total Dicairkan", value: formatMoney(stats.totalPaidOut) },
               ].map((s) => (
                 <Card key={s.label}>
                   <CardContent className="pt-6">
                     <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-xl font-bold text-gray-900 mt-1">{s.value}</p>
+                    <p className="text-lg font-bold text-gray-900 mt-1">{s.value}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </TabsContent>
 
-          {/* KELOLA SETORAN */}
-          <TabsContent value="submissions" className="space-y-3">
+          {/* KELOLA SETORAN & STOK EMAIL */}
+          <TabsContent value="submissions" className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                placeholder="Cari email, ID pekerja, atau nama..."
+                value={submissionSearch}
+                onChange={(e) => setSubmissionSearch(e.target.value)}
+                className="text-xs h-9 flex-1"
+              />
+              <Select value={submissionStatusFilter} onValueChange={setSubmissionStatusFilter}>
+                <SelectTrigger className="h-9 w-full sm:w-44 text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="pending">Menunggu (Pending)</SelectItem>
+                  <SelectItem value="available">Stok Tersedia</SelectItem>
+                  <SelectItem value="sold">Stok Terjual</SelectItem>
+                  <SelectItem value="rejected">Ditolak</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {submissions.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
-            {!submissions.loading && submissions.data.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Belum ada setoran.</p>
+            {!submissions.loading && filteredSubmissions.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">Tidak ada data setoran / stok email.</p>
             )}
-            {submissions.data.map((item) => (
+            {filteredSubmissions.map((item) => (
               <Card key={item.id}>
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -296,6 +380,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
                     <StatusBadge status={item.status} />
                   </div>
+
                   {item.status === "pending" && (
                     <div className="flex gap-2 mt-3">
                       <Input
@@ -308,23 +393,63 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         disabled={busyId === item.id}
                         onClick={() => handleSubmissionDecision(item.id, "approved")}
-                        className="bg-green-600 hover:bg-green-700 gap-1 shrink-0"
+                        className="bg-green-600 hover:bg-green-700 gap-1 shrink-0 text-xs"
                       >
                         {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                        Setujui
+                        Setujui & Tambah Stok
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
                         disabled={busyId === item.id}
                         onClick={() => handleSubmissionDecision(item.id, "rejected")}
-                        className="gap-1 shrink-0"
+                        className="gap-1 shrink-0 text-xs"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         Tolak
                       </Button>
                     </div>
                   )}
+
+                  {item.status !== "pending" && (
+                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100">
+                      <span className="text-xs text-gray-500">Ubah Status Stok:</span>
+                      {(item.status === "available" || item.status === "approved") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === item.id}
+                          onClick={() => handleStockStatusChange(item.id, "sold")}
+                          className="h-7 text-xs bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
+                        >
+                          Tandai Terjual (Sold)
+                        </Button>
+                      )}
+                      {item.status === "sold" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === item.id}
+                          onClick={() => handleStockStatusChange(item.id, "available")}
+                          className="h-7 text-xs bg-green-50 border-green-200 text-green-800 hover:bg-green-100"
+                        >
+                          Kembalikan ke Stok Tersedia
+                        </Button>
+                      )}
+                      {item.status !== "rejected" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyId === item.id}
+                          onClick={() => handleStockStatusChange(item.id, "rejected")}
+                          className="h-7 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          Nonaktifkan / Tolak
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {item.reviewNote && <p className="text-xs text-gray-500 mt-2 italic">Catatan: {item.reviewNote}</p>}
                 </CardContent>
               </Card>
