@@ -464,7 +464,12 @@ export async function deletePortalUser(uid: string) {
 
 export async function saveSettings(name: string, data: Record<string, unknown>) {
   if (!db) throw new Error("Firebase is not configured.");
-  return setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  try {
+    return await setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  } catch (err) {
+    console.error(`[saveSettings] Failed to save settings/${name}:`, err);
+    throw err;
+  }
 }
 
 export function useSettings<T>(name: string, initial: T) {

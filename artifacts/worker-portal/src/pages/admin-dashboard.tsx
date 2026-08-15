@@ -272,6 +272,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       toast.success("Aturan berhasil diperbarui dan langsung berlaku untuk semua pekerja.");
       setRulesDraft(null);
     } catch (err) {
+      console.error("[AdminDashboard] Error saving rules:", err);
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan aturan.");
     } finally {
       setSavingRules(false);
