@@ -273,19 +273,21 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
 }
 
 /**
- * Approving a submission credits the worker's balance by `pricePerEmail`
- * (from the dynamic settings/rules doc) in a single atomic transaction, so a
- * submission can never be approved twice or credited without actually being
- * approved.
+ * Approving a submission sets status to "available" (stock) and credits the worker's balance
+ * by `pricePerEmail` (from dynamic rules) in a single atomic transaction.
+ * Rejecting sets status to "rejected" without crediting balance.
+ * Prevents double crediting if status is not "pending".
  */
 export async function reviewSubmission(
   submissionId: string,
-  decision: "approved" | "rejected",
+  decision: "approved" | "rejected" | "available",
   reviewNote: string,
   pricePerEmail: number,
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
+  const newStatus: SubmissionStatus = decision === "approved" ? "available" : decision;
+
   await runTransaction(firestore, async (tx) => {
     const submissionRef = doc(firestore, "emailSubmissions", submissionId);
     const submissionSnap = await tx.get(submissionRef);
@@ -296,12 +298,13 @@ export async function reviewSubmission(
     }
 
     tx.update(submissionRef, {
-      status: decision,
+      status: newStatus,
       reviewNote,
       reviewedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
 
-    if (decision === "approved") {
+    if (newStatus === "available" || decision === "approved") {
       const userRef = doc(firestore, "users", submission.workerId);
       const userSnap = await tx.get(userRef);
       if (userSnap.exists()) {
@@ -309,6 +312,45 @@ export async function reviewSubmission(
         tx.update(userRef, { balance: current + pricePerEmail });
       }
     }
+  });
+}
+
+/**
+ * Update stock status (e.g. mark "available" email stock as "sold" or "rejected",
+ * or restore "sold" back to "available").
+ * DOES NOT re-credit worker balance (balance credit occurs ONLY on initial submission approval).
+ */
+export async function updateEmailStockStatus(
+  submissionId: string,
+  newStatus: "available" | "sold" | "rejected",
+  note?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+  await runTransaction(firestore, async (tx) => {
+    const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+    const submissionSnap = await tx.get(submissionRef);
+    if (!submissionSnap.exists()) throw new Error("Email tidak ditemukan.");
+    const submission = submissionSnap.data() as EmailSubmission;
+
+    if (submission.status === "pending") {
+      throw new Error("Setoran masih berstatus pending. Harap tinjau setoran terlebih dahulu.");
+    }
+
+    const updates: Record<string, unknown> = {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (note !== undefined) {
+      updates.reviewNote = note;
+    }
+
+    if (newStatus === "sold") {
+      updates.soldAt = serverTimestamp();
+    }
+
+    tx.update(submissionRef, updates);
   });
 }
 
