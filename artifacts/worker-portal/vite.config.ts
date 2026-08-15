@@ -40,6 +40,26 @@ export default defineConfig(async ({ mode }) => {
   });
   console.log('==================================================');
 
+  // Helper to filter out dummy/placeholder values and select the actual configuration
+  const getRealEnvValue = (...vals: (string | undefined)[]): string => {
+    for (const val of vals) {
+      if (val !== undefined) {
+        const trimmed = String(val).trim();
+        const lower = trimmed.toLowerCase();
+        const isPlaceholder =
+          lower.startsWith('nilai') ||
+          lower.includes('placeholder') ||
+          lower.includes('your-') ||
+          lower.includes('your_') ||
+          trimmed === '';
+        if (!isPlaceholder) {
+          return trimmed;
+        }
+      }
+    }
+    return '';
+  };
+
   // Safe fallbacks for PORT and BASE_PATH to prevent failures on non-interactive / Vercel build systems
   const rawPort = mergedEnv.PORT || '3000';
   const port = Number(rawPort);
@@ -53,30 +73,22 @@ export default defineConfig(async ({ mode }) => {
     base: basePath,
     define: {
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_API_KEY || mergedEnv.FIREBASE_API_KEY || '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_API_KEY, mergedEnv.FIREBASE_API_KEY)
       ),
       'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_AUTH_DOMAIN ||
-          mergedEnv.FIREBASE_AUTH_DOMAIN ||
-          '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_AUTH_DOMAIN, mergedEnv.FIREBASE_AUTH_DOMAIN)
       ),
       'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_PROJECT_ID ||
-          mergedEnv.FIREBASE_PROJECT_ID ||
-          '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_PROJECT_ID, mergedEnv.FIREBASE_PROJECT_ID)
       ),
       'import.meta.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_STORAGE_BUCKET ||
-          mergedEnv.FIREBASE_STORAGE_BUCKET ||
-          '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_STORAGE_BUCKET, mergedEnv.FIREBASE_STORAGE_BUCKET)
       ),
       'import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_MESSAGING_SENDER_ID ||
-          mergedEnv.FIREBASE_MESSAGING_SENDER_ID ||
-          '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_MESSAGING_SENDER_ID, mergedEnv.FIREBASE_MESSAGING_SENDER_ID)
       ),
       'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
-        mergedEnv.VITE_FIREBASE_APP_ID || mergedEnv.FIREBASE_APP_ID || '',
+        getRealEnvValue(mergedEnv.VITE_FIREBASE_APP_ID, mergedEnv.FIREBASE_APP_ID)
       ),
     },
     envPrefix: ['VITE_', 'FIREBASE_'],
