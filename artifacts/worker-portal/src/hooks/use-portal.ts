@@ -35,29 +35,76 @@ export function usePortalAuth() {
       return;
     }
     const firestore = db;
+    let unsubscribeProfile: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       setFirebaseUser(user);
       if (!user) {
         setProfile(null);
+        setError("");
         setLoading(false);
         return;
       }
+
       setLoading(true);
-      const unsubscribeProfile = onSnapshot(
+      setError("");
+
+      unsubscribeProfile = onSnapshot(
         doc(firestore, "users", user.uid),
         (snapshot) => {
+          if (!auth?.currentUser) {
+            setProfile(null);
+            setError("");
+            setLoading(false);
+            return;
+          }
           setProfile(snapshot.exists() ? ({ uid: user.uid, ...snapshot.data() } as PortalUser) : null);
+          setError("");
           setLoading(false);
         },
         (reason) => {
+          if (!auth?.currentUser) {
+            setProfile(null);
+            setError("");
+            setLoading(false);
+            return;
+          }
           setError(reason instanceof Error ? reason.message : "Tidak bisa memuat profil Anda.");
           setLoading(false);
         },
       );
-      return () => unsubscribeProfile();
     });
-    return () => unsubscribeAuth();
+
+    return () => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+      unsubscribeAuth();
+    };
   }, []);
+
+  const logout = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } catch (err) {
+      console.error("SignOut error:", err);
+    } finally {
+      setFirebaseUser(null);
+      setProfile(null);
+      setError("");
+      setLoading(false);
+    }
+  };
 
   return {
     firebaseUser,
@@ -65,7 +112,7 @@ export function usePortalAuth() {
     loading,
     error,
     configured: firebaseConfigured,
-    logout: () => (auth ? signOut(auth) : Promise.resolve()),
+    logout,
   };
 }
 
@@ -85,12 +132,14 @@ export function useCollection<T>(
       setLoading(false);
       return;
     }
+    let isMounted = true;
     setLoading(true);
     const base = collection(db, collectionName);
     const q = constraints.length ? query(base, ...constraints) : query(base);
-    return onSnapshot(
+    const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        if (!isMounted) return;
         let rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T);
         if (sortBy) {
           const dir = sortBy.direction === "asc" ? 1 : -1;
@@ -106,10 +155,15 @@ export function useCollection<T>(
         setLoading(false);
       },
       (reason) => {
+        if (!isMounted) return;
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca data ini.");
         setLoading(false);
       },
     );
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionName, enabled, constraintsKey]);
 
@@ -315,17 +369,24 @@ export function useSettings<T>(name: string, initial: T) {
       setLoading(false);
       return;
     }
-    return onSnapshot(
+    let isMounted = true;
+    const unsubscribe = onSnapshot(
       doc(db, "settings", name),
       (snapshot) => {
+        if (!isMounted) return;
         if (snapshot.exists()) setData({ ...initial, ...(snapshot.data() as T) });
         setLoading(false);
       },
       (reason) => {
+        if (!isMounted) return;
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca pengaturan.");
         setLoading(false);
       },
     );
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
   return { data, setData, loading, error };
