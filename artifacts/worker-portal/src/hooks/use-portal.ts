@@ -464,10 +464,23 @@ export async function deletePortalUser(uid: string) {
 
 export async function saveSettings(name: string, data: Record<string, unknown>) {
   if (!db) throw new Error("Firebase is not configured.");
+  if (!auth?.currentUser) {
+    console.error("[saveSettings] Cannot save settings: auth.currentUser is null.");
+    throw new Error("Sesi pengguna tidak ditemukan. Silakan masuk kembali.");
+  }
+
+  const currentUid = auth.currentUser.uid;
+  const projectId = db.app.options.projectId;
+  console.log(`[saveSettings] Executing setDoc(doc(db, 'settings', '${name}')) for UID: ${currentUid} in project: ${projectId}`);
+
   try {
-    return await setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    const res = await setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    console.log(`[saveSettings] Successfully saved settings/${name}`);
+    return res;
   } catch (err) {
-    console.error(`[saveSettings] Failed to save settings/${name}:`, err);
+    const errorCode = (err as { code?: string })?.code || "unknown";
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[saveSettings] Failed to save settings/${name}: Code=${errorCode}, Message=${errorMsg}`, err);
     throw err;
   }
 }
