@@ -475,13 +475,8 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
     console.warn("[saveSettings] Token refresh warning before setDoc:", tokenErr);
   }
 
-  const currentUid = auth.currentUser.uid;
-  const projectId = db.app.options.projectId;
-  console.log(`[saveSettings] Executing setDoc(doc(db, 'settings', '${name}')) for UID: ${currentUid} in project: ${projectId}`);
-
   try {
     const res = await setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
-    console.log(`[saveSettings] Successfully saved settings/${name}`);
     return res;
   } catch (err) {
     const errorCode = (err as { code?: string })?.code || "unknown";
