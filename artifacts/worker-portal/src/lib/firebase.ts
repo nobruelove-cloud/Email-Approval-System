@@ -28,7 +28,8 @@ export let auth: Auth | undefined;
 export let db: Firestore | undefined;
 
 if (firebaseConfigured) {
-  app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  const defaultApp = getApps().find((a) => a.name === "[DEFAULT]");
+  app = defaultApp ?? initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
 }
