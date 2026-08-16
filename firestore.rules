@@ -25,7 +25,7 @@ service cloud.firestore {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role is string &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() == 'admin';
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // ---- users/{uid} ----
