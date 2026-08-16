@@ -275,8 +275,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const activeWithdrawFeePercent = rulesDraft !== null ? rulesDraft.withdrawFeePercent : rules.data.withdrawFeePercent;
   const activeMinWithdraw = rulesDraft !== null ? rulesDraft.minWithdraw : rules.data.minWithdraw;
   const activeMaxWithdraw = rulesDraft !== null ? rulesDraft.maxWithdraw : rules.data.maxWithdraw;
-  const activePaymentMethodsStr = rulesDraft !== null ? rulesDraft.paymentMethodsStr : rules.data.paymentMethods.join(", ");
-  const activeSubmissionNotesText = rulesDraft !== null ? rulesDraft.submissionNotesText : rules.data.submissionNotes.join("\n");
+  const activePaymentMethodsStr =
+    rulesDraft !== null
+      ? rulesDraft.paymentMethodsStr
+      : Array.isArray(rules.data.paymentMethods)
+        ? rules.data.paymentMethods.join(", ")
+        : String(rules.data.paymentMethods ?? "");
+  const activeSubmissionNotesText =
+    rulesDraft !== null
+      ? rulesDraft.submissionNotesText
+      : Array.isArray(rules.data.submissionNotes)
+        ? rules.data.submissionNotes.join("\n")
+        : String(rules.data.submissionNotes ?? "");
 
   const [savingRules, setSavingRules] = useState(false);
 
