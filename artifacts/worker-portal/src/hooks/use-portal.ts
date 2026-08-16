@@ -469,6 +469,12 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
     throw new Error("Sesi pengguna tidak ditemukan. Silakan masuk kembali.");
   }
 
+  try {
+    await auth.currentUser.getIdToken(true);
+  } catch (tokenErr) {
+    console.warn("[saveSettings] Token refresh warning before setDoc:", tokenErr);
+  }
+
   const currentUid = auth.currentUser.uid;
   const projectId = db.app.options.projectId;
   console.log(`[saveSettings] Executing setDoc(doc(db, 'settings', '${name}')) for UID: ${currentUid} in project: ${projectId}`);
