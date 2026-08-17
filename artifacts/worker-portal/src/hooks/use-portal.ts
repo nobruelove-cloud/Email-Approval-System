@@ -24,6 +24,7 @@ import type {
 } from "@/lib/portal-types";
 
 export function usePortalAuth() {
+  console.log("[DIAGNOSTIC LOGGING] initializing usePortalAuth hook...");
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
   const [loading, setLoading] = useState(firebaseConfigured);
