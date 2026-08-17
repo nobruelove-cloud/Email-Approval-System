@@ -463,26 +463,191 @@ export async function deletePortalUser(uid: string) {
   return deleteDoc(doc(db, "users", uid));
 }
 
+export interface DiagnosticInfo {
+  currentUserExists: boolean;
+  uid: string | null;
+  email: string | null;
+  projectId: string | null;
+  appId: string | null;
+  authDomain: string | null;
+  databaseId: string | null;
+  documentPath: string;
+  tokenRefreshSuccess: boolean | null;
+  expirationTime: string | null;
+  authTime: string | null;
+  claims: Record<string, unknown> | null;
+  setDocReached: boolean;
+  errorCode: string | null;
+  errorName: string | null;
+  errorMessage: string | null;
+  lastUpdated: string | null;
+}
+
+function getDatabaseId(): string {
+  if (!db) return "N/A";
+  const firestoreObj = db as unknown as Record<string, unknown>;
+  if (firestoreObj._databaseId && typeof firestoreObj._databaseId === "object") {
+    const dbIdObj = firestoreObj._databaseId as Record<string, unknown>;
+    if (typeof dbIdObj.database === "string") return dbIdObj.database;
+  }
+  if (typeof firestoreObj.databaseId === "string") return firestoreObj.databaseId;
+  return "(default)";
+}
+
+export function createInitialDiagnosticInfo(): DiagnosticInfo {
+  const user = auth?.currentUser;
+  return {
+    currentUserExists: !!user,
+    uid: user?.uid || null,
+    email: user?.email || null,
+    projectId: db?.app?.options?.projectId || null,
+    appId: db?.app?.options?.appId || null,
+    authDomain: db?.app?.options?.authDomain || null,
+    databaseId: getDatabaseId(),
+    documentPath: "settings/rules",
+    tokenRefreshSuccess: null,
+    expirationTime: null,
+    authTime: null,
+    claims: null,
+    setDocReached: false,
+    errorCode: null,
+    errorName: null,
+    errorMessage: null,
+    lastUpdated: new Date().toISOString(),
+  };
+}
+
+let currentDiagnosticInfo: DiagnosticInfo = createInitialDiagnosticInfo();
+const diagnosticListeners = new Set<() => void>();
+
+export function updateDiagnosticInfo(updates: Partial<DiagnosticInfo>) {
+  currentDiagnosticInfo = {
+    ...currentDiagnosticInfo,
+    ...updates,
+    lastUpdated: new Date().toISOString(),
+  };
+  diagnosticListeners.forEach((listener) => listener());
+}
+
+export function useDiagnosticInfo(): DiagnosticInfo {
+  const [info, setInfo] = useState<DiagnosticInfo>(() => {
+    const user = auth?.currentUser;
+    return {
+      ...currentDiagnosticInfo,
+      currentUserExists: !!user,
+      uid: user?.uid || currentDiagnosticInfo.uid,
+      email: user?.email || currentDiagnosticInfo.email,
+      projectId: db?.app?.options?.projectId || currentDiagnosticInfo.projectId,
+      appId: db?.app?.options?.appId || currentDiagnosticInfo.appId,
+      authDomain: db?.app?.options?.authDomain || currentDiagnosticInfo.authDomain,
+      databaseId: getDatabaseId(),
+    };
+  });
+
+  useEffect(() => {
+    const listener = () => setInfo({ ...currentDiagnosticInfo });
+    diagnosticListeners.add(listener);
+    return () => {
+      diagnosticListeners.delete(listener);
+    };
+  }, []);
+
+  return info;
+}
+
 export async function saveSettings(name: string, data: Record<string, unknown>) {
-  if (!db) throw new Error("Firebase is not configured.");
-  if (!auth?.currentUser) {
-    console.error("[saveSettings] Cannot save settings: auth.currentUser is null.");
-    throw new Error("Sesi pengguna tidak ditemukan. Silakan masuk kembali.");
+  const docPath = `settings/${name}`;
+  const currentUser = auth?.currentUser;
+
+  const baseDiagnostic: Partial<DiagnosticInfo> = {
+    currentUserExists: !!currentUser,
+    uid: currentUser?.uid || null,
+    email: currentUser?.email || null,
+    projectId: db?.app?.options?.projectId || null,
+    appId: db?.app?.options?.appId || null,
+    authDomain: db?.app?.options?.authDomain || null,
+    databaseId: getDatabaseId(),
+    documentPath: docPath,
+  };
+
+  updateDiagnosticInfo({
+    ...baseDiagnostic,
+    errorCode: null,
+    errorName: null,
+    errorMessage: null,
+  });
+
+  if (!db) {
+    const errorMsg = "Firebase is not configured.";
+    updateDiagnosticInfo({
+      errorCode: "app/not-configured",
+      errorName: "Error",
+      errorMessage: errorMsg,
+    });
+    throw new Error(errorMsg);
   }
 
+  if (!currentUser) {
+    const errorMsg = "Sesi pengguna tidak ditemukan. Silakan masuk kembali.";
+    console.error("[saveSettings] Cannot save settings: auth.currentUser is null.");
+    updateDiagnosticInfo({
+      errorCode: "auth/no-current-user",
+      errorName: "Error",
+      errorMessage: errorMsg,
+    });
+    throw new Error(errorMsg);
+  }
+
+  let tokenRefreshSuccess = false;
+  let expirationTime: string | null = null;
+  let authTime: string | null = null;
+  let claims: Record<string, unknown> | null = null;
+
   try {
-    await auth.currentUser.getIdToken(true);
+    const tokenResult = await currentUser.getIdTokenResult(true);
+    tokenRefreshSuccess = true;
+    expirationTime = tokenResult.expirationTime || null;
+    authTime = tokenResult.authTime || null;
+    if (tokenResult.claims) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { token, ...cleanClaims } = tokenResult.claims as Record<string, unknown>;
+      claims = cleanClaims;
+    }
   } catch (tokenErr) {
+    tokenRefreshSuccess = false;
     console.warn("[saveSettings] Token refresh warning before setDoc:", tokenErr);
   }
 
+  // Update diagnostic state immediately before setDoc()
+  updateDiagnosticInfo({
+    ...baseDiagnostic,
+    tokenRefreshSuccess,
+    expirationTime,
+    authTime,
+    claims,
+    setDocReached: true,
+  });
+
   try {
     const res = await setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    updateDiagnosticInfo({
+      errorCode: "NONE (SUCCESS)",
+      errorName: "NONE",
+      errorMessage: "NONE",
+    });
     return res;
   } catch (err) {
     const errorCode = (err as { code?: string })?.code || "unknown";
+    const errorName = err instanceof Error ? err.name : "Error";
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error(`[saveSettings] Failed to save settings/${name}: Code=${errorCode}, Message=${errorMsg}`, err);
+
+    updateDiagnosticInfo({
+      errorCode,
+      errorName,
+      errorMessage: errorMsg,
+    });
+
     throw err;
   }
 }
