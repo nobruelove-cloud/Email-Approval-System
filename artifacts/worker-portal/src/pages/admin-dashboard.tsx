@@ -51,6 +51,7 @@ import {
 import {
   useAdminData,
   useSettings,
+  useDiagnosticInfo,
   reviewSubmission,
   updateEmailStockStatus,
   reviewWithdrawal,
@@ -85,6 +86,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals } = useAdminData();
   const rules = useSettings("rules", DEFAULT_RULES);
+  const diagnostic = useDiagnosticInfo();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -325,8 +327,88 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Diagnostic Panel */}
-      <div className="bg-amber-500 text-white p-4 font-bold text-center border-b border-amber-600">
-        [DIAGNOSTIC PANEL - PRODUCTION ERROR CAPTURE]
+      <div className="bg-amber-600 text-white p-4 font-mono text-xs border-b border-amber-700 shadow-md">
+        <div className="font-bold text-center text-sm md:text-base mb-3 tracking-wide">
+          [DIAGNOSTIC PANEL - PRODUCTION ERROR CAPTURE]
+        </div>
+        <div className="max-w-4xl mx-auto bg-amber-950/90 p-4 rounded-lg border border-amber-500/40 text-amber-100 space-y-1.5 font-mono">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Auth currentUser:</span>
+            <span className="sm:col-span-2 font-semibold text-white">{diagnostic.currentUserExists ? "YES" : "NO"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Auth UID:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.uid || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Auth Email:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.email || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Project ID:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.projectId || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">App ID:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.appId || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Auth Domain:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.authDomain || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Firestore Database ID:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.databaseId || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Document Path:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.documentPath || "settings/rules"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Token Refresh:</span>
+            <span className="sm:col-span-2 font-semibold">
+              {diagnostic.tokenRefreshSuccess === null
+                ? "NOT RUN YET"
+                : diagnostic.tokenRefreshSuccess
+                ? "SUCCESS"
+                : "FAILED"}
+            </span>
+          </div>
+          {diagnostic.expirationTime && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+              <span className="font-bold text-amber-300">Token Expiration Time:</span>
+              <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.expirationTime}</span>
+            </div>
+          )}
+          {diagnostic.authTime && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+              <span className="font-bold text-amber-300">Token Auth Time:</span>
+              <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.authTime}</span>
+            </div>
+          )}
+          {diagnostic.claims && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+              <span className="font-bold text-amber-300">Token Claims:</span>
+              <span className="sm:col-span-2 break-all text-amber-100">{JSON.stringify(diagnostic.claims)}</span>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">setDoc reached:</span>
+            <span className="sm:col-span-2 font-semibold text-white">{diagnostic.setDocReached ? "YES" : "NO"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Error Code:</span>
+            <span className="sm:col-span-2 break-all text-amber-200 font-bold">{diagnostic.errorCode || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1 border-b border-amber-800/60">
+            <span className="font-bold text-amber-300">Error Name:</span>
+            <span className="sm:col-span-2 break-all text-amber-100">{diagnostic.errorName || "N/A"}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-1">
+            <span className="font-bold text-amber-300">Error Message:</span>
+            <span className="sm:col-span-2 break-all text-red-300 font-semibold">{diagnostic.errorMessage || "N/A"}</span>
+          </div>
+        </div>
       </div>
 
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
