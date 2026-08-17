@@ -21,6 +21,8 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Evaluates whether the authenticated user has role = "admin" in Firestore users/{uid}.
+    // Case-insensitive regex matching handles formatting variations (e.g. "Admin", "ADMIN", " admin ").
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&

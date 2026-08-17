@@ -36,6 +36,7 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
+firestore-debug.log
 
 # System Files
 .DS_Store
