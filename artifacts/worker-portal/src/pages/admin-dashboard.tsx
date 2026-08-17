@@ -324,6 +324,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Diagnostic Panel */}
+      <div className="bg-amber-500 text-white p-4 font-bold text-center border-b border-amber-600">
+        [DIAGNOSTIC PANEL - PRODUCTION ERROR CAPTURE]
+      </div>
+
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
