@@ -298,6 +298,10 @@ export async function reviewSubmission(
       throw new Error("Setoran ini sudah pernah ditinjau.");
     }
 
+    const isApproval = newStatus === "available" || decision === "approved";
+    const userRef = isApproval ? doc(firestore, "users", submission.workerId) : null;
+    const userSnap = userRef ? await tx.get(userRef) : null;
+
     tx.update(submissionRef, {
       status: newStatus,
       reviewNote,
@@ -305,13 +309,9 @@ export async function reviewSubmission(
       updatedAt: serverTimestamp(),
     });
 
-    if (newStatus === "available" || decision === "approved") {
-      const userRef = doc(firestore, "users", submission.workerId);
-      const userSnap = await tx.get(userRef);
-      if (userSnap.exists()) {
-        const current = (userSnap.data() as PortalUser).balance ?? 0;
-        tx.update(userRef, { balance: current + pricePerEmail });
-      }
+    if (isApproval && userRef && userSnap && userSnap.exists()) {
+      const current = (userSnap.data() as PortalUser).balance ?? 0;
+      tx.update(userRef, { balance: current + pricePerEmail });
     }
   });
 }
@@ -408,15 +408,15 @@ export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalS
       throw new Error("Penarikan ini sudah selesai diproses.");
     }
 
+    const isRejected = status === "rejected";
+    const userRef = isRejected ? doc(firestore, "users", withdrawal.workerId) : null;
+    const userSnap = userRef ? await tx.get(userRef) : null;
+
     tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
 
-    if (status === "rejected") {
-      const userRef = doc(firestore, "users", withdrawal.workerId);
-      const userSnap = await tx.get(userRef);
-      if (userSnap.exists()) {
-        const current = (userSnap.data() as PortalUser).balance ?? 0;
-        tx.update(userRef, { balance: current + withdrawal.amount });
-      }
+    if (isRejected && userRef && userSnap && userSnap.exists()) {
+      const current = (userSnap.data() as PortalUser).balance ?? 0;
+      tx.update(userRef, { balance: current + withdrawal.amount });
     }
   });
 }
