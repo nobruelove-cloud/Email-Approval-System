@@ -25,14 +25,28 @@ import type {
 } from "@/lib/portal-types";
 import { getItemCountOfSubmission } from "@/lib/portal-utils";
 
+import { useRef } from "react";
+
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
 
-  // Keep a reference to the active profile snapshot unsubscribe function
-  const activeUnsubscribeProfile = useMemo(() => ({ current: null as (() => void) | null }), []);
+  const profileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const missingDocTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeUnsubscribeProfile = useRef<(() => void) | null>(null);
+
+  const clearAllTimers = () => {
+    if (profileTimerRef.current) {
+      clearTimeout(profileTimerRef.current);
+      profileTimerRef.current = null;
+    }
+    if (missingDocTimerRef.current) {
+      clearTimeout(missingDocTimerRef.current);
+      missingDocTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!auth || !db) {
@@ -40,15 +54,11 @@ export function usePortalAuth() {
       return;
     }
     const firestore = db;
-    let profileTimer: ReturnType<typeof setTimeout> | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       console.log("[PortalAuth] Auth state changed:", user ? `UID: ${user.uid} (${user.email})` : "Null user");
 
-      if (profileTimer) {
-        clearTimeout(profileTimer);
-        profileTimer = null;
-      }
+      clearAllTimers();
 
       if (activeUnsubscribeProfile.current) {
         console.log("[PortalAuth] Cleaning up previous profile listener.");
@@ -67,11 +77,11 @@ export function usePortalAuth() {
       setLoading(true);
       setError("");
 
-      console.log(`[PortalAuth] Registering Firestore snapshot listener for users/${user.uid}`);
+      console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
 
       // Set a 10-second safety fallback timeout in case Firestore listener hangs
-      profileTimer = setTimeout(() => {
-        console.warn("[PortalAuth] Profile listener timeout reached (10s).");
+      profileTimerRef.current = setTimeout(() => {
+        console.warn(`[PortalAuth] Profile listener timeout reached (10s) for users/${user.uid}.`);
         setLoading((prevLoading) => {
           if (prevLoading) {
             setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
@@ -81,23 +91,21 @@ export function usePortalAuth() {
         });
       }, 10000);
 
-      let missingDocTimer: ReturnType<typeof setTimeout> | null = null;
-
       const unsubscribe = onSnapshot(
         doc(firestore, "users", user.uid),
         (snapshot) => {
-          if (profileTimer) {
-            clearTimeout(profileTimer);
-            profileTimer = null;
+          if (profileTimerRef.current) {
+            clearTimeout(profileTimerRef.current);
+            profileTimerRef.current = null;
           }
 
           console.log(
-            `[PortalAuth] Profile snapshot fired for users/${user.uid}: exists=${snapshot.exists()}`,
+            `[PortalAuth] Profile snapshot fired for users/${user.uid}: exists=${snapshot.exists()}, authUID=${auth?.currentUser?.uid}`,
           );
 
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             console.warn("[PortalAuth] Snapshot fired but user is no longer active.");
-            if (missingDocTimer) clearTimeout(missingDocTimer);
+            clearAllTimers();
             setProfile(null);
             setError("");
             setLoading(false);
@@ -105,23 +113,28 @@ export function usePortalAuth() {
           }
 
           if (snapshot.exists()) {
-            if (missingDocTimer) {
-              clearTimeout(missingDocTimer);
-              missingDocTimer = null;
+            if (missingDocTimerRef.current) {
+              clearTimeout(missingDocTimerRef.current);
+              missingDocTimerRef.current = null;
             }
             const data = snapshot.data();
-            console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, data);
+            console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, {
+              uid: user.uid,
+              role: data?.role,
+              status: data?.status,
+            });
             const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
             const normalizedStatus = typeof data?.status === "string" ? data.status.trim().toLowerCase() : data?.status;
             setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
           } else {
-            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore yet. Holding in loading state during grace period...`);
+            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Starting 5s grace period...`);
             setLoading(true);
-            if (!missingDocTimer) {
-              missingDocTimer = setTimeout(() => {
+            if (!missingDocTimerRef.current) {
+              missingDocTimerRef.current = setTimeout(() => {
                 console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after 5s grace period.`);
+                missingDocTimerRef.current = null;
                 setProfile(null);
                 setError("Profil pengguna tidak ditemukan di database.");
                 setLoading(false);
@@ -130,14 +143,7 @@ export function usePortalAuth() {
           }
         },
         (reason) => {
-          if (profileTimer) {
-            clearTimeout(profileTimer);
-            profileTimer = null;
-          }
-          if (missingDocTimer) {
-            clearTimeout(missingDocTimer);
-            missingDocTimer = null;
-          }
+          clearAllTimers();
 
           const code = (reason as { code?: string })?.code ?? "";
           console.error(`[PortalAuth] Profile snapshot error for users/${user.uid} [code: ${code}]:`, reason);
@@ -165,14 +171,14 @@ export function usePortalAuth() {
     });
 
     return () => {
-      if (profileTimer) clearTimeout(profileTimer);
+      clearAllTimers();
       if (activeUnsubscribeProfile.current) {
         activeUnsubscribeProfile.current();
         activeUnsubscribeProfile.current = null;
       }
       unsubscribeAuth();
     };
-  }, [activeUnsubscribeProfile]);
+  }, []);
 
   const logout = async () => {
     console.log("[PortalAuth] Initiating logout...");
