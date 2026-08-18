@@ -82,11 +82,14 @@ export default function LoginPage() {
       return;
     }
     setBusy(true);
+    let createdUserCredential = null;
     try {
       console.log(`[Auth] Registering user: ${regEmail.trim()}`);
-      const credential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
-      console.log(`[Auth] Firebase Auth account created. UID: ${credential.user.uid}. Creating Firestore profile...`);
-      await createPortalUser(credential.user.uid, {
+      createdUserCredential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
+      const uid = createdUserCredential.user.uid;
+      console.log(`[Auth] Firebase Auth account created. UID: ${uid}, Path: users/${uid}. Creating Firestore profile...`);
+
+      await createPortalUser(uid, {
         name: name.trim(),
         email: regEmail.trim(),
         phone: phone.trim() || undefined,
@@ -95,10 +98,26 @@ export default function LoginPage() {
         tier: 1,
         balance: 0,
       });
-      console.log(`[Auth] Firestore profile created for UID: ${credential.user.uid}`);
+      console.log(`[Auth] Firestore profile created successfully for UID: ${uid}`);
       toast.success("Pendaftaran berhasil! Akun Anda telah aktif.");
     } catch (err) {
       console.error("[Auth] Register error:", err);
+
+      if (createdUserCredential?.user) {
+        console.warn(`[Auth] Profile creation failed after Auth creation. Attempting cleanup for UID: ${createdUserCredential.user.uid}`);
+        try {
+          await createdUserCredential.user.delete();
+          console.log("[Auth] Orphaned Auth user deleted successfully.");
+        } catch (cleanupErr) {
+          console.error("[Auth] Failed to delete orphaned Auth user:", cleanupErr);
+          try {
+            await auth.signOut();
+          } catch {
+            // ignore signout error
+          }
+        }
+      }
+
       const code = (err as { code?: string }).code ?? "";
       const baseMessage = friendlyAuthError(code, "register");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);

@@ -110,21 +110,22 @@ export function usePortalAuth() {
               missingDocTimer = null;
             }
             const data = snapshot.data();
-            console.log("[PortalAuth] User profile retrieved successfully:", data);
+            console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, data);
             const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
             const normalizedStatus = typeof data?.status === "string" ? data.status.trim().toLowerCase() : data?.status;
             setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
           } else {
-            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore yet.`);
+            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore yet. Holding in loading state during grace period...`);
+            setLoading(true);
             if (!missingDocTimer) {
               missingDocTimer = setTimeout(() => {
-                console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after grace period.`);
+                console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after 5s grace period.`);
                 setProfile(null);
                 setError("Profil pengguna tidak ditemukan di database.");
                 setLoading(false);
-              }, 3000);
+              }, 5000);
             }
           }
         },
@@ -138,7 +139,9 @@ export function usePortalAuth() {
             missingDocTimer = null;
           }
 
-          console.error("[PortalAuth] Profile snapshot error:", reason);
+          const code = (reason as { code?: string })?.code ?? "";
+          console.error(`[PortalAuth] Profile snapshot error for users/${user.uid} [code: ${code}]:`, reason);
+
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             setProfile(null);
             setError("");
@@ -146,7 +149,13 @@ export function usePortalAuth() {
             return;
           }
 
-          const msg = reason instanceof Error ? reason.message : "Tidak bisa memuat profil Anda.";
+          let msg = "Terjadi kesalahan saat memuat profil Anda.";
+          if (code === "permission-denied" || (reason instanceof Error && reason.message.includes("permission-denied"))) {
+            msg = "Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.";
+          } else if (reason instanceof Error && reason.message) {
+            msg = reason.message;
+          }
+
           setError(msg);
           setLoading(false);
         },
@@ -485,7 +494,45 @@ export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid"
   const cleanData = Object.fromEntries(
     Object.entries(data).filter(([_, v]) => v !== undefined)
   );
-  return setDoc(doc(db, "users", uid), { uid, ...cleanData, createdAt: serverTimestamp() });
+
+  console.log(`[createPortalUser] Initiating profile creation for path: users/${uid}`);
+
+  if (auth?.currentUser && auth.currentUser.uid === uid) {
+    try {
+      console.log(`[createPortalUser] Forcing token refresh for user UID: ${uid}`);
+      await auth.currentUser.getIdToken(true);
+    } catch (tokenErr) {
+      console.warn("[createPortalUser] Token refresh warning prior to document creation:", tokenErr);
+    }
+  }
+
+  const maxAttempts = 3;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
+      await setDoc(doc(db, "users", uid), { uid, ...cleanData, createdAt: serverTimestamp() });
+      console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
+      return;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[createPortalUser] Attempt ${attempt}/${maxAttempts} failed for users/${uid}:`, err);
+      if (attempt < maxAttempts) {
+        const delay = attempt * 500;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (auth?.currentUser && auth.currentUser.uid === uid) {
+          try {
+            await auth.currentUser.getIdToken(true);
+          } catch {
+            // ignore token refresh error on retry
+          }
+        }
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 export async function createWorkerAccount(data: {
