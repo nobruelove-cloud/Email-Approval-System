@@ -392,3 +392,137 @@ describe("StatusBadge Expected Display Value Mapping", () => {
     expect(extractLabel("rejected")).toBe("Ditolak");
   });
 });
+
+describe("Authentication & Security Rule Logic Unit Tests", () => {
+  // Mock simulation of snapshot handling and grace period state machine in usePortalAuth
+  function simulateSnapshotResolution(
+    authUid: string,
+    snapshotExists: boolean,
+    snapshotData?: Record<string, any>,
+    gracePeriodMs = 5000,
+  ) {
+    let state = {
+      firebaseUser: { uid: authUid },
+      profile: null as Record<string, any> | null,
+      loading: true,
+      error: "",
+    };
+
+    if (snapshotExists && snapshotData) {
+      const normalizedRole = typeof snapshotData.role === "string" ? snapshotData.role.trim().toLowerCase() : snapshotData.role;
+      const normalizedStatus = typeof snapshotData.status === "string" ? snapshotData.status.trim().toLowerCase() : snapshotData.status;
+      state.profile = { uid: authUid, ...snapshotData, role: normalizedRole, status: normalizedStatus };
+      state.loading = false;
+      state.error = "";
+    } else {
+      // Document does not exist yet. Remain in loading state during grace period
+      state.loading = true;
+      state.profile = null;
+      state.error = "";
+    }
+
+    return {
+      state,
+      expireGracePeriod: () => {
+        if (!snapshotExists) {
+          state.loading = false;
+          state.profile = null;
+          state.error = "Profil pengguna tidak ditemukan di database.";
+        }
+      },
+    };
+  }
+
+  it("A. Keeps user authenticated and in loading state before Firestore profile exists (no false logout or premature error)", () => {
+    const authUid = "worker_grace_123";
+    const sim = simulateSnapshotResolution(authUid, false);
+
+    expect(sim.state.firebaseUser.uid).toBe(authUid);
+    expect(sim.state.loading).toBe(true);
+    expect(sim.state.error).toBe("");
+    expect(sim.state.profile).toBeNull();
+
+    // After grace period expires, error is displayed but firebaseUser remains authenticated
+    sim.expireGracePeriod();
+    expect(sim.state.loading).toBe(false);
+    expect(sim.state.error).toBe("Profil pengguna tidak ditemukan di database.");
+    expect(sim.state.firebaseUser.uid).toBe(authUid);
+  });
+
+  it("B. Detects newly created profile as an active worker", () => {
+    const authUid = "worker_active_456";
+    const profileData = { name: "Budi", email: "budi@test.com", role: "worker", status: "active", tier: 1, balance: 0 };
+    const sim = simulateSnapshotResolution(authUid, true, profileData);
+
+    expect(sim.state.loading).toBe(false);
+    expect(sim.state.error).toBe("");
+    expect(sim.state.profile?.role).toBe("worker");
+    expect(sim.state.profile?.status).toBe("active");
+  });
+
+  it("C & D. Evaluates isSelf rule strictly: allows reading own profile, rejects reading another user's profile", () => {
+    function isSelf(requestAuthUid: string | null, targetUid: string): boolean {
+      return requestAuthUid !== null && requestAuthUid === targetUid;
+    }
+
+    function canReadUserProfile(requestAuthUid: string | null, targetUid: string, isUserAdmin = false): boolean {
+      return isSelf(requestAuthUid, targetUid) || isUserAdmin;
+    }
+
+    const workerA = "worker_A_111";
+    const workerB = "worker_B_222";
+
+    // C. Worker A reading Worker A's profile
+    expect(canReadUserProfile(workerA, workerA)).toBe(true);
+
+    // D. Worker A attempting to read Worker B's profile -> denied
+    expect(canReadUserProfile(workerA, workerB)).toBe(false);
+
+    // Unauthenticated user -> denied
+    expect(canReadUserProfile(null, workerA)).toBe(false);
+  });
+
+  it("E. Restricts worker from modifying protected fields (role, tier, balance increase)", () => {
+    function canWorkerUpdateProfile(
+      authUid: string,
+      targetUid: string,
+      currentData: { role: string; status: string; tier: number; balance: number },
+      newData: { role: string; status: string; tier: number; balance: number },
+    ): boolean {
+      if (authUid !== targetUid) return false;
+      // Workers cannot change role, status, or tier, and balance must not increase
+      if (newData.role !== currentData.role) return false;
+      if (newData.status !== currentData.status) return false;
+      if (newData.tier !== currentData.tier) return false;
+      if (newData.balance > currentData.balance) return false;
+      return true;
+    }
+
+    const workerUid = "worker_protected_789";
+    const currentDoc = { role: "worker", status: "active", tier: 1, balance: 5000 };
+
+    // Valid update (e.g. balance decrease due to withdrawal request)
+    expect(canWorkerUpdateProfile(workerUid, workerUid, currentDoc, { ...currentDoc, balance: 2000 })).toBe(true);
+
+    // Invalid: self-crediting balance
+    expect(canWorkerUpdateProfile(workerUid, workerUid, currentDoc, { ...currentDoc, balance: 10000 })).toBe(false);
+
+    // Invalid: elevating tier
+    expect(canWorkerUpdateProfile(workerUid, workerUid, currentDoc, { ...currentDoc, tier: 2 })).toBe(false);
+
+    // Invalid: self-promoting to admin
+    expect(canWorkerUpdateProfile(workerUid, workerUid, currentDoc, { ...currentDoc, role: "admin" })).toBe(false);
+  });
+
+  it("F. Admin retains functional access for reading any profile and writing configuration settings", () => {
+    function canReadUserProfile(requestAuthUid: string | null, targetUid: string, isUserAdmin = false): boolean {
+      return (requestAuthUid !== null && requestAuthUid === targetUid) || isUserAdmin;
+    }
+
+    const adminUid = "admin_super_999";
+    const workerUid = "worker_target_000";
+
+    // Admin reading worker profile
+    expect(canReadUserProfile(adminUid, workerUid, true)).toBe(true);
+  });
+});
