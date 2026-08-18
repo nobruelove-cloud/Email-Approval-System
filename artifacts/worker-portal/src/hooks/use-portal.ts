@@ -57,6 +57,7 @@ export function usePortalAuth() {
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       console.log("[PortalAuth] Auth state changed:", user ? `UID: ${user.uid} (${user.email})` : "Null user");
+      console.log(`[PortalAuth] Diagnostic 1: Authenticated Firebase UID = ${user?.uid ?? "null"}`);
 
       clearAllTimers();
 
@@ -77,11 +78,12 @@ export function usePortalAuth() {
       setLoading(true);
       setError("");
 
-      console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
+      const firestorePath = `users/${user.uid}`;
+      console.log(`[PortalAuth] Diagnostic 2: Firestore path being read = ${firestorePath}`);
 
       // Set a 10-second safety fallback timeout in case Firestore listener hangs
       profileTimerRef.current = setTimeout(() => {
-        console.warn(`[PortalAuth] Profile listener timeout reached (10s) for users/${user.uid}.`);
+        console.warn(`[PortalAuth] Profile listener timeout reached (10s) for ${firestorePath}.`);
         setLoading((prevLoading) => {
           if (prevLoading) {
             setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
@@ -99,8 +101,9 @@ export function usePortalAuth() {
             profileTimerRef.current = null;
           }
 
+          console.log(`[PortalAuth] Diagnostic 3: snapshot.exists() = ${snapshot.exists()} for path = ${firestorePath}`);
           console.log(
-            `[PortalAuth] Profile snapshot fired for users/${user.uid}: exists=${snapshot.exists()}, authUID=${auth?.currentUser?.uid}`,
+            `[PortalAuth] Profile snapshot details: exists=${snapshot.exists()}, path=${firestorePath}, authUID=${auth?.currentUser?.uid}`,
           );
 
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
@@ -118,8 +121,9 @@ export function usePortalAuth() {
               missingDocTimerRef.current = null;
             }
             const data = snapshot.data();
-            console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, {
+            console.log(`[PortalAuth] User profile retrieved successfully for ${firestorePath}:`, {
               uid: user.uid,
+              dataUid: data?.uid,
               role: data?.role,
               status: data?.status,
             });
@@ -129,11 +133,31 @@ export function usePortalAuth() {
             setError("");
             setLoading(false);
           } else {
-            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Starting 5s grace period...`);
+            console.warn(`[PortalAuth] Document ${firestorePath} does NOT exist in Firestore. Attempting profile auto-initialization...`);
             setLoading(true);
+
+            // Attempt auto-recovery profile creation for authenticated worker if doc missing
+            if (auth?.currentUser && auth.currentUser.uid === user.uid) {
+              const defaultName = user.displayName?.trim() || user.email?.split("@")[0] || "Worker";
+              const defaultEmail = user.email || "";
+              if (defaultEmail) {
+                createPortalUser(user.uid, {
+                  name: defaultName,
+                  email: defaultEmail,
+                  role: "worker",
+                  status: "active",
+                  tier: 1,
+                  balance: 0,
+                }).catch((createErr) => {
+                  console.warn(`[PortalAuth] Auto-recovery profile creation warning for ${firestorePath}:`, createErr);
+                });
+              }
+            }
+
             if (!missingDocTimerRef.current) {
               missingDocTimerRef.current = setTimeout(() => {
-                console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after 5s grace period.`);
+                console.warn(`[PortalAuth] Document ${firestorePath} still does NOT exist after 5s grace period.`);
+                console.log(`[PortalAuth] Diagnostic 5: Firebase Auth state when profile missing error set: isAuthenticated=${!!auth?.currentUser}, authUID=${auth?.currentUser?.uid}`);
                 missingDocTimerRef.current = null;
                 setProfile(null);
                 setError("Profil pengguna tidak ditemukan di database.");
@@ -146,7 +170,7 @@ export function usePortalAuth() {
           clearAllTimers();
 
           const code = (reason as { code?: string })?.code ?? "";
-          console.error(`[PortalAuth] Profile snapshot error for users/${user.uid} [code: ${code}]:`, reason);
+          console.error(`[PortalAuth] Diagnostic 4: Profile snapshot error code = '${code}' for path = ${firestorePath}:`, reason);
 
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             setProfile(null);

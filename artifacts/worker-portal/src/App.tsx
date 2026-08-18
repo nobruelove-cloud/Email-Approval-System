@@ -39,6 +39,16 @@ function PortalGate() {
   const { firebaseUser, profile, loading, error, configured, logout } = usePortalAuth();
   const [location, setLocation] = useLocation();
 
+  console.log(`[PortalGate] Diagnostic 6: Render state:`, {
+    firebaseUserUID: firebaseUser?.uid ?? null,
+    profileUID: profile?.uid ?? null,
+    profileRole: profile?.role ?? null,
+    profileStatus: profile?.status ?? null,
+    loading,
+    error,
+    configured,
+  });
+
   useEffect(() => {
     if (!profile) return;
     const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
