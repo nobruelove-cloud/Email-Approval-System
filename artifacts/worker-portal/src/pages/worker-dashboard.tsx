@@ -230,6 +230,56 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">
+            {/* TIER CONFIGURATION LIST FOR WORKER */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-600" />
+                    Daftar Tier & Harga Setor
+                  </CardTitle>
+                  <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
+                    Tier Anda Saat Ini: {currentTierConfig.name}
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs">
+                  Semakin banyak email yang Anda setor dan disetujui, semakin tinggi tier dan harga per akun.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(rules.data.tiers && rules.data.tiers.length > 0 ? rules.data.tiers : [currentTierConfig]).map((t) => {
+                    const isCurrentTier = Number(t.tier) === Number(currentTierConfig.tier);
+                    const qtyText = t.maxQty >= 99999 ? `${t.minQty}+ akun` : `${t.minQty}–${t.maxQty} akun`;
+
+                    return (
+                      <div
+                        key={t.tier}
+                        className={`p-3 rounded-lg border text-center transition-all ${
+                          isCurrentTier
+                            ? "bg-amber-50 border-amber-400 ring-2 ring-amber-400/30 shadow-sm"
+                            : "bg-gray-50 border-gray-200 text-gray-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                          <span className="font-bold text-sm text-gray-900">{t.name}</span>
+                          {isCurrentTier && (
+                            <Badge className="bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 font-semibold">
+                              Aktif
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium mb-1">{qtyText}</p>
+                        <p className="text-sm font-extrabold text-amber-700">
+                          {formatMoney(t.pricePerItem)} <span className="text-[11px] font-normal text-gray-500">/ akun</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">
@@ -302,31 +352,54 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </Card>
           </TabsContent>
 
-          {/* RIWAYAT SETORAN (GROUPED BY BATCH) */}
+          {/* RIWAYAT SETORAN (GROUPED BY BATCH WITH PER-ITEM STATS) */}
           <TabsContent value="submit-history" className="space-y-3">
             {submissions.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
             {!submissions.loading && submissions.data.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">Belum ada batch setoran email.</p>
             )}
             {submissions.data.map((item) => {
-              const count = getItemCountOfSubmission(item);
+              const baseItems = Array.isArray(item.items) && item.items.length > 0
+                ? item.items
+                : item.email
+                  ? [{ email: item.email, password: item.password, status: item.status === "available" || item.status === "approved" ? "approved" : item.status === "rejected" ? "rejected" : "pending" }]
+                  : [];
+
+              const count = baseItems.length || getItemCountOfSubmission(item);
+              const approvedCount = item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+              const rejectedCount = item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+              const pendingCount = count - approvedCount - rejectedCount;
+
               const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
               const tierCfg = getTierConfig(tierNum, rules.data.tiers);
               const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-              const totalAmount = item.totalAmount ?? (count * pricePerItem);
+              const earnedAmount = item.totalAmount ?? (approvedCount * pricePerItem);
 
               return (
                 <Card key={item.id}>
                   <CardContent className="pt-4 flex items-center justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-gray-900">{count} item</span>
+                        <span className="font-bold text-sm text-gray-900">{count} Total Email</span>
                         <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
                           {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                         </Badge>
                       </div>
-                      <p className="text-xs text-amber-700 font-semibold">
-                        Potensi / Total: {formatMoney(totalAmount)}
+
+                      <div className="flex items-center gap-2 text-xs font-medium">
+                        <span className="text-green-600">Disetujui: {approvedCount}</span>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-red-600">Ditolak: {rejectedCount}</span>
+                        {pendingCount > 0 && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-amber-600">Menunggu: {pendingCount}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-amber-700 font-bold">
+                        Total Saldo Didapat: {formatMoney(earnedAmount)}
                       </p>
                       <p className="text-xs text-gray-400">
                         #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
@@ -344,7 +417,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         onClick={() => setDetailSubmission(item)}
                         className="text-xs h-7 gap-1"
                       >
-                        <Eye className="w-3.5 h-3.5" /> Lihat Detail
+                        <Eye className="w-3.5 h-3.5" /> Lihat Email
                       </Button>
                     </div>
                   </CardContent>
@@ -448,53 +521,111 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </TabsContent>
         </Tabs>
 
-        {/* DIALOG LIHAT DETAIL BATCH */}
+        {/* DIALOG LIHAT DETAIL BATCH (WORKER PER-ITEM VIEW) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detail Batch Setoran</DialogTitle>
+              <DialogTitle>Detail Setoran Batch Email</DialogTitle>
               <DialogDescription>
-                Waktu setur: {formatDateTime(detailSubmission?.submittedAt)}
+                Waktu setor: {formatDateTime(detailSubmission?.submittedAt)} · #{shortId(detailSubmission?.id ?? "")}
               </DialogDescription>
             </DialogHeader>
-            {detailSubmission && (
-              <div className="space-y-3 pt-2">
-                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
-                  <div>
-                    <span className="text-gray-500">Jumlah Item:</span>
-                    <p className="font-bold text-gray-900">{getItemCountOfSubmission(detailSubmission)} item</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Tier / Harga:</span>
-                    <p className="font-bold text-amber-700">
-                      {getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? profile.tier, rules.data.tiers).name} (
-                      {formatMoney(detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? getTierConfig(profile.tier, rules.data.tiers).pricePerItem)}/item)
-                    </p>
-                  </div>
-                </div>
+            {detailSubmission && (() => {
+              const baseItems = Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0
+                ? detailSubmission.items
+                : detailSubmission.email
+                  ? [{
+                      email: detailSubmission.email,
+                      password: detailSubmission.password,
+                      status: detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending"
+                    }]
+                  : [];
 
-                <div>
-                  <Label className="text-xs text-gray-500">Daftar Email dalam Batch:</Label>
-                  <div className="mt-1.5 p-3 bg-gray-900 text-gray-100 rounded-lg max-h-56 overflow-y-auto text-xs font-mono space-y-1">
-                    {Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0 ? (
-                      detailSubmission.items.map((it, idx) => (
-                        <div key={idx} className="flex justify-between border-b border-gray-800 pb-1 last:border-0 last:pb-0">
-                          <span>{idx + 1}. {it.email}</span>
-                          {it.password && <span className="text-gray-400">sandi: {it.password}</span>}
-                        </div>
-                      ))
-                    ) : detailSubmission.email ? (
-                      <div className="flex justify-between">
-                        <span>1. {detailSubmission.email}</span>
-                        {detailSubmission.password && <span className="text-gray-400">sandi: {detailSubmission.password}</span>}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Tidak ada item email detail.</p>
-                    )}
+              const tierCfg = getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? profile.tier, rules.data.tiers);
+              const pricePerItem = detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? tierCfg.pricePerItem;
+
+              const approvedCount = detailSubmission.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+              const rejectedCount = detailSubmission.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+              const earned = detailSubmission.totalAmount ?? (approvedCount * pricePerItem);
+
+              return (
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                    <div>
+                      <span className="text-gray-500">Total Email:</span>
+                      <p className="font-bold text-gray-900">{baseItems.length} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Terjual (✓):</span>
+                      <p className="font-bold text-green-600">{approvedCount} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Ditolak (X):</span>
+                      <p className="font-bold text-red-600">{rejectedCount} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Total Didapat:</span>
+                      <p className="font-bold text-amber-700">{formatMoney(earned)}</p>
+                    </div>
                   </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-xs text-gray-600">
+                        Status per Alamat Email ({baseItems.length} item):
+                      </Label>
+                      <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
+                        {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                      {baseItems.map((it, idx) => {
+                        const st = it.status ?? (detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending");
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs font-mono transition-colors ${
+                              st === "approved"
+                                ? "bg-green-50/60 border-green-200"
+                                : st === "rejected"
+                                  ? "bg-red-50/60 border-red-200"
+                                  : "bg-amber-50/60 border-amber-200"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {idx + 1}. {it.email}
+                              </p>
+                              {it.password && <p className="text-[11px] text-gray-500 font-sans">Sandi: {it.password}</p>}
+                            </div>
+
+                            <Badge
+                              className={`shrink-0 text-[11px] font-sans ${
+                                st === "approved"
+                                  ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                  : st === "rejected"
+                                    ? "bg-red-100 text-red-800 hover:bg-red-100"
+                                    : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                              }`}
+                            >
+                              {st === "approved" ? "✓ Terjual" : st === "rejected" ? "X Ditolak" : "Menunggu"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {detailSubmission.reviewNote && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                      <p className="font-bold mb-0.5">Catatan Admin:</p>
+                      <p className="italic">{detailSubmission.reviewNote}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
       </main>

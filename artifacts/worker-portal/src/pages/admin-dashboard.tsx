@@ -108,12 +108,26 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Detail submission modal
+  // Detail submission modal & per-item status state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
+  const [itemStatuses, setItemStatuses] = useState<Record<string, "pending" | "approved" | "rejected">>({});
 
   // Filter states
   const [submissionSearch, setSubmissionSearch] = useState("");
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState("all");
+
+  function openDetailModal(sub: EmailSubmission) {
+    setDetailSubmission(sub);
+    const initialStatuses: Record<string, "pending" | "approved" | "rejected"> = {};
+    if (Array.isArray(sub.items) && sub.items.length > 0) {
+      sub.items.forEach((it, idx) => {
+        initialStatuses[idx] = it.status ?? (sub.status === "available" || sub.status === "approved" ? "approved" : sub.status === "rejected" ? "rejected" : "pending");
+      });
+    } else if (sub.email) {
+      initialStatuses[0] = sub.status === "available" || sub.status === "approved" ? "approved" : sub.status === "rejected" ? "rejected" : "pending";
+    }
+    setItemStatuses(initialStatuses);
+  }
 
   const workerMap = useMemo(() => {
     const map = new Map<string, PortalUser>();
@@ -179,7 +193,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     };
   }, [users.data, submissions.data, withdrawals.data]);
 
-  async function handleSubmissionDecision(sub: EmailSubmission, decision: "approved" | "rejected") {
+  async function handleFinalizeBatchReview(sub: EmailSubmission) {
     setBusyId(sub.id);
     try {
       const worker = workerMap.get(sub.workerId);
@@ -187,12 +201,36 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       const tierCfg = getTierConfig(workerTierNum, activeTiersList);
       const pricePerItem = sub.currentPricePerItem ?? tierCfg.pricePerItem;
 
-      await reviewSubmission(sub.id, decision, notes[sub.id] ?? "", pricePerItem, tierCfg.tier);
-      toast.success(
-        decision === "approved"
-          ? `Batch ${getItemCountOfSubmission(sub)} item disetujui! Total ${formatMoney(getItemCountOfSubmission(sub) * pricePerItem)} ditambahkan ke saldo pekerja.`
-          : "Batch setoran ditolak.",
+      const baseItems = Array.isArray(sub.items) && sub.items.length > 0
+        ? sub.items
+        : sub.email
+          ? [{ email: sub.email, password: sub.password }]
+          : [];
+
+      const updatedItems = baseItems.map((it, idx) => ({
+        ...it,
+        status: itemStatuses[idx] ?? "pending",
+      }));
+
+      const approvedCount = updatedItems.filter((it) => it.status === "approved").length;
+      const rejectedCount = updatedItems.filter((it) => it.status === "rejected").length;
+      const totalCredit = approvedCount * pricePerItem;
+
+      const decision = approvedCount > 0 ? "approved" : "rejected";
+
+      await reviewSubmission(
+        sub.id,
+        decision,
+        notes[sub.id] ?? "",
+        pricePerItem,
+        tierCfg.tier,
+        updatedItems,
       );
+
+      toast.success(
+        `Finalisasi batch berhasil! ${approvedCount} disetujui, ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
+      );
+      setDetailSubmission(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses setoran.");
     } finally {
@@ -562,43 +600,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setDetailSubmission(item)}
+                          onClick={() => openDetailModal(item)}
                           className="text-xs h-7 gap-1"
                         >
-                          <Eye className="w-3.5 h-3.5" /> Lihat Detail
+                          <Eye className="w-3.5 h-3.5" /> {item.status === "pending" ? "Tinjau Per Email" : "Lihat Detail"}
                         </Button>
                       </div>
                     </div>
-
-                    {item.status === "pending" && (
-                      <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
-                        <Input
-                          placeholder="Catatan review (opsional)"
-                          value={notes[item.id] ?? ""}
-                          onChange={(e) => setNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                          className="text-xs h-9 flex-1"
-                        />
-                        <Button
-                          size="sm"
-                          disabled={busyId === item.id}
-                          onClick={() => handleSubmissionDecision(item, "approved")}
-                          className="bg-green-600 hover:bg-green-700 gap-1 shrink-0 text-xs"
-                        >
-                          {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                          Setujui ({formatMoney(totalVal)})
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={busyId === item.id}
-                          onClick={() => handleSubmissionDecision(item, "rejected")}
-                          className="gap-1 shrink-0 text-xs"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          Tolak
-                        </Button>
-                      </div>
-                    )}
 
                     {item.status !== "pending" && (
                       <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500">
@@ -1069,57 +1077,193 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           </TabsContent>
         </Tabs>
 
-        {/* DIALOG LIHAT DETAIL BATCH */}
+        {/* DIALOG LIHAT & TINJAU DETAIL BATCH (PER EMAIL) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detail Batch Setoran</DialogTitle>
+              <DialogTitle>Tinjau Batch Setoran Email</DialogTitle>
               <DialogDescription>
-                Pekerja: <strong>{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong>
+                Pekerja: <strong>{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong> · #{shortId(detailSubmission?.id ?? "")}
               </DialogDescription>
             </DialogHeader>
-            {detailSubmission && (
-              <div className="space-y-3 pt-2">
-                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
-                  <div>
-                    <span className="text-gray-500">Jumlah Item:</span>
-                    <p className="font-bold text-gray-900">{getItemCountOfSubmission(detailSubmission)} item</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Tier / Harga:</span>
-                    <p className="font-bold text-amber-700">
-                      {getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList).name} (
-                      {formatMoney(detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? getTierConfig(1, activeTiersList).pricePerItem)}/item)
-                    </p>
-                  </div>
-                  <div className="col-span-2 pt-1 border-t border-gray-200 flex justify-between">
-                    <span className="text-gray-500">Waktu Kirim:</span>
-                    <span className="font-medium text-gray-900">{formatDateTime(detailSubmission.submittedAt)}</span>
-                  </div>
-                </div>
+            {detailSubmission && (() => {
+              const baseItems = Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0
+                ? detailSubmission.items
+                : detailSubmission.email
+                  ? [{ email: detailSubmission.email, password: detailSubmission.password }]
+                  : [];
 
-                <div>
-                  <Label className="text-xs text-gray-500">Daftar Email dalam Batch:</Label>
-                  <div className="mt-1.5 p-3 bg-gray-900 text-gray-100 rounded-lg max-h-56 overflow-y-auto text-xs font-mono space-y-1">
-                    {Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0 ? (
-                      detailSubmission.items.map((it, idx) => (
-                        <div key={idx} className="flex justify-between border-b border-gray-800 pb-1 last:border-0 last:pb-0">
-                          <span>{idx + 1}. {it.email}</span>
-                          {it.password && <span className="text-gray-400">sandi: {it.password}</span>}
-                        </div>
-                      ))
-                    ) : detailSubmission.email ? (
-                      <div className="flex justify-between">
-                        <span>1. {detailSubmission.email}</span>
-                        {detailSubmission.password && <span className="text-gray-400">sandi: {detailSubmission.password}</span>}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Tidak ada item email detail.</p>
-                    )}
+              const tierCfg = getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList);
+              const pricePerItem = detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? tierCfg.pricePerItem;
+
+              const approvedCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "approved").length;
+              const rejectedCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "rejected").length;
+              const pendingCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "pending").length;
+              const calcTotal = approvedCount * pricePerItem;
+
+              const isReadOnly = detailSubmission.status !== "pending";
+
+              return (
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                    <div>
+                      <span className="text-gray-500">Total Item:</span>
+                      <p className="font-bold text-gray-900">{baseItems.length} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Disetujui:</span>
+                      <p className="font-bold text-green-600">{approvedCount} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Ditolak:</span>
+                      <p className="font-bold text-red-600">{rejectedCount} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Total Saldo:</span>
+                      <p className="font-bold text-amber-700">{formatMoney(calcTotal)}</p>
+                    </div>
                   </div>
+
+                  {!isReadOnly && (
+                    <div className="flex items-center justify-between gap-2 bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-xs">
+                      <span className="text-amber-900 font-medium">Setujui/Tolak Semua:</span>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const newMap: Record<string, "approved"> = {};
+                            baseItems.forEach((_, idx) => { newMap[idx] = "approved"; });
+                            setItemStatuses(newMap);
+                          }}
+                          className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                        >
+                          Setujui Semua (✓)
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const newMap: Record<string, "rejected"> = {};
+                            baseItems.forEach((_, idx) => { newMap[idx] = "rejected"; });
+                            setItemStatuses(newMap);
+                          }}
+                          className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                        >
+                          Tolak Semua (X)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1.5 block">
+                      Tinjau Item Email Individu ({baseItems.length} item):
+                    </Label>
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                      {baseItems.map((it, idx) => {
+                        const currentSt = itemStatuses[idx] ?? "pending";
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs transition-colors ${
+                              currentSt === "approved"
+                                ? "bg-green-50/60 border-green-200"
+                                : currentSt === "rejected"
+                                  ? "bg-red-50/60 border-red-200"
+                                  : "bg-gray-50 border-gray-200"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1 font-mono">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {idx + 1}. {it.email}
+                              </p>
+                              {it.password && <p className="text-[11px] text-gray-500">Sandi: {it.password}</p>}
+                            </div>
+
+                            {isReadOnly ? (
+                              <Badge
+                                className={
+                                  currentSt === "approved"
+                                    ? "bg-green-100 text-green-800"
+                                    : currentSt === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-700"
+                                }
+                              >
+                                {currentSt === "approved" ? "Terjual (✓)" : currentSt === "rejected" ? "Ditolak (X)" : "Menunggu"}
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => setItemStatuses((prev) => ({ ...prev, [idx]: "approved" }))}
+                                  className={`h-7 px-2.5 text-xs gap-1 ${
+                                    currentSt === "approved"
+                                      ? "bg-green-600 text-white hover:bg-green-700 font-bold"
+                                      : "bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-800"
+                                  }`}
+                                >
+                                  ✓ Disetujui
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => setItemStatuses((prev) => ({ ...prev, [idx]: "rejected" }))}
+                                  className={`h-7 px-2.5 text-xs gap-1 ${
+                                    currentSt === "rejected"
+                                      ? "bg-red-600 text-white hover:bg-red-700 font-bold"
+                                      : "bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-800"
+                                  }`}
+                                >
+                                  X Ditolak
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {!isReadOnly && (
+                    <div className="space-y-3 pt-2 border-t border-gray-100">
+                      <div>
+                        <Label htmlFor="batch-note" className="text-xs">Catatan Review Admin (opsional)</Label>
+                        <Input
+                          id="batch-note"
+                          placeholder="Contoh: 3 email valid, 2 email tidak bisa login"
+                          value={notes[detailSubmission.id] ?? ""}
+                          onChange={(e) => setNotes((prev) => ({ ...prev, [detailSubmission.id]: e.target.value }))}
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        disabled={busyId === detailSubmission.id || pendingCount > 0}
+                        onClick={() => handleFinalizeBatchReview(detailSubmission)}
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs gap-2"
+                      >
+                        {busyId === detailSubmission.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        Finalisasi Review Batch ({approvedCount} Disetujui · {formatMoney(calcTotal)})
+                      </Button>
+                      {pendingCount > 0 && (
+                        <p className="text-[11px] text-amber-700 text-center font-medium">
+                          Harap tentukan status (Disetujui / Ditolak) untuk seluruh {pendingCount} item sebelum finalisasi.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
       </main>
