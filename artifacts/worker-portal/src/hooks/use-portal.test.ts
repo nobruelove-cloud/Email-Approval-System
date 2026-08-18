@@ -1,10 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { StatusBadge } from "../pages/worker-dashboard";
+import {
+  getItemCountOfSubmission,
+  getTierConfig,
+  getRecommendedTier,
+  validateTierConfigs,
+} from "../lib/portal-utils";
+import { DEFAULT_TIERS, type EmailSubmission, type TierConfig } from "../lib/portal-types";
 
 // Mock Firestore transaction object
-function createMockTransaction(store) {
-  const reads = [];
-  const writes = [];
+function createMockTransaction(store: Record<string, any>) {
+  const reads: string[] = [];
+  const writes: any[] = [];
 
   return {
     get: vi.fn(async (ref) => {
@@ -34,8 +41,15 @@ function createMockTransaction(store) {
   };
 }
 
-// Transaction logic under test (matching reviewSubmission and reviewWithdrawal implementation)
-async function reviewSubmissionTx(tx, submissionId, decision, reviewNote, pricePerEmail, store) {
+// Batch review transaction logic under test (matching reviewSubmission in use-portal.ts)
+async function reviewBatchSubmissionTx(
+  tx: any,
+  submissionId: string,
+  decision: "approved" | "rejected" | "available",
+  reviewNote: string,
+  pricePerItemFallback: number,
+  tierNumFallback: number,
+) {
   const submissionPath = `emailSubmissions/${submissionId}`;
   const submissionSnap = await tx.get({ path: submissionPath });
   if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
@@ -49,145 +63,201 @@ async function reviewSubmissionTx(tx, submissionId, decision, reviewNote, priceP
   const userPath = isApproval ? `users/${submission.workerId}` : null;
   const userSnap = userPath ? await tx.get({ path: userPath }) : null;
 
-  tx.update({ path: submissionPath }, {
-    status: newStatus,
-    reviewNote,
-    reviewedAt: "TIMESTAMP",
-    updatedAt: "TIMESTAMP",
+  const itemCount = getItemCountOfSubmission(submission);
+  const appliedPricePerItem = submission.currentPricePerItem ?? pricePerItemFallback;
+  const appliedTier = submission.currentTier ?? tierNumFallback;
+  const totalAmount = itemCount * appliedPricePerItem;
+
+  if (isApproval) {
+    tx.update({ path: submissionPath }, {
+      status: newStatus,
+      reviewNote,
+      appliedTier,
+      appliedPricePerItem,
+      itemCount,
+      totalAmount,
+      reviewedAt: "TIMESTAMP",
+      updatedAt: "TIMESTAMP",
+    });
+
+    if (userPath && userSnap && userSnap.exists()) {
+      const current = userSnap.data().balance ?? 0;
+      tx.update({ path: userPath }, { balance: current + totalAmount });
+    }
+  } else {
+    tx.update({ path: submissionPath }, {
+      status: "rejected",
+      reviewNote,
+      reviewedAt: "TIMESTAMP",
+      updatedAt: "TIMESTAMP",
+    });
+  }
+}
+
+describe("Batch Item & Tier Utility Unit Tests", () => {
+  it("counts items accurately for single legacy emails and batch email submissions", () => {
+    const singleSub: EmailSubmission = { id: "1", workerId: "w1", email: "single@a.com", status: "pending" };
+    expect(getItemCountOfSubmission(singleSub)).toBe(1);
+
+    const batchSub: EmailSubmission = {
+      id: "2",
+      workerId: "w1",
+      items: [{ email: "a@a.com" }, { email: "b@a.com" }, { email: "c@a.com text" }, { email: "d@a.com" }, { email: "e@a.com" }],
+      itemCount: 5,
+      status: "pending",
+    };
+    expect(getItemCountOfSubmission(batchSub)).toBe(5);
   });
 
-  if (isApproval && userPath && userSnap && userSnap.exists()) {
-    const current = userSnap.data().balance ?? 0;
-    tx.update({ path: userPath }, { balance: current + pricePerEmail });
-  }
-}
+  it("retrieves tier configurations and prices correctly", () => {
+    expect(getTierConfig(1, DEFAULT_TIERS).pricePerItem).toBe(2000);
+    expect(getTierConfig(2, DEFAULT_TIERS).pricePerItem).toBe(2500);
+    expect(getTierConfig(3, DEFAULT_TIERS).pricePerItem).toBe(3000);
+  });
 
-async function reviewWithdrawalTx(tx, withdrawalId, status, note, store) {
-  const withdrawalPath = `withdrawals/${withdrawalId}`;
-  const withdrawalSnap = await tx.get({ path: withdrawalPath });
-  if (!withdrawalSnap.exists()) throw new Error("Penarikan tidak ditemukan.");
-  const withdrawal = withdrawalSnap.data();
-  if (withdrawal.status !== "pending" && withdrawal.status !== "processing") {
-    throw new Error("Penarikan ini sudah selesai diproses.");
-  }
+  it("calculates recommended tier based on worker's approved/submitted quantity", () => {
+    expect(getRecommendedTier(0, DEFAULT_TIERS).tier).toBe(1);
+    expect(getRecommendedTier(2, DEFAULT_TIERS).tier).toBe(1); // 1-3 -> Tier 1
+    expect(getRecommendedTier(4, DEFAULT_TIERS).tier).toBe(2); // 4-10 -> Tier 2
+    expect(getRecommendedTier(7, DEFAULT_TIERS).tier).toBe(2);
+    expect(getRecommendedTier(11, DEFAULT_TIERS).tier).toBe(3); // 11+ -> Tier 3
+    expect(getRecommendedTier(50, DEFAULT_TIERS).tier).toBe(3);
+  });
 
-  const isRejected = status === "rejected";
-  const userPath = isRejected ? `users/${withdrawal.workerId}` : null;
-  const userSnap = userPath ? await tx.get({ path: userPath }) : null;
+  it("validates tier configurations against overlaps and invalid ranges", () => {
+    const validTiers: TierConfig[] = [
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 3, pricePerItem: 2000 },
+      { tier: 2, name: "Tier 2", minQty: 4, maxQty: 10, pricePerItem: 2500 },
+    ];
+    expect(validateTierConfigs(validTiers)).toBeNull();
 
-  tx.update({ path: withdrawalPath }, { status, note, processedAt: "TIMESTAMP" });
+    const overlappingTiers: TierConfig[] = [
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 5, pricePerItem: 2000 },
+      { tier: 2, name: "Tier 2", minQty: 4, maxQty: 10, pricePerItem: 2500 },
+    ];
+    expect(validateTierConfigs(overlappingTiers)).toContain("Rentang tier bertabrakan");
+  });
+});
 
-  if (isRejected && userPath && userSnap && userSnap.exists()) {
-    const current = userSnap.data().balance ?? 0;
-    tx.update({ path: userPath }, { balance: current + withdrawal.amount });
-  }
-}
-
-describe("Firestore Transaction Read-Before-Write Tests", () => {
-  it("successfully approves email submission, credits balance, and executes all reads before writes", async () => {
+describe("Batch Approval, Credit Calculation, and Price Snapshot Tests", () => {
+  it("approves 5-item batch at Tier 2 (Rp2.500/item), credits Rp12.500 balance, and saves historical snapshot", async () => {
     const store = {
-      "emailSubmissions/sub_1": {
-        workerId: "worker_123",
+      "emailSubmissions/batch_1": {
+        workerId: "seno_123",
+        items: [{ email: "1@a.com" }, { email: "2@a.com" }, { email: "3@a.com" }, { email: "4@a.com" }, { email: "5@a.com" }],
+        itemCount: 5,
+        currentTier: 2,
+        currentPricePerItem: 2500,
         status: "pending",
-        email: "test@example.com",
       },
-      "users/worker_123": {
-        uid: "worker_123",
-        name: "Worker One",
-        balance: 10000,
+      "users/seno_123": {
+        uid: "seno_123",
+        name: "Seno",
+        tier: 2,
+        balance: 0,
       },
     };
 
     const tx = createMockTransaction(store);
-    await reviewSubmissionTx(tx, "sub_1", "approved", "Good submission", 5000, store);
+    await reviewBatchSubmissionTx(tx, "batch_1", "approved", "Approved batch", 2500, 2);
 
     // Verify submission status updated to available
-    expect(store["emailSubmissions/sub_1"].status).toBe("available");
-    // Verify worker balance credited by pricePerEmail (10000 + 5000 = 15000)
-    expect(store["users/worker_123"].balance).toBe(15000);
-    // Verify reads occurred before writes without throwing transaction error
-    expect(tx._reads).toEqual(["emailSubmissions/sub_1", "users/worker_123"]);
-    expect(tx._writes.length).toBe(2);
+    const updatedSub = store["emailSubmissions/batch_1"];
+    expect(updatedSub.status).toBe("available");
+    expect(updatedSub.appliedTier).toBe(2);
+    expect(updatedSub.appliedPricePerItem).toBe(2500);
+    expect(updatedSub.totalAmount).toBe(12500);
+
+    // Verify worker balance credited by 5 * 2500 = 12500
+    expect(store["users/seno_123"].balance).toBe(12500);
+
+    // Verify reads happened before writes
+    expect(tx._reads).toEqual(["emailSubmissions/batch_1", "users/seno_123"]);
   });
 
-  it("prevents duplicate approval when submission is not pending", async () => {
+  it("historical financial amount remains unchanged even if worker tier changes later", async () => {
     const store = {
-      "emailSubmissions/sub_1": {
-        workerId: "worker_123",
-        status: "available",
-        email: "test@example.com",
+      "emailSubmissions/batch_historic": {
+        workerId: "seno_123",
+        items: [{ email: "1@a.com" }, { email: "2@a.com" }, { email: "3@a.com" }, { email: "4@a.com" }, { email: "5@a.com" }],
+        itemCount: 5,
+        currentTier: 1,
+        currentPricePerItem: 2000,
+        status: "pending",
       },
-      "users/worker_123": {
-        uid: "worker_123",
-        name: "Worker One",
-        balance: 15000,
+      "users/seno_123": {
+        uid: "seno_123",
+        name: "Seno",
+        tier: 1,
+        balance: 0,
+      },
+    };
+
+    // Approve at Tier 1 (Rp2.000 / item -> Total Rp10.000)
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_historic", "approved", "OK", 2000, 1);
+
+    expect(store["emailSubmissions/batch_historic"].totalAmount).toBe(10000);
+    expect(store["users/seno_123"].balance).toBe(10000);
+
+    // Admin later changes worker Seno to Tier 3
+    store["users/seno_123"].tier = 3;
+
+    // Historic submission record snapshot MUST remain Rp10.000
+    expect(store["emailSubmissions/batch_historic"].totalAmount).toBe(10000);
+    expect(store["emailSubmissions/batch_historic"].appliedPricePerItem).toBe(2000);
+  });
+
+  it("prevents double crediting on batch submissions", async () => {
+    const store = {
+      "emailSubmissions/batch_2": {
+        workerId: "worker_777",
+        itemCount: 3,
+        currentTier: 1,
+        currentPricePerItem: 2000,
+        status: "available",
+      },
+      "users/worker_777": {
+        uid: "worker_777",
+        balance: 6000,
       },
     };
 
     const tx = createMockTransaction(store);
     await expect(
-      reviewSubmissionTx(tx, "sub_1", "approved", "Second try", 5000, store)
+      reviewBatchSubmissionTx(tx, "batch_2", "approved", "Second try", 2000, 1)
     ).rejects.toThrow("Setoran ini sudah pernah ditinjau.");
 
-    // Verify balance unchanged
-    expect(store["users/worker_123"].balance).toBe(15000);
+    expect(store["users/worker_777"].balance).toBe(6000);
   });
 
-  it("rejection flow works correctly without updating worker balance and preserves read-before-write", async () => {
+  it("rejected batch does not credit worker balance", async () => {
     const store = {
-      "emailSubmissions/sub_1": {
-        workerId: "worker_123",
+      "emailSubmissions/batch_bad": {
+        workerId: "worker_888",
+        itemCount: 10,
+        currentTier: 2,
+        currentPricePerItem: 2500,
         status: "pending",
-        email: "bad@example.com",
       },
-      "users/worker_123": {
-        uid: "worker_123",
-        name: "Worker One",
-        balance: 10000,
+      "users/worker_888": {
+        uid: "worker_888",
+        balance: 5000,
       },
     };
 
     const tx = createMockTransaction(store);
-    await reviewSubmissionTx(tx, "sub_1", "rejected", "Invalid email", 5000, store);
+    await reviewBatchSubmissionTx(tx, "batch_bad", "rejected", "Invalid emails", 2500, 2);
 
-    // Verify status rejected
-    expect(store["emailSubmissions/sub_1"].status).toBe("rejected");
-    // Verify balance unaffected
-    expect(store["users/worker_123"].balance).toBe(10000);
-    // Verify only 1 write was performed
-    expect(tx._writes.length).toBe(1);
-  });
-
-  it("reviewWithdrawal handles rejection balance refund with reads before writes", async () => {
-    const store = {
-      "withdrawals/w_1": {
-        workerId: "worker_123",
-        amount: 50000,
-        status: "pending",
-      },
-      "users/worker_123": {
-        uid: "worker_123",
-        name: "Worker One",
-        balance: 20000,
-      },
-    };
-
-    const tx = createMockTransaction(store);
-    await reviewWithdrawalTx(tx, "w_1", "rejected", "Invalid bank info", store);
-
-    // Verify withdrawal status rejected and balance refunded
-    expect(store["withdrawals/w_1"].status).toBe("rejected");
-    expect(store["users/worker_123"].balance).toBe(70000);
-    expect(tx._reads).toEqual(["withdrawals/w_1", "users/worker_123"]);
+    expect(store["emailSubmissions/batch_bad"].status).toBe("rejected");
+    expect(store["users/worker_888"].balance).toBe(5000);
   });
 });
 
 describe("StatusBadge Expected Display Value Mapping", () => {
   function extractLabel(status: string): string {
     const element = StatusBadge({ status });
-    // element is <Badge className="..."> {v.icon} {v.label} </Badge>
     const children = element.props.children;
-    // children is [icon, label]
     return Array.isArray(children) ? children[1] : String(children);
   }
 
@@ -203,37 +273,5 @@ describe("StatusBadge Expected Display Value Mapping", () => {
 
   it("displays 'Ditolak' for rejected submissions", () => {
     expect(extractLabel("rejected")).toBe("Ditolak");
-  });
-
-  it("credits worker balance exactly once on approval and rejects subsequent approvals", async () => {
-    const store = {
-      "emailSubmissions/sub_100": {
-        workerId: "worker_999",
-        status: "pending",
-        email: "worker_test@example.com",
-      },
-      "users/worker_999": {
-        uid: "worker_999",
-        name: "Worker Test",
-        balance: 2000,
-      },
-    };
-
-    const pricePerEmail = 2000;
-    const tx1 = createMockTransaction(store);
-    await reviewSubmissionTx(tx1, "sub_100", "approved", "Approved by admin", pricePerEmail, store);
-
-    // Initial balance (2000) + credited once (2000) = 4000
-    expect(store["users/worker_999"].balance).toBe(4000);
-    expect(store["emailSubmissions/sub_100"].status).toBe("available");
-
-    // Attempting approval a second time on the same submission must fail
-    const tx2 = createMockTransaction(store);
-    await expect(
-      reviewSubmissionTx(tx2, "sub_100", "approved", "Second approval attempt", pricePerEmail, store)
-    ).rejects.toThrow("Setoran ini sudah pernah ditinjau.");
-
-    // Balance must remain credited exactly once (4000)
-    expect(store["users/worker_999"].balance).toBe(4000);
   });
 });

@@ -21,7 +21,9 @@ import type {
   Withdrawal,
   SubmissionStatus,
   WithdrawalStatus,
+  UserStatus,
 } from "@/lib/portal-types";
+import { getItemCountOfSubmission } from "@/lib/portal-utils";
 
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -274,22 +276,24 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
 }
 
 /**
- * Approving a submission sets status to "available" (stock) and credits the worker's balance
- * by `pricePerEmail` (from dynamic rules) in a single atomic transaction.
- * Rejecting sets status to "rejected" without crediting balance.
- * Prevents double crediting if status is not "pending".
+ * Approving a submission (single or batch) sets status to "available" (stock) and credits the worker's balance
+ * by (itemCount * applicablePricePerItem) in a single atomic transaction.
+ * Permanently snapshots appliedTier, appliedPricePerItem, itemCount, and totalAmount.
+ * ALL tx.get() calls are executed BEFORE any tx.update() calls to satisfy Firestore transaction ordering constraints.
  */
 export async function reviewSubmission(
   submissionId: string,
   decision: "approved" | "rejected" | "available",
   reviewNote: string,
-  pricePerEmail: number,
+  overridePricePerItem?: number,
+  overrideTierNum?: number,
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
   const newStatus: SubmissionStatus = decision === "approved" ? "available" : decision;
 
   await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
     const submissionRef = doc(firestore, "emailSubmissions", submissionId);
     const submissionSnap = await tx.get(submissionRef);
     if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
@@ -302,16 +306,35 @@ export async function reviewSubmission(
     const userRef = isApproval ? doc(firestore, "users", submission.workerId) : null;
     const userSnap = userRef ? await tx.get(userRef) : null;
 
-    tx.update(submissionRef, {
-      status: newStatus,
-      reviewNote,
-      reviewedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    // 2. ALL WRITES AFTER READS
+    const itemCount = getItemCountOfSubmission(submission);
+    const appliedPricePerItem = submission.currentPricePerItem ?? overridePricePerItem ?? 2000;
+    const appliedTier = submission.currentTier ?? overrideTierNum ?? 1;
+    const creditAmount = itemCount * appliedPricePerItem;
 
-    if (isApproval && userRef && userSnap && userSnap.exists()) {
-      const current = (userSnap.data() as PortalUser).balance ?? 0;
-      tx.update(userRef, { balance: current + pricePerEmail });
+    if (isApproval) {
+      tx.update(submissionRef, {
+        status: newStatus,
+        reviewNote,
+        appliedTier,
+        appliedPricePerItem,
+        itemCount,
+        totalAmount: creditAmount,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      if (userRef && userSnap && userSnap.exists()) {
+        const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+        tx.update(userRef, { balance: currentBalance + creditAmount });
+      }
+    } else {
+      tx.update(submissionRef, {
+        status: "rejected",
+        reviewNote,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
     }
   });
 }
@@ -439,8 +462,8 @@ export async function createWorkerAccount(data: {
   email: string;
   password: string;
   phone?: string;
-  tier: 1 | 2 | 3;
-  status: "pending" | "approved" | "rejected" | "inactive";
+  tier: number;
+  status: UserStatus;
   balance: number;
 }) {
   if (!db) throw new Error("Firebase is not configured.");

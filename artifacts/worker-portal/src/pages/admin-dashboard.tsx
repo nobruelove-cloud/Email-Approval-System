@@ -12,6 +12,10 @@ import {
   Trash2,
   UserPlus,
   Clock,
+  Eye,
+  Award,
+  Sparkles,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,14 +63,24 @@ import {
   createWorkerAccount,
   saveSettings,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, type PortalUser, type UserStatus, type UserTier } from "@/lib/portal-types";
-import { formatDateTime, formatMoney, shortId } from "@/lib/portal-utils";
+import { DEFAULT_RULES, DEFAULT_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
+import {
+  formatDateTime,
+  formatMoney,
+  getItemCountOfSubmission,
+  getRecommendedTier,
+  getTierConfig,
+  shortId,
+  validateTierConfigs,
+} from "@/lib/portal-utils";
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
     pending: "bg-amber-100 text-amber-800",
     processing: "bg-blue-100 text-blue-800",
     approved: "bg-green-100 text-green-800",
+    available: "bg-green-100 text-green-800",
+    sold: "bg-green-100 text-green-800",
     success: "bg-green-100 text-green-800",
     rejected: "bg-red-100 text-red-800",
     inactive: "bg-gray-100 text-gray-600",
@@ -74,7 +88,9 @@ function StatusBadge({ status }: { status: string }) {
   const labels: Record<string, string> = {
     pending: "Menunggu",
     processing: "Diproses",
-    approved: "Disetujui",
+    approved: "Terjual",
+    available: "Terjual",
+    sold: "Terjual",
     success: "Berhasil",
     rejected: "Ditolak",
     inactive: "Nonaktif",
@@ -85,8 +101,15 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals } = useAdminData();
   const rules = useSettings("rules", DEFAULT_RULES);
+  const activeTiersList = useMemo(() => {
+    return Array.isArray(rules.data.tiers) && rules.data.tiers.length > 0 ? rules.data.tiers : DEFAULT_TIERS;
+  }, [rules.data.tiers]);
+
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Detail submission modal
+  const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
 
   // Filter states
   const [submissionSearch, setSubmissionSearch] = useState("");
@@ -100,15 +123,39 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const workerName = (id: string) => workerMap.get(id)?.name ?? shortId(id);
 
+  // Map worker accumulated approved item counts
+  const workerApprovedQtyMap = useMemo(() => {
+    const map = new Map<string, number>();
+    submissions.data.forEach((sub) => {
+      const isApprovedOrStock = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+      if (isApprovedOrStock) {
+        const count = getItemCountOfSubmission(sub);
+        const current = map.get(sub.workerId) ?? 0;
+        map.set(sub.workerId, current + count);
+      }
+    });
+    return map;
+  }, [submissions.data]);
+
   const stats = useMemo(() => {
     const totalWorkers = users.data.filter((u) => u.role === "worker").length;
     const pendingWorkers = users.data.filter((u) => u.role === "worker" && u.status === "pending").length;
-    const activeWorkers = users.data.filter((u) => u.role === "worker" && u.status === "approved").length;
+    const activeWorkers = users.data.filter((u) => u.role === "worker" && (u.status === "approved" || u.status === "active")).length;
     const totalBalance = users.data.reduce((sum, u) => sum + (u.balance ?? 0), 0);
     const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
-    const availableStock = submissions.data.filter((s) => s.status === "available" || s.status === "approved").length;
-    const soldStock = submissions.data.filter((s) => s.status === "sold").length;
+    const availableStock = submissions.data.reduce((sum, s) => {
+      if (s.status === "available" || s.status === "approved") {
+        return sum + getItemCountOfSubmission(s);
+      }
+      return sum;
+    }, 0);
+    const soldStock = submissions.data.reduce((sum, s) => {
+      if (s.status === "sold") {
+        return sum + getItemCountOfSubmission(s);
+      }
+      return sum;
+    }, 0);
     const pendingWithdrawals = withdrawals.data.filter((w) => w.status === "pending" || w.status === "processing").length;
     const pendingWithdrawalAmount = withdrawals.data
       .filter((w) => w.status === "pending" || w.status === "processing")
@@ -116,6 +163,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     const totalPaidOut = withdrawals.data
       .filter((w) => w.status === "success")
       .reduce((sum, w) => sum + w.amount, 0);
+
     return {
       totalWorkers,
       pendingWorkers,
@@ -131,11 +179,20 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     };
   }, [users.data, submissions.data, withdrawals.data]);
 
-  async function handleSubmissionDecision(id: string, decision: "approved" | "rejected") {
-    setBusyId(id);
+  async function handleSubmissionDecision(sub: EmailSubmission, decision: "approved" | "rejected") {
+    setBusyId(sub.id);
     try {
-      await reviewSubmission(id, decision, notes[id] ?? "", rules.data.pricePerEmail);
-      toast.success(decision === "approved" ? "Setoran disetujui, masuk stok 'Tersedia' dan saldo pekerja bertambah." : "Setoran ditolak.");
+      const worker = workerMap.get(sub.workerId);
+      const workerTierNum = sub.currentTier ?? worker?.tier ?? 1;
+      const tierCfg = getTierConfig(workerTierNum, activeTiersList);
+      const pricePerItem = sub.currentPricePerItem ?? tierCfg.pricePerItem;
+
+      await reviewSubmission(sub.id, decision, notes[sub.id] ?? "", pricePerItem, tierCfg.tier);
+      toast.success(
+        decision === "approved"
+          ? `Batch ${getItemCountOfSubmission(sub)} item disetujui! Total ${formatMoney(getItemCountOfSubmission(sub) * pricePerItem)} ditambahkan ke saldo pekerja.`
+          : "Batch setoran ditolak.",
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses setoran.");
     } finally {
@@ -147,7 +204,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     setBusyId(id);
     try {
       await updateEmailStockStatus(id, status, notes[id] ?? undefined);
-      toast.success(`Status stok email berhasil diubah menjadi '${status}'.`);
+      toast.success(`Status stok email berhasil diubah.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengubah status stok.");
     } finally {
@@ -157,11 +214,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const filteredSubmissions = useMemo(() => {
     return submissions.data.filter((item) => {
-      const wName = workerName(item.workerId).toLowerCase();
+      const wName = (item.workerName || workerName(item.workerId)).toLowerCase();
       const search = submissionSearch.toLowerCase().trim();
+      const firstEmail = item.items?.[0]?.email ?? item.email ?? "";
       const matchesSearch =
         !search ||
-        item.email.toLowerCase().includes(search) ||
+        firstEmail.toLowerCase().includes(search) ||
         item.workerId.toLowerCase().includes(search) ||
         wName.includes(search);
 
@@ -211,7 +269,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   async function handleUserTier(uid: string, tier: UserTier) {
     try {
       await updatePortalUser(uid, { tier });
-      toast.success("Tier pekerja diperbarui.");
+      toast.success("Tier pekerja berhasil diperbarui!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memperbarui tier.");
     }
@@ -247,8 +305,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         email: newWorker.email.trim(),
         password: newWorker.password,
         phone: newWorker.phone.trim() || undefined,
-        tier: Number(newWorker.tier) as UserTier,
-        status: "approved",
+        tier: Number(newWorker.tier),
+        status: "active",
         balance: 0,
       });
       toast.success("Akun pekerja berhasil dibuat.");
@@ -261,7 +319,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }
 
-  // --- Rules editor ---
+  // --- Rules & Tiers editor ---
   const [rulesDraft, setRulesDraft] = useState<{
     pricePerEmail: number;
     withdrawFeePercent: number;
@@ -269,6 +327,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     maxWithdraw: number;
     paymentMethodsStr: string;
     submissionNotesText: string;
+    tiers: TierConfig[];
   } | null>(null);
 
   const activePricePerEmail = rulesDraft !== null ? rulesDraft.pricePerEmail : rules.data.pricePerEmail;
@@ -287,10 +346,69 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       : Array.isArray(rules.data.submissionNotes)
         ? rules.data.submissionNotes.join("\n")
         : String(rules.data.submissionNotes ?? "");
+  const activeTiers = rulesDraft !== null ? rulesDraft.tiers : activeTiersList;
 
   const [savingRules, setSavingRules] = useState(false);
 
+  function handleAddTierConfig() {
+    const nextNum = activeTiers.length + 1;
+    const lastMax = activeTiers.length > 0 ? activeTiers[activeTiers.length - 1].maxQty : 0;
+    const newTierItem: TierConfig = {
+      tier: nextNum,
+      name: `Tier ${nextNum}`,
+      minQty: lastMax + 1,
+      maxQty: lastMax + 10,
+      pricePerItem: 3500,
+    };
+
+    setRulesDraft({
+      pricePerEmail: activePricePerEmail,
+      withdrawFeePercent: activeWithdrawFeePercent,
+      minWithdraw: activeMinWithdraw,
+      maxWithdraw: activeMaxWithdraw,
+      paymentMethodsStr: activePaymentMethodsStr,
+      submissionNotesText: activeSubmissionNotesText,
+      tiers: [...activeTiers, newTierItem],
+    });
+  }
+
+  function handleUpdateTierConfig(index: number, field: keyof TierConfig, value: unknown) {
+    const updated = activeTiers.map((t, idx) => (idx === index ? { ...t, [field]: value } : t));
+    setRulesDraft({
+      pricePerEmail: activePricePerEmail,
+      withdrawFeePercent: activeWithdrawFeePercent,
+      minWithdraw: activeMinWithdraw,
+      maxWithdraw: activeMaxWithdraw,
+      paymentMethodsStr: activePaymentMethodsStr,
+      submissionNotesText: activeSubmissionNotesText,
+      tiers: updated,
+    });
+  }
+
+  function handleRemoveTierConfig(index: number) {
+    if (activeTiers.length <= 1) {
+      toast.error("Minimal harus ada 1 tier konfigurasi.");
+      return;
+    }
+    const updated = activeTiers.filter((_, idx) => idx !== index);
+    setRulesDraft({
+      pricePerEmail: activePricePerEmail,
+      withdrawFeePercent: activeWithdrawFeePercent,
+      minWithdraw: activeMinWithdraw,
+      maxWithdraw: activeMaxWithdraw,
+      paymentMethodsStr: activePaymentMethodsStr,
+      submissionNotesText: activeSubmissionNotesText,
+      tiers: updated,
+    });
+  }
+
   async function handleSaveRules() {
+    const tierValError = validateTierConfigs(activeTiers);
+    if (tierValError) {
+      toast.error(tierValError);
+      return;
+    }
+
     setSavingRules(true);
     try {
       const parsedPaymentMethods = activePaymentMethodsStr
@@ -309,10 +427,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         maxWithdraw: Number(activeMaxWithdraw) || 0,
         paymentMethods: parsedPaymentMethods,
         submissionNotes: parsedSubmissionNotes,
+        tiers: activeTiers,
       };
 
       await saveSettings("rules", updatedRules);
-      toast.success("Aturan berhasil diperbarui dan langsung berlaku untuk semua pekerja.");
+      toast.success("Aturan & Konfigurasi Tier berhasil diperbarui!");
       setRulesDraft(null);
     } catch (err) {
       console.error("[AdminDashboard] Error saving rules:", err);
@@ -341,7 +460,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           <TabsList className="grid grid-cols-5 w-full mb-6">
             <TabsTrigger value="overview">Ringkasan</TabsTrigger>
             <TabsTrigger value="submissions" className="gap-1">
-              <FileText className="w-3.5 h-3.5" /> Email & Stok
+              <FileText className="w-3.5 h-3.5" /> Batch & Stok
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
@@ -356,7 +475,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
             <TabsTrigger value="rules">
-              <SettingsIcon className="w-3.5 h-3.5" /> Aturan
+              <SettingsIcon className="w-3.5 h-3.5" /> Aturan & Tier
             </TabsTrigger>
           </TabsList>
 
@@ -366,12 +485,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               {[
                 { label: "Total Pekerja", value: stats.totalWorkers },
                 { label: "Pekerja Menunggu", value: stats.pendingWorkers },
-                { label: "Pekerja Disetujui", value: stats.activeWorkers },
+                { label: "Pekerja Aktif", value: stats.activeWorkers },
                 { label: "Total Saldo Beredar", value: formatMoney(stats.totalBalance) },
-                { label: "Total Setoran Email", value: stats.totalSubmissions },
-                { label: "Setoran Menunggu", value: stats.pendingSubmissions },
-                { label: "Stok Email Tersedia", value: stats.availableStock },
-                { label: "Stok Email Terjual", value: stats.soldStock },
+                { label: "Total Batch Setoran", value: stats.totalSubmissions },
+                { label: "Batch Menunggu Review", value: stats.pendingSubmissions },
+                { label: "Stok Email Tersedia", value: `${stats.availableStock} item` },
+                { label: "Stok Email Terjual", value: `${stats.soldStock} item` },
                 { label: "Penarikan Menunggu", value: `${stats.pendingWithdrawals} (${formatMoney(stats.pendingWithdrawalAmount)})` },
                 { label: "Total Dicairkan", value: formatMoney(stats.totalPaidOut) },
               ].map((s) => (
@@ -385,7 +504,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </div>
           </TabsContent>
 
-          {/* KELOLA SETORAN & STOK EMAIL */}
+          {/* KELOLA BATCH SETORAN & STOK EMAIL */}
           <TabsContent value="submissions" className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
@@ -401,8 +520,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <SelectContent>
                   <SelectItem value="all">Semua Status</SelectItem>
                   <SelectItem value="pending">Menunggu (Pending)</SelectItem>
-                  <SelectItem value="available">Stok Tersedia</SelectItem>
-                  <SelectItem value="sold">Stok Terjual</SelectItem>
+                  <SelectItem value="available">Stok Tersedia / Terjual</SelectItem>
                   <SelectItem value="rejected">Ditolak</SelectItem>
                 </SelectContent>
               </Select>
@@ -410,94 +528,122 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {submissions.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
             {!submissions.loading && filteredSubmissions.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Tidak ada data setoran / stok email.</p>
+              <p className="text-sm text-gray-400 text-center py-8">Tidak ada data setoran / batch email.</p>
             )}
-            {filteredSubmissions.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="font-medium text-sm text-gray-900">{item.email}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {workerName(item.workerId)} · #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
-                      </p>
-                    </div>
-                    <StatusBadge status={item.status} />
-                  </div>
+            {filteredSubmissions.map((item) => {
+              const count = getItemCountOfSubmission(item);
+              const workerObj = workerMap.get(item.workerId);
+              const displayWorkerName = item.workerName || workerObj?.name || shortId(item.workerId);
+              const tierNum = item.appliedTier ?? item.currentTier ?? workerObj?.tier ?? 1;
+              const tierCfg = getTierConfig(tierNum, activeTiersList);
+              const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
+              const totalVal = item.totalAmount ?? (count * pricePerItem);
 
-                  {item.status === "pending" && (
-                    <div className="flex gap-2 mt-3">
-                      <Input
-                        placeholder="Catatan (opsional)"
-                        value={notes[item.id] ?? ""}
-                        onChange={(e) => setNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                        className="text-xs h-9"
-                      />
-                      <Button
-                        size="sm"
-                        disabled={busyId === item.id}
-                        onClick={() => handleSubmissionDecision(item.id, "approved")}
-                        className="bg-green-600 hover:bg-green-700 gap-1 shrink-0 text-xs"
-                      >
-                        {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                        Setujui & Tambah Stok
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={busyId === item.id}
-                        onClick={() => handleSubmissionDecision(item.id, "rejected")}
-                        className="gap-1 shrink-0 text-xs"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Tolak
-                      </Button>
-                    </div>
-                  )}
-
-                  {item.status !== "pending" && (
-                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100">
-                      <span className="text-xs text-gray-500">Ubah Status Stok:</span>
-                      {(item.status === "available" || item.status === "approved") && (
+              return (
+                <Card key={item.id}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-base text-gray-900">{displayWorkerName}</p>
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
+                            {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-600 font-medium">
+                          <strong>{count} item</strong> · Potential Total: <span className="text-amber-700 font-bold">{formatMoney(totalVal)}</span>
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <StatusBadge status={item.status} />
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={busyId === item.id}
-                          onClick={() => handleStockStatusChange(item.id, "sold")}
-                          className="h-7 text-xs bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
+                          onClick={() => setDetailSubmission(item)}
+                          className="text-xs h-7 gap-1"
                         >
-                          Tandai Terjual (Sold)
+                          <Eye className="w-3.5 h-3.5" /> Lihat Detail
                         </Button>
-                      )}
-                      {item.status === "sold" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busyId === item.id}
-                          onClick={() => handleStockStatusChange(item.id, "available")}
-                          className="h-7 text-xs bg-green-50 border-green-200 text-green-800 hover:bg-green-100"
-                        >
-                          Kembalikan ke Stok Tersedia
-                        </Button>
-                      )}
-                      {item.status !== "rejected" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busyId === item.id}
-                          onClick={() => handleStockStatusChange(item.id, "rejected")}
-                          className="h-7 text-xs text-red-600 hover:bg-red-50"
-                        >
-                          Nonaktifkan / Tolak
-                        </Button>
-                      )}
+                      </div>
                     </div>
-                  )}
 
-                  {item.reviewNote && <p className="text-xs text-gray-500 mt-2 italic">Catatan: {item.reviewNote}</p>}
-                </CardContent>
-              </Card>
-            ))}
+                    {item.status === "pending" && (
+                      <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
+                        <Input
+                          placeholder="Catatan review (opsional)"
+                          value={notes[item.id] ?? ""}
+                          onChange={(e) => setNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                          className="text-xs h-9 flex-1"
+                        />
+                        <Button
+                          size="sm"
+                          disabled={busyId === item.id}
+                          onClick={() => handleSubmissionDecision(item, "approved")}
+                          className="bg-green-600 hover:bg-green-700 gap-1 shrink-0 text-xs"
+                        >
+                          {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          Setujui ({formatMoney(totalVal)})
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyId === item.id}
+                          onClick={() => handleSubmissionDecision(item, "rejected")}
+                          className="gap-1 shrink-0 text-xs"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Tolak
+                        </Button>
+                      </div>
+                    )}
+
+                    {item.status !== "pending" && (
+                      <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                        <span>Status Stok:</span>
+                        {(item.status === "available" || item.status === "approved") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyId === item.id}
+                            onClick={() => handleStockStatusChange(item.id, "sold")}
+                            className="h-7 text-xs bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
+                          >
+                            Tandai Terjual (Sold)
+                          </Button>
+                        )}
+                        {item.status === "sold" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyId === item.id}
+                            onClick={() => handleStockStatusChange(item.id, "available")}
+                            className="h-7 text-xs bg-green-50 border-green-200 text-green-800 hover:bg-green-100"
+                          >
+                            Kembalikan ke Stok Tersedia
+                          </Button>
+                        )}
+                        {item.status !== "rejected" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busyId === item.id}
+                            onClick={() => handleStockStatusChange(item.id, "rejected")}
+                            className="h-7 text-xs text-red-600 hover:bg-red-50"
+                          >
+                            Nonaktifkan / Tolak
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {item.reviewNote && <p className="text-xs text-gray-500 mt-2 italic">Catatan: {item.reviewNote}</p>}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           {/* KELOLA PENARIKAN */}
@@ -567,7 +713,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             ))}
           </TabsContent>
 
-          {/* KELOLA PEKERJA */}
+          {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
           <TabsContent value="workers" className="space-y-3">
             <div className="flex justify-end">
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -579,7 +725,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Tambah Pekerja Baru</DialogTitle>
-                    <DialogDescription>Akun akan langsung berstatus disetujui.</DialogDescription>
+                    <DialogDescription>Akun akan langsung berstatus aktif.</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAddWorker} className="space-y-3">
                     <div>
@@ -621,15 +767,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         />
                       </div>
                       <div>
-                        <Label>Tier</Label>
+                        <Label>Tier Awal</Label>
                         <Select value={newWorker.tier} onValueChange={(v) => setNewWorker((p) => ({ ...p, tier: v }))}>
                           <SelectTrigger className="mt-1.5">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">Tier 1</SelectItem>
-                            <SelectItem value="2">Tier 2</SelectItem>
-                            <SelectItem value="3">Tier 3</SelectItem>
+                            {activeTiersList.map((t) => (
+                              <SelectItem key={t.tier} value={String(t.tier)}>
+                                {t.name} ({formatMoney(t.pricePerItem)}/item)
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -648,202 +796,332 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             {users.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
             {users.data
               .filter((u) => u.role === "worker")
-              .map((u) => (
-                <Card key={u.uid}>
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-medium text-sm text-gray-900">{u.name}</p>
-                        <p className="text-xs text-gray-400">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Saldo: {formatMoney(u.balance ?? 0)}</p>
+              .map((u) => {
+                const currentTierCfg = getTierConfig(u.tier ?? 1, activeTiersList);
+                const approvedCount = workerApprovedQtyMap.get(u.uid) ?? 0;
+                const recTierCfg = getRecommendedTier(approvedCount, activeTiersList);
+                const needsTierChange = Number(recTierCfg.tier) !== Number(currentTierCfg.tier);
+
+                return (
+                  <Card key={u.uid}>
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm text-gray-900">{u.name}</p>
+                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
+                              {currentTierCfg.name} ({formatMoney(currentTierCfg.pricePerItem)}/item)
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-gray-400">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
+                          <div className="flex gap-3 text-xs text-gray-600 mt-1">
+                            <span>Total Item Disetujui: <strong>{approvedCount} item</strong></span>
+                            <span>Saldo: <strong className="text-amber-700">{formatMoney(u.balance ?? 0)}</strong></span>
+                          </div>
+                        </div>
+                        <StatusBadge status={u.status} />
                       </div>
-                      <StatusBadge status={u.status} />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select value={String(u.tier)} onValueChange={(v) => handleUserTier(u.uid, Number(v) as UserTier)}>
-                        <SelectTrigger className="h-8 w-24 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Tier 1</SelectItem>
-                          <SelectItem value="2">Tier 2</SelectItem>
-                          <SelectItem value="3">Tier 3</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {u.status === "pending" && (
-                        <>
-                          <Button size="sm" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "approved")} className="bg-green-600 hover:bg-green-700 h-8">
-                            Setujui
+
+                      {/* Tier Recommendation Notice */}
+                      {needsTierChange && (
+                        <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between text-xs text-blue-900">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>
+                              Rekomendasi Tier: <strong>{recTierCfg.name}</strong> ({formatMoney(recTierCfg.pricePerItem)}/item) berdasarkan {approvedCount} item disetujui.
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleUserTier(u.uid, recTierCfg.tier)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-[11px] shrink-0"
+                          >
+                            Terapkan {recTierCfg.name}
                           </Button>
-                          <Button size="sm" variant="destructive" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "rejected")} className="h-8">
-                            Tolak
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <span>Set Tier Manual:</span>
+                          <Select value={String(u.tier)} onValueChange={(v) => handleUserTier(u.uid, Number(v))}>
+                            <SelectTrigger className="h-8 w-36 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {activeTiersList.map((t) => (
+                                <SelectItem key={t.tier} value={String(t.tier)}>
+                                  {t.name} ({formatMoney(t.pricePerItem)})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {u.status === "pending" && (
+                          <>
+                            <Button size="sm" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="bg-green-600 hover:bg-green-700 h-8">
+                              Setujui
+                            </Button>
+                            <Button size="sm" variant="destructive" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "rejected")} className="h-8">
+                              Tolak
+                            </Button>
+                          </>
+                        )}
+                        {(u.status === "approved" || u.status === "active") && (
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8">
+                            Nonaktifkan
                           </Button>
-                        </>
-                      )}
-                      {u.status === "approved" && (
-                        <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8">
-                          Nonaktifkan
-                        </Button>
-                      )}
-                      {(u.status === "inactive" || u.status === "rejected") && (
-                        <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "approved")} className="h-8">
-                          Aktifkan
-                        </Button>
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="ghost" className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 gap-1">
-                            <Trash2 className="w-3.5 h-3.5" /> Hapus
+                        )}
+                        {(u.status === "inactive" || u.status === "rejected") && (
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="h-8">
+                            Aktifkan
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Hapus data pekerja ini?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Ini menghapus profil "{u.name}" dari Firestore. Akun login (Firebase Authentication)
-                              tidak ikut terhapus otomatis — hapus manual dari Firebase Console jika perlu.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Batal</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(u.uid)} className="bg-red-600 hover:bg-red-700">
-                              Hapus
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        )}
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 gap-1 ml-auto">
+                              <Trash2 className="w-3.5 h-3.5" /> Hapus
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Hapus data pekerja ini?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Ini menghapus profil "{u.name}" dari Firestore.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Batal</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteUser(u.uid)} className="bg-red-600 hover:bg-red-700">
+                                Hapus
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
           </TabsContent>
 
-          {/* ATURAN DINAMIS */}
+          {/* ATURAN & TIER CONFIGURATION */}
           <TabsContent value="rules">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Aturan & Harga (Dinamis)</CardTitle>
-                <CardDescription>
-                  Perubahan di sini tersimpan di Firestore (settings/rules) dan langsung berlaku untuk semua
-                  pekerja tanpa perlu deploy ulang.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Harga per Email (Rp)</Label>
-                    <FormattedNumberInput
-                      value={activePricePerEmail}
-                      onChange={(val) =>
-                        setRulesDraft({
-                          pricePerEmail: val,
-                          withdrawFeePercent: activeWithdrawFeePercent,
-                          minWithdraw: activeMinWithdraw,
-                          maxWithdraw: activeMaxWithdraw,
-                          paymentMethodsStr: activePaymentMethodsStr,
-                          submissionNotesText: activeSubmissionNotesText,
-                        })
-                      }
-                      className="mt-1.5"
-                    />
+            <div className="space-y-6">
+              {/* TIER CONFIGURATION EDITOR */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Konfigurasi Tier Pekerja</CardTitle>
+                      <CardDescription>
+                        Atur rentang jumlah item dan harga per item untuk tiap tier. Sistem akan memberikan rekomendasi otomatis ke admin.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={handleAddTierConfig} variant="outline" className="gap-1 text-xs">
+                      <Plus className="w-3.5 h-3.5" /> Tambah Tier
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {activeTiers.map((t, idx) => (
+                    <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                      <div>
+                        <Label className="text-xs">Nama Tier</Label>
+                        <Input
+                          value={t.name}
+                          onChange={(e) => handleUpdateTierConfig(idx, "name", e.target.value)}
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Min. Qty</Label>
+                        <Input
+                          type="number"
+                          value={t.minQty}
+                          onChange={(e) => handleUpdateTierConfig(idx, "minQty", Number(e.target.value))}
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Max. Qty</Label>
+                        <Input
+                          type="number"
+                          value={t.maxQty}
+                          onChange={(e) => handleUpdateTierConfig(idx, "maxQty", Number(e.target.value))}
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Harga / Item (Rp)</Label>
+                        <FormattedNumberInput
+                          value={t.pricePerItem}
+                          onChange={(val) => handleUpdateTierConfig(idx, "pricePerItem", val)}
+                          className="mt-1 h-8 text-xs"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveTierConfig(idx)}
+                          className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* GENERAL RULES */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Aturan & Biaya Penarikan</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Minimal Penarikan (Rp)</Label>
+                      <FormattedNumberInput
+                        value={activeMinWithdraw}
+                        onChange={(val) =>
+                          setRulesDraft({
+                            pricePerEmail: activePricePerEmail,
+                            withdrawFeePercent: activeWithdrawFeePercent,
+                            minWithdraw: val,
+                            maxWithdraw: activeMaxWithdraw,
+                            paymentMethodsStr: activePaymentMethodsStr,
+                            submissionNotesText: activeSubmissionNotesText,
+                            tiers: activeTiers,
+                          })
+                        }
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label>Maksimal Penarikan (Rp)</Label>
+                      <FormattedNumberInput
+                        value={activeMaxWithdraw}
+                        onChange={(val) =>
+                          setRulesDraft({
+                            pricePerEmail: activePricePerEmail,
+                            withdrawFeePercent: activeWithdrawFeePercent,
+                            minWithdraw: activeMinWithdraw,
+                            maxWithdraw: val,
+                            paymentMethodsStr: activePaymentMethodsStr,
+                            submissionNotesText: activeSubmissionNotesText,
+                            tiers: activeTiers,
+                          })
+                        }
+                        className="mt-1.5"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <Label>Biaya Penarikan (%)</Label>
+                    <Label>Metode Pembayaran (pisahkan dengan koma)</Label>
                     <Input
-                      type="number"
-                      value={activeWithdrawFeePercent}
+                      value={activePaymentMethodsStr}
                       onChange={(e) =>
                         setRulesDraft({
                           pricePerEmail: activePricePerEmail,
-                          withdrawFeePercent: Number(e.target.value),
+                          withdrawFeePercent: activeWithdrawFeePercent,
                           minWithdraw: activeMinWithdraw,
                           maxWithdraw: activeMaxWithdraw,
-                          paymentMethodsStr: activePaymentMethodsStr,
+                          paymentMethodsStr: e.target.value,
                           submissionNotesText: activeSubmissionNotesText,
+                          tiers: activeTiers,
                         })
                       }
                       className="mt-1.5"
                     />
                   </div>
                   <div>
-                    <Label>Minimal Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      value={activeMinWithdraw}
-                      onChange={(val) =>
-                        setRulesDraft({
-                          pricePerEmail: activePricePerEmail,
-                          withdrawFeePercent: activeWithdrawFeePercent,
-                          minWithdraw: val,
-                          maxWithdraw: activeMaxWithdraw,
-                          paymentMethodsStr: activePaymentMethodsStr,
-                          submissionNotesText: activeSubmissionNotesText,
-                        })
-                      }
-                      className="mt-1.5"
-                    />
-                  </div>
-                  <div>
-                    <Label>Maksimal Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      value={activeMaxWithdraw}
-                      onChange={(val) =>
+                    <Label>Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
+                    <Textarea
+                      rows={6}
+                      value={activeSubmissionNotesText}
+                      onChange={(e) =>
                         setRulesDraft({
                           pricePerEmail: activePricePerEmail,
                           withdrawFeePercent: activeWithdrawFeePercent,
                           minWithdraw: activeMinWithdraw,
-                          maxWithdraw: val,
+                          maxWithdraw: activeMaxWithdraw,
                           paymentMethodsStr: activePaymentMethodsStr,
-                          submissionNotesText: activeSubmissionNotesText,
+                          submissionNotesText: e.target.value,
+                          tiers: activeTiers,
                         })
                       }
+                      placeholder="Tuliskan aturan setoran di sini..."
                       className="mt-1.5"
                     />
                   </div>
-                </div>
-                <div>
-                  <Label>Metode Pembayaran (pisahkan dengan koma)</Label>
-                  <Input
-                    value={activePaymentMethodsStr}
-                    onChange={(e) =>
-                      setRulesDraft({
-                        pricePerEmail: activePricePerEmail,
-                        withdrawFeePercent: activeWithdrawFeePercent,
-                        minWithdraw: activeMinWithdraw,
-                        maxWithdraw: activeMaxWithdraw,
-                        paymentMethodsStr: e.target.value,
-                        submissionNotesText: activeSubmissionNotesText,
-                      })
-                    }
-                    className="mt-1.5"
-                  />
-                </div>
-                <div>
-                  <Label>Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
-                  <Textarea
-                    rows={6}
-                    value={activeSubmissionNotesText}
-                    onChange={(e) =>
-                      setRulesDraft({
-                        pricePerEmail: activePricePerEmail,
-                        withdrawFeePercent: activeWithdrawFeePercent,
-                        minWithdraw: activeMinWithdraw,
-                        maxWithdraw: activeMaxWithdraw,
-                        paymentMethodsStr: activePaymentMethodsStr,
-                        submissionNotesText: e.target.value,
-                      })
-                    }
-                    placeholder="Tuliskan aturan setoran di sini..."
-                    className="mt-1.5"
-                  />
-                </div>
-                <Button onClick={handleSaveRules} disabled={savingRules} className="bg-amber-600 hover:bg-amber-700 gap-2">
-                  {savingRules && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Simpan Aturan
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button onClick={handleSaveRules} disabled={savingRules} className="bg-amber-600 hover:bg-amber-700 gap-2">
+                    {savingRules && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Simpan Pengaturan Aturan & Tier
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
+
+        {/* DIALOG LIHAT DETAIL BATCH */}
+        <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Detail Batch Setoran</DialogTitle>
+              <DialogDescription>
+                Pekerja: <strong>{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            {detailSubmission && (
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                  <div>
+                    <span className="text-gray-500">Jumlah Item:</span>
+                    <p className="font-bold text-gray-900">{getItemCountOfSubmission(detailSubmission)} item</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Tier / Harga:</span>
+                    <p className="font-bold text-amber-700">
+                      {getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList).name} (
+                      {formatMoney(detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? getTierConfig(1, activeTiersList).pricePerItem)}/item)
+                    </p>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-gray-200 flex justify-between">
+                    <span className="text-gray-500">Waktu Kirim:</span>
+                    <span className="font-medium text-gray-900">{formatDateTime(detailSubmission.submittedAt)}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-500">Daftar Email dalam Batch:</Label>
+                  <div className="mt-1.5 p-3 bg-gray-900 text-gray-100 rounded-lg max-h-56 overflow-y-auto text-xs font-mono space-y-1">
+                    {Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0 ? (
+                      detailSubmission.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between border-b border-gray-800 pb-1 last:border-0 last:pb-0">
+                          <span>{idx + 1}. {it.email}</span>
+                          {it.password && <span className="text-gray-400">sandi: {it.password}</span>}
+                        </div>
+                      ))
+                    ) : detailSubmission.email ? (
+                      <div className="flex justify-between">
+                        <span>1. {detailSubmission.email}</span>
+                        {detailSubmission.password && <span className="text-gray-400">sandi: {detailSubmission.password}</span>}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">Tidak ada item email detail.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
