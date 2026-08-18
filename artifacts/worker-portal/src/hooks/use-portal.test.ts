@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { StatusBadge } from "../pages/worker-dashboard";
 
 // Mock Firestore transaction object
 function createMockTransaction(store) {
@@ -178,5 +179,61 @@ describe("Firestore Transaction Read-Before-Write Tests", () => {
     expect(store["withdrawals/w_1"].status).toBe("rejected");
     expect(store["users/worker_123"].balance).toBe(70000);
     expect(tx._reads).toEqual(["withdrawals/w_1", "users/worker_123"]);
+  });
+});
+
+describe("StatusBadge Expected Display Value Mapping", () => {
+  function extractLabel(status: string): string {
+    const element = StatusBadge({ status });
+    // element is <Badge className="..."> {v.icon} {v.label} </Badge>
+    const children = element.props.children;
+    // children is [icon, label]
+    return Array.isArray(children) ? children[1] : String(children);
+  }
+
+  it("displays 'Menunggu' for pending submissions", () => {
+    expect(extractLabel("pending")).toBe("Menunggu");
+  });
+
+  it("displays 'Terjual' for approved, available, or sold submissions", () => {
+    expect(extractLabel("approved")).toBe("Terjual");
+    expect(extractLabel("available")).toBe("Terjual");
+    expect(extractLabel("sold")).toBe("Terjual");
+  });
+
+  it("displays 'Ditolak' for rejected submissions", () => {
+    expect(extractLabel("rejected")).toBe("Ditolak");
+  });
+
+  it("credits worker balance exactly once on approval and rejects subsequent approvals", async () => {
+    const store = {
+      "emailSubmissions/sub_100": {
+        workerId: "worker_999",
+        status: "pending",
+        email: "worker_test@example.com",
+      },
+      "users/worker_999": {
+        uid: "worker_999",
+        name: "Worker Test",
+        balance: 2000,
+      },
+    };
+
+    const pricePerEmail = 2000;
+    const tx1 = createMockTransaction(store);
+    await reviewSubmissionTx(tx1, "sub_100", "approved", "Approved by admin", pricePerEmail, store);
+
+    // Initial balance (2000) + credited once (2000) = 4000
+    expect(store["users/worker_999"].balance).toBe(4000);
+    expect(store["emailSubmissions/sub_100"].status).toBe("available");
+
+    // Attempting approval a second time on the same submission must fail
+    const tx2 = createMockTransaction(store);
+    await expect(
+      reviewSubmissionTx(tx2, "sub_100", "approved", "Second approval attempt", pricePerEmail, store)
+    ).rejects.toThrow("Setoran ini sudah pernah ditinjau.");
+
+    // Balance must remain credited exactly once (4000)
+    expect(store["users/worker_999"].balance).toBe(4000);
   });
 });
