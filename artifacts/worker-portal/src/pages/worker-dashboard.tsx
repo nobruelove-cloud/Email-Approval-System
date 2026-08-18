@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Send,
@@ -11,6 +11,8 @@ import {
   Clock,
   XCircle,
   Loader2,
+  Eye,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,9 +29,23 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useWorkerData, useSettings, createSubmission, createWithdrawal } from "@/hooks/use-portal";
-import { DEFAULT_RULES, type PortalUser } from "@/lib/portal-types";
-import { formatDateTime, formatMoney, shortId, validatePasswordAgainstRules } from "@/lib/portal-utils";
+import { DEFAULT_RULES, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import {
+  formatDateTime,
+  formatMoney,
+  getItemCountOfSubmission,
+  getTierConfig,
+  shortId,
+  validatePasswordAgainstRules,
+} from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string; icon: React.JSX.Element }> = {
@@ -54,10 +70,18 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
 
+  // Active Tier configuration
+  const currentTierConfig = useMemo(() => {
+    return getTierConfig(profile.tier ?? 1, rules.data.tiers);
+  }, [profile.tier, rules.data.tiers]);
+
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Detail Dialog state
+  const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
 
   const emailList = useMemo(
     () =>
@@ -94,16 +118,21 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
     setSubmitting(true);
     try {
-      await Promise.all(
-        emailList.map((email) =>
-          createSubmission({
-            workerId: profile.uid,
-            email,
-            password: password.trim(),
-          }),
-        ),
-      );
-      toast.success(`Berhasil mengirim ${emailList.length} email untuk ditinjau admin!`);
+      const batchItems = emailList.map((email) => ({
+        email,
+        password: password.trim(),
+      }));
+
+      await createSubmission({
+        workerId: profile.uid,
+        workerName: profile.name,
+        items: batchItems,
+        itemCount: batchItems.length,
+        currentTier: currentTierConfig.tier,
+        currentPricePerItem: currentTierConfig.pricePerItem,
+      });
+
+      toast.success(`Berhasil mengirim batch berisi ${batchItems.length} email untuk ditinjau admin!`);
       setEmailsText("");
       setPassword("");
     } catch (err) {
@@ -161,7 +190,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <p className="font-bold text-gray-900">{profile.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-900">{profile.name}</p>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300 gap-1">
+                <Award className="w-3 h-3" />
+                {currentTierConfig.name} ({formatMoney(currentTierConfig.pricePerItem)}/item)
+              </Badge>
+            </div>
             <p className="text-xs text-gray-500">{profile.email}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -193,43 +228,48 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </TabsTrigger>
           </TabsList>
 
-          {/* SETOR EMAIL */}
+          {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-2 text-amber-900 font-bold text-sm">
-                  <ShieldAlert className="w-4 h-4" />
-                  Aturan Setor Email
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                    <ShieldAlert className="w-4 h-4" />
+                    Aturan Setor Email
+                  </div>
+                  <Badge className="bg-amber-600 text-white font-semibold">
+                    {currentTierConfig.name} · {formatMoney(currentTierConfig.pricePerItem)}/item
+                  </Badge>
                 </div>
                 <ul className="space-y-1 text-xs text-amber-800 list-disc list-inside whitespace-pre-wrap">
                   {rules.data.submissionNotes.map((note, idx) => (
                     <li key={idx} className="whitespace-pre-wrap">{note}</li>
                   ))}
-                  <li>Harga per email disetujui: {formatMoney(rules.data.pricePerEmail)}</li>
+                  <li>Harga aktif Anda: {formatMoney(currentTierConfig.pricePerItem)} per item ({currentTierConfig.name}).</li>
                 </ul>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Detail Akun Setoran</CardTitle>
-                <CardDescription>Masukkan satu atau banyak email sekaligus, satu per baris.</CardDescription>
+                <CardTitle className="text-lg">Detail Batch Setoran</CardTitle>
+                <CardDescription>Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitEmails} className="space-y-4">
                   <div>
-                    <Label htmlFor="emails">Daftar Alamat Email ({emailList.length} email)</Label>
+                    <Label htmlFor="emails">Daftar Alamat Email ({emailList.length} item)</Label>
                     <Textarea
                       id="emails"
                       rows={6}
                       value={emailsText}
                       onChange={(e) => setEmailsText(e.target.value)}
-                      placeholder={"worker1@example.com\nworker2@example.com\nworker3@example.com"}
+                      placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
                       className="mt-1.5 font-mono text-sm"
                       required
                     />
                     <p className="text-[11px] text-gray-400 mt-1">
-                      Pisahkan setiap email dengan baris baru atau koma.
+                      Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch.
                     </p>
                   </div>
                   <div>
@@ -244,37 +284,73 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       required
                     />
                   </div>
+
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between text-xs text-gray-600">
+                    <div>
+                      <span>Estimasi Total Setoran: </span>
+                      <strong className="text-gray-900">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
+                    </div>
+                    <span className="font-bold text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
+                  </div>
+
                   <Button type="submit" disabled={submitting} className="w-full bg-amber-600 hover:bg-amber-700 gap-2">
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Kirim untuk Ditinjau
+                    Kirim Batch ({emailList.length} Item)
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* RIWAYAT SETORAN */}
+          {/* RIWAYAT SETORAN (GROUPED BY BATCH) */}
           <TabsContent value="submit-history" className="space-y-3">
             {submissions.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
             {!submissions.loading && submissions.data.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Belum ada setoran email.</p>
+              <p className="text-sm text-gray-400 text-center py-8">Belum ada batch setoran email.</p>
             )}
-            {submissions.data.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="pt-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{item.email}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
-                    </p>
-                    {item.reviewNote && (
-                      <p className="text-xs text-gray-500 mt-1 italic">Catatan: {item.reviewNote}</p>
-                    )}
-                  </div>
-                  <StatusBadge status={item.status} />
-                </CardContent>
-              </Card>
-            ))}
+            {submissions.data.map((item) => {
+              const count = getItemCountOfSubmission(item);
+              const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
+              const tierCfg = getTierConfig(tierNum, rules.data.tiers);
+              const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
+              const totalAmount = item.totalAmount ?? (count * pricePerItem);
+
+              return (
+                <Card key={item.id}>
+                  <CardContent className="pt-4 flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-gray-900">{count} item</span>
+                        <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
+                          {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-amber-700 font-semibold">
+                        Potensi / Total: {formatMoney(totalAmount)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
+                      </p>
+                      {item.reviewNote && (
+                        <p className="text-xs text-gray-500 italic">Catatan: {item.reviewNote}</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <StatusBadge status={item.status} />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDetailSubmission(item)}
+                        className="text-xs h-7 gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Lihat Detail
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           {/* TARIK SALDO */}
@@ -371,6 +447,56 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             ))}
           </TabsContent>
         </Tabs>
+
+        {/* DIALOG LIHAT DETAIL BATCH */}
+        <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Detail Batch Setoran</DialogTitle>
+              <DialogDescription>
+                Waktu setur: {formatDateTime(detailSubmission?.submittedAt)}
+              </DialogDescription>
+            </DialogHeader>
+            {detailSubmission && (
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                  <div>
+                    <span className="text-gray-500">Jumlah Item:</span>
+                    <p className="font-bold text-gray-900">{getItemCountOfSubmission(detailSubmission)} item</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Tier / Harga:</span>
+                    <p className="font-bold text-amber-700">
+                      {getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? profile.tier, rules.data.tiers).name} (
+                      {formatMoney(detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? getTierConfig(profile.tier, rules.data.tiers).pricePerItem)}/item)
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-500">Daftar Email dalam Batch:</Label>
+                  <div className="mt-1.5 p-3 bg-gray-900 text-gray-100 rounded-lg max-h-56 overflow-y-auto text-xs font-mono space-y-1">
+                    {Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0 ? (
+                      detailSubmission.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between border-b border-gray-800 pb-1 last:border-0 last:pb-0">
+                          <span>{idx + 1}. {it.email}</span>
+                          {it.password && <span className="text-gray-400">sandi: {it.password}</span>}
+                        </div>
+                      ))
+                    ) : detailSubmission.email ? (
+                      <div className="flex justify-between">
+                        <span>1. {detailSubmission.email}</span>
+                        {detailSubmission.password && <span className="text-gray-400">sandi: {detailSubmission.password}</span>}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">Tidak ada item email detail.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

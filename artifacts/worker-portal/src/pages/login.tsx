@@ -91,12 +91,12 @@ export default function LoginPage() {
         email: regEmail.trim(),
         phone: phone.trim() || undefined,
         role: "worker",
-        status: "pending",
+        status: "active",
         tier: 1,
         balance: 0,
       });
       console.log(`[Auth] Firestore profile created for UID: ${credential.user.uid}`);
-      toast.success("Pendaftaran berhasil! Menunggu persetujuan admin.");
+      toast.success("Pendaftaran berhasil! Akun Anda telah aktif.");
     } catch (err) {
       console.error("[Auth] Register error:", err);
       const code = (err as { code?: string }).code ?? "";
@@ -221,7 +221,7 @@ export default function LoginPage() {
               <>
                 <CardTitle className="text-lg mb-1">Buat Akun Baru</CardTitle>
                 <CardDescription className="mb-4">
-                  Akun akan aktif setelah disetujui oleh admin.
+                  Daftar akun pekerja baru untuk langsung menyetor email.
                 </CardDescription>
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div>
