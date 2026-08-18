@@ -24,9 +24,12 @@ export type PortalUser = {
   createdAt?: unknown;
 };
 
+export type EmailItemStatus = "pending" | "approved" | "rejected";
+
 export type EmailBatchItem = {
   email: string;
   password?: string;
+  status?: EmailItemStatus;
 };
 
 export type EmailSubmission = {
@@ -39,6 +42,8 @@ export type EmailSubmission = {
   // Batch submission support
   items?: EmailBatchItem[];
   itemCount?: number;
+  approvedItemCount?: number;
+  rejectedItemCount?: number;
   // Snapshot/info at submission time
   currentTier?: number;
   currentPricePerItem?: number;

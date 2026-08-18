@@ -64,33 +64,32 @@ async function reviewBatchSubmissionTx(
   const userSnap = userPath ? await tx.get({ path: userPath }) : null;
 
   const itemCount = getItemCountOfSubmission(submission);
+  const itemsToSave = submission.items?.map((it: any) => ({ ...it, status: it.status ?? (decision === "approved" ? "approved" : "rejected") })) ?? [];
+  const approvedCount = itemsToSave.filter((it: any) => it.status === "approved").length;
+  const rejectedCount = itemsToSave.filter((it: any) => it.status === "rejected").length;
+
   const appliedPricePerItem = submission.currentPricePerItem ?? pricePerItemFallback;
   const appliedTier = submission.currentTier ?? tierNumFallback;
-  const totalAmount = itemCount * appliedPricePerItem;
+  const totalAmount = approvedCount * appliedPricePerItem;
+  const finalStatus = approvedCount > 0 ? "available" : "rejected";
 
-  if (isApproval) {
-    tx.update({ path: submissionPath }, {
-      status: newStatus,
-      reviewNote,
-      appliedTier,
-      appliedPricePerItem,
-      itemCount,
-      totalAmount,
-      reviewedAt: "TIMESTAMP",
-      updatedAt: "TIMESTAMP",
-    });
+  tx.update({ path: submissionPath }, {
+    status: finalStatus,
+    items: itemsToSave,
+    itemCount,
+    approvedItemCount: approvedCount,
+    rejectedItemCount: rejectedCount,
+    reviewNote,
+    appliedTier,
+    appliedPricePerItem,
+    totalAmount,
+    reviewedAt: "TIMESTAMP",
+    updatedAt: "TIMESTAMP",
+  });
 
-    if (userPath && userSnap && userSnap.exists()) {
-      const current = userSnap.data().balance ?? 0;
-      tx.update({ path: userPath }, { balance: current + totalAmount });
-    }
-  } else {
-    tx.update({ path: submissionPath }, {
-      status: "rejected",
-      reviewNote,
-      reviewedAt: "TIMESTAMP",
-      updatedAt: "TIMESTAMP",
-    });
+  if (userPath && userSnap && userSnap.exists() && totalAmount > 0) {
+    const current = userSnap.data().balance ?? 0;
+    tx.update({ path: userPath }, { balance: current + totalAmount });
   }
 }
 
@@ -229,6 +228,41 @@ describe("Batch Approval, Credit Calculation, and Price Snapshot Tests", () => {
     ).rejects.toThrow("Setoran ini sudah pernah ditinjau.");
 
     expect(store["users/worker_777"].balance).toBe(6000);
+  });
+
+  it("handles partial approvals (3 approved, 2 rejected) and credits worker balance only for approved items", async () => {
+    const store = {
+      "emailSubmissions/batch_partial": {
+        workerId: "worker_partial_1",
+        items: [
+          { email: "1@a.com", status: "approved" },
+          { email: "2@a.com", status: "approved" },
+          { email: "3@a.com", status: "approved" },
+          { email: "4@a.com", status: "rejected" },
+          { email: "5@a.com", status: "rejected" },
+        ],
+        itemCount: 5,
+        currentTier: 2,
+        currentPricePerItem: 2500,
+        status: "pending",
+      },
+      "users/worker_partial_1": {
+        uid: "worker_partial_1",
+        balance: 1000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_partial", "approved", "3 approved / 2 rejected", 2500, 2);
+
+    const updatedSub = store["emailSubmissions/batch_partial"];
+    expect(updatedSub.status).toBe("available");
+    expect(updatedSub.approvedItemCount).toBe(3);
+    expect(updatedSub.rejectedItemCount).toBe(2);
+    expect(updatedSub.totalAmount).toBe(7500); // 3 * 2500
+
+    // Initial 1000 + 7500 = 8500
+    expect(store["users/worker_partial_1"].balance).toBe(8500);
   });
 
   it("rejected batch does not credit worker balance", async () => {

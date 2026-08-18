@@ -81,6 +81,8 @@ export function usePortalAuth() {
         });
       }, 10000);
 
+      let missingDocTimer: ReturnType<typeof setTimeout> | null = null;
+
       const unsubscribe = onSnapshot(
         doc(firestore, "users", user.uid),
         (snapshot) => {
@@ -95,6 +97,7 @@ export function usePortalAuth() {
 
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             console.warn("[PortalAuth] Snapshot fired but user is no longer active.");
+            if (missingDocTimer) clearTimeout(missingDocTimer);
             setProfile(null);
             setError("");
             setLoading(false);
@@ -102,22 +105,36 @@ export function usePortalAuth() {
           }
 
           if (snapshot.exists()) {
+            if (missingDocTimer) {
+              clearTimeout(missingDocTimer);
+              missingDocTimer = null;
+            }
             const data = snapshot.data();
             console.log("[PortalAuth] User profile retrieved successfully:", data);
             const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
             setProfile({ uid: user.uid, ...data, role: normalizedRole } as PortalUser);
             setError("");
+            setLoading(false);
           } else {
-            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore.`);
-            setProfile(null);
-            setError("Profil pengguna tidak ditemukan di database.");
+            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore yet.`);
+            if (!missingDocTimer) {
+              missingDocTimer = setTimeout(() => {
+                console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after grace period.`);
+                setProfile(null);
+                setError("Profil pengguna tidak ditemukan di database.");
+                setLoading(false);
+              }, 3000);
+            }
           }
-          setLoading(false);
         },
         (reason) => {
           if (profileTimer) {
             clearTimeout(profileTimer);
             profileTimer = null;
+          }
+          if (missingDocTimer) {
+            clearTimeout(missingDocTimer);
+            missingDocTimer = null;
           }
 
           console.error("[PortalAuth] Profile snapshot error:", reason);
@@ -287,10 +304,10 @@ export async function reviewSubmission(
   reviewNote: string,
   overridePricePerItem?: number,
   overrideTierNum?: number,
+  updatedItems?: EmailSubmission["items"],
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
-  const newStatus: SubmissionStatus = decision === "approved" ? "available" : decision;
 
   await runTransaction(firestore, async (tx) => {
     // 1. ALL READS FIRST
@@ -302,39 +319,52 @@ export async function reviewSubmission(
       throw new Error("Setoran ini sudah pernah ditinjau.");
     }
 
-    const isApproval = newStatus === "available" || decision === "approved";
-    const userRef = isApproval ? doc(firestore, "users", submission.workerId) : null;
+    // Determine items & status counts
+    const itemCount = getItemCountOfSubmission(submission);
+    let itemsToSave = updatedItems ?? submission.items;
+
+    if (!itemsToSave || itemsToSave.length === 0) {
+      // Legacy single email fallback
+      const singleEmail = submission.email ?? "";
+      const singlePassword = submission.password;
+      const singleStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+      itemsToSave = [{ email: singleEmail, password: singlePassword, status: singleStatus }];
+    } else if (!updatedItems) {
+      // Bulk decision applied to all batch items
+      const bulkItemStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+      itemsToSave = itemsToSave.map((it) => ({ ...it, status: it.status ?? bulkItemStatus }));
+    }
+
+    const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
+    const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
+
+    const appliedPricePerItem = submission.currentPricePerItem ?? overridePricePerItem ?? 2000;
+    const appliedTier = submission.currentTier ?? overrideTierNum ?? 1;
+    const creditAmount = approvedCount * appliedPricePerItem;
+
+    const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
+
+    const userRef = creditAmount > 0 ? doc(firestore, "users", submission.workerId) : null;
     const userSnap = userRef ? await tx.get(userRef) : null;
 
     // 2. ALL WRITES AFTER READS
-    const itemCount = getItemCountOfSubmission(submission);
-    const appliedPricePerItem = submission.currentPricePerItem ?? overridePricePerItem ?? 2000;
-    const appliedTier = submission.currentTier ?? overrideTierNum ?? 1;
-    const creditAmount = itemCount * appliedPricePerItem;
+    tx.update(submissionRef, {
+      status: finalStatus,
+      items: itemsToSave,
+      itemCount,
+      approvedItemCount: approvedCount,
+      rejectedItemCount: rejectedCount,
+      reviewNote,
+      appliedTier,
+      appliedPricePerItem,
+      totalAmount: creditAmount,
+      reviewedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
-    if (isApproval) {
-      tx.update(submissionRef, {
-        status: newStatus,
-        reviewNote,
-        appliedTier,
-        appliedPricePerItem,
-        itemCount,
-        totalAmount: creditAmount,
-        reviewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      if (userRef && userSnap && userSnap.exists()) {
-        const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-        tx.update(userRef, { balance: currentBalance + creditAmount });
-      }
-    } else {
-      tx.update(submissionRef, {
-        status: "rejected",
-        reviewNote,
-        reviewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+    if (userRef && userSnap && userSnap.exists()) {
+      const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+      tx.update(userRef, { balance: currentBalance + creditAmount });
     }
   });
 }
