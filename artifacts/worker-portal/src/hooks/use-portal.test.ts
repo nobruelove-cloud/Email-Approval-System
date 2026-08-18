@@ -449,6 +449,24 @@ describe("Authentication & Security Rule Logic Unit Tests", () => {
     expect(sim.state.firebaseUser.uid).toBe(authUid);
   });
 
+  it("A2. Profile document is created during grace period -> listener detects document and loads profile with no 'profile not found' error or logout", () => {
+    const authUid = "worker_delay_999";
+    // 1. Initial snapshot: document does not exist yet
+    const sim = simulateSnapshotResolution(authUid, false);
+    expect(sim.state.loading).toBe(true);
+    expect(sim.state.error).toBe("");
+
+    // 2. Profile created asynchronously while in grace period
+    const createdProfile = { name: "Delay Worker", email: "delay@test.com", role: "worker", status: "active", tier: 1, balance: 0 };
+    const simUpdated = simulateSnapshotResolution(authUid, true, createdProfile);
+
+    // 3. Snapshot listener receives updated snapshot and loads profile cleanly
+    expect(simUpdated.state.loading).toBe(false);
+    expect(simUpdated.state.error).toBe("");
+    expect(simUpdated.state.profile?.name).toBe("Delay Worker");
+    expect(simUpdated.state.profile?.status).toBe("active");
+  });
+
   it("B. Detects newly created profile as an active worker", () => {
     const authUid = "worker_active_456";
     const profileData = { name: "Budi", email: "budi@test.com", role: "worker", status: "active", tier: 1, balance: 0 };

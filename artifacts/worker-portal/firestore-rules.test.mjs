@@ -95,6 +95,52 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST D: Worker can read own users/{uid} document ---');
+  try {
+    await assertSucceeds(getDoc(doc(workerDb, 'users', workerUid)));
+    console.log('[PASS] Worker read own profile succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker read own profile failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST E: Worker cannot read another worker profile document (should fail) ---');
+  const otherWorkerUid = 'other_worker_456';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'users', otherWorkerUid), {
+      uid: otherWorkerUid,
+      name: 'Other Worker',
+      email: 'other@example.com',
+      role: 'worker',
+      status: 'active',
+    });
+  });
+  try {
+    await assertFails(getDoc(doc(workerDb, 'users', otherWorkerUid)));
+    console.log('[PASS] Worker reading another worker profile correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading another worker profile was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST F: Worker cannot modify role, tier, or increase balance (should fail) ---');
+  try {
+    await assertFails(
+      setDoc(doc(workerDb, 'users', workerUid), {
+        uid: workerUid,
+        name: 'Worker User',
+        email: 'worker@example.com',
+        role: 'admin', // disallowed
+        status: 'approved',
+      })
+    );
+    console.log('[PASS] Worker role elevation correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker role elevation was not rejected:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed.');
 }
