@@ -112,7 +112,8 @@ export function usePortalAuth() {
             const data = snapshot.data();
             console.log("[PortalAuth] User profile retrieved successfully:", data);
             const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
-            setProfile({ uid: user.uid, ...data, role: normalizedRole } as PortalUser);
+            const normalizedStatus = typeof data?.status === "string" ? data.status.trim().toLowerCase() : data?.status;
+            setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
           } else {

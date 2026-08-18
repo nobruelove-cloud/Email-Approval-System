@@ -49,7 +49,7 @@ service cloud.firestore {
         request.resource.data.email.size() > 0 &&
         (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
         request.resource.data.role == 'worker' &&
-        (request.resource.data.status == 'active' || request.resource.data.status == 'pending') &&
+        request.resource.data.status == 'active' &&
         request.resource.data.tier == 1 &&
         request.resource.data.balance == 0 &&
         request.resource.data.createdAt is timestamp
