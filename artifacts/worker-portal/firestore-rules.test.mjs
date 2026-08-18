@@ -8,7 +8,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
-const rulesContent = fs.readFileSync(path.resolve('../../firestore.rules'), 'utf8');
+const rulesContent = fs.readFileSync(path.resolve('../firestore.rules'), 'utf8');
 
 const adminUid = 'vQfEbhhVyXMXVlhYmu4AgOvmony1';
 const workerUid = 'worker_test_user_123';

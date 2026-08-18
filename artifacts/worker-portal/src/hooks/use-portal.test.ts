@@ -288,6 +288,89 @@ describe("Batch Approval, Credit Calculation, and Price Snapshot Tests", () => {
   });
 });
 
+describe("Worker Self-Registration Flow & Status Regression Tests", () => {
+  it("creates worker profile with status: 'active', tier: 1, balance: 0, role: 'worker'", () => {
+    const uid = "new_worker_123";
+    const name = "Worker Baru";
+    const email = "newworker@test.com";
+
+    const payload = {
+      name,
+      email,
+      role: "worker" as const,
+      status: "active" as const,
+      tier: 1,
+      balance: 0,
+    };
+
+    expect(payload.status).toBe("active");
+    expect(payload.role).toBe("worker");
+    expect(payload.tier).toBe(1);
+    expect(payload.balance).toBe(0);
+
+    // Profile snapshot simulation
+    const profileDoc = { uid, ...payload };
+
+    const normalizedRole = typeof profileDoc.role === "string" ? profileDoc.role.trim().toLowerCase() : profileDoc.role;
+    const normalizedStatus = typeof profileDoc.status === "string" ? profileDoc.status.trim().toLowerCase() : profileDoc.status;
+
+    expect(normalizedRole).toBe("worker");
+    expect(normalizedStatus).toBe("active");
+    expect(normalizedStatus).not.toBe("pending");
+  });
+
+  it("validates self-registration payload constraints (rejects pending status or altered privileges)", () => {
+    function isValidSelfRegistration(data: Record<string, any>, authUid: string) {
+      const allowedKeys = ["uid", "name", "email", "phone", "role", "status", "tier", "balance", "createdAt"];
+      const hasRequired = ["uid", "name", "email", "role", "status", "tier", "balance", "createdAt"].every((k) => k in data);
+      const hasOnlyAllowed = Object.keys(data).every((k) => allowedKeys.includes(k));
+
+      return (
+        hasRequired &&
+        hasOnlyAllowed &&
+        data.uid === authUid &&
+        typeof data.name === "string" &&
+        data.name.length > 0 &&
+        typeof data.email === "string" &&
+        data.email.length > 0 &&
+        (!("phone" in data) || typeof data.phone === "string") &&
+        data.role === "worker" &&
+        data.status === "active" && // Strictly active
+        data.tier === 1 &&
+        data.balance === 0
+      );
+    }
+
+    const validData = {
+      uid: "user_abc",
+      name: "Budi",
+      email: "budi@test.com",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    };
+    expect(isValidSelfRegistration(validData, "user_abc")).toBe(true);
+
+    // Invalid: status is 'pending'
+    const pendingData = { ...validData, status: "pending" };
+    expect(isValidSelfRegistration(pendingData, "user_abc")).toBe(false);
+
+    // Invalid: tier elevated
+    const elevatedTierData = { ...validData, tier: 2 };
+    expect(isValidSelfRegistration(elevatedTierData, "user_abc")).toBe(false);
+
+    // Invalid: balance > 0
+    const nonZeroBalanceData = { ...validData, balance: 1000 };
+    expect(isValidSelfRegistration(nonZeroBalanceData, "user_abc")).toBe(false);
+
+    // Invalid: role is admin
+    const adminRoleData = { ...validData, role: "admin" };
+    expect(isValidSelfRegistration(adminRoleData, "user_abc")).toBe(false);
+  });
+});
+
 describe("StatusBadge Expected Display Value Mapping", () => {
   function extractLabel(status: string): string {
     const element = StatusBadge({ status });

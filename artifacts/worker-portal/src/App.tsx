@@ -95,7 +95,9 @@ function PortalGate() {
     );
   }
 
-  if (profile.status === "pending") {
+  const userStatus = typeof profile.status === "string" ? profile.status.trim().toLowerCase() : profile.status;
+
+  if (userStatus === "pending") {
     return (
       <FullScreenMessage
         icon={<Clock className="w-8 h-8 text-amber-600" />}
@@ -110,13 +112,13 @@ function PortalGate() {
     );
   }
 
-  if (profile.status === "rejected" || profile.status === "inactive") {
+  if (userStatus === "rejected" || userStatus === "inactive") {
     return (
       <FullScreenMessage
         icon={<ShieldOff className="w-8 h-8 text-red-600" />}
-        title={profile.status === "rejected" ? "Pendaftaran Ditolak" : "Akun Dinonaktifkan"}
+        title={userStatus === "rejected" ? "Pendaftaran Ditolak" : "Akun Dinonaktifkan"}
         description={
-          profile.status === "rejected"
+          userStatus === "rejected"
             ? "Maaf, pendaftaran Anda tidak disetujui oleh admin. Hubungi admin untuk informasi lebih lanjut."
             : "Akun Anda saat ini dinonaktifkan. Hubungi admin untuk mengaktifkan kembali."
         }
