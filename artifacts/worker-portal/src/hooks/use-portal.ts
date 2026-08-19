@@ -36,6 +36,9 @@ export function usePortalAuth() {
   const profileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const missingDocTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveringUidRef = useRef<string | null>(null);
+  const resolvedUidRef = useRef<string | null>(null);
+  const recoveryFailedUidRef = useRef<string | null>(null);
+  const recoveryGenRef = useRef<number>(0);
   const activeUnsubscribeProfile = useRef<(() => void) | null>(null);
 
   const clearAllTimers = () => {
@@ -68,8 +71,12 @@ export function usePortalAuth() {
       }
 
       setFirebaseUser(user);
+      recoveringUidRef.current = null;
+      resolvedUidRef.current = null;
+      recoveryFailedUidRef.current = null;
+      recoveryGenRef.current += 1;
+
       if (!user) {
-        recoveringUidRef.current = null;
         setProfile(null);
         setError("");
         setLoading(false);
@@ -108,6 +115,8 @@ export function usePortalAuth() {
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
             console.warn("[PortalAuth] Snapshot fired but user is no longer active.");
             clearAllTimers();
+            resolvedUidRef.current = null;
+            recoveringUidRef.current = null;
             setProfile(null);
             setError("");
             setLoading(false);
@@ -119,7 +128,10 @@ export function usePortalAuth() {
               clearTimeout(missingDocTimerRef.current);
               missingDocTimerRef.current = null;
             }
+            resolvedUidRef.current = user.uid;
             recoveringUidRef.current = null;
+            recoveryFailedUidRef.current = null;
+
             const data = snapshot.data();
             console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, {
               uid: user.uid,
@@ -138,7 +150,15 @@ export function usePortalAuth() {
               return;
             }
 
+            if (recoveryFailedUidRef.current === user.uid) {
+              console.warn(`[PortalAuth] Auto-recovery previously failed for users/${user.uid}. Skipping repeated recovery attempt.`);
+              setLoading(false);
+              setError("Profil pengguna tidak ditemukan di database Firestore.");
+              return;
+            }
+
             recoveringUidRef.current = user.uid;
+            const currentGen = ++recoveryGenRef.current;
             setLoading(true);
 
             const defaultName = user.displayName || (user.email ? user.email.split("@")[0] : "Worker");
@@ -153,7 +173,21 @@ export function usePortalAuth() {
               balance: 0,
             }).catch((err) => {
               console.error(`[PortalAuth] Automatic profile recovery failed for users/${user.uid}:`, err);
+
+              // Stale operation protection: check if user changed, new recovery started, or profile was already resolved
+              if (
+                auth?.currentUser?.uid !== user.uid ||
+                recoveryGenRef.current !== currentGen ||
+                resolvedUidRef.current === user.uid
+              ) {
+                console.warn(
+                  `[PortalAuth] Stale recovery rejection ignored for users/${user.uid}. Active user: ${auth?.currentUser?.uid}, Resolved UID: ${resolvedUidRef.current}`,
+                );
+                return;
+              }
+
               recoveringUidRef.current = null;
+              recoveryFailedUidRef.current = user.uid;
               setProfile(null);
               setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
               setLoading(false);

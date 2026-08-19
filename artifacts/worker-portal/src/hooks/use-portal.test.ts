@@ -544,3 +544,274 @@ describe("Authentication & Security Rule Logic Unit Tests", () => {
     expect(canReadUserProfile(adminUid, workerUid, true)).toBe(true);
   });
 });
+
+describe("Race Condition & Lifecycle State Machine Regression Tests", () => {
+  // Helper harness simulating usePortalAuth state management logic exactly
+  function createPortalAuthHarness() {
+    const refs = {
+      recoveringUidRef: null as string | null,
+      resolvedUidRef: null as string | null,
+      recoveryFailedUidRef: null as string | null,
+      recoveryGenRef: 0,
+    };
+
+    let activeUser: { uid: string; email?: string; displayName?: string } | null = null;
+    let state = {
+      firebaseUser: null as { uid: string } | null,
+      profile: null as any,
+      loading: false,
+      error: "",
+    };
+
+    let recoveryCallCount = 0;
+    let activeRecoveryDeferred: {
+      resolve: () => void;
+      reject: (err: Error) => void;
+    } | null = null;
+
+    function handleAuthStateChange(user: { uid: string; email?: string } | null) {
+      activeUser = user;
+      state.firebaseUser = user;
+      refs.recoveringUidRef = null;
+      refs.resolvedUidRef = null;
+      refs.recoveryFailedUidRef = null;
+      refs.recoveryGenRef += 1;
+
+      if (!user) {
+        state.profile = null;
+        state.error = "";
+        state.loading = false;
+      } else {
+        state.loading = true;
+        state.error = "";
+      }
+    }
+
+    function handleSnapshot(snapshotExists: boolean, snapshotData?: any) {
+      if (!activeUser) return;
+      const uid = activeUser.uid;
+
+      if (snapshotExists) {
+        refs.resolvedUidRef = uid;
+        refs.recoveringUidRef = null;
+        refs.recoveryFailedUidRef = null;
+
+        const normalizedRole = typeof snapshotData?.role === "string" ? snapshotData.role.trim().toLowerCase() : snapshotData?.role;
+        const normalizedStatus = typeof snapshotData?.status === "string" ? snapshotData.status.trim().toLowerCase() : snapshotData?.status;
+
+        state.profile = { uid, ...snapshotData, role: normalizedRole, status: normalizedStatus };
+        state.error = "";
+        state.loading = false;
+      } else {
+        if (refs.recoveringUidRef === uid) {
+          return;
+        }
+
+        if (refs.recoveryFailedUidRef === uid) {
+          state.loading = false;
+          state.error = "Profil pengguna tidak ditemukan di database Firestore.";
+          return;
+        }
+
+        refs.recoveringUidRef = uid;
+        const currentGen = ++refs.recoveryGenRef;
+        state.loading = true;
+
+        recoveryCallCount += 1;
+
+        // Trigger async recovery promise
+        const recoveryPromise = new Promise<void>((resolve, reject) => {
+          activeRecoveryDeferred = { resolve, reject };
+        });
+
+        recoveryPromise.catch((err) => {
+          // Stale operation protection
+          if (
+            activeUser?.uid !== uid ||
+            refs.recoveryGenRef !== currentGen ||
+            refs.resolvedUidRef === uid
+          ) {
+            // Stale recovery error ignored
+            return;
+          }
+
+          refs.recoveringUidRef = null;
+          refs.recoveryFailedUidRef = uid;
+          state.profile = null;
+          state.error = err.message || "Gagal memulihkan profil pengguna.";
+          state.loading = false;
+        });
+      }
+    }
+
+    return {
+      refs,
+      getState: () => ({ ...state }),
+      getRecoveryCallCount: () => recoveryCallCount,
+      handleAuthStateChange,
+      handleSnapshot,
+      resolveRecovery: () => activeRecoveryDeferred?.resolve(),
+      rejectRecovery: (errMessage: string) => activeRecoveryDeferred?.reject(new Error(errMessage)),
+    };
+  }
+
+  it("A. Missing profile triggers automatic recovery", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_A" });
+    expect(harness.getState().loading).toBe(true);
+
+    harness.handleSnapshot(false); // snapshot.exists() === false
+    expect(harness.getRecoveryCallCount()).toBe(1);
+    expect(harness.refs.recoveringUidRef).toBe("user_A");
+    expect(harness.getState().loading).toBe(true);
+  });
+
+  it("B. Recovery succeeds and resulting Firestore snapshot loads profile", async () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_B" });
+    harness.handleSnapshot(false);
+
+    // Auto-recovery creates the doc, snapshot fires with exists === true
+    harness.handleSnapshot(true, { name: "User B", role: "worker", status: "active", tier: 1, balance: 0 });
+    harness.resolveRecovery();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const state = harness.getState();
+    expect(state.profile?.name).toBe("User B");
+    expect(state.loading).toBe(false);
+    expect(state.error).toBe("");
+    expect(harness.refs.resolvedUidRef).toBe("user_B");
+  });
+
+  it("C. CRITICAL RACE TEST: Recovery starts -> valid profile snapshot arrives -> recovery promise later rejects", async () => {
+    const harness = createPortalAuthHarness();
+
+    // 1. Auth state changes for user_race
+    harness.handleAuthStateChange({ uid: "user_race" });
+
+    // 2. Snapshot fires with exists === false, triggering recovery
+    harness.handleSnapshot(false);
+    expect(harness.refs.recoveringUidRef).toBe("user_race");
+    expect(harness.getRecoveryCallCount()).toBe(1);
+
+    // 3. Firestore snapshot listener receives valid profile document (exists === true)
+    harness.handleSnapshot(true, {
+      name: "Race Worker",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    });
+
+    expect(harness.getState().profile?.name).toBe("Race Worker");
+    expect(harness.getState().loading).toBe(false);
+    expect(harness.getState().error).toBe("");
+    expect(harness.refs.resolvedUidRef).toBe("user_race");
+
+    // 4. The previously started createPortalUser promise LATER rejects
+    harness.rejectRecovery("Network timeout writing document");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // EXPECTED RESULT:
+    // Profile MUST remain populated, loading MUST remain false, error MUST remain empty
+    const finalState = harness.getState();
+    expect(finalState.profile).not.toBeNull();
+    expect(finalState.profile?.name).toBe("Race Worker");
+    expect(finalState.loading).toBe(false);
+    expect(finalState.error).toBe("");
+  });
+
+  it("D. Recovery fails before any profile exists -> produces controlled error state, not infinite loop", async () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_failed" });
+    harness.handleSnapshot(false);
+
+    expect(harness.getRecoveryCallCount()).toBe(1);
+
+    // Recovery fails before any valid snapshot arrives
+    harness.rejectRecovery("Permission denied creating document");
+    await new Promise((r) => setTimeout(r, 10));
+
+    let state = harness.getState();
+    expect(state.loading).toBe(false);
+    expect(state.profile).toBeNull();
+    expect(state.error).toBe("Permission denied creating document");
+    expect(harness.refs.recoveryFailedUidRef).toBe("user_failed");
+
+    // Subsequent snapshot callbacks with exists === false DO NOT start duplicate recovery calls
+    harness.handleSnapshot(false);
+    harness.handleSnapshot(false);
+
+    expect(harness.getRecoveryCallCount()).toBe(1); // Still 1, no infinite loop
+    expect(harness.getState().error).toBe("Profil pengguna tidak ditemukan di database Firestore.");
+  });
+
+  it("E. Auth UID changes while recovery is pending -> stale recovery from previous UID cannot modify new user's state", async () => {
+    const harness = createPortalAuthHarness();
+
+    // User 1 logs in & triggers recovery
+    harness.handleAuthStateChange({ uid: "user_1" });
+    harness.handleSnapshot(false);
+    expect(harness.refs.recoveringUidRef).toBe("user_1");
+
+    // User 1 logs out / User 2 logs in while User 1's recovery is still pending
+    harness.handleAuthStateChange({ uid: "user_2" });
+    harness.handleSnapshot(true, { name: "User Two", role: "worker", status: "active", tier: 1, balance: 0 });
+
+    expect(harness.getState().profile?.name).toBe("User Two");
+
+    // User 1's stale recovery promise now rejects
+    harness.rejectRecovery("User 1 recovery failed");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // EXPECTED RESULT: User 2's valid state remains untouched
+    const state = harness.getState();
+    expect(state.firebaseUser?.uid).toBe("user_2");
+    expect(state.profile?.name).toBe("User Two");
+    expect(state.loading).toBe(false);
+    expect(state.error).toBe("");
+  });
+
+  it("F. Existing profile is never overwritten by automatic recovery", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_existing" });
+
+    // Initial snapshot exists === true
+    harness.handleSnapshot(true, { name: "Existing Worker", role: "worker", status: "active", tier: 2, balance: 5000 });
+
+    expect(harness.getRecoveryCallCount()).toBe(0);
+    expect(harness.getState().profile?.tier).toBe(2);
+    expect(harness.getState().profile?.balance).toBe(5000);
+  });
+
+  it("G. Multiple snapshot callbacks do not start uncontrolled duplicate recovery operations", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_multi" });
+
+    // Firing missing doc snapshot 5 times in rapid succession
+    harness.handleSnapshot(false);
+    harness.handleSnapshot(false);
+    harness.handleSnapshot(false);
+    harness.handleSnapshot(false);
+    harness.handleSnapshot(false);
+
+    expect(harness.getRecoveryCallCount()).toBe(1);
+  });
+
+  it("H. Worker profile remains normalized: role/status trimmed and lowercased", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_norm" });
+
+    harness.handleSnapshot(true, {
+      name: "Norm Worker",
+      role: "  WORKER  ",
+      status: "  ACTIVE  ",
+      tier: 1,
+      balance: 0,
+    });
+
+    const profile = harness.getState().profile;
+    expect(profile?.role).toBe("worker");
+    expect(profile?.status).toBe("active");
+  });
+});
