@@ -196,11 +196,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   async function handleFinalizeBatchReview(sub: EmailSubmission) {
     setBusyId(sub.id);
     try {
-      const worker = workerMap.get(sub.workerId);
-      const workerTierNum = sub.currentTier ?? worker?.tier ?? 1;
-      const tierCfg = getTierConfig(workerTierNum, activeTiersList);
-      const pricePerItem = sub.currentPricePerItem ?? tierCfg.pricePerItem;
-
       const baseItems = Array.isArray(sub.items) && sub.items.length > 0
         ? sub.items
         : sub.email
@@ -214,6 +209,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       const approvedCount = updatedItems.filter((it) => it.status === "approved").length;
       const rejectedCount = updatedItems.filter((it) => it.status === "rejected").length;
+
+      // Determine resulting Tier and price per item based ONLY on final ACC/valid count
+      const recTierCfg = getRecommendedTier(approvedCount, activeTiersList);
+      const pricePerItem = recTierCfg.pricePerItem;
       const totalCredit = approvedCount * pricePerItem;
 
       const decision = approvedCount > 0 ? "approved" : "rejected";
@@ -223,12 +222,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         decision,
         notes[sub.id] ?? "",
         pricePerItem,
-        tierCfg.tier,
+        recTierCfg.tier,
         updatedItems,
       );
 
       toast.success(
-        `Finalisasi batch berhasil! ${approvedCount} disetujui, ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
+        `Finalisasi batch berhasil! ${approvedCount} ACC (${recTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
       );
       setDetailSubmission(null);
     } catch (err) {
