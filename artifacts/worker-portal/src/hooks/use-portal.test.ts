@@ -241,14 +241,16 @@ describe("Dynamic Worker Tier Recalculation & Payout Unit Tests", () => {
     expect(worker.tier).toBe(2);
   });
 
-  it("Final ACC count causes Tier downgrade (Example 1 from prompt)", async () => {
+  it("A. Worker Tier 3 submits 100 emails, 98 ACC -> final Batch Tier = Tier 2, price = Tier 2 price, payout = 98 x Tier 2 price, worker Tier = Tier 2", async () => {
     // Worker currently Tier 3 submits 100 emails: 98 valid/ACC, 2 invalid.
-    // Custom tier config where 98 ACC belongs to Tier 2 (Tier 1: 1-10 @ 2000, Tier 2: 11-100 @ 2500, Tier 3: 101+ @ 3000)
-    // Worker becomes Tier 2, Payout = 98 * 2500 = 245.000.
+    // Custom tier config matching prompt example:
+    // Tier 1: 1+ ACC, Rp1,000/email (minQty: 1, maxQty: 49)
+    // Tier 2: 50+ ACC, Rp1,500/email (minQty: 50, maxQty: 99)
+    // Tier 3: 100+ ACC, Rp2,000/email (minQty: 100, maxQty: 999999)
     const customTiers: TierConfig[] = [
-      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 10, pricePerItem: 2000 },
-      { tier: 2, name: "Tier 2", minQty: 11, maxQty: 100, pricePerItem: 2500 },
-      { tier: 3, name: "Tier 3", minQty: 101, maxQty: 999999, pricePerItem: 3000 },
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 49, pricePerItem: 1000 },
+      { tier: 2, name: "Tier 2", minQty: 50, maxQty: 99, pricePerItem: 1500 },
+      { tier: 3, name: "Tier 3", minQty: 100, maxQty: 999999, pricePerItem: 2000 },
     ];
 
     const items = Array.from({ length: 100 }, (_, i) => ({
@@ -262,7 +264,7 @@ describe("Dynamic Worker Tier Recalculation & Payout Unit Tests", () => {
         items,
         itemCount: 100,
         currentTier: 3,
-        currentPricePerItem: 3000,
+        currentPricePerItem: 2000,
         status: "pending",
       },
       "users/worker_downgrade": {
@@ -281,11 +283,202 @@ describe("Dynamic Worker Tier Recalculation & Payout Unit Tests", () => {
     expect(sub.approvedItemCount).toBe(98);
     expect(sub.rejectedItemCount).toBe(2);
     expect(sub.appliedTier).toBe(2);
-    expect(sub.appliedPricePerItem).toBe(2500);
-    expect(sub.totalAmount).toBe(245000); // 98 * 2500
+    expect(sub.appliedPricePerItem).toBe(1500);
+    expect(sub.totalAmount).toBe(147000); // 98 * 1500
 
     expect(worker.tier).toBe(2); // Downgraded to Tier 2
-    expect(worker.balance).toBe(245000);
+    expect(worker.balance).toBe(147000);
+  });
+
+  it("B. Worker Tier 2 submits 150 emails, 150 ACC -> final Batch Tier = Tier 3, price = Tier 3 price, payout = 150 x Tier 3 price, worker Tier = Tier 3", async () => {
+    // Custom tier config matching prompt example:
+    // Tier 1: 1+ ACC, Rp1,000
+    // Tier 2: 50+ ACC, Rp1,500
+    // Tier 3: 100+ ACC, Rp2,000
+    const customTiers: TierConfig[] = [
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 49, pricePerItem: 1000 },
+      { tier: 2, name: "Tier 2", minQty: 50, maxQty: 99, pricePerItem: 1500 },
+      { tier: 3, name: "Tier 3", minQty: 100, maxQty: 999999, pricePerItem: 2000 },
+    ];
+
+    const items = Array.from({ length: 150 }, (_, i) => ({
+      email: `test${i}@a.com`,
+      status: "approved",
+    }));
+
+    const store = {
+      "emailSubmissions/batch_upgrade": {
+        workerId: "worker_upgrade",
+        items,
+        itemCount: 150,
+        currentTier: 2,
+        currentPricePerItem: 1500,
+        status: "pending",
+      },
+      "users/worker_upgrade": {
+        uid: "worker_upgrade",
+        tier: 2,
+        balance: 50000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_upgrade", "approved", "All 150 ACC", undefined, undefined, customTiers);
+
+    const sub = store["emailSubmissions/batch_upgrade"];
+    const worker = store["users/worker_upgrade"];
+
+    expect(sub.approvedItemCount).toBe(150);
+    expect(sub.appliedTier).toBe(3);
+    expect(sub.appliedPricePerItem).toBe(2000);
+    expect(sub.totalAmount).toBe(300000); // 150 * 2000
+
+    expect(worker.tier).toBe(3); // Upgraded to Tier 3
+    expect(worker.balance).toBe(350000); // Initial 50000 + 300000 payout
+  });
+
+  it("C. Worker submits 2 emails while currently Tier 3 -> final Tier must be Tier 1 (2 ACC), payout uses Tier 1 price, does NOT blindly use Tier 3", async () => {
+    // Tier 1: 1-49 ACC @ Rp1000, Tier 2: 50-99 ACC @ Rp1500, Tier 3: 100+ ACC @ Rp2000
+    const customTiers: TierConfig[] = [
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 49, pricePerItem: 1000 },
+      { tier: 2, name: "Tier 2", minQty: 50, maxQty: 99, pricePerItem: 1500 },
+      { tier: 3, name: "Tier 3", minQty: 100, maxQty: 999999, pricePerItem: 2000 },
+    ];
+
+    const store = {
+      "emailSubmissions/batch_tier3_submits_2": {
+        workerId: "worker_t3_small",
+        items: [{ email: "1@a.com", status: "approved" }, { email: "2@a.com", status: "approved" }],
+        itemCount: 2,
+        currentTier: 3,
+        currentPricePerItem: 2000,
+        status: "pending",
+      },
+      "users/worker_t3_small": {
+        uid: "worker_t3_small",
+        tier: 3,
+        balance: 20000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_tier3_submits_2", "approved", "Tier 3 worker submitted 2 emails", undefined, undefined, customTiers);
+
+    const sub = store["emailSubmissions/batch_tier3_submits_2"];
+    const worker = store["users/worker_t3_small"];
+
+    // 2 ACC emails -> resolved Tier 1 (1-49 ACC @ 1000/item)
+    expect(sub.appliedTier).toBe(1);
+    expect(sub.appliedPricePerItem).toBe(1000);
+    expect(sub.totalAmount).toBe(2000); // 2 * 1000
+
+    expect(worker.tier).toBe(1);
+    expect(worker.balance).toBe(22000);
+  });
+
+  it("D. Partial invalid emails: only ACC emails count toward Tier, invalid emails receive no payout", async () => {
+    // Worker submits 60 emails: 50 ACC, 10 rejected.
+    // Custom tiers: Tier 1: 1-49 ACC @ 1000, Tier 2: 50-99 ACC @ 1500, Tier 3: 100+ @ 2000
+    const customTiers: TierConfig[] = [
+      { tier: 1, name: "Tier 1", minQty: 1, maxQty: 49, pricePerItem: 1000 },
+      { tier: 2, name: "Tier 2", minQty: 50, maxQty: 99, pricePerItem: 1500 },
+      { tier: 3, name: "Tier 3", minQty: 100, maxQty: 999999, pricePerItem: 2000 },
+    ];
+
+    const items = Array.from({ length: 60 }, (_, i) => ({
+      email: `partial${i}@a.com`,
+      status: i < 50 ? "approved" : "rejected",
+    }));
+
+    const store = {
+      "emailSubmissions/batch_partial_test": {
+        workerId: "worker_partial",
+        items,
+        itemCount: 60,
+        status: "pending",
+      },
+      "users/worker_partial": {
+        uid: "worker_partial",
+        tier: 1,
+        balance: 0,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_partial_test", "approved", "50 ACC / 10 rejected", undefined, undefined, customTiers);
+
+    const sub = store["emailSubmissions/batch_partial_test"];
+    const worker = store["users/worker_partial"];
+
+    expect(sub.approvedItemCount).toBe(50);
+    expect(sub.rejectedItemCount).toBe(10);
+    expect(sub.appliedTier).toBe(2);
+    expect(sub.appliedPricePerItem).toBe(1500);
+    expect(sub.totalAmount).toBe(75000); // 50 * 1500, 10 rejected emails receive Rp0
+
+    expect(worker.tier).toBe(2);
+    expect(worker.balance).toBe(75000);
+  });
+
+  it("E. Zero ACC: payout = 0, balance unchanged", async () => {
+    const store = {
+      "emailSubmissions/batch_zero_acc_test": {
+        workerId: "worker_zero_test",
+        items: [{ email: "bad1@a.com", status: "rejected" }, { email: "bad2@a.com", status: "rejected" }],
+        itemCount: 2,
+        currentTier: 2,
+        currentPricePerItem: 1500,
+        status: "pending",
+      },
+      "users/worker_zero_test": {
+        uid: "worker_zero_test",
+        tier: 2,
+        balance: 15000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await reviewBatchSubmissionTx(tx, "batch_zero_acc_test", "rejected", "0 ACC");
+
+    const sub = store["emailSubmissions/batch_zero_acc_test"];
+    const worker = store["users/worker_zero_test"];
+
+    expect(sub.status).toBe("rejected");
+    expect(sub.approvedItemCount).toBe(0);
+    expect(sub.rejectedItemCount).toBe(2);
+    expect(sub.totalAmount).toBe(0);
+
+    // Balance remains unchanged at 15000
+    expect(worker.balance).toBe(15000);
+  });
+
+  it("G. Finalized batch retains resolved Tier/price when Admin later changes Tier rules", async () => {
+    // 1. Batch finalized under old rules
+    const store = {
+      "emailSubmissions/finalized_batch_1": {
+        workerId: "worker_hist",
+        items: [{ email: "1@a.com", status: "approved" }, { email: "2@a.com", status: "approved" }],
+        itemCount: 2,
+        approvedItemCount: 2,
+        rejectedItemCount: 0,
+        appliedTier: 1,
+        appliedPricePerItem: 2000,
+        totalAmount: 4000,
+        status: "available",
+      },
+      "settings/rules": {
+        // Admin later changes Tier 1 price to 5000
+        tiers: [
+          { tier: 1, name: "Tier 1", minQty: 1, maxQty: 3, pricePerItem: 5000 },
+        ],
+      },
+    };
+
+    const sub = store["emailSubmissions/finalized_batch_1"];
+    // Historic finalized record retains original applied values
+    expect(sub.appliedTier).toBe(1);
+    expect(sub.appliedPricePerItem).toBe(2000);
+    expect(sub.totalAmount).toBe(4000);
   });
 
   it("Final ACC count causes Tier upgrade (Example 2 from prompt)", async () => {

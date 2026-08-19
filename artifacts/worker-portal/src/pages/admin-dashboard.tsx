@@ -571,10 +571,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               const count = getItemCountOfSubmission(item);
               const workerObj = workerMap.get(item.workerId);
               const displayWorkerName = item.workerName || workerObj?.name || shortId(item.workerId);
+
+              const isFinalized = item.status !== "pending";
+              const approvedCount = item.approvedItemCount ?? (item.status === "available" || item.status === "approved" || item.status === "sold" ? count : 0);
+              const rejectedCount = item.rejectedItemCount ?? (item.status === "rejected" ? count : 0);
+
               const tierNum = item.appliedTier ?? item.currentTier ?? workerObj?.tier ?? 1;
               const tierCfg = getTierConfig(tierNum, activeTiersList);
               const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-              const totalVal = item.totalAmount ?? (count * pricePerItem);
+              const totalVal = item.totalAmount ?? (approvedCount * pricePerItem);
 
               return (
                 <Card key={item.id}>
@@ -587,9 +592,19 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                           </Badge>
                         </div>
-                        <p className="text-xs text-gray-600 font-medium">
-                          <strong>{count} item</strong> · Potential Total: <span className="text-amber-700 font-bold">{formatMoney(totalVal)}</span>
-                        </p>
+                        {isFinalized ? (
+                          <div className="text-xs text-gray-600 font-medium flex flex-wrap items-center gap-2">
+                            <span>Disetujui (ACC): <strong className="text-green-700">{approvedCount}</strong>/{count}</span>
+                            <span>·</span>
+                            <span>Ditolak: <strong className="text-red-700">{rejectedCount}</strong></span>
+                            <span>·</span>
+                            <span>Total Payout: <strong className="text-amber-700">{formatMoney(totalVal)}</strong></span>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-600 font-medium">
+                            <strong>{count} email disetorkan</strong> · Estimasi Awal: <span className="text-amber-700 font-bold">{formatMoney(count * pricePerItem)}</span>
+                          </p>
+                        )}
                         <p className="text-xs text-gray-400">
                           #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
                         </p>
@@ -1092,30 +1107,51 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   ? [{ email: detailSubmission.email, password: detailSubmission.password }]
                   : [];
 
-              const tierCfg = getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList);
-              const pricePerItem = detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? tierCfg.pricePerItem;
-
-              const approvedCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "approved").length;
-              const rejectedCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "rejected").length;
-              const pendingCount = baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "pending").length;
-              const calcTotal = approvedCount * pricePerItem;
-
               const isReadOnly = detailSubmission.status !== "pending";
+
+              const approvedCount = isReadOnly
+                ? (detailSubmission.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length)
+                : baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "approved").length;
+
+              const rejectedCount = isReadOnly
+                ? (detailSubmission.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length)
+                : baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "rejected").length;
+
+              const pendingCount = isReadOnly
+                ? 0
+                : baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "pending").length;
+
+              // Resolved tier and price based on final ACC count (if pending, preview dynamic recommendation)
+              const recTierCfg = isReadOnly
+                ? getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList)
+                : getRecommendedTier(approvedCount, activeTiersList);
+
+              const pricePerItem = isReadOnly
+                ? (detailSubmission.appliedPricePerItem ?? recTierCfg.pricePerItem)
+                : recTierCfg.pricePerItem;
+
+              const calcTotal = isReadOnly
+                ? (detailSubmission.totalAmount ?? (approvedCount * pricePerItem))
+                : (approvedCount * pricePerItem);
 
               return (
                 <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
                     <div>
                       <span className="text-gray-500">Total Item:</span>
                       <p className="font-bold text-gray-900">{baseItems.length} item</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Disetujui:</span>
+                      <span className="text-gray-500">ACC:</span>
                       <p className="font-bold text-green-600">{approvedCount} item</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Ditolak:</span>
                       <p className="font-bold text-red-600">{rejectedCount} item</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Hasil Tier:</span>
+                      <p className="font-bold text-amber-800">{recTierCfg.name}</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Total Saldo:</span>
