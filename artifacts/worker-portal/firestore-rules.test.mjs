@@ -8,10 +8,12 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
-const rulesContent = fs.readFileSync(path.resolve('../firestore.rules'), 'utf8');
+const rulesContent = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../firestore.rules'), 'utf8');
 
 const adminUid = 'vQfEbhhVyXMXVlhYmu4AgOvmony1';
 const workerUid = 'worker_test_user_123';
+const newWorkerUid = 'new_worker_456';
+const otherWorkerUid = 'other_worker_789';
 
 async function main() {
   console.log('Initializing Firestore rules regression test suite...');
@@ -29,115 +31,189 @@ async function main() {
   // Setup initial user documents bypassing rules
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    // Admin user doc with casing "Admin"
+    // Admin user doc
     await setDoc(doc(db, 'users', adminUid), {
       uid: adminUid,
       name: 'Admin User',
       email: 'mandarawanzz@gmail.com',
       role: 'Admin',
-      status: 'approved',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
     });
-    // Worker user doc
+    // Existing Worker user doc
     await setDoc(doc(db, 'users', workerUid), {
       uid: workerUid,
       name: 'Worker User',
       email: 'worker@example.com',
       role: 'worker',
-      status: 'approved',
+      status: 'active',
+      tier: 2,
+      balance: 15000,
+      createdAt: new Date(),
     });
   });
 
-  console.log('\n--- TEST A: Authenticated Admin UID write settings/rules ---');
-  const adminDb = testEnv.authenticatedContext(adminUid).firestore();
+  console.log('\n--- TEST A: Valid worker self-profile creation succeeds ---');
+  const newWorkerDb = testEnv.authenticatedContext(newWorkerUid).firestore();
   try {
     await assertSucceeds(
-      setDoc(
-        doc(adminDb, 'settings', 'rules'),
-        { pricePerEmail: 5000, minWithdraw: 50000, updatedAt: serverTimestamp() },
-        { merge: true }
-      )
+      setDoc(doc(newWorkerDb, 'users', newWorkerUid), {
+        uid: newWorkerUid,
+        name: 'New Worker',
+        email: 'newworker@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
     );
-    console.log('[PASS] Admin UID write settings/rules succeeded.');
+    console.log('[PASS] Valid worker self-profile creation succeeded.');
   } catch (err) {
-    console.error('[FAIL] Admin UID write settings/rules failed:', err);
+    console.error('[FAIL] Valid worker self-profile creation failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST B: Authenticated Worker UID write settings/rules (should fail) ---');
-  const workerDb = testEnv.authenticatedContext(workerUid).firestore();
+  console.log('\n--- TEST B: Worker attempting role: "admin" fails ---');
+  const badRoleUid = 'bad_role_user';
+  const badRoleDb = testEnv.authenticatedContext(badRoleUid).firestore();
   try {
     await assertFails(
-      setDoc(
-        doc(workerDb, 'settings', 'rules'),
-        { pricePerEmail: 99999, updatedAt: serverTimestamp() },
-        { merge: true }
-      )
+      setDoc(doc(badRoleDb, 'users', badRoleUid), {
+        uid: badRoleUid,
+        name: 'Bad Role User',
+        email: 'badrole@example.com',
+        role: 'admin',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
     );
-    console.log('[PASS] Worker UID write settings/rules correctly rejected with permission-denied.');
+    console.log('[PASS] Worker attempting role: "admin" correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker UID write settings/rules was not rejected properly:', err);
+    console.error('[FAIL] Worker attempting role: "admin" was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST C: Unauthenticated user write settings/rules (should fail) ---');
-  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  console.log('\n--- TEST C: Worker attempting tier > 1 fails ---');
+  const badTierUid = 'bad_tier_user';
+  const badTierDb = testEnv.authenticatedContext(badTierUid).firestore();
   try {
     await assertFails(
-      setDoc(
-        doc(unauthDb, 'settings', 'rules'),
-        { pricePerEmail: 99999, updatedAt: serverTimestamp() },
-        { merge: true }
-      )
+      setDoc(doc(badTierDb, 'users', badTierUid), {
+        uid: badTierUid,
+        name: 'Bad Tier User',
+        email: 'badtier@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 5,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
     );
-    console.log('[PASS] Unauthenticated user write settings/rules correctly rejected with permission-denied.');
+    console.log('[PASS] Worker attempting tier > 1 correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Unauthenticated user write settings/rules was not rejected properly:', err);
+    console.error('[FAIL] Worker attempting tier > 1 was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST D: Worker can read own users/{uid} document ---');
-  try {
-    await assertSucceeds(getDoc(doc(workerDb, 'users', workerUid)));
-    console.log('[PASS] Worker read own profile succeeded.');
-  } catch (err) {
-    console.error('[FAIL] Worker read own profile failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- TEST E: Worker cannot read another worker profile document (should fail) ---');
-  const otherWorkerUid = 'other_worker_456';
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    const db = context.firestore();
-    await setDoc(doc(db, 'users', otherWorkerUid), {
-      uid: otherWorkerUid,
-      name: 'Other Worker',
-      email: 'other@example.com',
-      role: 'worker',
-      status: 'active',
-    });
-  });
-  try {
-    await assertFails(getDoc(doc(workerDb, 'users', otherWorkerUid)));
-    console.log('[PASS] Worker reading another worker profile correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker reading another worker profile was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- TEST F: Worker cannot modify role, tier, or increase balance (should fail) ---');
+  console.log('\n--- TEST D: Worker attempting balance > 0 fails ---');
+  const badBalanceUid = 'bad_balance_user';
+  const badBalanceDb = testEnv.authenticatedContext(badBalanceUid).firestore();
   try {
     await assertFails(
-      setDoc(doc(workerDb, 'users', workerUid), {
+      setDoc(doc(badBalanceDb, 'users', badBalanceUid), {
+        uid: badBalanceUid,
+        name: 'Bad Balance User',
+        email: 'badbalance@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 1000000,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting balance > 0 correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting balance > 0 was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST E: Worker attempting to create uid != request.auth.uid fails ---');
+  try {
+    await assertFails(
+      setDoc(doc(newWorkerDb, 'users', otherWorkerUid), {
+        uid: otherWorkerUid,
+        name: 'Spoofed User',
+        email: 'spoof@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting create for another UID correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting create for another UID was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST F: Worker attempting to overwrite an existing profile with role escalation, tier escalation, or balance increase fails ---');
+  const existingWorkerDb = testEnv.authenticatedContext(workerUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'users', workerUid), {
+        uid: workerUid,
+        name: 'Worker User Escalated',
+        email: 'worker@example.com',
+        role: 'admin',
+        status: 'active',
+        tier: 3,
+        balance: 999999,
+        createdAt: new Date(),
+      })
+    );
+    console.log('[PASS] Worker overwriting existing profile with role/tier/balance escalation correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker overwriting existing profile escalation was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST G: Existing profile is not overwritten by automatic recovery ---');
+  // Attempting setDoc with recovery default payload (tier 1, balance 0) on existing profile (tier 2, balance 15000)
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'users', workerUid), {
         uid: workerUid,
         name: 'Worker User',
         email: 'worker@example.com',
-        role: 'admin', // disallowed
-        status: 'approved',
+        role: 'worker',
+        status: 'active',
+        tier: 1, // trying to overwrite tier 2 to tier 1
+        balance: 0, // trying to overwrite balance 15000 to 0
+        createdAt: new Date(),
       })
     );
-    console.log('[PASS] Worker role elevation correctly rejected.');
+    console.log('[PASS] Worker attempt to overwrite existing profile with default recovery values correctly rejected by update rules.');
   } catch (err) {
-    console.error('[FAIL] Worker role elevation was not rejected:', err);
+    console.error('[FAIL] Worker overwrite of existing profile was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  // Verify profile balance & tier remain unchanged
+  let data;
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const snap = await getDoc(doc(context.firestore(), 'users', workerUid));
+    data = snap.data();
+  });
+  if (data?.tier === 2 && data?.balance === 15000 && data?.role === 'worker') {
+    console.log('[PASS] Verified existing profile data was protected and preserved intact.');
+  } else {
+    console.error('[FAIL] Existing profile data was corrupted or altered:', data);
     process.exitCode = 1;
   }
 

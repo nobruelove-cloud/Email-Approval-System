@@ -35,6 +35,7 @@ export function usePortalAuth() {
 
   const profileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const missingDocTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveringUidRef = useRef<string | null>(null);
   const activeUnsubscribeProfile = useRef<(() => void) | null>(null);
 
   const clearAllTimers = () => {
@@ -68,6 +69,7 @@ export function usePortalAuth() {
 
       setFirebaseUser(user);
       if (!user) {
+        recoveringUidRef.current = null;
         setProfile(null);
         setError("");
         setLoading(false);
@@ -117,6 +119,7 @@ export function usePortalAuth() {
               clearTimeout(missingDocTimerRef.current);
               missingDocTimerRef.current = null;
             }
+            recoveringUidRef.current = null;
             const data = snapshot.data();
             console.log(`[PortalAuth] User profile retrieved successfully for users/${user.uid}:`, {
               uid: user.uid,
@@ -129,17 +132,32 @@ export function usePortalAuth() {
             setError("");
             setLoading(false);
           } else {
-            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Starting 5s grace period...`);
-            setLoading(true);
-            if (!missingDocTimerRef.current) {
-              missingDocTimerRef.current = setTimeout(() => {
-                console.warn(`[PortalAuth] Document users/${user.uid} still does NOT exist after 5s grace period.`);
-                missingDocTimerRef.current = null;
-                setProfile(null);
-                setError("Profil pengguna tidak ditemukan di database.");
-                setLoading(false);
-              }, 5000);
+            console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Initiating automatic profile recovery...`);
+            if (recoveringUidRef.current === user.uid) {
+              console.log(`[PortalAuth] Auto-recovery already in progress for users/${user.uid}. Waiting for snapshot update.`);
+              return;
             }
+
+            recoveringUidRef.current = user.uid;
+            setLoading(true);
+
+            const defaultName = user.displayName || (user.email ? user.email.split("@")[0] : "Worker");
+            const defaultEmail = user.email || "";
+
+            createPortalUser(user.uid, {
+              name: defaultName,
+              email: defaultEmail,
+              role: "worker",
+              status: "active",
+              tier: 1,
+              balance: 0,
+            }).catch((err) => {
+              console.error(`[PortalAuth] Automatic profile recovery failed for users/${user.uid}:`, err);
+              recoveringUidRef.current = null;
+              setProfile(null);
+              setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
+              setLoading(false);
+            });
           }
         },
         (reason) => {
