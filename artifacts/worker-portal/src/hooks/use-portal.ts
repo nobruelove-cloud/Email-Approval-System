@@ -15,15 +15,17 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
-import type {
-  EmailSubmission,
-  PortalUser,
-  Withdrawal,
-  SubmissionStatus,
-  WithdrawalStatus,
-  UserStatus,
+import {
+  DEFAULT_TIERS,
+  type EmailSubmission,
+  type PortalUser,
+  type Withdrawal,
+  type SubmissionStatus,
+  type WithdrawalStatus,
+  type UserStatus,
+  type TierConfig,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier } from "@/lib/portal-utils";
 
 import { useRef } from "react";
 
@@ -387,6 +389,16 @@ export async function reviewSubmission(
       throw new Error("Setoran ini sudah pernah ditinjau.");
     }
 
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await tx.get(rulesRef);
+    const activeTiers =
+      rulesSnap.exists() && Array.isArray(rulesSnap.data()?.tiers) && rulesSnap.data().tiers.length > 0
+        ? (rulesSnap.data().tiers as TierConfig[])
+        : DEFAULT_TIERS;
+
+    const userRef = doc(firestore, "users", submission.workerId);
+    const userSnap = await tx.get(userRef);
+
     // Determine items & status counts
     const itemCount = getItemCountOfSubmission(submission);
     let itemsToSave = updatedItems ?? submission.items;
@@ -406,14 +418,13 @@ export async function reviewSubmission(
     const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
     const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
 
-    const appliedPricePerItem = submission.currentPricePerItem ?? overridePricePerItem ?? 2000;
-    const appliedTier = submission.currentTier ?? overrideTierNum ?? 1;
+    // Dynamically calculate Tier and Price per item based ONLY on final ACC/valid email count
+    const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
+    const appliedPricePerItem = overridePricePerItem ?? resultingTierCfg.pricePerItem;
+    const appliedTier = overrideTierNum ?? resultingTierCfg.tier;
     const creditAmount = approvedCount * appliedPricePerItem;
 
     const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
-
-    const userRef = creditAmount > 0 ? doc(firestore, "users", submission.workerId) : null;
-    const userSnap = userRef ? await tx.get(userRef) : null;
 
     // 2. ALL WRITES AFTER READS
     tx.update(submissionRef, {
@@ -430,9 +441,12 @@ export async function reviewSubmission(
       updatedAt: serverTimestamp(),
     });
 
-    if (userRef && userSnap && userSnap.exists()) {
+    if (userSnap && userSnap.exists()) {
       const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-      tx.update(userRef, { balance: currentBalance + creditAmount });
+      tx.update(userRef, {
+        balance: currentBalance + creditAmount,
+        tier: appliedTier,
+      });
     }
   });
 }
