@@ -1,0 +1,10 @@
+{
+  "buildCommand": "pnpm --filter @workspace/worker-portal run build",
+  "outputDirectory": "artifacts/worker-portal/dist/public",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
