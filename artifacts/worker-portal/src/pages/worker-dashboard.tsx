@@ -13,7 +13,6 @@ import {
   Loader2,
   Eye,
   Award,
-  Tv,
   Target,
   Users,
   Trophy,
@@ -51,7 +50,6 @@ import {
   createSubmission,
   createWithdrawal,
   createMissionClaimRequest,
-  createAdClaimRequest,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
@@ -292,12 +290,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-5 w-full mb-6">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full mb-6">
             <TabsTrigger value="submit" className="gap-1 text-xs">
               <Send className="w-3.5 h-3.5" /> Setor
-            </TabsTrigger>
-            <TabsTrigger value="ads" className="gap-1 text-xs">
-              <Tv className="w-3.5 h-3.5" /> Iklan
             </TabsTrigger>
             <TabsTrigger value="missions" className="gap-1 text-xs">
               <Target className="w-3.5 h-3.5" /> Misi
@@ -512,35 +507,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     </Card>
                   );
                 })}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* WATCH ADS / REWARDED TASKS */}
-          <TabsContent value="ads" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Tv className="w-5 h-5 text-amber-600" /> Tugas Nonton Iklan
-                </CardTitle>
-                <CardDescription>
-                  Status ketersediaan iklan untuk pekerja.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center space-y-2">
-                  <Badge variant="outline" className="bg-gray-100 text-gray-600">
-                    Iklan Belum Tersedia
-                  </Badge>
-                  <p className="text-sm font-semibold text-gray-800">Iklan Belum Dikonfigurasi oleh Admin</p>
-                  <p className="text-xs text-gray-500">
-                    Fitur iklan saat ini belum terhubung ke SDK/provider iklan nyata. Tombol klaim dinonaktifkan.
-                  </p>
-                </div>
-                <Button disabled className="w-full bg-gray-200 text-gray-500 cursor-not-allowed gap-2 h-11">
-                  <Tv className="w-4 h-4" />
-                  Iklan Belum Tersedia
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>

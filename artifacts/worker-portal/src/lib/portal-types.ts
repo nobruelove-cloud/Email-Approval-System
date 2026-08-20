@@ -78,23 +78,7 @@ export type LeaderboardPayout = {
   paidAt?: unknown;
 };
 
-export type AdTaskConfig = {
-  enabled: boolean;
-  rewardAmount: number;
-  dailyLimit: number;
-  cooldownSeconds: number;
-};
-
-export type AdClaim = {
-  id: string;
-  workerId: string;
-  dateKey: string; // YYYY-MM-DD
-  rewardAmount: number;
-  completedAt?: unknown;
-  status: "completed" | "rewarded";
-};
-
-export type RewardType = "referral" | "mission" | "leaderboard" | "ad";
+export type RewardType = "referral" | "mission" | "leaderboard";
 
 export type RewardLedgerEntry = {
   id: string;
@@ -180,9 +164,6 @@ export type PortalRules = {
   leaderboardEnabled?: boolean;
   leaderboardRewards?: LeaderboardRewardConfig[];
 
-  // Ads Settings
-  adConfig?: AdTaskConfig;
-
   // Reward Budget Settings
   rewardBudgetEnabled?: boolean;
   rewardBudget?: number;
@@ -242,13 +223,6 @@ export const DEFAULT_RULES: PortalRules = {
     { rank: 2, rewardAmount: 30000 },
     { rank: 3, rewardAmount: 15000 },
   ],
-
-  adConfig: {
-    enabled: false,
-    rewardAmount: 500,
-    dailyLimit: 5,
-    cooldownSeconds: 60,
-  },
 
   rewardBudgetEnabled: false,
   rewardBudget: 1000000,

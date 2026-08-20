@@ -17,7 +17,6 @@ import {
   Sparkles,
   Plus,
   Gift,
-  Tv,
   Target,
   Trophy,
 } from "lucide-react";
@@ -70,7 +69,6 @@ import {
   evaluateReferralQualificationAndReward,
   distributeLeaderboardReward,
   reviewMissionClaim,
-  reviewAdClaim,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
 import {
@@ -112,18 +110,12 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
-  const adClaims = useCollection<{ id: string; workerId: string; dateKey: string; status: string; workerName?: string }>("adClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
 
   const pendingMissionClaims = useMemo(
     () => missionClaims.data.filter((c) => c.status === "pending"),
     [missionClaims.data],
-  );
-
-  const pendingAdClaims = useMemo(
-    () => adClaims.data.filter((c) => c.status === "pending"),
-    [adClaims.data],
   );
 
   async function handleReviewMission(claimId: string, decision: "approved" | "rejected") {
@@ -133,18 +125,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       toast.success(`Klaim misi berhasil ${decision === "approved" ? "disetujui & dicairkan" : "ditolak"}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses klaim misi.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleReviewAdClaim(claimId: string, decision: "approved" | "rejected") {
-    setBusyId(claimId);
-    try {
-      await reviewAdClaim(claimId, decision);
-      toast.success(`Tugas iklan berhasil ${decision === "approved" ? "disetujui & dicairkan" : "ditolak"}.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memproses tugas iklan.");
     } finally {
       setBusyId(null);
     }
@@ -1052,49 +1032,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
             )}
 
-            {/* PENDING AD CLAIMS REVIEW */}
-            {pendingAdClaims.length > 0 && (
-              <Card className="border-blue-300 bg-blue-50/50">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Tv className="w-5 h-5 text-blue-600" /> Klaim Tugas Iklan Menunggu Review ({pendingAdClaims.length})
-                  </CardTitle>
-                  <CardDescription>
-                    Pekerja menyelesaikan tugas nonton iklan. Verifikasi dan setujui untuk mencairkan saldo.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {pendingAdClaims.map((claim) => (
-                    <div key={claim.id} className="p-3 bg-white border border-blue-200 rounded-lg flex items-center justify-between text-xs">
-                      <div>
-                        <p className="font-bold text-gray-900">{claim.workerName || workerName(claim.workerId)}</p>
-                        <p className="text-gray-500 mt-0.5">Tanggal: {claim.dateKey}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          disabled={busyId === claim.id}
-                          onClick={() => handleReviewAdClaim(claim.id, "approved")}
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 gap-1"
-                        >
-                          {busyId === claim.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                          Setujui
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={busyId === claim.id}
-                          onClick={() => handleReviewAdClaim(claim.id, "rejected")}
-                          className="text-xs h-8 gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Tolak
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
             {/* REFERRAL CONTROL */}
             <Card>
               <CardHeader>
@@ -1161,71 +1098,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
 
-            {/* REWARDED ADS CONTROL */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Tv className="w-5 h-5 text-amber-600" /> Pengaturan Tugas Nonton Iklan
-                </CardTitle>
-                <CardDescription>
-                  Kontrol status aktif, batas harian, dan hadiah per iklan resmi.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs">Status Fitur Iklan</Label>
-                    <Select
-                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).enabled ? "active" : "disabled"}
-                      onValueChange={(val) => {
-                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
-                        saveSettings("rules", {
-                          adConfig: { ...currentAdCfg, enabled: val === "active" },
-                        }).then(() => toast.success(`Fitur iklan ${val === "active" ? "diaktifkan" : "dinonaktifkan"}.`));
-                      }}
-                    >
-                      <SelectTrigger className="mt-1 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Aktif (Enabled)</SelectItem>
-                        <SelectItem value="disabled">Nonaktif (Disabled)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Hadiah Per Iklan (Rp)</Label>
-                    <FormattedNumberInput
-                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).rewardAmount}
-                      onChange={(val) => {
-                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
-                        saveSettings("rules", { adConfig: { ...currentAdCfg, rewardAmount: val } });
-                      }}
-                      className="mt-1 h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Batas Harian Per Pekerja (x/hari)</Label>
-                    <Input
-                      type="number"
-                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).dailyLimit}
-                      onChange={(e) => {
-                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
-                        saveSettings("rules", { adConfig: { ...currentAdCfg, dailyLimit: Number(e.target.value) } });
-                      }}
-                      className="mt-1 h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* AUDIT LEDGER HADIAH */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Audit Ledger Payout Hadiah</CardTitle>
                 <CardDescription>
-                  Rekam jejak seluruh pencairan hadiah (referral, misi, klasemen, iklan) yang transparan dan dapat diaudit.
+                  Rekam jejak seluruh pencairan hadiah (referral, misi, klasemen) yang transparan dan dapat diaudit.
                 </CardDescription>
               </CardHeader>
               <CardContent>

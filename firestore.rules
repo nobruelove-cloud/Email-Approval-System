@@ -138,15 +138,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ---- adClaims/{id} ----
-    match /adClaims/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
-      allow create: if isSignedIn() &&
-        request.resource.data.workerId == request.auth.uid &&
-        request.resource.data.status == 'pending';
-      allow update, delete: if isAdmin();
-    }
-
     // ---- rewardLedger/{id} ----
     match /rewardLedger/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
