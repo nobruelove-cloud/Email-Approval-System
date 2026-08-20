@@ -375,18 +375,13 @@ export function useWorkerEngagementData(uid?: string) {
     uid ? [where("workerId", "==", uid)] : [],
     !!uid,
   );
-  const adClaims = useCollection<import("@/lib/portal-types").AdClaim>(
-    "adClaims",
-    uid ? [where("workerId", "==", uid)] : [],
-    !!uid,
-  );
   const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>(
     "rewardLedger",
     uid ? [where("workerId", "==", uid)] : [],
     !!uid,
     { field: "createdAt", direction: "desc" },
   );
-  return { referrals, missionClaims, adClaims, rewardLedger };
+  return { referrals, missionClaims, rewardLedger };
 }
 
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
@@ -995,93 +990,6 @@ export async function distributeLeaderboardReward(
       description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
       createdAt: serverTimestamp(),
     });
-  });
-}
-
-/**
- * Creates a pending ad task claim request from a worker.
- */
-export async function createAdClaimRequest(
-  workerId: string,
-  dateKey: string,
-  workerName?: string,
-) {
-  if (!db) throw new Error("Firebase is not configured.");
-  const timestampMs = Date.now();
-  const claimId = `${workerId}_ad_${timestampMs}`;
-  const claimRef = doc(db, "adClaims", claimId);
-
-  await setDoc(claimRef, {
-    id: claimId,
-    workerId,
-    dateKey,
-    workerName,
-    status: "pending",
-    requestedAt: serverTimestamp(),
-  });
-
-  return claimId;
-}
-
-/**
- * Admin resolves/approves an ad claim request.
- */
-export async function reviewAdClaim(
-  claimId: string,
-  decision: "approved" | "rejected",
-) {
-  if (!db) throw new Error("Firebase is not configured.");
-  const firestore = db;
-
-  await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
-    const claimRef = doc(firestore, "adClaims", claimId);
-    const claimSnap = await tx.get(claimRef);
-    if (!claimSnap.exists()) throw new Error("Klaim tugas iklan tidak ditemukan.");
-    const claim = claimSnap.data() as { workerId: string; dateKey: string; status: string; workerName?: string };
-
-    if (claim.status === "approved" || claim.status === "rewarded") {
-      throw new Error("Tugas iklan ini sudah pernah dicairkan.");
-    }
-
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const adConfig = rulesData?.adConfig ?? { enabled: false, rewardAmount: 500, dailyLimit: 5, cooldownSeconds: 60 };
-
-    if (decision === "approved" && !adConfig.enabled) {
-      throw new Error("Fitur iklan/tugas berhadiah sedang tidak aktif.");
-    }
-
-    const userRef = doc(firestore, "users", claim.workerId);
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
-
-    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-
-    // 2. ALL WRITES AFTER READS
-    tx.update(claimRef, {
-      status: decision === "approved" ? "rewarded" : "rejected",
-      rewardAmount: decision === "approved" ? adConfig.rewardAmount : 0,
-      processedAt: serverTimestamp(),
-    });
-
-    if (decision === "approved") {
-      tx.update(userRef, {
-        balance: currentBalance + adConfig.rewardAmount,
-      });
-
-      const ledgerRef = doc(collection(firestore, "rewardLedger"));
-      tx.set(ledgerRef, {
-        workerId: claim.workerId,
-        workerName: claim.workerName || (userSnap.data() as PortalUser).name,
-        rewardType: "ad",
-        amount: adConfig.rewardAmount,
-        sourceRefId: claimId,
-        description: `Hadiah Nonton Iklan (${claim.dateKey})`,
-        createdAt: serverTimestamp(),
-      });
-    }
   });
 }
 

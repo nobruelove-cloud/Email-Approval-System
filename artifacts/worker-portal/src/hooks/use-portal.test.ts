@@ -1015,47 +1015,6 @@ async function distributeLeaderboardTx(tx: any, workerId: string, periodKey: str
   });
 }
 
-async function createAdClaimRequestTx(tx: any, workerId: string, dateKey: string, timestampMs: number) {
-  const claimPath = `adClaims/${workerId}_ad_${timestampMs}`;
-  tx.set({ path: claimPath }, {
-    id: `${workerId}_ad_${timestampMs}`,
-    workerId,
-    dateKey,
-    status: "pending",
-  });
-}
-
-async function reviewAdClaimTx(tx: any, claimId: string, decision: "approved" | "rejected") {
-  const claimPath = `adClaims/${claimId}`;
-  const claimSnap = await tx.get({ path: claimPath });
-  if (!claimSnap.exists()) throw new Error("Klaim iklan tidak ditemukan");
-
-  const claim = claimSnap.data();
-  if (claim.status === "approved" || claim.status === "rewarded") throw new Error("Tugas iklan ini sudah pernah dicairkan");
-
-  const rulesSnap = await tx.get({ path: "settings/rules" });
-  const rules = rulesSnap.exists() ? rulesSnap.data() : {};
-  const adCfg = rules.adConfig ?? { enabled: true, rewardAmount: 500, dailyLimit: 5 };
-
-  if (decision === "approved" && !adCfg.enabled) throw new Error("Iklan nonaktif");
-
-  const userPath = `users/${claim.workerId}`;
-  const userSnap = await tx.get({ path: userPath });
-  if (!userSnap.exists()) throw new Error("Worker tidak ditemukan");
-
-  const currentBalance = userSnap.data().balance ?? 0;
-
-  tx.update({ path: claimPath }, {
-    status: decision === "approved" ? "rewarded" : "rejected",
-    rewardAmount: decision === "approved" ? adCfg.rewardAmount : 0,
-  });
-
-  if (decision === "approved") {
-    tx.update({ path: userPath }, {
-      balance: currentBalance + adCfg.rewardAmount,
-    });
-  }
-}
 
 describe("New Worker Engagement & Earning Unit Tests (A-S)", () => {
   it("A & B. Registration with referral code creates relationship & registration alone yields 0 reward", () => {
@@ -1169,40 +1128,7 @@ describe("New Worker Engagement & Earning Unit Tests (A-S)", () => {
     expect(store["users/worker_top1"].balance).toBe(50000);
   });
 
-  it("M, N, O, P. Rewarded ads completion grants reward, unverified disabled grants 0, daily limit & idempotency enforced", async () => {
-    const storeActive = {
-      "settings/rules": { adConfig: { enabled: true, rewardAmount: 500, dailyLimit: 5 } },
-      "users/worker_ad1": { balance: 1000 },
-    };
-
-    // Worker creates ad claim request
-    const txReq = createMockTransaction(storeActive);
-    await createAdClaimRequestTx(txReq, "worker_ad1", "2026-08-20", 10001);
-
-    // Admin reviews and approves ad claim -> credits 500
-    const txAd = createMockTransaction(storeActive);
-    await reviewAdClaimTx(txAd, "worker_ad1_ad_10001", "approved");
-
-    expect(storeActive["users/worker_ad1"].balance).toBe(1500);
-
-    // Disabled ad provider -> throws error on review
-    const storeDisabled = {
-      "settings/rules": { adConfig: { enabled: false, rewardAmount: 500, dailyLimit: 5 } },
-      "users/worker_ad2": { balance: 1000 },
-    };
-
-    const txReqDisabled = createMockTransaction(storeDisabled);
-    await createAdClaimRequestTx(txReqDisabled, "worker_ad2", "2026-08-20", 10002);
-
-    const txDisabled = createMockTransaction(storeDisabled);
-    await expect(
-      reviewAdClaimTx(txDisabled, "worker_ad2_ad_10002", "approved")
-    ).rejects.toThrow("Iklan nonaktif");
-
-    expect(storeDisabled["users/worker_ad2"].balance).toBe(1000);
-  });
-
-  it("Q, R, S. Rewards correctly increase existing balance, duplicate processing does not double-credit, email payout logic unchanged", async () => {
+  it("Q, R, S. Email payout logic and balance updates function correctly", async () => {
     const store = {
       "emailSubmissions/sub_100": {
         workerId: "worker_q",
@@ -1218,15 +1144,6 @@ describe("New Worker Engagement & Earning Unit Tests (A-S)", () => {
     await reviewBatchSubmissionTx(txEmail, "sub_100", "approved", "Valid");
 
     expect(store["users/worker_q"].balance).toBe(24000);
-
-    // Reward transaction on top of balance
-    const reqTx = createMockTransaction(store);
-    await createAdClaimRequestTx(reqTx, "worker_q", "2026-08-20", 20001);
-
-    const adTx = createMockTransaction(store);
-    await reviewAdClaimTx(adTx, "worker_q_ad_20001", "approved");
-
-    expect(store["users/worker_q"].balance).toBe(24500); // 24000 + 500
   });
 });
 
