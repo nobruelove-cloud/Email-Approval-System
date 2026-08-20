@@ -13,13 +13,9 @@ import {
   Loader2,
   Eye,
   Award,
-  Target,
   Users,
-  Trophy,
   Copy,
   Check,
-  PlayCircle,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -49,7 +45,6 @@ import {
   useSettings,
   createSubmission,
   createWithdrawal,
-  createMissionClaimRequest,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
@@ -59,11 +54,6 @@ import {
   getTierConfig,
   shortId,
   validatePasswordAgainstRules,
-  getDailyPeriodKey,
-  getWeeklyPeriodKey,
-  getStartAndEndOfDay,
-  getStartAndEndOfWeek,
-  getWorkerAccInPeriod,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -92,7 +82,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
-  const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
 
   const referralCode = profile.uid;
   const referralLink = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referralCode}` : `/register?ref=${referralCode}`;
@@ -116,36 +105,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       .reduce((sum, item) => sum + item.amount, 0);
     return { total, pending, qualified, earnings };
   }, [engagement.referrals.data, engagement.rewardLedger.data]);
-
-  // Handle Mission Claim Request
-  async function handleClaimMission(missionId: string, type: "daily" | "weekly", targetCount: number) {
-    const { start, end } = type === "daily" ? getStartAndEndOfDay() : getStartAndEndOfWeek();
-    const periodKey = type === "daily" ? getDailyPeriodKey() : getWeeklyPeriodKey();
-    const validAccCount = getWorkerAccInPeriod(submissions.data, start, end, profile.uid);
-
-    if (validAccCount < targetCount) {
-      toast.error(`Misi belum memenuhi target ${targetCount} ACC.`);
-      return;
-    }
-
-    const claimId = `${profile.uid}_${missionId}_${periodKey}`;
-    const alreadyClaimed = engagement.missionClaims.data.some((c) => c.id === claimId);
-    if (alreadyClaimed) {
-      toast.error("Klaim misi ini sudah pernah diajukan.");
-      return;
-    }
-
-    setClaimingMissionId(missionId);
-    try {
-      await createMissionClaimRequest(profile.uid, missionId, periodKey, profile.name);
-      toast.success("Permintaan klaim misi berhasil dikirim untuk ditinjau admin!");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengajukan klaim misi.");
-    } finally {
-      setClaimingMissionId(null);
-    }
-  }
-
 
   // Active Tier configuration
   const currentTierConfig = useMemo(() => {
@@ -290,12 +249,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full mb-6">
+          <TabsList className="grid grid-cols-3 w-full mb-6">
             <TabsTrigger value="submit" className="gap-1 text-xs">
               <Send className="w-3.5 h-3.5" /> Setor
-            </TabsTrigger>
-            <TabsTrigger value="missions" className="gap-1 text-xs">
-              <Target className="w-3.5 h-3.5" /> Misi
             </TabsTrigger>
             <TabsTrigger value="referral" className="gap-1 text-xs">
               <Users className="w-3.5 h-3.5" /> Referral
@@ -511,120 +467,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </Card>
           </TabsContent>
 
-          {/* MISI PEKERJA (DAILY & WEEKLY) */}
-          <TabsContent value="missions" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="w-5 h-5 text-amber-600" /> Misi Harian & Mingguan
-                </CardTitle>
-                <CardDescription>
-                  Selesaikan target setoran email valid (ACC) untuk mengklaim bonus saldo tambahan.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(() => {
-                  const missionList = rules.data.missions ?? DEFAULT_RULES.missions!;
-                  const activeMissions = missionList.filter((m) => m.enabled);
-
-                  if (activeMissions.length === 0) {
-                    return <p className="text-sm text-gray-400 text-center py-6">Belum ada misi aktif dari admin.</p>;
-                  }
-
-                  return (
-                    <div className="space-y-3">
-                      {activeMissions.map((m) => {
-                        const isDaily = m.type === "daily";
-                        const { start, end } = isDaily ? getStartAndEndOfDay() : getStartAndEndOfWeek();
-                        const periodKey = isDaily ? getDailyPeriodKey() : getWeeklyPeriodKey();
-
-                        const validAcc = getWorkerAccInPeriod(submissions.data, start, end, profile.uid);
-                        const percent = Math.min(100, Math.round((validAcc / m.targetAccCount) * 100));
-
-                        const claimId = `${profile.uid}_${m.id}_${periodKey}`;
-                        const isClaimed = engagement.missionClaims.data.some((c) => c.id === claimId);
-                        const isTargetReached = validAcc >= m.targetAccCount;
-
-                        return (
-                          <div key={m.id} className="p-4 bg-white border border-gray-200 rounded-lg space-y-3 shadow-sm">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className={`text-[10px] ${isDaily ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200"}`}>
-                                    {isDaily ? "Misi Harian" : "Misi Mingguan"}
-                                  </Badge>
-                                  <h4 className="font-bold text-sm text-gray-900">{m.title}</h4>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">{m.description}</p>
-                              </div>
-                              <Badge className="bg-amber-100 text-amber-900 font-bold shrink-0">
-                                +{formatMoney(m.rewardAmount)}
-                              </Badge>
-                            </div>
-
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs font-medium text-gray-600">
-                                <span>Progres Setoran ACC:</span>
-                                <span>{validAcc} / {m.targetAccCount} ACC ({percent}%)</span>
-                              </div>
-                              <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${percent}%` }} />
-                              </div>
-                            </div>
-
-                            <div className="flex justify-end pt-1">
-                              {(() => {
-                                const claimDoc = engagement.missionClaims.data.find((c) => c.id === claimId);
-                                if (claimDoc) {
-                                  if (claimDoc.status === "approved") {
-                                    return (
-                                      <Badge className="bg-green-100 text-green-800 gap-1 font-semibold">
-                                        <CheckCircle2 className="w-3 h-3" /> Disetujui ({formatMoney(m.rewardAmount)})
-                                      </Badge>
-                                    );
-                                  }
-                                  return (
-                                    <Badge className="bg-amber-100 text-amber-800 gap-1 font-semibold">
-                                      <Clock className="w-3 h-3 animate-spin" /> Menunggu Review Admin
-                                    </Badge>
-                                  );
-                                }
-
-                                if (isTargetReached) {
-                                  return (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleClaimMission(m.id, m.type, m.targetAccCount)}
-                                      disabled={claimingMissionId === m.id}
-                                      className="bg-green-600 hover:bg-green-700 text-white gap-1 text-xs h-8"
-                                    >
-                                      {claimingMissionId === m.id ? (
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                      ) : (
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                      )}
-                                      Klaim Hadiah ({formatMoney(m.rewardAmount)})
-                                    </Button>
-                                  );
-                                }
-
-                                return (
-                                  <Button size="sm" variant="outline" disabled className="text-xs h-8 text-gray-400">
-                                    Belum Selesai ({validAcc}/{m.targetAccCount})
-                                  </Button>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* REFERRAL SYSTEM */}
           <TabsContent value="referral" className="space-y-4">
             <Card className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200">
@@ -699,7 +541,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardContent>
             </Card>
           </TabsContent>
-
 
           {/* TARIK SALDO */}
           <TabsContent value="withdraw" className="space-y-4">
