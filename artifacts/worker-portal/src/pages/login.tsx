@@ -34,7 +34,16 @@ function friendlyAuthError(code: string, context: "login" | "register" | "reset"
 }
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(() => {
+    if (typeof window !== "undefined") {
+      const pathname = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      if (pathname.startsWith("/register") || params.has("ref")) {
+        return "register";
+      }
+    }
+    return "login";
+  });
   const [busy, setBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
 
