@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { auth, firebaseConfigured } from "@/lib/firebase";
-import { createPortalUser } from "@/hooks/use-portal";
+import { createPortalUser, registerReferral } from "@/hooks/use-portal";
+import { Users } from "lucide-react";
 
 function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
@@ -47,6 +48,13 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirm, setRegConfirm] = useState("");
+  const [refCode, setRefCode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("ref") || "";
+    }
+    return "";
+  });
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -89,15 +97,27 @@ export default function LoginPage() {
       const uid = createdUserCredential.user.uid;
       console.log(`[Auth] Firebase Auth account created. UID: ${uid}, Path: users/${uid}. Creating Firestore profile...`);
 
+      const cleanRef = refCode.trim();
       await createPortalUser(uid, {
         name: name.trim(),
         email: regEmail.trim(),
         phone: phone.trim() || undefined,
+        referredBy: cleanRef || undefined,
         role: "worker",
         status: "active",
         tier: 1,
         balance: 0,
       });
+
+      if (cleanRef) {
+        try {
+          await registerReferral(cleanRef, uid, name.trim());
+          console.log(`[Auth] Referral relationship stored for referredBy: ${cleanRef}`);
+        } catch (refErr) {
+          console.warn("[Auth] Referral registration warning:", refErr);
+        }
+      }
+
       console.log(`[Auth] Firestore profile created successfully for UID: ${uid}`);
       toast.success("Pendaftaran berhasil! Akun Anda telah aktif.");
     } catch (err) {
@@ -269,6 +289,20 @@ export default function LoginPage() {
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="08xxxxxxxxxx"
                         className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="reg-ref">Kode Referral (opsional)</Label>
+                    <div className="relative mt-1.5">
+                      <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="reg-ref"
+                        disabled={!firebaseConfigured}
+                        value={refCode}
+                        onChange={(e) => setRefCode(e.target.value)}
+                        placeholder="Contoh: WORKER123"
+                        className="pl-9 font-mono text-xs"
                       />
                     </div>
                   </div>

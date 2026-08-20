@@ -160,6 +160,7 @@ export default function App() {
     <>
       <Switch>
         <Route path="/" component={PortalGate} />
+        <Route path="/register" component={PortalGate} />
         <Route path="/dashboard" component={PortalGate} />
         <Route path="/admin" component={PortalGate} />
         <Route component={NotFound} />

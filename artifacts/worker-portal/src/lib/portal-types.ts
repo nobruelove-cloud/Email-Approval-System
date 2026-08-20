@@ -21,6 +21,89 @@ export type PortalUser = {
   status: UserStatus;
   tier: UserTier;
   balance: number;
+  referredBy?: string;
+  createdAt?: unknown;
+};
+
+export type ReferralStatus = "PENDING" | "QUALIFIED" | "REWARDED";
+
+export type Referral = {
+  id: string; // e.g. referredWorkerId
+  referrerId: string;
+  referrerName?: string;
+  referredWorkerId: string;
+  referredWorkerName?: string;
+  status: ReferralStatus;
+  createdAt?: unknown;
+  qualifiedAt?: unknown;
+  rewardedAt?: unknown;
+  rewardAmount?: number;
+};
+
+export type MissionType = "daily" | "weekly";
+
+export type MissionConfig = {
+  id: string;
+  type: MissionType;
+  title: string;
+  description: string;
+  targetAccCount: number;
+  rewardAmount: number;
+  enabled: boolean;
+};
+
+export type MissionClaim = {
+  id: string; // `${workerId}_${missionId}_${periodKey}`
+  workerId: string;
+  missionId: string;
+  periodKey: string;
+  status?: "pending" | "approved" | "rejected";
+  rewardAmount: number;
+  claimedAt?: unknown;
+};
+
+export type LeaderboardRewardConfig = {
+  rank: number;
+  rewardAmount: number;
+};
+
+export type LeaderboardPayout = {
+  id: string; // `${periodKey}_rank${rank}_${workerId}`
+  workerId: string;
+  workerName?: string;
+  periodKey: string;
+  rank: number;
+  validAccCount: number;
+  rewardAmount: number;
+  paidAt?: unknown;
+};
+
+export type AdTaskConfig = {
+  enabled: boolean;
+  rewardAmount: number;
+  dailyLimit: number;
+  cooldownSeconds: number;
+};
+
+export type AdClaim = {
+  id: string;
+  workerId: string;
+  dateKey: string; // YYYY-MM-DD
+  rewardAmount: number;
+  completedAt?: unknown;
+  status: "completed" | "rewarded";
+};
+
+export type RewardType = "referral" | "mission" | "leaderboard" | "ad";
+
+export type RewardLedgerEntry = {
+  id: string;
+  workerId: string;
+  workerName?: string;
+  rewardType: RewardType;
+  amount: number;
+  sourceRefId: string;
+  description: string;
   createdAt?: unknown;
 };
 
@@ -83,6 +166,27 @@ export type PortalRules = {
   paymentMethods: string[];
   submissionNotes: string[];
   tiers: TierConfig[];
+
+  // Referral Settings
+  referralEnabled?: boolean;
+  referralReward?: number;
+  referralMinAcc?: number;
+  referralMinEarnings?: number;
+
+  // Mission Settings
+  missions?: MissionConfig[];
+
+  // Leaderboard Settings
+  leaderboardEnabled?: boolean;
+  leaderboardRewards?: LeaderboardRewardConfig[];
+
+  // Ads Settings
+  adConfig?: AdTaskConfig;
+
+  // Reward Budget Settings
+  rewardBudgetEnabled?: boolean;
+  rewardBudget?: number;
+
   updatedAt?: unknown;
 };
 
@@ -105,4 +209,47 @@ export const DEFAULT_RULES: PortalRules = {
     "Proses verifikasi memerlukan waktu maksimal 1x24 jam.",
   ],
   tiers: DEFAULT_TIERS,
+
+  referralEnabled: true,
+  referralReward: 10000,
+  referralMinAcc: 5,
+  referralMinEarnings: 0,
+
+  missions: [
+    {
+      id: "daily_acc_3",
+      type: "daily",
+      title: "Setor 3 Email ACC",
+      description: "Capai 3 email ACC/terjual hari ini",
+      targetAccCount: 3,
+      rewardAmount: 3000,
+      enabled: true,
+    },
+    {
+      id: "weekly_acc_15",
+      type: "weekly",
+      title: "Pahlawan Mingguan",
+      description: "Capai 15 email ACC/terjual minggu ini",
+      targetAccCount: 15,
+      rewardAmount: 15000,
+      enabled: true,
+    },
+  ],
+
+  leaderboardEnabled: true,
+  leaderboardRewards: [
+    { rank: 1, rewardAmount: 50000 },
+    { rank: 2, rewardAmount: 30000 },
+    { rank: 3, rewardAmount: 15000 },
+  ],
+
+  adConfig: {
+    enabled: false,
+    rewardAmount: 500,
+    dailyLimit: 5,
+    cooldownSeconds: 60,
+  },
+
+  rewardBudgetEnabled: false,
+  rewardBudget: 1000000,
 };

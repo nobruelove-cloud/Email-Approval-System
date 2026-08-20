@@ -16,6 +16,10 @@ import {
   Award,
   Sparkles,
   Plus,
+  Gift,
+  Tv,
+  Target,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -54,6 +58,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useAdminData,
+  useCollection,
   useSettings,
   reviewSubmission,
   updateEmailStockStatus,
@@ -62,6 +67,10 @@ import {
   deletePortalUser,
   createWorkerAccount,
   saveSettings,
+  evaluateReferralQualificationAndReward,
+  distributeLeaderboardReward,
+  reviewMissionClaim,
+  reviewAdClaim,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
 import {
@@ -72,6 +81,8 @@ import {
   getTierConfig,
   shortId,
   validateTierConfigs,
+  getStartAndEndOfWeek,
+  getWeeklyPeriodKey,
 } from "@/lib/portal-utils";
 
 function StatusBadge({ status }: { status: string }) {
@@ -99,8 +110,46 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
-  const { users, submissions, withdrawals } = useAdminData();
+  const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
+  const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
+  const adClaims = useCollection<{ id: string; workerId: string; dateKey: string; status: string; workerName?: string }>("adClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
+  const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+  const [distributingLeaderboard, setDistributingLeaderboard] = useState(false);
+
+  const pendingMissionClaims = useMemo(
+    () => missionClaims.data.filter((c) => c.status === "pending"),
+    [missionClaims.data],
+  );
+
+  const pendingAdClaims = useMemo(
+    () => adClaims.data.filter((c) => c.status === "pending"),
+    [adClaims.data],
+  );
+
+  async function handleReviewMission(claimId: string, decision: "approved" | "rejected") {
+    setBusyId(claimId);
+    try {
+      await reviewMissionClaim(claimId, decision);
+      toast.success(`Klaim misi berhasil ${decision === "approved" ? "disetujui & dicairkan" : "ditolak"}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memproses klaim misi.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReviewAdClaim(claimId: string, decision: "approved" | "rejected") {
+    setBusyId(claimId);
+    try {
+      await reviewAdClaim(claimId, decision);
+      toast.success(`Tugas iklan berhasil ${decision === "approved" ? "disetujui & dicairkan" : "ditolak"}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memproses tugas iklan.");
+    } finally {
+      setBusyId(null);
+    }
+  }
   const activeTiersList = useMemo(() => {
     return Array.isArray(rules.data.tiers) && rules.data.tiers.length > 0 ? rules.data.tiers : DEFAULT_TIERS;
   }, [rules.data.tiers]);
@@ -225,6 +274,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         recTierCfg.tier,
         updatedItems,
       );
+
+      // Auto-evaluate referral qualification for worker if they have a pending referral
+      if (approvedCount > 0) {
+        const workerAccTotal = (workerApprovedQtyMap.get(sub.workerId) ?? 0) + approvedCount;
+        evaluateReferralQualificationAndReward(sub.workerId, workerAccTotal).catch((e) =>
+          console.warn("[AdminDashboard] Referral auto-eval notice:", e)
+        );
+      }
 
       toast.success(
         `Finalisasi batch berhasil! ${approvedCount} ACC (${recTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
@@ -478,6 +535,91 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }
 
+  async function handleEvaluateReferrals() {
+    setEvaluatingRefs(true);
+    try {
+      let count = 0;
+      for (const refItem of referrals.data) {
+        if (refItem.status === "PENDING") {
+          const accCount = workerApprovedQtyMap.get(refItem.referredWorkerId) ?? 0;
+          await evaluateReferralQualificationAndReward(refItem.referredWorkerId, accCount);
+          count++;
+        }
+      }
+      toast.success(`Evaluasi referral selesai! ${count} data referral diperiksa.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengevaluasi referral.");
+    } finally {
+      setEvaluatingRefs(false);
+    }
+  }
+
+  async function handleDistributeLeaderboard() {
+    setDistributingLeaderboard(true);
+    try {
+      const { start, end } = getStartAndEndOfWeek();
+      const periodKey = getWeeklyPeriodKey();
+
+      const workerAccMap = new Map<string, { workerName: string; accCount: number }>();
+      users.data.forEach((u) => {
+        if (u.role === "worker") {
+          workerAccMap.set(u.uid, { workerName: u.name, accCount: 0 });
+        }
+      });
+
+      submissions.data.forEach((sub) => {
+        let subDate: Date | null = null;
+        if (sub.submittedAt) {
+          subDate = typeof sub.submittedAt === "object" && "toDate" in (sub.submittedAt as Record<string, unknown>)
+            ? (sub.submittedAt as { toDate: () => Date }).toDate()
+            : new Date(sub.submittedAt as string | number);
+        }
+        if (subDate && subDate >= start && subDate <= end) {
+          const isFinal = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+          if (isFinal) {
+            const approvedCount = sub.approvedItemCount ?? (Array.isArray(sub.items) ? sub.items.filter((i) => i.status === "approved").length : 1);
+            const current = workerAccMap.get(sub.workerId) ?? { workerName: sub.workerName || shortId(sub.workerId), accCount: 0 };
+            workerAccMap.set(sub.workerId, { workerName: current.workerName, accCount: current.accCount + approvedCount });
+          }
+        }
+      });
+
+      const rows = Array.from(workerAccMap.entries()).map(([wId, val]) => ({
+        workerId: wId,
+        workerName: val.workerName,
+        validAccCount: val.accCount,
+      }));
+
+      rows.sort((a, b) => b.validAccCount - a.validAccCount);
+
+      const rewardsList = rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!;
+      let paidCount = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const rank = i + 1;
+        const row = rows[i];
+        if (row.validAccCount <= 0) continue;
+
+        const rewardObj = rewardsList.find((rw) => Number(rw.rank) === rank);
+        if (rewardObj && rewardObj.rewardAmount > 0) {
+          try {
+            await distributeLeaderboardReward(row.workerId, periodKey, rank, row.validAccCount, rewardObj.rewardAmount, row.workerName);
+            paidCount++;
+          } catch (e) {
+            // Already paid or warning
+            console.warn(`[Leaderboard] Rank ${rank} payout notice:`, e);
+          }
+        }
+      }
+
+      toast.success(`Pencairan klasemen ${periodKey} selesai! ${paidCount} pemenang mendapatkan hadiah.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mencairkan hadiah klasemen.");
+    } finally {
+      setDistributingLeaderboard(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -494,24 +636,27 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue="overview">
-          <TabsList className="grid grid-cols-5 w-full mb-6">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full mb-6">
             <TabsTrigger value="overview">Ringkasan</TabsTrigger>
-            <TabsTrigger value="submissions" className="gap-1">
+            <TabsTrigger value="submissions" className="gap-1 text-xs">
               <FileText className="w-3.5 h-3.5" /> Batch & Stok
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="gap-1">
+            <TabsTrigger value="withdrawals" className="gap-1 text-xs">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workers">
+            <TabsTrigger value="workers" className="text-xs">
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
-            <TabsTrigger value="rules">
+            <TabsTrigger value="rewards" className="text-xs">
+              <Gift className="w-3.5 h-3.5" /> Hadiah & Fitur
+            </TabsTrigger>
+            <TabsTrigger value="rules" className="text-xs">
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan & Tier
             </TabsTrigger>
           </TabsList>
@@ -927,6 +1072,298 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </Card>
                 );
               })}
+          </TabsContent>
+
+          {/* PENGATURAN HADIAH & ENGAGEMENT FEATURES */}
+          <TabsContent value="rewards" className="space-y-6">
+            {/* PENDING MISSION CLAIMS REVIEW */}
+            {pendingMissionClaims.length > 0 && (
+              <Card className="border-amber-300 bg-amber-50/50">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Target className="w-5 h-5 text-amber-600" /> Klaim Misi Menunggu Review ({pendingMissionClaims.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Pekerja mengajukan klaim misi. Verifikasi dan setujui untuk mencairkan saldo.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingMissionClaims.map((claim) => (
+                    <div key={claim.id} className="p-3 bg-white border border-amber-200 rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-gray-900">{claim.workerName || workerName(claim.workerId)}</p>
+                        <p className="text-gray-500 mt-0.5">Misi ID: {claim.missionId} · Periode: {claim.periodKey}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          disabled={busyId === claim.id}
+                          onClick={() => handleReviewMission(claim.id, "approved")}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 gap-1"
+                        >
+                          {busyId === claim.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          Setujui
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyId === claim.id}
+                          onClick={() => handleReviewMission(claim.id, "rejected")}
+                          className="text-xs h-8 gap-1"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Tolak
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* PENDING AD CLAIMS REVIEW */}
+            {pendingAdClaims.length > 0 && (
+              <Card className="border-blue-300 bg-blue-50/50">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Tv className="w-5 h-5 text-blue-600" /> Klaim Tugas Iklan Menunggu Review ({pendingAdClaims.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Pekerja menyelesaikan tugas nonton iklan. Verifikasi dan setujui untuk mencairkan saldo.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingAdClaims.map((claim) => (
+                    <div key={claim.id} className="p-3 bg-white border border-blue-200 rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-gray-900">{claim.workerName || workerName(claim.workerId)}</p>
+                        <p className="text-gray-500 mt-0.5">Tanggal: {claim.dateKey}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          disabled={busyId === claim.id}
+                          onClick={() => handleReviewAdClaim(claim.id, "approved")}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 gap-1"
+                        >
+                          {busyId === claim.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          Setujui
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyId === claim.id}
+                          onClick={() => handleReviewAdClaim(claim.id, "rejected")}
+                          className="text-xs h-8 gap-1"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Tolak
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            {/* REFERRAL CONTROL */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="w-5 h-5 text-amber-600" /> Pengaturan Sistem Referral
+                    </CardTitle>
+                    <CardDescription>
+                      Atur syarat kualifikasi dan hadiah referral pekerja.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleEvaluateReferrals}
+                    disabled={evaluatingRefs}
+                    className="bg-amber-600 hover:bg-amber-700 text-xs gap-1.5 shrink-0"
+                  >
+                    {evaluatingRefs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    Evaluasi Referral
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Hadiah Referral / Pekerja Qualified (Rp)</Label>
+                    <FormattedNumberInput
+                      value={rules.data.referralReward ?? 10000}
+                      onChange={(val) =>
+                        saveSettings("rules", { referralReward: val }).then(() =>
+                          toast.success("Hadiah referral disimpan!")
+                        )
+                      }
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Syarat Min. Email ACC Qualified</Label>
+                    <Input
+                      type="number"
+                      value={rules.data.referralMinAcc ?? 5}
+                      onChange={(e) =>
+                        saveSettings("rules", { referralMinAcc: Number(e.target.value) }).then(() =>
+                          toast.success("Syarat min. ACC referral disimpan!")
+                        )
+                      }
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Syarat Min. Pendapatan (Rp)</Label>
+                    <FormattedNumberInput
+                      value={rules.data.referralMinEarnings ?? 0}
+                      onChange={(val) =>
+                        saveSettings("rules", { referralMinEarnings: val }).then(() =>
+                          toast.success("Syarat min. pendapatan referral disimpan!")
+                        )
+                      }
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* LEADERBOARD CONTROL */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-amber-600" /> Hadiah Klasemen Mingguan
+                    </CardTitle>
+                    <CardDescription>
+                      Atur besaran hadiah untuk pekerja dengan jumlah setoran ACC tertinggi minggu ini.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleDistributeLeaderboard}
+                    disabled={distributingLeaderboard}
+                    className="bg-green-600 hover:bg-green-700 text-xs gap-1.5 shrink-0"
+                  >
+                    {distributingLeaderboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                    Cairkan Hadiah Minggu Ini ({getWeeklyPeriodKey()})
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!).map((rw, idx) => (
+                  <div key={rw.rank} className="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3 text-xs">
+                    <span className="font-bold text-gray-900">Juara {rw.rank} ({rw.rank === 1 ? "🥇 Emas" : rw.rank === 2 ? "🥈 Perak" : "🥉 Perunggu"})</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500">Bonus Saldo:</span>
+                      <FormattedNumberInput
+                        value={rw.rewardAmount}
+                        onChange={(val) => {
+                          const updated = (rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!).map((r, i) =>
+                            i === idx ? { ...r, rewardAmount: val } : r
+                          );
+                          saveSettings("rules", { leaderboardRewards: updated }).then(() =>
+                            toast.success("Hadiah klasemen disimpan!")
+                          );
+                        }}
+                        className="h-8 w-36 text-xs"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* REWARDED ADS CONTROL */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tv className="w-5 h-5 text-amber-600" /> Pengaturan Tugas Nonton Iklan
+                </CardTitle>
+                <CardDescription>
+                  Kontrol status aktif, batas harian, dan hadiah per iklan resmi.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Status Fitur Iklan</Label>
+                    <Select
+                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).enabled ? "active" : "disabled"}
+                      onValueChange={(val) => {
+                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
+                        saveSettings("rules", {
+                          adConfig: { ...currentAdCfg, enabled: val === "active" },
+                        }).then(() => toast.success(`Fitur iklan ${val === "active" ? "diaktifkan" : "dinonaktifkan"}.`));
+                      }}
+                    >
+                      <SelectTrigger className="mt-1 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Aktif (Enabled)</SelectItem>
+                        <SelectItem value="disabled">Nonaktif (Disabled)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hadiah Per Iklan (Rp)</Label>
+                    <FormattedNumberInput
+                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).rewardAmount}
+                      onChange={(val) => {
+                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
+                        saveSettings("rules", { adConfig: { ...currentAdCfg, rewardAmount: val } });
+                      }}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Batas Harian Per Pekerja (x/hari)</Label>
+                    <Input
+                      type="number"
+                      value={(rules.data.adConfig ?? DEFAULT_RULES.adConfig!).dailyLimit}
+                      onChange={(e) => {
+                        const currentAdCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
+                        saveSettings("rules", { adConfig: { ...currentAdCfg, dailyLimit: Number(e.target.value) } });
+                      }}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* AUDIT LEDGER HADIAH */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Audit Ledger Payout Hadiah</CardTitle>
+                <CardDescription>
+                  Rekam jejak seluruh pencairan hadiah (referral, misi, klasemen, iklan) yang transparan dan dapat diaudit.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {rewardLedger.data.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada transaksi pencairan hadiah.</p>
+                )}
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {rewardLedger.data.map((log) => (
+                    <div key={log.id} className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-gray-900">{log.workerName || workerName(log.workerId)}</p>
+                        <p className="text-gray-500 mt-0.5">{log.description}</p>
+                        <p className="text-[11px] text-gray-400">{formatDateTime(log.createdAt)}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold">
+                          +{formatMoney(log.amount)}
+                        </Badge>
+                        <p className="text-[10px] text-gray-400 uppercase mt-1">{log.rewardType}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ATURAN & TIER CONFIGURATION */}

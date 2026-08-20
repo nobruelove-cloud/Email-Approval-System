@@ -3,6 +3,8 @@ import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase
 import {
   collection,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -25,7 +27,7 @@ import {
   type UserStatus,
   type TierConfig,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, shortId } from "@/lib/portal-utils";
 
 import { useRef } from "react";
 
@@ -350,7 +352,41 @@ export function useAdminData() {
     field: "requestedAt",
     direction: "desc",
   });
-  return { users, submissions, withdrawals };
+  const referrals = useCollection<import("@/lib/portal-types").Referral>("referrals", [], true, {
+    field: "createdAt",
+    direction: "desc",
+  });
+  const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>("rewardLedger", [], true, {
+    field: "createdAt",
+    direction: "desc",
+  });
+  return { users, submissions, withdrawals, referrals, rewardLedger };
+}
+
+export function useWorkerEngagementData(uid?: string) {
+  const referrals = useCollection<import("@/lib/portal-types").Referral>(
+    "referrals",
+    uid ? [where("referrerId", "==", uid)] : [],
+    !!uid,
+    { field: "createdAt", direction: "desc" },
+  );
+  const missionClaims = useCollection<import("@/lib/portal-types").MissionClaim>(
+    "missionClaims",
+    uid ? [where("workerId", "==", uid)] : [],
+    !!uid,
+  );
+  const adClaims = useCollection<import("@/lib/portal-types").AdClaim>(
+    "adClaims",
+    uid ? [where("workerId", "==", uid)] : [],
+    !!uid,
+  );
+  const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>(
+    "rewardLedger",
+    uid ? [where("workerId", "==", uid)] : [],
+    !!uid,
+    { field: "createdAt", direction: "desc" },
+  );
+  return { referrals, missionClaims, adClaims, rewardLedger };
 }
 
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
@@ -650,6 +686,375 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
   }
 
   return setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+/**
+ * Registers a referral relationship upon worker registration.
+ * Registration alone generates ZERO reward.
+ * Self-referral is rejected.
+ */
+export async function registerReferral(referrerId: string, referredWorkerId: string, referredWorkerName: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  if (!referrerId || !referredWorkerId) return;
+  if (referrerId === referredWorkerId) {
+    console.warn("[registerReferral] Self-referral rejected.");
+    return;
+  }
+
+  const firestore = db;
+  const refDoc = doc(firestore, "referrals", referredWorkerId);
+
+  // Check if referrer exists in Firestore users collection
+  const referrerSnap = await getDoc(doc(firestore, "users", referrerId));
+  if (!referrerSnap.exists()) {
+    console.warn(`[registerReferral] Referrer UID ${referrerId} does not exist in Firestore.`);
+    return;
+  }
+
+  await setDoc(refDoc, {
+    id: referredWorkerId,
+    referrerId,
+    referredWorkerId,
+    referredWorkerName,
+    status: "PENDING",
+    createdAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+/**
+ * Evaluates a referral's qualification criteria and atomically grants reward to referrer.
+ * Prevents duplicate referral rewards using idempotent transaction checks.
+ */
+export async function evaluateReferralQualificationAndReward(
+  referredWorkerId: string,
+  accumulatedAccCount: number,
+  accumulatedEarnings: number = 0,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
+    const referralRef = doc(firestore, "referrals", referredWorkerId);
+    const referralSnap = await tx.get(referralRef);
+    if (!referralSnap.exists()) return; // No referral record exists for this worker
+
+    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+    if (referral.status === "REWARDED") {
+      return; // Already rewarded! Idempotency protection.
+    }
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await tx.get(rulesRef);
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+    const referralEnabled = rulesData?.referralEnabled ?? true;
+    const minAcc = rulesData?.referralMinAcc ?? 5;
+    const minEarnings = rulesData?.referralMinEarnings ?? 0;
+    const rewardAmt = rulesData?.referralReward ?? 10000;
+
+    if (!referralEnabled) return;
+
+    // Check qualification
+    const isQualified = accumulatedAccCount >= minAcc && accumulatedEarnings >= minEarnings;
+    if (!isQualified) {
+      if (referral.status !== "PENDING") {
+        tx.update(referralRef, { status: "PENDING" });
+      }
+      return;
+    }
+
+    const referrerRef = doc(firestore, "users", referral.referrerId);
+    const referrerSnap = await tx.get(referrerRef);
+    if (!referrerSnap.exists()) return;
+
+    const currentBalance = (referrerSnap.data() as PortalUser).balance ?? 0;
+
+    // Budget check if enabled
+    const budgetEnabled = rulesData?.rewardBudgetEnabled ?? false;
+    let currentBudget = rulesData?.rewardBudget ?? 0;
+
+    if (budgetEnabled && currentBudget < rewardAmt) {
+      throw new Error("Anggaran hadiah referral tidak mencukupi.");
+    }
+
+    // 2. ALL WRITES AFTER READS
+    tx.update(referralRef, {
+      status: "REWARDED",
+      qualifiedAt: serverTimestamp(),
+      rewardedAt: serverTimestamp(),
+      rewardAmount: rewardAmt,
+    });
+
+    tx.update(referrerRef, {
+      balance: currentBalance + rewardAmt,
+    });
+
+    if (budgetEnabled) {
+      tx.update(rulesRef, {
+        rewardBudget: currentBudget - rewardAmt,
+      });
+    }
+
+    const ledgerRef = doc(collection(firestore, "rewardLedger"));
+    tx.set(ledgerRef, {
+      workerId: referral.referrerId,
+      rewardType: "referral",
+      amount: rewardAmt,
+      sourceRefId: referredWorkerId,
+      description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referredWorkerId)}`,
+      createdAt: serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * Creates a pending mission claim request from a worker.
+ * Adheres to Firestore security rules (status is "pending").
+ */
+export async function createMissionClaimRequest(
+  workerId: string,
+  missionId: string,
+  periodKey: string,
+  workerName?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const claimId = `${workerId}_${missionId}_${periodKey}`;
+  const claimRef = doc(db, "missionClaims", claimId);
+
+  return setDoc(claimRef, {
+    id: claimId,
+    workerId,
+    missionId,
+    periodKey,
+    workerName,
+    status: "pending",
+    requestedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+/**
+ * Admin resolves/approves a mission claim request.
+ * Server-side / transactionally validates actual Firestore submission records inside the transaction.
+ */
+export async function reviewMissionClaim(
+  claimId: string,
+  decision: "approved" | "rejected",
+  actualAccCountOverride?: number,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
+    const claimRef = doc(firestore, "missionClaims", claimId);
+    const claimSnap = await tx.get(claimRef);
+    if (!claimSnap.exists()) throw new Error("Klaim misi tidak ditemukan.");
+    const claim = claimSnap.data() as { workerId: string; missionId: string; periodKey: string; status: string; workerName?: string };
+
+    if (claim.status === "approved") {
+      throw new Error("Klaim misi ini sudah pernah disetujui.");
+    }
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await tx.get(rulesRef);
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+    const missions = (rulesData?.missions ?? []) as import("@/lib/portal-types").MissionConfig[];
+    const mission = missions.find((m) => m.id === claim.missionId);
+
+    if (!mission || !mission.enabled) {
+      throw new Error("Misi tidak ditemukan atau sedang nonaktif.");
+    }
+
+    const userRef = doc(firestore, "users", claim.workerId);
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+
+    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+
+    // Budget check
+    const budgetEnabled = rulesData?.rewardBudgetEnabled ?? false;
+    const currentBudget = rulesData?.rewardBudget ?? 0;
+
+    if (decision === "approved" && budgetEnabled && currentBudget < mission.rewardAmount) {
+      throw new Error("Anggaran hadiah misi tidak mencukupi.");
+    }
+
+    // 2. ALL WRITES AFTER READS
+    tx.update(claimRef, {
+      status: decision,
+      rewardAmount: decision === "approved" ? mission.rewardAmount : 0,
+      processedAt: serverTimestamp(),
+    });
+
+    if (decision === "approved") {
+      tx.update(userRef, {
+        balance: currentBalance + mission.rewardAmount,
+      });
+
+      if (budgetEnabled) {
+        tx.update(rulesRef, {
+          rewardBudget: currentBudget - mission.rewardAmount,
+        });
+      }
+
+      const ledgerRef = doc(collection(firestore, "rewardLedger"));
+      tx.set(ledgerRef, {
+        workerId: claim.workerId,
+        workerName: claim.workerName || (userSnap.data() as PortalUser).name,
+        rewardType: "mission",
+        amount: mission.rewardAmount,
+        sourceRefId: claimId,
+        description: `Hadiah Misi (${claim.periodKey}): ${mission.title}`,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
+}
+
+/**
+ * Distributes leaderboard rewards to top workers for a given period.
+ * Enforces single reward per rank/worker per period.
+ */
+export async function distributeLeaderboardReward(
+  workerId: string,
+  periodKey: string,
+  rank: number,
+  validAccCount: number,
+  rewardAmount: number,
+  workerName?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
+    const payoutId = `${periodKey}_rank${rank}_${workerId}`;
+    const payoutRef = doc(firestore, "leaderboardPayouts", payoutId);
+    const payoutSnap = await tx.get(payoutRef);
+    if (payoutSnap.exists()) {
+      throw new Error("Hadiah klasemen untuk peringkat ini sudah pernah dicairkan.");
+    }
+
+    const userRef = doc(firestore, "users", workerId);
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+
+    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+
+    // 2. ALL WRITES AFTER READS
+    tx.set(payoutRef, {
+      id: payoutId,
+      workerId,
+      workerName: workerName || (userSnap.data() as PortalUser).name,
+      periodKey,
+      rank,
+      validAccCount,
+      rewardAmount,
+      paidAt: serverTimestamp(),
+    });
+
+    tx.update(userRef, {
+      balance: currentBalance + rewardAmount,
+    });
+
+    const ledgerRef = doc(collection(firestore, "rewardLedger"));
+    tx.set(ledgerRef, {
+      workerId,
+      workerName: workerName || (userSnap.data() as PortalUser).name,
+      rewardType: "leaderboard",
+      amount: rewardAmount,
+      sourceRefId: payoutId,
+      description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
+      createdAt: serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * Creates a pending ad task claim request from a worker.
+ */
+export async function createAdClaimRequest(
+  workerId: string,
+  dateKey: string,
+  workerName?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const timestampMs = Date.now();
+  const claimId = `${workerId}_ad_${timestampMs}`;
+  const claimRef = doc(db, "adClaims", claimId);
+
+  await setDoc(claimRef, {
+    id: claimId,
+    workerId,
+    dateKey,
+    workerName,
+    status: "pending",
+    requestedAt: serverTimestamp(),
+  });
+
+  return claimId;
+}
+
+/**
+ * Admin resolves/approves an ad claim request.
+ */
+export async function reviewAdClaim(
+  claimId: string,
+  decision: "approved" | "rejected",
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
+    const claimRef = doc(firestore, "adClaims", claimId);
+    const claimSnap = await tx.get(claimRef);
+    if (!claimSnap.exists()) throw new Error("Klaim tugas iklan tidak ditemukan.");
+    const claim = claimSnap.data() as { workerId: string; dateKey: string; status: string; workerName?: string };
+
+    if (claim.status === "approved" || claim.status === "rewarded") {
+      throw new Error("Tugas iklan ini sudah pernah dicairkan.");
+    }
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await tx.get(rulesRef);
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+    const adConfig = rulesData?.adConfig ?? { enabled: false, rewardAmount: 500, dailyLimit: 5, cooldownSeconds: 60 };
+
+    if (decision === "approved" && !adConfig.enabled) {
+      throw new Error("Fitur iklan/tugas berhadiah sedang tidak aktif.");
+    }
+
+    const userRef = doc(firestore, "users", claim.workerId);
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+
+    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+
+    // 2. ALL WRITES AFTER READS
+    tx.update(claimRef, {
+      status: decision === "approved" ? "rewarded" : "rejected",
+      rewardAmount: decision === "approved" ? adConfig.rewardAmount : 0,
+      processedAt: serverTimestamp(),
+    });
+
+    if (decision === "approved") {
+      tx.update(userRef, {
+        balance: currentBalance + adConfig.rewardAmount,
+      });
+
+      const ledgerRef = doc(collection(firestore, "rewardLedger"));
+      tx.set(ledgerRef, {
+        workerId: claim.workerId,
+        workerName: claim.workerName || (userSnap.data() as PortalUser).name,
+        rewardType: "ad",
+        amount: adConfig.rewardAmount,
+        sourceRefId: claimId,
+        description: `Hadiah Nonton Iklan (${claim.dateKey})`,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
 }
 
 export function useSettings<T>(name: string, initial: T) {
