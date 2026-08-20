@@ -217,6 +217,84 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST H: Worker missionClaim creation ---');
+  const missionClaimId = `${workerUid}_daily_acc_3_2026-W34`;
+  try {
+    await assertSucceeds(
+      setDoc(doc(existingWorkerDb, 'missionClaims', missionClaimId), {
+        id: missionClaimId,
+        workerId: workerUid,
+        missionId: 'daily_acc_3',
+        periodKey: '2026-W34',
+        workerName: 'Worker User',
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      }, { merge: true })
+    );
+    console.log('[PASS] Worker missionClaim creation succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker missionClaim creation failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST I: Worker attempting status: "approved" in missionClaim fails ---');
+  const badClaimId = `${workerUid}_bad_claim`;
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'missionClaims', badClaimId), {
+        id: badClaimId,
+        workerId: workerUid,
+        missionId: 'daily_acc_3',
+        periodKey: '2026-W34',
+        workerName: 'Worker User',
+        status: 'approved',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting status "approved" in missionClaim correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting status "approved" in missionClaim was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST J: Worker adClaim creation as pending succeeds ---');
+  const adClaimId = `${workerUid}_ad_${Date.now()}`;
+  try {
+    await assertSucceeds(
+      setDoc(doc(existingWorkerDb, 'adClaims', adClaimId), {
+        id: adClaimId,
+        workerId: workerUid,
+        dateKey: '2026-08-20',
+        workerName: 'Worker User',
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker adClaim creation as pending succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker adClaim creation failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST K: Worker attempting status: "rewarded" in adClaim fails ---');
+  const badAdClaimId = `${workerUid}_bad_ad_claim`;
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'adClaims', badAdClaimId), {
+        id: badAdClaimId,
+        workerId: workerUid,
+        dateKey: '2026-08-20',
+        workerName: 'Worker User',
+        status: 'rewarded',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting status "rewarded" in adClaim correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting status "rewarded" in adClaim was not rejected:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed.');
 }

@@ -530,80 +530,88 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </form>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* RIWAYAT SETORAN (GROUPED BY BATCH WITH PER-ITEM STATS) */}
-          <TabsContent value="submit-history" className="space-y-3">
-            {submissions.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
-            {!submissions.loading && submissions.data.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Belum ada batch setoran email.</p>
-            )}
-            {submissions.data.map((item) => {
-              const baseItems = Array.isArray(item.items) && item.items.length > 0
-                ? item.items
-                : item.email
-                  ? [{ email: item.email, password: item.password, status: item.status === "available" || item.status === "approved" ? "approved" : item.status === "rejected" ? "rejected" : "pending" }]
-                  : [];
+            {/* RIWAYAT SETORAN (GROUPED BY BATCH WITH PER-ITEM STATS) */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="w-4 h-4 text-amber-600" />
+                  Riwayat Setoran Email
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {submissions.loading && <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>}
+                {!submissions.loading && submissions.data.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
+                )}
+                {submissions.data.map((item) => {
+                  const baseItems = Array.isArray(item.items) && item.items.length > 0
+                    ? item.items
+                    : item.email
+                      ? [{ email: item.email, password: item.password, status: item.status === "available" || item.status === "approved" ? "approved" : item.status === "rejected" ? "rejected" : "pending" }]
+                      : [];
 
-              const count = baseItems.length || getItemCountOfSubmission(item);
-              const approvedCount = item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-              const rejectedCount = item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-              const pendingCount = count - approvedCount - rejectedCount;
+                  const count = baseItems.length || getItemCountOfSubmission(item);
+                  const approvedCount = item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+                  const rejectedCount = item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+                  const pendingCount = count - approvedCount - rejectedCount;
 
-              const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
-              const tierCfg = getTierConfig(tierNum, rules.data.tiers);
-              const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-              const earnedAmount = item.totalAmount ?? (approvedCount * pricePerItem);
+                  const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
+                  const tierCfg = getTierConfig(tierNum, rules.data.tiers);
+                  const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
+                  const earnedAmount = item.totalAmount ?? (approvedCount * pricePerItem);
 
-              return (
-                <Card key={item.id}>
-                  <CardContent className="pt-4 flex items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-gray-900">{count} Total Email</span>
-                        <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
-                          {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                        </Badge>
-                      </div>
+                  return (
+                    <Card key={item.id} className="border-gray-200">
+                      <CardContent className="pt-4 flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-gray-900">{count} Total Email</span>
+                            <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
+                              {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                            </Badge>
+                          </div>
 
-                      <div className="flex items-center gap-2 text-xs font-medium">
-                        <span className="text-green-600">Disetujui: {approvedCount}</span>
-                        <span className="text-gray-300">|</span>
-                        <span className="text-red-600">Ditolak: {rejectedCount}</span>
-                        {pendingCount > 0 && (
-                          <>
+                          <div className="flex items-center gap-2 text-xs font-medium">
+                            <span className="text-green-600">Disetujui: {approvedCount}</span>
                             <span className="text-gray-300">|</span>
-                            <span className="text-amber-600">Menunggu: {pendingCount}</span>
-                          </>
-                        )}
-                      </div>
+                            <span className="text-red-600">Ditolak: {rejectedCount}</span>
+                            {pendingCount > 0 && (
+                              <>
+                                <span className="text-gray-300">|</span>
+                                <span className="text-amber-600">Menunggu: {pendingCount}</span>
+                              </>
+                            )}
+                          </div>
 
-                      <p className="text-xs text-amber-700 font-bold">
-                        Total Saldo Didapat: {formatMoney(earnedAmount)}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
-                      </p>
-                      {item.reviewNote && (
-                        <p className="text-xs text-gray-500 italic">Catatan: {item.reviewNote}</p>
-                      )}
-                    </div>
+                          <p className="text-xs text-amber-700 font-bold">
+                            Total Saldo Didapat: {formatMoney(earnedAmount)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
+                          </p>
+                          {item.reviewNote && (
+                            <p className="text-xs text-gray-500 italic">Catatan: {item.reviewNote}</p>
+                          )}
+                        </div>
 
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <StatusBadge status={item.status} />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setDetailSubmission(item)}
-                        className="text-xs h-7 gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Lihat Email
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <StatusBadge status={item.status} />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDetailSubmission(item)}
+                            className="text-xs h-7 gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Lihat Email
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* WATCH ADS / REWARDED TASKS */}
@@ -1021,31 +1029,39 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </form>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* RIWAYAT PENARIKAN */}
-          <TabsContent value="withdraw-history" className="space-y-3">
-            {withdrawals.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat…</p>}
-            {!withdrawals.loading && withdrawals.data.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Belum ada penarikan.</p>
-            )}
-            {withdrawals.data.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="pt-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{formatMoney(item.amount)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {item.method} · {item.account}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
-                    </p>
-                    {item.note && <p className="text-xs text-gray-500 mt-1 italic">Catatan: {item.note}</p>}
-                  </div>
-                  <StatusBadge status={item.status} />
-                </CardContent>
-              </Card>
-            ))}
+            {/* RIWAYAT PENARIKAN */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="w-4 h-4 text-amber-600" />
+                  Riwayat Penarikan Saldo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {withdrawals.loading && <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>}
+                {!withdrawals.loading && withdrawals.data.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada penarikan.</p>
+                )}
+                {withdrawals.data.map((item) => (
+                  <Card key={item.id} className="border-gray-200">
+                    <CardContent className="pt-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">{formatMoney(item.amount)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {item.method} · {item.account}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
+                        </p>
+                        {item.note && <p className="text-xs text-gray-500 mt-1 italic">Catatan: {item.note}</p>}
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
