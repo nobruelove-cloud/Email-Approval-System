@@ -13,6 +13,14 @@ import {
   Loader2,
   Eye,
   Award,
+  Tv,
+  Target,
+  Users,
+  Trophy,
+  Copy,
+  Check,
+  PlayCircle,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,7 +44,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useWorkerData, useSettings, createSubmission, createWithdrawal } from "@/hooks/use-portal";
+import {
+  useWorkerData,
+  useWorkerEngagementData,
+  useAdminData,
+  useSettings,
+  createSubmission,
+  createWithdrawal,
+  createMissionClaimRequest,
+  createAdClaimRequest,
+} from "@/hooks/use-portal";
 import { DEFAULT_RULES, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
   formatDateTime,
@@ -45,6 +62,11 @@ import {
   getTierConfig,
   shortId,
   validatePasswordAgainstRules,
+  getDailyPeriodKey,
+  getWeeklyPeriodKey,
+  getStartAndEndOfDay,
+  getStartAndEndOfWeek,
+  getWorkerAccInPeriod,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -68,7 +90,159 @@ export function StatusBadge({ status }: { status: string }) {
 
 export default function WorkerDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { submissions, withdrawals } = useWorkerData(profile.uid);
+  const engagement = useWorkerEngagementData(profile.uid);
+  const adminData = useAdminData();
   const rules = useSettings("rules", DEFAULT_RULES);
+
+  // Engagement UI States
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [adProgress, setAdProgress] = useState(0);
+
+  const referralCode = profile.uid;
+  const referralLink = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referralCode}` : `/register?ref=${referralCode}`;
+
+  function handleCopyReferralLink() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(referralLink);
+      setCopiedLink(true);
+      toast.success("Tautan referral berhasil disalin!");
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  }
+
+  // Calculate Engagement Stats
+  const refStats = useMemo(() => {
+    const total = engagement.referrals.data.length;
+    const pending = engagement.referrals.data.filter((r) => r.status === "PENDING").length;
+    const qualified = engagement.referrals.data.filter((r) => r.status === "QUALIFIED" || r.status === "REWARDED").length;
+    const earnings = engagement.rewardLedger.data
+      .filter((l) => l.rewardType === "referral")
+      .reduce((sum, item) => sum + item.amount, 0);
+    return { total, pending, qualified, earnings };
+  }, [engagement.referrals.data, engagement.rewardLedger.data]);
+
+  // Handle Mission Claim Request
+  async function handleClaimMission(missionId: string, type: "daily" | "weekly", targetCount: number) {
+    const { start, end } = type === "daily" ? getStartAndEndOfDay() : getStartAndEndOfWeek();
+    const periodKey = type === "daily" ? getDailyPeriodKey() : getWeeklyPeriodKey();
+    const validAccCount = getWorkerAccInPeriod(submissions.data, start, end, profile.uid);
+
+    if (validAccCount < targetCount) {
+      toast.error(`Misi belum memenuhi target ${targetCount} ACC.`);
+      return;
+    }
+
+    setClaimingMissionId(missionId);
+    try {
+      await createMissionClaimRequest(profile.uid, missionId, periodKey, profile.name);
+      toast.success("Permintaan klaim misi berhasil dikirim untuk ditinjau admin!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengajukan klaim misi.");
+    } finally {
+      setClaimingMissionId(null);
+    }
+  }
+
+  // Handle Watching Rewarded Ad
+  async function handleWatchAd() {
+    const adCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
+    if (!adCfg.enabled) {
+      toast.error("Fitur nonton iklan sedang nonaktif oleh admin.");
+      return;
+    }
+
+    const dateKey = getDailyPeriodKey();
+    const todayClaims = engagement.adClaims.data.filter((c) => c.dateKey === dateKey).length;
+    if (todayClaims >= adCfg.dailyLimit) {
+      toast.error(`Batas harian nonton iklan (${adCfg.dailyLimit}x) telah tercapai hari ini.`);
+      return;
+    }
+
+    setWatchingAd(true);
+    setAdProgress(0);
+
+    const interval = setInterval(() => {
+      setAdProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 25;
+      });
+    }, 750);
+
+    setTimeout(async () => {
+      clearInterval(interval);
+      try {
+        await createAdClaimRequest(profile.uid, dateKey, profile.name);
+        toast.success(`Tugas iklan selesai! Klaim berhasil dikirim untuk ditinjau admin.`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Gagal menyelesaikan tugas iklan.");
+      } finally {
+        setWatchingAd(false);
+        setAdProgress(0);
+      }
+    }, 3200);
+  }
+
+  // Leaderboard Calculation for current week
+  const leaderboardWeekly = useMemo(() => {
+    const { start, end } = getStartAndEndOfWeek();
+    const allSubs = adminData.submissions.data.length > 0 ? adminData.submissions.data : submissions.data;
+    const allUsers = adminData.users.data.length > 0 ? adminData.users.data : [profile];
+
+    const workerAccMap = new Map<string, { workerName: string; accCount: number }>();
+
+    allUsers.forEach((u) => {
+      if (u.role === "worker") {
+        workerAccMap.set(u.uid, { workerName: u.name, accCount: 0 });
+      }
+    });
+
+    allSubs.forEach((sub) => {
+      let subDate: Date | null = null;
+      if (sub.submittedAt) {
+        subDate = typeof sub.submittedAt === "object" && "toDate" in (sub.submittedAt as Record<string, unknown>)
+          ? (sub.submittedAt as { toDate: () => Date }).toDate()
+          : new Date(sub.submittedAt as string | number);
+      }
+      if (subDate && subDate >= start && subDate <= end) {
+        const isFinal = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+        if (isFinal) {
+          const approvedCount = sub.approvedItemCount ?? (Array.isArray(sub.items) ? sub.items.filter((i) => i.status === "approved").length : 1);
+          const current = workerAccMap.get(sub.workerId) ?? { workerName: sub.workerName || shortId(sub.workerId), accCount: 0 };
+          workerAccMap.set(sub.workerId, { workerName: current.workerName, accCount: current.accCount + approvedCount });
+        }
+      }
+    });
+
+    const rows = Array.from(workerAccMap.entries()).map(([wId, val]) => ({
+      workerId: wId,
+      workerName: val.workerName,
+      validAccCount: val.accCount,
+    }));
+
+    // Strictly sort by valid ACC count descending
+    rows.sort((a, b) => b.validAccCount - a.validAccCount);
+
+    const rewardsList = rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!;
+
+    return rows.map((r, idx) => {
+      const rank = idx + 1;
+      const rewardObj = rewardsList.find((reward) => Number(reward.rank) === rank);
+      return {
+        ...r,
+        rank,
+        potentialReward: rewardObj?.rewardAmount ?? 0,
+      };
+    });
+  }, [adminData.submissions.data, adminData.users.data, submissions.data, profile, rules.data.leaderboardRewards]);
+
+  const currentWorkerRankObj = useMemo(() => {
+    return leaderboardWeekly.find((r) => r.workerId === profile.uid);
+  }, [leaderboardWeekly, profile.uid]);
 
   // Active Tier configuration
   const currentTierConfig = useMemo(() => {
@@ -213,18 +387,24 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-4 w-full mb-6">
-            <TabsTrigger value="submit" className="gap-1.5">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full mb-6">
+            <TabsTrigger value="submit" className="gap-1 text-xs">
               <Send className="w-3.5 h-3.5" /> Setor
             </TabsTrigger>
-            <TabsTrigger value="submit-history" className="gap-1.5">
-              <History className="w-3.5 h-3.5" /> Riwayat
+            <TabsTrigger value="ads" className="gap-1 text-xs">
+              <Tv className="w-3.5 h-3.5" /> Iklan
             </TabsTrigger>
-            <TabsTrigger value="withdraw" className="gap-1.5">
+            <TabsTrigger value="missions" className="gap-1 text-xs">
+              <Target className="w-3.5 h-3.5" /> Misi
+            </TabsTrigger>
+            <TabsTrigger value="referral" className="gap-1 text-xs">
+              <Users className="w-3.5 h-3.5" /> Referral
+            </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="gap-1 text-xs">
+              <Trophy className="w-3.5 h-3.5" /> Klasemen
+            </TabsTrigger>
+            <TabsTrigger value="withdraw" className="gap-1 text-xs">
               <Wallet className="w-3.5 h-3.5" /> Tarik
-            </TabsTrigger>
-            <TabsTrigger value="withdraw-history" className="gap-1.5">
-              <History className="w-3.5 h-3.5" /> Riwayat
             </TabsTrigger>
           </TabsList>
 
@@ -424,6 +604,354 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </Card>
               );
             })}
+          </TabsContent>
+
+          {/* WATCH ADS / REWARDED TASKS */}
+          <TabsContent value="ads" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tv className="w-5 h-5 text-amber-600" /> Tugas Nonton Iklan
+                </CardTitle>
+                <CardDescription>
+                  Selesaikan penayangan iklan resmi untuk mendapatkan hadiah saldo tambahan harian.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(() => {
+                  const adCfg = rules.data.adConfig ?? DEFAULT_RULES.adConfig!;
+                  const dateKey = getDailyPeriodKey();
+                  const todayCount = engagement.adClaims.data.filter((c) => c.dateKey === dateKey).length;
+                  const isLimitReached = todayCount >= adCfg.dailyLimit;
+
+                  if (!adCfg.enabled) {
+                    return (
+                      <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center space-y-2">
+                        <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                          Fitur Tidak Aktif
+                        </Badge>
+                        <p className="text-sm font-semibold text-gray-800">Tugas Nonton Iklan Belum Dibuka</p>
+                        <p className="text-xs text-gray-500">
+                          Admin belum mengaktifkan penyedia iklan saat ini. Tidak ada manipulasi atau tayangan iklan palsu.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+                        <div>
+                          <span className="text-amber-800">Progres Hari Ini:</span>
+                          <p className="font-bold text-amber-900 text-sm">{todayCount} / {adCfg.dailyLimit} Selesai</p>
+                        </div>
+                        <div>
+                          <span className="text-amber-800">Hadiah Per Iklan:</span>
+                          <p className="font-bold text-amber-900 text-sm">{formatMoney(adCfg.rewardAmount)}</p>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <span className="text-amber-800">Maks. Saldo Harian:</span>
+                          <p className="font-bold text-amber-900 text-sm">{formatMoney(adCfg.dailyLimit * adCfg.rewardAmount)}</p>
+                        </div>
+                      </div>
+
+                      {watchingAd && (
+                        <div className="p-4 bg-gray-900 text-white rounded-lg space-y-3">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-2 font-medium">
+                              <PlayCircle className="w-4 h-4 animate-pulse text-amber-400" />
+                              Memutar Iklan Berhadiah...
+                            </span>
+                            <span>{adProgress}%</span>
+                          </div>
+                          <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+                            <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${adProgress}%` }} />
+                          </div>
+                          <p className="text-[11px] text-gray-400 text-center">
+                            Verifikasi penayangan iklan sedang berlangsung...
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={handleWatchAd}
+                        disabled={watchingAd || isLimitReached}
+                        className="w-full bg-amber-600 hover:bg-amber-700 gap-2 h-11"
+                      >
+                        {watchingAd ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Tv className="w-4 h-4" />
+                        )}
+                        {isLimitReached
+                          ? "Batas Harian Iklan Tercapai"
+                          : `Tonton Iklan (+${formatMoney(adCfg.rewardAmount)})`}
+                      </Button>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* MISI PEKERJA (DAILY & WEEKLY) */}
+          <TabsContent value="missions" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-amber-600" /> Misi Harian & Mingguan
+                </CardTitle>
+                <CardDescription>
+                  Selesaikan target setoran email valid (ACC) untuk mengklaim bonus saldo tambahan.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(() => {
+                  const missionList = rules.data.missions ?? DEFAULT_RULES.missions!;
+                  const activeMissions = missionList.filter((m) => m.enabled);
+
+                  if (activeMissions.length === 0) {
+                    return <p className="text-sm text-gray-400 text-center py-6">Belum ada misi aktif dari admin.</p>;
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {activeMissions.map((m) => {
+                        const isDaily = m.type === "daily";
+                        const { start, end } = isDaily ? getStartAndEndOfDay() : getStartAndEndOfWeek();
+                        const periodKey = isDaily ? getDailyPeriodKey() : getWeeklyPeriodKey();
+
+                        const validAcc = getWorkerAccInPeriod(submissions.data, start, end, profile.uid);
+                        const percent = Math.min(100, Math.round((validAcc / m.targetAccCount) * 100));
+
+                        const claimId = `${profile.uid}_${m.id}_${periodKey}`;
+                        const isClaimed = engagement.missionClaims.data.some((c) => c.id === claimId);
+                        const isTargetReached = validAcc >= m.targetAccCount;
+
+                        return (
+                          <div key={m.id} className="p-4 bg-white border border-gray-200 rounded-lg space-y-3 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-[10px] ${isDaily ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200"}`}>
+                                    {isDaily ? "Misi Harian" : "Misi Mingguan"}
+                                  </Badge>
+                                  <h4 className="font-bold text-sm text-gray-900">{m.title}</h4>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{m.description}</p>
+                              </div>
+                              <Badge className="bg-amber-100 text-amber-900 font-bold shrink-0">
+                                +{formatMoney(m.rewardAmount)}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs font-medium text-gray-600">
+                                <span>Progres Setoran ACC:</span>
+                                <span>{validAcc} / {m.targetAccCount} ACC ({percent}%)</span>
+                              </div>
+                              <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${percent}%` }} />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                              {(() => {
+                                const claimDoc = engagement.missionClaims.data.find((c) => c.id === claimId);
+                                if (claimDoc) {
+                                  if (claimDoc.status === "approved") {
+                                    return (
+                                      <Badge className="bg-green-100 text-green-800 gap-1 font-semibold">
+                                        <CheckCircle2 className="w-3 h-3" /> Disetujui ({formatMoney(m.rewardAmount)})
+                                      </Badge>
+                                    );
+                                  }
+                                  return (
+                                    <Badge className="bg-amber-100 text-amber-800 gap-1 font-semibold">
+                                      <Clock className="w-3 h-3 animate-spin" /> Menunggu Review Admin
+                                    </Badge>
+                                  );
+                                }
+
+                                if (isTargetReached) {
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleClaimMission(m.id, m.type, m.targetAccCount)}
+                                      disabled={claimingMissionId === m.id}
+                                      className="bg-green-600 hover:bg-green-700 text-white gap-1 text-xs h-8"
+                                    >
+                                      {claimingMissionId === m.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                      )}
+                                      Klaim Hadiah ({formatMoney(m.rewardAmount)})
+                                    </Button>
+                                  );
+                                }
+
+                                return (
+                                  <Button size="sm" variant="outline" disabled className="text-xs h-8 text-gray-400">
+                                    Belum Selesai ({validAcc}/{m.targetAccCount})
+                                  </Button>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* REFERRAL SYSTEM */}
+          <TabsContent value="referral" className="space-y-4">
+            <Card className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-amber-600" /> Tautan & Kode Referral
+                </CardTitle>
+                <CardDescription>
+                  Bagikan tautan ini ke teman atau pekerja lain. Dapatkan bonus saldo untuk setiap referral qualified.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-xs text-gray-600">Tautan Referral Anda</Label>
+                  <div className="flex gap-2 mt-1.5">
+                    <Input readOnly value={referralLink} className="font-mono text-xs bg-white" />
+                    <Button onClick={handleCopyReferralLink} className="bg-amber-600 hover:bg-amber-700 shrink-0 gap-1.5">
+                      {copiedLink ? <Check className="w-4 h-4 text-green-200" /> : <Copy className="w-4 h-4" />}
+                      {copiedLink ? "Tersalin!" : "Salin Link"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
+                    <p className="text-[11px] text-gray-500">Total Referral</p>
+                    <p className="text-lg font-bold text-gray-900 mt-0.5">{refStats.total}</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
+                    <p className="text-[11px] text-gray-500">Menunggu (Pending)</p>
+                    <p className="text-lg font-bold text-amber-700 mt-0.5">{refStats.pending}</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
+                    <p className="text-[11px] text-gray-500">Qualified (ACC)</p>
+                    <p className="text-lg font-bold text-green-700 mt-0.5">{refStats.qualified}</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
+                    <p className="text-[11px] text-gray-500">Total Bonus Didapat</p>
+                    <p className="text-lg font-bold text-amber-700 mt-0.5">{formatMoney(refStats.earnings)}</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold flex items-center gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Ketentuan Kualifikasi Referral:
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
+                    <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
+                    <li>Pekerja yang diundang harus mencapai minimal <strong>{rules.data.referralMinAcc ?? 5} email ACC</strong> disetujui admin.</li>
+                    <li>Bonus referral hanya diberikan 1 kali per pekerja qualified: <strong>{formatMoney(rules.data.referralReward ?? 10000)}</strong>.</li>
+                  </ul>
+                </div>
+
+                {engagement.referrals.data.length > 0 && (
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-2 block">Daftar Pekerja Terdaftar Via Referral Anda:</Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                      {engagement.referrals.data.map((ref) => (
+                        <div key={ref.id} className="p-2.5 rounded-md border flex items-center justify-between text-xs">
+                          <div>
+                            <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
+                            <p className="text-[11px] text-gray-400">{formatDateTime(ref.createdAt)}</p>
+                          </div>
+                          <Badge className={ref.status === "REWARDED" || ref.status === "QUALIFIED" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
+                            {ref.status === "REWARDED" ? "Diberikan Hadiah" : ref.status === "QUALIFIED" ? "Qualified" : "Pending (Belum Cukup ACC)"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* KLASEMEN / LEADERBOARD */}
+          <TabsContent value="leaderboard" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-amber-600" /> Papan Klasemen Mingguan
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Peringkat berdasarkan total email valid (ACC) yang disetujui pada periode minggu ini ({getWeeklyPeriodKey()}).
+                    </CardDescription>
+                  </div>
+                  {currentWorkerRankObj && (
+                    <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-xs">
+                      Peringkat Anda: #{currentWorkerRankObj.rank} ({currentWorkerRankObj.validAccCount} ACC)
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {leaderboardWeekly.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-6">Belum ada aktivitas setoran disetujui minggu ini.</p>
+                  )}
+                  {leaderboardWeekly.map((row) => {
+                    const isSelf = row.workerId === profile.uid;
+                    const isTop3 = row.rank <= 3;
+                    const badgeClass =
+                      row.rank === 1
+                        ? "bg-amber-500 text-white"
+                        : row.rank === 2
+                          ? "bg-gray-400 text-white"
+                          : row.rank === 3
+                            ? "bg-amber-700 text-white"
+                            : "bg-gray-100 text-gray-700";
+
+                    return (
+                      <div
+                        key={row.workerId}
+                        className={`p-3 rounded-lg border flex items-center justify-between text-xs transition-all ${
+                          isSelf
+                            ? "bg-amber-50 border-amber-400 ring-2 ring-amber-400/30"
+                            : "bg-white border-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${badgeClass}`}>
+                            {row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : `#${row.rank}`}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900 flex items-center gap-1.5">
+                              {row.workerName} {isSelf && <span className="text-[10px] text-amber-700">(Anda)</span>}
+                            </p>
+                            <p className="text-[11px] text-gray-500">{row.validAccCount} Email ACC Valid</p>
+                          </div>
+                        </div>
+
+                        {row.potentialReward > 0 && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 font-bold">
+                            Bonus #{row.rank}: +{formatMoney(row.potentialReward)}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* TARIK SALDO */}

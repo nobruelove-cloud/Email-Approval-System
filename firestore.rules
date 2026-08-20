@@ -41,13 +41,14 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
-        request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'referredBy', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
         request.resource.data.uid == uid &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
         request.resource.data.email is string &&
         request.resource.data.email.size() > 0 &&
         (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
+        (!('referredBy' in request.resource.data) || request.resource.data.referredBy is string) &&
         request.resource.data.role == 'worker' &&
         request.resource.data.status == 'active' &&
         request.resource.data.tier == 1 &&
@@ -109,6 +110,46 @@ service cloud.firestore {
     // ---- settings/{name} ---- (dynamic rules, payment methods, pricing)
     match /settings/{name} {
       allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- referrals/{id} ----
+    match /referrals/{id} {
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.referrerId == request.auth.uid || resource.data.referredWorkerId == request.auth.uid));
+      allow create: if isSignedIn() &&
+        request.resource.data.referredWorkerId == request.auth.uid &&
+        request.resource.data.referrerId != request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- missionClaims/{id} ----
+    match /missionClaims/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow create: if isSignedIn() &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- leaderboardPayouts/{id} ----
+    match /leaderboardPayouts/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- adClaims/{id} ----
+    match /adClaims/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow create: if isSignedIn() &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- rewardLedger/{id} ----
+    match /rewardLedger/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
       allow write: if isAdmin();
     }
   }

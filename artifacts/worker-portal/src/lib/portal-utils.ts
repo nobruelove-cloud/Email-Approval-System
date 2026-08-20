@@ -117,6 +117,103 @@ export function validateTierConfigs(tiers: TierConfig[]): string | null {
 }
 
 /**
+ * Returns a YYYY-MM-DD date key string in local/Indonesian timezone.
+ */
+export function getDailyPeriodKey(inputDate?: Date | unknown): string {
+  const date = inputDate instanceof Timestamp ? inputDate.toDate() : inputDate instanceof Date ? inputDate : new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns a ISO YYYY-Www week period key string (e.g. 2026-W34).
+ */
+export function getWeeklyPeriodKey(inputDate?: Date | unknown): string {
+  const date = inputDate instanceof Timestamp ? inputDate.toDate() : inputDate instanceof Date ? new Date(inputDate as Date) : new Date();
+  const target = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7; // Monday = 0
+  target.setDate(target.getDate() - dayNr + 3); // Thursday of same week
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNumber = 1 + Math.round((firstThursday - target.valueOf()) / 604800000);
+  const year = new Date(firstThursday).getFullYear();
+  return `${year}-W${String(weekNumber).padStart(2, "0")}`;
+}
+
+/**
+ * Returns the start date (00:00:00) and end date (23:59:59.999) of the current day.
+ */
+export function getStartAndEndOfDay(inputDate?: Date): { start: Date; end: Date } {
+  const base = inputDate ? new Date(inputDate) : new Date();
+  const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+  const end = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
+  return { start, end };
+}
+
+/**
+ * Returns the start date (Monday 00:00:00) and end date (Sunday 23:59:59.999) of the current week.
+ */
+export function getStartAndEndOfWeek(inputDate?: Date): { start: Date; end: Date } {
+  const base = inputDate ? new Date(inputDate) : new Date();
+  const day = base.getDay();
+  const diffToMon = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + diffToMon);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  return { start: monday, end: sunday };
+}
+
+/**
+ * Calculates valid ACC (approved) email count for a worker within a time window.
+ */
+export function getWorkerAccInPeriod(
+  submissions: EmailSubmission[],
+  startDate: Date,
+  endDate: Date,
+  workerId?: string,
+): number {
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+
+  return submissions.reduce((sum, sub) => {
+    if (workerId && sub.workerId !== workerId) return sum;
+
+    let subDate: Date | null = null;
+    if (sub.submittedAt) {
+      subDate = sub.submittedAt instanceof Timestamp ? sub.submittedAt.toDate() : new Date(sub.submittedAt as string | number);
+    }
+    if (!subDate || isNaN(subDate.getTime())) return sum;
+
+    const t = subDate.getTime();
+    if (t < startMs || t > endMs) return sum;
+
+    const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+    if (!isFinalized) return sum;
+
+    let approvedCount = 0;
+    if (typeof sub.approvedItemCount === "number") {
+      approvedCount = sub.approvedItemCount;
+    } else if (Array.isArray(sub.items) && sub.items.length > 0) {
+      approvedCount = sub.items.filter((i) => i.status === "approved").length;
+    } else if (sub.email) {
+      approvedCount = 1;
+    }
+
+    return sum + approvedCount;
+  }, 0);
+}
+
+/**
  * Validates a submitted password against password format rules found in submission notes.
  * Returns an error string in Indonesian if validation fails, or null if valid.
  */
