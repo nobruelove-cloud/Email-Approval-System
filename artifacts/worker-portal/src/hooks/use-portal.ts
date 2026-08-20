@@ -414,6 +414,7 @@ export async function reviewSubmission(
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
+  let workerIdToEvaluate = "";
 
   await runTransaction(firestore, async (tx) => {
     // 1. ALL READS FIRST
@@ -424,6 +425,7 @@ export async function reviewSubmission(
     if (submission.status !== "pending") {
       throw new Error("Setoran ini sudah pernah ditinjau.");
     }
+    workerIdToEvaluate = submission.workerId;
 
     const rulesRef = doc(firestore, "settings", "rules");
     const rulesSnap = await tx.get(rulesRef);
@@ -485,6 +487,15 @@ export async function reviewSubmission(
       });
     }
   });
+
+  // Automatically evaluate referral qualification if worker has a pending referral
+  if (workerIdToEvaluate) {
+    try {
+      await evaluateReferralQualificationAndReward(workerIdToEvaluate);
+    } catch (refEvalErr) {
+      console.warn("[reviewSubmission] Auto referral evaluation notice:", refEvalErr);
+    }
+  }
 }
 
 /**
@@ -704,13 +715,6 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   const firestore = db;
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
-  // Check if referrer exists in Firestore users collection
-  const referrerSnap = await getDoc(doc(firestore, "users", referrerId));
-  if (!referrerSnap.exists()) {
-    console.warn(`[registerReferral] Referrer UID ${referrerId} does not exist in Firestore.`);
-    return;
-  }
-
   await setDoc(refDoc, {
     id: referredWorkerId,
     referrerId,
@@ -722,16 +726,37 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
 }
 
 /**
- * Evaluates a referral's qualification criteria and atomically grants reward to referrer.
+ * Evaluates a referral's qualification criteria using actual Firestore email submission documents
+ * and atomically grants reward to referrer.
  * Prevents duplicate referral rewards using idempotent transaction checks.
  */
 export async function evaluateReferralQualificationAndReward(
   referredWorkerId: string,
-  accumulatedAccCount: number,
-  accumulatedEarnings: number = 0,
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
+
+  // Query actual approved email submission documents for referredWorkerId directly from Firestore
+  const submissionsQuery = query(
+    collection(firestore, "emailSubmissions"),
+    where("workerId", "==", referredWorkerId),
+  );
+  const subSnaps = await getDocs(submissionsQuery);
+
+  let actualAccCount = 0;
+  subSnaps.forEach((docSnap) => {
+    const sub = docSnap.data() as EmailSubmission;
+    const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+    if (isFinalized) {
+      if (typeof sub.approvedItemCount === "number") {
+        actualAccCount += sub.approvedItemCount;
+      } else if (Array.isArray(sub.items) && sub.items.length > 0) {
+        actualAccCount += sub.items.filter((i) => i.status === "approved").length;
+      } else if (sub.email) {
+        actualAccCount += 1;
+      }
+    }
+  });
 
   await runTransaction(firestore, async (tx) => {
     // 1. ALL READS FIRST
@@ -744,19 +769,22 @@ export async function evaluateReferralQualificationAndReward(
       return; // Already rewarded! Idempotency protection.
     }
 
+    if (referral.referrerId === referral.referredWorkerId) {
+      console.warn("[evaluateReferral] Self-referral rejected.");
+      return;
+    }
+
     const rulesRef = doc(firestore, "settings", "rules");
     const rulesSnap = await tx.get(rulesRef);
     const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
     const referralEnabled = rulesData?.referralEnabled ?? true;
     const minAcc = rulesData?.referralMinAcc ?? 5;
-    const minEarnings = rulesData?.referralMinEarnings ?? 0;
     const rewardAmt = rulesData?.referralReward ?? 10000;
 
     if (!referralEnabled) return;
 
-    // Check qualification
-    const isQualified = accumulatedAccCount >= minAcc && accumulatedEarnings >= minEarnings;
-    if (!isQualified) {
+    // Check qualification using actual Firestore ACC count
+    if (actualAccCount < minAcc) {
       if (referral.status !== "PENDING") {
         tx.update(referralRef, { status: "PENDING" });
       }

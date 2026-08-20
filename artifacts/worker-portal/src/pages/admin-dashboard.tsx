@@ -115,7 +115,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const adClaims = useCollection<{ id: string; workerId: string; dateKey: string; status: string; workerName?: string }>("adClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
-  const [distributingLeaderboard, setDistributingLeaderboard] = useState(false);
 
   const pendingMissionClaims = useMemo(
     () => missionClaims.data.filter((c) => c.status === "pending"),
@@ -277,8 +276,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       // Auto-evaluate referral qualification for worker if they have a pending referral
       if (approvedCount > 0) {
-        const workerAccTotal = (workerApprovedQtyMap.get(sub.workerId) ?? 0) + approvedCount;
-        evaluateReferralQualificationAndReward(sub.workerId, workerAccTotal).catch((e) =>
+        evaluateReferralQualificationAndReward(sub.workerId).catch((e) =>
           console.warn("[AdminDashboard] Referral auto-eval notice:", e)
         );
       }
@@ -541,8 +539,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       let count = 0;
       for (const refItem of referrals.data) {
         if (refItem.status === "PENDING") {
-          const accCount = workerApprovedQtyMap.get(refItem.referredWorkerId) ?? 0;
-          await evaluateReferralQualificationAndReward(refItem.referredWorkerId, accCount);
+          await evaluateReferralQualificationAndReward(refItem.referredWorkerId);
           count++;
         }
       }
@@ -554,71 +551,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }
 
-  async function handleDistributeLeaderboard() {
-    setDistributingLeaderboard(true);
-    try {
-      const { start, end } = getStartAndEndOfWeek();
-      const periodKey = getWeeklyPeriodKey();
-
-      const workerAccMap = new Map<string, { workerName: string; accCount: number }>();
-      users.data.forEach((u) => {
-        if (u.role === "worker") {
-          workerAccMap.set(u.uid, { workerName: u.name, accCount: 0 });
-        }
-      });
-
-      submissions.data.forEach((sub) => {
-        let subDate: Date | null = null;
-        if (sub.submittedAt) {
-          subDate = typeof sub.submittedAt === "object" && "toDate" in (sub.submittedAt as Record<string, unknown>)
-            ? (sub.submittedAt as { toDate: () => Date }).toDate()
-            : new Date(sub.submittedAt as string | number);
-        }
-        if (subDate && subDate >= start && subDate <= end) {
-          const isFinal = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
-          if (isFinal) {
-            const approvedCount = sub.approvedItemCount ?? (Array.isArray(sub.items) ? sub.items.filter((i) => i.status === "approved").length : 1);
-            const current = workerAccMap.get(sub.workerId) ?? { workerName: sub.workerName || shortId(sub.workerId), accCount: 0 };
-            workerAccMap.set(sub.workerId, { workerName: current.workerName, accCount: current.accCount + approvedCount });
-          }
-        }
-      });
-
-      const rows = Array.from(workerAccMap.entries()).map(([wId, val]) => ({
-        workerId: wId,
-        workerName: val.workerName,
-        validAccCount: val.accCount,
-      }));
-
-      rows.sort((a, b) => b.validAccCount - a.validAccCount);
-
-      const rewardsList = rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!;
-      let paidCount = 0;
-
-      for (let i = 0; i < rows.length; i++) {
-        const rank = i + 1;
-        const row = rows[i];
-        if (row.validAccCount <= 0) continue;
-
-        const rewardObj = rewardsList.find((rw) => Number(rw.rank) === rank);
-        if (rewardObj && rewardObj.rewardAmount > 0) {
-          try {
-            await distributeLeaderboardReward(row.workerId, periodKey, rank, row.validAccCount, rewardObj.rewardAmount, row.workerName);
-            paidCount++;
-          } catch (e) {
-            // Already paid or warning
-            console.warn(`[Leaderboard] Rank ${rank} payout notice:`, e);
-          }
-        }
-      }
-
-      toast.success(`Pencairan klasemen ${periodKey} selesai! ${paidCount} pemenang mendapatkan hadiah.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mencairkan hadiah klasemen.");
-    } finally {
-      setDistributingLeaderboard(false);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1228,51 +1160,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </CardContent>
             </Card>
 
-            {/* LEADERBOARD CONTROL */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-amber-600" /> Hadiah Klasemen Mingguan
-                    </CardTitle>
-                    <CardDescription>
-                      Atur besaran hadiah untuk pekerja dengan jumlah setoran ACC tertinggi minggu ini.
-                    </CardDescription>
-                  </div>
-                  <Button
-                    onClick={handleDistributeLeaderboard}
-                    disabled={distributingLeaderboard}
-                    className="bg-green-600 hover:bg-green-700 text-xs gap-1.5 shrink-0"
-                  >
-                    {distributingLeaderboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
-                    Cairkan Hadiah Minggu Ini ({getWeeklyPeriodKey()})
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!).map((rw, idx) => (
-                  <div key={rw.rank} className="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3 text-xs">
-                    <span className="font-bold text-gray-900">Juara {rw.rank} ({rw.rank === 1 ? "🥇 Emas" : rw.rank === 2 ? "🥈 Perak" : "🥉 Perunggu"})</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">Bonus Saldo:</span>
-                      <FormattedNumberInput
-                        value={rw.rewardAmount}
-                        onChange={(val) => {
-                          const updated = (rules.data.leaderboardRewards ?? DEFAULT_RULES.leaderboardRewards!).map((r, i) =>
-                            i === idx ? { ...r, rewardAmount: val } : r
-                          );
-                          saveSettings("rules", { leaderboardRewards: updated }).then(() =>
-                            toast.success("Hadiah klasemen disimpan!")
-                          );
-                        }}
-                        className="h-8 w-36 text-xs"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
 
             {/* REWARDED ADS CONTROL */}
             <Card>
