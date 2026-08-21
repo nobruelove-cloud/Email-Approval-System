@@ -46,7 +46,7 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -54,6 +54,9 @@ import {
   getTierConfig,
   shortId,
   validatePasswordAgainstRules,
+  getReferralRewardForAccCount,
+  getReferralTierForAccCount,
+  getNextReferralTierForAccCount,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -110,6 +113,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const currentTierConfig = useMemo(() => {
     return getTierConfig(profile.tier ?? 1, rules.data.tiers);
   }, [profile.tier, rules.data.tiers]);
+
+  const activeReferralTiers = useMemo(() => {
+    return Array.isArray(rules.data.referralTiers) && rules.data.referralTiers.length > 0
+      ? rules.data.referralTiers
+      : DEFAULT_REFERRAL_TIERS;
+  }, [rules.data.referralTiers]);
 
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
@@ -515,8 +524,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </p>
                   <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
                     <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
-                    <li>Pekerja yang diundang harus mencapai minimal <strong>{rules.data.referralMinAcc ?? 5} email ACC</strong> disetujui admin.</li>
-                    <li>Bonus referral hanya diberikan 1 kali per pekerja qualified: <strong>{formatMoney(rules.data.referralReward ?? 500)}</strong>.</li>
+                    <li>Pekerja yang diundang harus mencapai minimal email ACC yang disetujui admin untuk membuka tier reward.</li>
+                    <li>Hadiah referral dihitung berdasarkan tier tertinggi yang dicapai ketika admin menyetujui kualifikasi (1 kali payout per referral).</li>
                   </ul>
                 </div>
 
@@ -531,44 +540,56 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   ) : (
                     <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
                       {engagement.referrals.data.map((ref) => {
-                        const minAcc = rules.data.referralMinAcc ?? 5;
                         const accProgress = ref.currentAccCount ?? 0;
                         const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
                         const isQualified = ref.status === "QUALIFIED";
                         const isRejected = ref.status === "REJECTED";
 
+                        const currentTier = getReferralTierForAccCount(accProgress, activeReferralTiers);
+                        const nextTier = getNextReferralTierForAccCount(accProgress, activeReferralTiers);
+                        const currentReward = isPaid
+                          ? (ref.rewardAmount ?? getReferralRewardForAccCount(accProgress, activeReferralTiers))
+                          : getReferralRewardForAccCount(accProgress, activeReferralTiers);
+
                         let statusText = "Belum Qualified";
                         let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
-                        let bonusText = formatMoney(0);
 
                         if (isPaid) {
                           statusText = "Sudah Disetujui";
                           statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
-                          bonusText = formatMoney(ref.rewardAmount ?? rules.data.referralReward ?? 500);
                         } else if (isQualified) {
                           statusText = "Menunggu ACC Admin";
                           statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                          bonusText = formatMoney(rules.data.referralReward ?? 500);
                         } else if (isRejected) {
                           statusText = "Ditolak";
                           statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
-                          bonusText = formatMoney(0);
                         }
+
+                        const targetAccDisplay = nextTier ? nextTier.minAcc : (currentTier ? currentTier.minAcc : 5);
 
                         return (
                           <div key={ref.id} className="p-3 rounded-md border border-gray-200 flex items-center justify-between text-xs bg-gray-50/50">
-                            <div className="space-y-1">
+                            <div className="space-y-0.5">
                               <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
                               <p className="text-[11px] text-gray-500">
-                                Progress: <strong className="text-gray-800">{accProgress}/{minAcc} ACC</strong>
+                                ACC: <strong className="text-gray-800">{accProgress}/{targetAccDisplay}</strong>
                               </p>
+                              {nextTier ? (
+                                <p className="text-[11px] text-gray-500">
+                                  Tier berikutnya: <strong className="text-blue-900">{nextTier.minAcc} ACC</strong>
+                                </p>
+                              ) : currentTier ? (
+                                <p className="text-[11px] text-gray-500">
+                                  Tier: <strong className="text-blue-900">{currentTier.minAcc} ACC</strong>
+                                </p>
+                              ) : null}
                             </div>
                             <div className="text-right space-y-1">
                               <Badge className={`text-[11px] font-medium ${statusBadgeClass}`}>
                                 {statusText}
                               </Badge>
                               <p className="text-[11px] text-amber-800 font-bold">
-                                Bonus: {bonusText}
+                                {isPaid ? `Bonus: ${formatMoney(currentReward)}` : isRejected ? `Bonus: ${formatMoney(0)}` : `Reward saat ini: ${formatMoney(currentReward)}`}
                               </p>
                             </div>
                           </div>

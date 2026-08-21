@@ -1,5 +1,5 @@
 import { Timestamp } from "firebase/firestore";
-import { DEFAULT_TIERS, type EmailSubmission, type TierConfig } from "./portal-types";
+import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type TierConfig, type ReferralTierConfig } from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
   if (!value) return fallback;
@@ -110,6 +110,91 @@ export function validateTierConfigs(tiers: TierConfig[]): string | null {
       if (t.minQty <= prev.maxQty) {
         return `Rentang tier bertabrakan: ${prev.name} (${prev.minQty}–${prev.maxQty}) dan ${t.name} (${t.minQty}–${t.maxQty}).`;
       }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns total reward for a given ACC count based on highest reached tier.
+ */
+export function getReferralRewardForAccCount(accCount: number, referralTiers?: ReferralTierConfig[]): number {
+  const activeTiers = Array.isArray(referralTiers) && referralTiers.length > 0 ? referralTiers : DEFAULT_REFERRAL_TIERS;
+  const count = Math.max(0, accCount);
+  const sorted = [...activeTiers].sort((a, b) => a.minAcc - b.minAcc);
+
+  let reward = 0;
+  for (const t of sorted) {
+    if (count >= t.minAcc) {
+      reward = t.reward;
+    }
+  }
+  return reward;
+}
+
+/**
+ * Returns the highest qualified referral tier for a given ACC count, or null if below lowest tier.
+ */
+export function getReferralTierForAccCount(accCount: number, referralTiers?: ReferralTierConfig[]): ReferralTierConfig | null {
+  const activeTiers = Array.isArray(referralTiers) && referralTiers.length > 0 ? referralTiers : DEFAULT_REFERRAL_TIERS;
+  const count = Math.max(0, accCount);
+  const sorted = [...activeTiers].sort((a, b) => a.minAcc - b.minAcc);
+
+  let matched: ReferralTierConfig | null = null;
+  for (const t of sorted) {
+    if (count >= t.minAcc) {
+      matched = t;
+    }
+  }
+  return matched;
+}
+
+/**
+ * Returns the next referral tier that has not been reached yet, or null if highest tier reached.
+ */
+export function getNextReferralTierForAccCount(accCount: number, referralTiers?: ReferralTierConfig[]): ReferralTierConfig | null {
+  const activeTiers = Array.isArray(referralTiers) && referralTiers.length > 0 ? referralTiers : DEFAULT_REFERRAL_TIERS;
+  const count = Math.max(0, accCount);
+  const sorted = [...activeTiers].sort((a, b) => a.minAcc - b.minAcc);
+
+  for (const t of sorted) {
+    if (count < t.minAcc) {
+      return t;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validates a list of ReferralTierConfigs.
+ * Returns null if valid, or an error message string if invalid.
+ */
+export function validateReferralTiers(tiers: ReferralTierConfig[]): string | null {
+  if (!Array.isArray(tiers) || tiers.length === 0) {
+    return "Konfigurasi tier referral tidak boleh kosong.";
+  }
+
+  const seenMinAcc = new Set<number>();
+  for (let i = 0; i < tiers.length; i++) {
+    const t = tiers[i];
+    if (typeof t.minAcc !== "number" || !Number.isInteger(t.minAcc) || t.minAcc <= 0) {
+      return `Syarat minimal ACC (baris ke-${i + 1}) harus berupa bilangan bulat positif (minimal 1).`;
+    }
+    if (typeof t.reward !== "number" || isNaN(t.reward) || t.reward < 0) {
+      return `Hadiah reward (baris ke-${i + 1}) tidak boleh negatif.`;
+    }
+    if (seenMinAcc.has(t.minAcc)) {
+      return `Ditemukan syarat minimal ACC ganda: ${t.minAcc} ACC.`;
+    }
+    seenMinAcc.add(t.minAcc);
+  }
+
+  const sorted = [...tiers].sort((a, b) => a.minAcc - b.minAcc);
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].reward < sorted[i - 1].reward) {
+      return `Hadiah reward untuk ${sorted[i].minAcc} ACC (${sorted[i].reward}) tidak boleh lebih kecil dari tier ${sorted[i - 1].minAcc} ACC (${sorted[i - 1].reward}).`;
     }
   }
 
