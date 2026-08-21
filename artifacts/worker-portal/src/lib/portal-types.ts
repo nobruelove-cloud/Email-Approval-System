@@ -25,7 +25,7 @@ export type PortalUser = {
   createdAt?: unknown;
 };
 
-export type ReferralStatus = "PENDING" | "QUALIFIED" | "REWARDED";
+export type ReferralStatus = "PENDING" | "QUALIFIED" | "REWARDED" | "PAID" | "REJECTED";
 
 export type Referral = {
   id: string; // e.g. referredWorkerId
@@ -33,11 +33,13 @@ export type Referral = {
   referrerName?: string;
   referredWorkerId: string;
   referredWorkerName?: string;
+  currentAccCount?: number;
   status: ReferralStatus;
   createdAt?: unknown;
   qualifiedAt?: unknown;
   rewardedAt?: unknown;
   rewardAmount?: number;
+  reviewNote?: string;
 };
 
 export type MissionType = "daily" | "weekly";
@@ -192,7 +194,7 @@ export const DEFAULT_RULES: PortalRules = {
   tiers: DEFAULT_TIERS,
 
   referralEnabled: true,
-  referralReward: 10000,
+  referralReward: 500,
   referralMinAcc: 5,
   referralMinEarnings: 0,
 
