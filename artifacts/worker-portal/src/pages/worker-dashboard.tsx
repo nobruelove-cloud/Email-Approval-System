@@ -518,6 +518,34 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </div>
                 </div>
 
+                {/* READ-ONLY REFERRAL TIERS DISPLAY */}
+                <div className="p-4 bg-white rounded-lg border border-amber-200 space-y-3">
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                      <span>🎁</span> Daftar Reward Referral
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Capai ACC referral sesuai tier untuk mendapatkan bonus.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {activeReferralTiers.map((tier, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 bg-amber-50/50 border border-amber-200/80 rounded-lg text-center space-y-1"
+                      >
+                        <p className="font-extrabold text-sm text-gray-900">{tier.minAcc} ACC</p>
+                        <p className="font-bold text-xs text-amber-700">{formatMoney(tier.reward)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 italic">
+                    * Reward diberikan berdasarkan tier ACC tertinggi yang dicapai saat referral disetujui Admin.
+                  </p>
+                </div>
+
                 <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
                   <p className="font-bold flex items-center gap-1">
                     <ShieldAlert className="w-3.5 h-3.5" /> Ketentuan Kualifikasi Referral:

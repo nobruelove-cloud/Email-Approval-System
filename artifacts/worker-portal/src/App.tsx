@@ -155,6 +155,11 @@ function PortalGate() {
   );
 }
 
+function WorkerPreview() {
+  const mockWorkerProfile: any = { uid: "worker1", name: "Worker Sena", email: "worker@test.com", role: "worker", status: "active", tier: 1, balance: 150000 };
+  return <WorkerDashboard profile={mockWorkerProfile} onLogout={() => {}} />;
+}
+
 export default function App() {
   return (
     <>
@@ -163,6 +168,7 @@ export default function App() {
         <Route path="/register" component={PortalGate} />
         <Route path="/dashboard" component={PortalGate} />
         <Route path="/admin" component={PortalGate} />
+        <Route path="/preview-worker" component={WorkerPreview} />
         <Route component={NotFound} />
       </Switch>
       <Toaster />
