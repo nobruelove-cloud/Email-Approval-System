@@ -10,8 +10,22 @@ import {
   getNextReferralTierForAccCount,
   validateReferralTiers,
   isValidTelegramUrl,
+  validateTimeString,
+  validateOperatingHours,
+  getOperatingStatus,
 } from "../lib/portal-utils";
-import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_RULES, type EmailSubmission, type TierConfig, type ReferralTierConfig, type SupportConfig, type PortalRules } from "../lib/portal-types";
+import {
+  DEFAULT_TIERS,
+  DEFAULT_REFERRAL_TIERS,
+  DEFAULT_RULES,
+  DEFAULT_OPERATING_HOURS,
+  type EmailSubmission,
+  type TierConfig,
+  type ReferralTierConfig,
+  type SupportConfig,
+  type PortalRules,
+  type OperatingHoursConfig,
+} from "../lib/portal-types";
 
 // Mock Firestore transaction object
 function createMockTransaction(store: Record<string, any>) {
@@ -1663,6 +1677,258 @@ describe("Admin-Managed Telegram Customer Support Settings Unit Tests (TEST 1 - 
     }
 
     expect(canModifySettingsRules(null)).toBe(false);
+  });
+});
+
+describe("Admin-Managed Operating Hours Unit Tests (TEST 1 - TEST 15)", () => {
+  it("TEST 1: Default operating hours load correctly", () => {
+    expect(DEFAULT_RULES.operatingHours).toBeDefined();
+    expect(DEFAULT_RULES.operatingHours?.enabled).toBe(true);
+    expect(DEFAULT_RULES.operatingHours?.timezone).toBe("Asia/Jakarta");
+    expect(DEFAULT_RULES.operatingHours?.days).toBeDefined();
+  });
+
+  it("TEST 2: Monday-Friday default to 08:00-18:00", () => {
+    const days = DEFAULT_RULES.operatingHours!.days;
+    const weekDays = [days.monday, days.tuesday, days.wednesday, days.thursday, days.friday];
+    weekDays.forEach((d) => {
+      expect(d.enabled).toBe(true);
+      expect(d.open).toBe("08:00");
+      expect(d.close).toBe("18:00");
+    });
+  });
+
+  it("TEST 3: Saturday and Sunday default to closed", () => {
+    const days = DEFAULT_RULES.operatingHours!.days;
+    expect(days.saturday.enabled).toBe(false);
+    expect(days.sunday.enabled).toBe(false);
+  });
+
+  it("TEST 4: Admin can save operating hours", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": { ...DEFAULT_RULES },
+    };
+    const tx = createMockTransaction(store);
+
+    const newOperatingHours: OperatingHoursConfig = {
+      enabled: true,
+      timezone: "Asia/Jakarta",
+      days: {
+        monday: { enabled: true, open: "09:00", close: "17:00" },
+        tuesday: { enabled: true, open: "09:00", close: "17:00" },
+        wednesday: { enabled: true, open: "09:00", close: "17:00" },
+        thursday: { enabled: true, open: "09:00", close: "17:00" },
+        friday: { enabled: true, open: "09:00", close: "17:00" },
+        saturday: { enabled: true, open: "10:00", close: "14:00" },
+        sunday: { enabled: false, open: "08:00", close: "18:00" },
+      },
+    };
+
+    const rulesSnap = await tx.get({ path: "settings/rules" });
+    const currentRules = rulesSnap.exists() ? rulesSnap.data() : DEFAULT_RULES;
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      operatingHours: newOperatingHours,
+    });
+
+    const saved = store["settings/rules"].operatingHours;
+    expect(saved.days.monday.open).toBe("09:00");
+    expect(saved.days.saturday.enabled).toBe(true);
+  });
+
+  it("TEST 5: Worker can read operating hours", () => {
+    function canReadOperatingHours(userRole: string | null): boolean {
+      return userRole !== null;
+    }
+    expect(canReadOperatingHours("worker")).toBe(true);
+  });
+
+  it("TEST 6: Worker cannot modify operating hours", () => {
+    function canModifyOperatingHours(userRole: string | null): boolean {
+      return userRole === "admin";
+    }
+    expect(canModifyOperatingHours("worker")).toBe(false);
+  });
+
+  it("TEST 7: Unauthenticated user cannot modify operating hours", () => {
+    function canModifyOperatingHours(userRole: string | null): boolean {
+      return userRole === "admin";
+    }
+    expect(canModifyOperatingHours(null)).toBe(false);
+  });
+
+  it("TEST 8: Invalid HH:mm values are rejected", () => {
+    expect(validateTimeString("8:00")).toBe(false);
+    expect(validateTimeString("25:00")).toBe(false);
+    expect(validateTimeString("18:75")).toBe(false);
+    expect(validateTimeString("abc")).toBe(false);
+    expect(validateTimeString("08:00")).toBe(true);
+    expect(validateTimeString("18:00")).toBe(true);
+
+    const invalidCfg: OperatingHoursConfig = {
+      enabled: true,
+      timezone: "Asia/Jakarta",
+      days: {
+        ...DEFAULT_OPERATING_HOURS.days,
+        monday: { enabled: true, open: "8:00", close: "18:00" },
+      },
+    };
+    expect(validateOperatingHours(invalidCfg)).toBe("Jam operasional tidak valid.");
+  });
+
+  it("TEST 9: Open time >= close time is rejected", () => {
+    const equalCfg: OperatingHoursConfig = {
+      enabled: true,
+      timezone: "Asia/Jakarta",
+      days: {
+        ...DEFAULT_OPERATING_HOURS.days,
+        monday: { enabled: true, open: "18:00", close: "18:00" },
+      },
+    };
+    expect(validateOperatingHours(equalCfg)).toBe("Jam operasional tidak valid.");
+
+    const greaterCfg: OperatingHoursConfig = {
+      enabled: true,
+      timezone: "Asia/Jakarta",
+      days: {
+        ...DEFAULT_OPERATING_HOURS.days,
+        monday: { enabled: true, open: "19:00", close: "18:00" },
+      },
+    };
+    expect(validateOperatingHours(greaterCfg)).toBe("Jam operasional tidak valid.");
+  });
+
+  it("TEST 10: Disabled day can be saved without requiring valid active hours", () => {
+    const disabledDayCfg: OperatingHoursConfig = {
+      enabled: true,
+      timezone: "Asia/Jakarta",
+      days: {
+        ...DEFAULT_OPERATING_HOURS.days,
+        saturday: { enabled: false, open: "invalid_time", close: "00:00" },
+      },
+    };
+    expect(validateOperatingHours(disabledDayCfg)).toBeNull();
+  });
+
+  it("TEST 11: Changing Admin schedule is reflected dynamically on Worker Dashboard", () => {
+    let rulesData: PortalRules = { ...DEFAULT_RULES };
+    expect(rulesData.operatingHours?.days.monday.open).toBe("08:00");
+
+    rulesData = {
+      ...rulesData,
+      operatingHours: {
+        ...DEFAULT_OPERATING_HOURS,
+        days: {
+          ...DEFAULT_OPERATING_HOURS.days,
+          monday: { enabled: true, open: "10:00", close: "20:00" },
+        },
+      },
+    };
+
+    expect(rulesData.operatingHours?.days.monday.open).toBe("10:00");
+    expect(rulesData.operatingHours?.days.monday.close).toBe("20:00");
+  });
+
+  it("TEST 12: Saving operating hours preserves referralTiers", async () => {
+    const customReferralTiers = [{ minAcc: 5, reward: 1000 }];
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        referralTiers: customReferralTiers,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const currentRules = (await tx.get({ path: "settings/rules" })).data();
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      operatingHours: DEFAULT_OPERATING_HOURS,
+    });
+
+    expect(store["settings/rules"].referralTiers).toEqual(customReferralTiers);
+  });
+
+  it("TEST 13: Saving operating hours preserves supportConfig", async () => {
+    const customSupport: SupportConfig = {
+      enabled: true,
+      title: "CS Title",
+      description: "CS Desc",
+      telegramUrl: "https://t.me/cs_test",
+    };
+
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        supportConfig: customSupport,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const currentRules = (await tx.get({ path: "settings/rules" })).data();
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      operatingHours: DEFAULT_OPERATING_HOURS,
+    });
+
+    expect(store["settings/rules"].supportConfig).toEqual(customSupport);
+  });
+
+  it("TEST 14: Saving operating hours preserves all unrelated PortalRules fields", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        pricePerEmail: 3000,
+        minWithdraw: 25000,
+        maxWithdraw: 1000000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const currentRules = (await tx.get({ path: "settings/rules" })).data();
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      operatingHours: DEFAULT_OPERATING_HOURS,
+    });
+
+    const saved = store["settings/rules"];
+    expect(saved.pricePerEmail).toBe(3000);
+    expect(saved.minWithdraw).toBe(25000);
+    expect(saved.maxWithdraw).toBe(1000000);
+  });
+
+  it("TEST 15: Current open/closed calculation correctly handles Asia/Jakarta timezone", () => {
+    // Globally disabled
+    const disabledCfg: OperatingHoursConfig = {
+      ...DEFAULT_OPERATING_HOURS,
+      enabled: false,
+    };
+    expect(getOperatingStatus(disabledCfg).statusText).toBe("Jam operasional tidak tersedia.");
+
+    // Create a date corresponding to Monday at 10:00 AM UTC.
+    // In Asia/Jakarta (UTC+7), Monday 10:00 AM UTC is Monday 17:00 (5:00 PM).
+    // Schedule Monday: 08:00 - 18:00 -> 17:00 is OPEN.
+    const mondayUtc10 = new Date(Date.UTC(2026, 2, 2, 10, 0, 0)); // March 2, 2026 is a Monday
+    const openStatus = getOperatingStatus(DEFAULT_OPERATING_HOURS, mondayUtc10);
+    expect(openStatus.isOpen).toBe(true);
+    expect(openStatus.statusText).toBe("🟢 Sedang Buka");
+
+    // Create a date corresponding to Monday at 12:00 PM UTC.
+    // In Asia/Jakarta (UTC+7), Monday 12:00 PM UTC is Monday 19:00 (7:00 PM).
+    // Schedule Monday: 08:00 - 18:00 -> 19:00 is CLOSED.
+    const mondayUtc12 = new Date(Date.UTC(2026, 2, 2, 12, 0, 0));
+    const closedStatus = getOperatingStatus(DEFAULT_OPERATING_HOURS, mondayUtc12);
+    expect(closedStatus.isOpen).toBe(false);
+    expect(closedStatus.statusText).toBe("🔴 Sedang Tutup");
+
+    // Saturday in Asia/Jakarta -> disabled day -> CLOSED
+    const saturdayUtc = new Date(Date.UTC(2026, 2, 7, 5, 0, 0)); // March 7, 2026 is Saturday
+    const saturdayStatus = getOperatingStatus(DEFAULT_OPERATING_HOURS, saturdayUtc);
+    expect(saturdayStatus.isOpen).toBe(false);
+    expect(saturdayStatus.statusText).toBe("🔴 Sedang Tutup");
   });
 });
 

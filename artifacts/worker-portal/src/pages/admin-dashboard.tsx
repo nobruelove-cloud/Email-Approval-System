@@ -72,7 +72,7 @@ import {
   distributeLeaderboardReward,
   reviewMissionClaim,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -85,6 +85,7 @@ import {
   getReferralTierForAccCount,
   validateReferralTiers,
   isValidTelegramUrl,
+  validateOperatingHours,
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
 } from "@/lib/portal-utils";
@@ -220,6 +221,62 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const currentSupportTelegramUrl = supportTelegramUrl ?? activeSupportConfig.telegramUrl ?? "";
   const currentSupportDescription = supportDescription ?? activeSupportConfig.description ?? "Ada kendala? Hubungi Customer Service kami melalui Telegram.";
   const currentSupportEnabled = supportEnabled ?? (activeSupportConfig.enabled !== false);
+
+  // Jam Operasional configuration state
+  const activeOperatingHours = useMemo(() => {
+    return rules.data.operatingHours ?? DEFAULT_OPERATING_HOURS;
+  }, [rules.data.operatingHours]);
+
+  const [operatingHoursState, setOperatingHoursState] = useState<OperatingHoursConfig | null>(null);
+  const [savingOperatingHours, setSavingOperatingHours] = useState(false);
+
+  const currentOperatingHours = operatingHoursState ?? activeOperatingHours;
+
+  function handleUpdateDayOperatingHours(
+    dayKey: keyof OperatingHoursConfig["days"],
+    field: "enabled" | "open" | "close",
+    value: boolean | string
+  ) {
+    setOperatingHoursState({
+      ...currentOperatingHours,
+      days: {
+        ...currentOperatingHours.days,
+        [dayKey]: {
+          ...currentOperatingHours.days[dayKey],
+          [field]: value,
+        },
+      },
+    });
+  }
+
+  function handleUpdateGlobalOperatingHours(enabled: boolean) {
+    setOperatingHoursState({
+      ...currentOperatingHours,
+      enabled,
+    });
+  }
+
+  async function handleSaveOperatingHours() {
+    const valError = validateOperatingHours(currentOperatingHours);
+    if (valError) {
+      toast.error("Jam operasional tidak valid.");
+      return;
+    }
+
+    setSavingOperatingHours(true);
+    try {
+      await saveSettings("rules", {
+        ...rules.data,
+        operatingHours: currentOperatingHours,
+      });
+      toast.success("Jam operasional berhasil disimpan.");
+      setOperatingHoursState(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan jam operasional.");
+    } finally {
+      setSavingOperatingHours(false);
+    }
+  }
 
   async function handleSaveSupportConfig() {
     const trimmedUrl = currentSupportTelegramUrl.trim();
@@ -1607,6 +1664,108 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <Button onClick={handleSaveRules} disabled={savingRules} className="bg-amber-600 hover:bg-amber-700 gap-2">
                     {savingRules && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan Pengaturan Aturan & Tier
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* JAM OPERASIONAL */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Jam Operasional</CardTitle>
+                  <CardDescription>
+                    Atur jadwal operasional harian dan zona waktu platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div>
+                      <Label className="font-bold text-sm text-gray-900">Status Jam Operasional Global</Label>
+                      <p className="text-xs text-gray-500">Aktifkan atau nonaktifkan fitur jam operasional secara menyeluruh.</p>
+                    </div>
+                    <Select
+                      value={currentOperatingHours.enabled ? "ON" : "OFF"}
+                      onValueChange={(val) => handleUpdateGlobalOperatingHours(val === "ON")}
+                    >
+                      <SelectTrigger className="w-28 text-xs h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ON">ON</SelectItem>
+                        <SelectItem value="OFF">OFF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    {[
+                      { key: "monday" as const, label: "Senin" },
+                      { key: "tuesday" as const, label: "Selasa" },
+                      { key: "wednesday" as const, label: "Rabu" },
+                      { key: "thursday" as const, label: "Kamis" },
+                      { key: "friday" as const, label: "Jumat" },
+                      { key: "saturday" as const, label: "Sabtu" },
+                      { key: "sunday" as const, label: "Minggu" },
+                    ].map((d) => {
+                      const dayConfig = currentOperatingHours.days[d.key];
+                      return (
+                        <div
+                          key={d.key}
+                          className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
+                            dayConfig.enabled ? "bg-white border-gray-200" : "bg-gray-50 border-gray-200 text-gray-400"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 w-32">
+                            <span className="font-bold text-sm text-gray-900">{d.label}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 flex-1 flex-wrap">
+                            <Select
+                              value={dayConfig.enabled ? "ON" : "OFF"}
+                              onValueChange={(val) => handleUpdateDayOperatingHours(d.key, "enabled", val === "ON")}
+                            >
+                              <SelectTrigger className="w-24 text-xs h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ON">ON</SelectItem>
+                                <SelectItem value="OFF">OFF</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-2">
+                              <span>Buka:</span>
+                              <Input
+                                value={dayConfig.open}
+                                disabled={!dayConfig.enabled}
+                                onChange={(e) => handleUpdateDayOperatingHours(d.key, "open", e.target.value)}
+                                placeholder="08:00"
+                                className="w-24 h-8 text-xs font-mono"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span>Tutup:</span>
+                              <Input
+                                value={dayConfig.close}
+                                disabled={!dayConfig.enabled}
+                                onChange={(e) => handleUpdateDayOperatingHours(d.key, "close", e.target.value)}
+                                placeholder="18:00"
+                                className="w-24 h-8 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    onClick={handleSaveOperatingHours}
+                    disabled={savingOperatingHours}
+                    className="bg-amber-600 hover:bg-amber-700 gap-2 text-xs"
+                  >
+                    {savingOperatingHours && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Simpan Jam Operasional
                   </Button>
                 </CardContent>
               </Card>

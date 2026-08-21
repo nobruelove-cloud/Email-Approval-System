@@ -154,6 +154,40 @@ export type SupportConfig = {
   telegramUrl: string;
 };
 
+export type DayOperatingHours = {
+  enabled: boolean;
+  open: string;
+  close: string;
+};
+
+export type OperatingHoursConfig = {
+  enabled: boolean;
+  timezone: string;
+  days: {
+    monday: DayOperatingHours;
+    tuesday: DayOperatingHours;
+    wednesday: DayOperatingHours;
+    thursday: DayOperatingHours;
+    friday: DayOperatingHours;
+    saturday: DayOperatingHours;
+    sunday: DayOperatingHours;
+  };
+};
+
+export const DEFAULT_OPERATING_HOURS: OperatingHoursConfig = {
+  enabled: true,
+  timezone: "Asia/Jakarta",
+  days: {
+    monday: { enabled: true, open: "08:00", close: "18:00" },
+    tuesday: { enabled: true, open: "08:00", close: "18:00" },
+    wednesday: { enabled: true, open: "08:00", close: "18:00" },
+    thursday: { enabled: true, open: "08:00", close: "18:00" },
+    friday: { enabled: true, open: "08:00", close: "18:00" },
+    saturday: { enabled: false, open: "08:00", close: "18:00" },
+    sunday: { enabled: false, open: "08:00", close: "18:00" },
+  },
+};
+
 export const DEFAULT_REFERRAL_TIERS: ReferralTierConfig[] = [
   { minAcc: 5, reward: 500 },
   { minAcc: 10, reward: 1000 },
@@ -192,6 +226,9 @@ export type PortalRules = {
 
   // Support / Help Center Settings
   supportConfig?: SupportConfig;
+
+  // Operating Hours Settings
+  operatingHours?: OperatingHoursConfig;
 
   updatedAt?: unknown;
 };
@@ -259,4 +296,6 @@ export const DEFAULT_RULES: PortalRules = {
     description: "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
     telegramUrl: "",
   },
+
+  operatingHours: DEFAULT_OPERATING_HOURS,
 };
