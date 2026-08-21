@@ -147,7 +147,11 @@ export default function LoginPage() {
         }
       }
 
-      const code = (err as { code?: string }).code ?? "";
+      let code = (err as { code?: string }).code ?? "";
+      if (!code && err instanceof Error) {
+        const match = err.message.match(/auth\/[a-z0-9-]+/i);
+        if (match) code = match[0];
+      }
       const baseMessage = friendlyAuthError(code, "register");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {

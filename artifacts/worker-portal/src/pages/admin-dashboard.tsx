@@ -456,7 +456,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       setNewWorker({ name: "", email: "", phone: "", password: "", tier: "1" });
       setAddOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal membuat akun pekerja.");
+      console.error("[AdminDashboard] Add worker error:", err);
+      const code = (err as { code?: string })?.code ?? "";
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (code === "auth/email-already-in-use" || errMsg.includes("email-already-in-use")) {
+        toast.error("Email sudah terdaftar.");
+      } else {
+        toast.error(errMsg || "Gagal membuat akun pekerja.");
+      }
     } finally {
       setAddBusy(false);
     }
