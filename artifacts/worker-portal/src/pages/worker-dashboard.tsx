@@ -730,65 +730,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 )}
               </CardContent>
             </Card>
-
-            {/* 2. RIWAYAT TRANSAKSI */}
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                  <span>💰</span> Riwayat Transaksi
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Riwayat transaksi penarikan saldo dan penerimaan bonus reward.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(withdrawals.loading || engagement.rewardLedger.loading) && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat transaksi.</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                          <th className="py-2.5 px-3 font-semibold">Tanggal</th>
-                          <th className="py-2.5 px-3 font-semibold">Jenis Transaksi</th>
-                          <th className="py-2.5 px-3 font-semibold">Keterangan</th>
-                          <th className="py-2.5 px-3 font-semibold">Nominal</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {transactionHistory.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-gray-50/60 transition-colors">
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-gray-500">
-                              {formatDateTime(tx.date)}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
-                              {tx.type}
-                            </td>
-                            <td className="py-3 px-3 align-top">
-                              <p className="text-gray-800 font-medium">{tx.description}</p>
-                              {tx.note && <p className="text-[11px] text-gray-400 italic mt-0.5">Catatan: {tx.note}</p>}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-bold">
-                              <span className={tx.isCredit ? "text-green-600" : "text-red-600"}>
-                                {tx.isCredit ? "+" : "-"} {formatMoney(tx.amount)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                              <StatusBadge status={tx.status} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* REFERRAL SYSTEM */}
