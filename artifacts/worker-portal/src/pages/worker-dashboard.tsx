@@ -99,7 +99,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const refStats = useMemo(() => {
     const total = engagement.referrals.data.length;
     const pending = engagement.referrals.data.filter((r) => r.status === "PENDING").length;
-    const qualified = engagement.referrals.data.filter((r) => r.status === "QUALIFIED" || r.status === "REWARDED").length;
+    const qualified = engagement.referrals.data.filter((r) => r.status === "QUALIFIED" || r.status === "REWARDED" || r.status === "PAID").length;
     const earnings = engagement.rewardLedger.data
       .filter((l) => l.rewardType === "referral")
       .reduce((sum, item) => sum + item.amount, 0);
@@ -516,28 +516,67 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
                     <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
                     <li>Pekerja yang diundang harus mencapai minimal <strong>{rules.data.referralMinAcc ?? 5} email ACC</strong> disetujui admin.</li>
-                    <li>Bonus referral hanya diberikan 1 kali per pekerja qualified: <strong>{formatMoney(rules.data.referralReward ?? 10000)}</strong>.</li>
+                    <li>Bonus referral hanya diberikan 1 kali per pekerja qualified: <strong>{formatMoney(rules.data.referralReward ?? 500)}</strong>.</li>
                   </ul>
                 </div>
 
-                {engagement.referrals.data.length > 0 && (
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-2 block">Daftar Pekerja Terdaftar Via Referral Anda:</Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
-                      {engagement.referrals.data.map((ref) => (
-                        <div key={ref.id} className="p-2.5 rounded-md border flex items-center justify-between text-xs">
-                          <div>
-                            <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
-                            <p className="text-[11px] text-gray-400">{formatDateTime(ref.createdAt)}</p>
-                          </div>
-                          <Badge className={ref.status === "REWARDED" || ref.status === "QUALIFIED" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
-                            {ref.status === "REWARDED" ? "Diberikan Hadiah" : ref.status === "QUALIFIED" ? "Qualified" : "Pending (Belum Cukup ACC)"}
-                          </Badge>
-                        </div>
-                      ))}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-2 block font-semibold">
+                    Daftar Referral Saya ({engagement.referrals.data.length})
+                  </Label>
+                  {engagement.referrals.data.length === 0 ? (
+                    <div className="p-4 bg-white rounded-lg border border-gray-200 text-center text-xs text-gray-500">
+                      Belum ada pekerja yang mendaftar menggunakan referral Anda.
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                      {engagement.referrals.data.map((ref) => {
+                        const minAcc = rules.data.referralMinAcc ?? 5;
+                        const accProgress = ref.currentAccCount ?? 0;
+                        const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
+                        const isQualified = ref.status === "QUALIFIED";
+                        const isRejected = ref.status === "REJECTED";
+
+                        let statusText = "Belum Qualified";
+                        let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
+                        let bonusText = formatMoney(0);
+
+                        if (isPaid) {
+                          statusText = "Sudah Disetujui";
+                          statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
+                          bonusText = formatMoney(ref.rewardAmount ?? rules.data.referralReward ?? 500);
+                        } else if (isQualified) {
+                          statusText = "Menunggu ACC Admin";
+                          statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
+                          bonusText = formatMoney(rules.data.referralReward ?? 500);
+                        } else if (isRejected) {
+                          statusText = "Ditolak";
+                          statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
+                          bonusText = formatMoney(0);
+                        }
+
+                        return (
+                          <div key={ref.id} className="p-3 rounded-md border border-gray-200 flex items-center justify-between text-xs bg-gray-50/50">
+                            <div className="space-y-1">
+                              <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
+                              <p className="text-[11px] text-gray-500">
+                                Progress: <strong className="text-gray-800">{accProgress}/{minAcc} ACC</strong>
+                              </p>
+                            </div>
+                            <div className="text-right space-y-1">
+                              <Badge className={`text-[11px] font-medium ${statusBadgeClass}`}>
+                                {statusText}
+                              </Badge>
+                              <p className="text-[11px] text-amber-800 font-bold">
+                                Bonus: {bonusText}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

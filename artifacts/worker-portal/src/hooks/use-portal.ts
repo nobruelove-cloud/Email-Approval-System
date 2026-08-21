@@ -486,7 +486,7 @@ export async function reviewSubmission(
   // Automatically evaluate referral qualification if worker has a pending referral
   if (workerIdToEvaluate) {
     try {
-      await evaluateReferralQualificationAndReward(workerIdToEvaluate);
+      await evaluateReferralQualification(workerIdToEvaluate);
     } catch (refEvalErr) {
       console.warn("[reviewSubmission] Auto referral evaluation notice:", refEvalErr);
     }
@@ -698,6 +698,7 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
  * Registers a referral relationship upon worker registration.
  * Registration alone generates ZERO reward.
  * Self-referral is rejected.
+ * Validates that referrer exists before creating false relationships.
  */
 export async function registerReferral(referrerId: string, referredWorkerId: string, referredWorkerName: string) {
   if (!db) throw new Error("Firebase is not configured.");
@@ -708,26 +709,38 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   }
 
   const firestore = db;
+
+  // Validate referrer user existence in Firestore
+  const referrerRef = doc(firestore, "users", referrerId);
+  const referrerSnap = await getDoc(referrerRef);
+  if (!referrerSnap.exists()) {
+    console.warn("[registerReferral] Referrer user does not exist in database.");
+    return;
+  }
+
+  const referrerData = referrerSnap.data() as PortalUser;
+  const referrerName = referrerData.name || shortId(referrerId);
+
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
   await setDoc(refDoc, {
     id: referredWorkerId,
     referrerId,
+    referrerName,
     referredWorkerId,
     referredWorkerName,
+    currentAccCount: 0,
     status: "PENDING",
     createdAt: serverTimestamp(),
   }, { merge: true });
 }
 
 /**
- * Evaluates a referral's qualification criteria using actual Firestore email submission documents
- * and atomically grants reward to referrer.
- * Prevents duplicate referral rewards using idempotent transaction checks.
+ * Evaluates a referral's qualification criteria using actual Firestore email submission documents.
+ * Updates currentAccCount and marks status as QUALIFIED when >= referralMinAcc is reached.
+ * DOES NOT AUTO-PAY. Admin approval is required to grant reward.
  */
-export async function evaluateReferralQualificationAndReward(
-  referredWorkerId: string,
-) {
+export async function evaluateReferralQualification(referredWorkerId: string) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
@@ -754,16 +767,11 @@ export async function evaluateReferralQualificationAndReward(
   });
 
   await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
     const referralRef = doc(firestore, "referrals", referredWorkerId);
     const referralSnap = await tx.get(referralRef);
-    if (!referralSnap.exists()) return; // No referral record exists for this worker
+    if (!referralSnap.exists()) return;
 
     const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-    if (referral.status === "REWARDED") {
-      return; // Already rewarded! Idempotency protection.
-    }
-
     if (referral.referrerId === referral.referredWorkerId) {
       console.warn("[evaluateReferral] Self-referral rejected.");
       return;
@@ -772,60 +780,111 @@ export async function evaluateReferralQualificationAndReward(
     const rulesRef = doc(firestore, "settings", "rules");
     const rulesSnap = await tx.get(rulesRef);
     const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const referralEnabled = rulesData?.referralEnabled ?? true;
     const minAcc = rulesData?.referralMinAcc ?? 5;
-    const rewardAmt = rulesData?.referralReward ?? 10000;
 
-    if (!referralEnabled) return;
+    const updates: Record<string, unknown> = {
+      currentAccCount: actualAccCount,
+    };
 
-    // Check qualification using actual Firestore ACC count
-    if (actualAccCount < minAcc) {
-      if (referral.status !== "PENDING") {
-        tx.update(referralRef, { status: "PENDING" });
-      }
-      return;
+    // If still PENDING and reached minimum ACC, advance status to QUALIFIED
+    if (referral.status === "PENDING" && actualAccCount >= minAcc) {
+      updates.status = "QUALIFIED";
+      updates.qualifiedAt = serverTimestamp();
     }
+
+    tx.update(referralRef, updates);
+  });
+}
+
+// Alias for backwards compatibility if needed
+export const evaluateReferralQualificationAndReward = evaluateReferralQualification;
+
+/**
+ * Admin approves a qualified referral, atomically crediting reward to referrer balance
+ * and generating a reward ledger record. Prevents double rewards using transaction locks.
+ */
+export async function approveReferral(referralId: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    // 1. ALL READS FIRST
+    const referralRef = doc(firestore, "referrals", referralId);
+    const referralSnap = await tx.get(referralRef);
+    if (!referralSnap.exists()) {
+      throw new Error("Data referral tidak ditemukan.");
+    }
+
+    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+    if (referral.status === "PAID" || referral.status === "REWARDED") {
+      throw new Error("Referral ini sudah pernah disetujui / dibayar.");
+    }
+
+    if (referral.status === "REJECTED") {
+      throw new Error("Referral ini sudah ditolak.");
+    }
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await tx.get(rulesRef);
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+    const rewardAmt = rulesData?.referralReward ?? 500;
 
     const referrerRef = doc(firestore, "users", referral.referrerId);
     const referrerSnap = await tx.get(referrerRef);
-    if (!referrerSnap.exists()) return;
+    if (!referrerSnap.exists()) {
+      throw new Error("Profil pengundang tidak ditemukan.");
+    }
 
     const currentBalance = (referrerSnap.data() as PortalUser).balance ?? 0;
-
-    // Budget check if enabled
-    const budgetEnabled = rulesData?.rewardBudgetEnabled ?? false;
-    let currentBudget = rulesData?.rewardBudget ?? 0;
-
-    if (budgetEnabled && currentBudget < rewardAmt) {
-      throw new Error("Anggaran hadiah referral tidak mencukupi.");
-    }
+    const referrerName = (referrerSnap.data() as PortalUser).name || referral.referrerName || shortId(referral.referrerId);
 
     // 2. ALL WRITES AFTER READS
     tx.update(referralRef, {
-      status: "REWARDED",
-      qualifiedAt: serverTimestamp(),
-      rewardedAt: serverTimestamp(),
+      status: "PAID",
       rewardAmount: rewardAmt,
+      rewardedAt: serverTimestamp(),
     });
 
     tx.update(referrerRef, {
       balance: currentBalance + rewardAmt,
     });
 
-    if (budgetEnabled) {
-      tx.update(rulesRef, {
-        rewardBudget: currentBudget - rewardAmt,
-      });
-    }
-
     const ledgerRef = doc(collection(firestore, "rewardLedger"));
     tx.set(ledgerRef, {
       workerId: referral.referrerId,
+      workerName: referrerName,
       rewardType: "referral",
       amount: rewardAmt,
-      sourceRefId: referredWorkerId,
-      description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referredWorkerId)}`,
+      sourceRefId: referralId,
+      description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
       createdAt: serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * Admin rejects a referral. The status is set to REJECTED with no balance change.
+ */
+export async function rejectReferral(referralId: string, reviewNote?: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransaction(firestore, async (tx) => {
+    const referralRef = doc(firestore, "referrals", referralId);
+    const referralSnap = await tx.get(referralRef);
+    if (!referralSnap.exists()) {
+      throw new Error("Data referral tidak ditemukan.");
+    }
+
+    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+    if (referral.status === "PAID" || referral.status === "REWARDED") {
+      throw new Error("Referral yang sudah dibayar tidak dapat ditolak.");
+    }
+
+    tx.update(referralRef, {
+      status: "REJECTED",
+      reviewNote: reviewNote || "Ditolak oleh admin",
+      updatedAt: serverTimestamp(),
     });
   });
 }

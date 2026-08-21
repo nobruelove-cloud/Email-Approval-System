@@ -66,7 +66,9 @@ import {
   deletePortalUser,
   createWorkerAccount,
   saveSettings,
-  evaluateReferralQualificationAndReward,
+  evaluateReferralQualification,
+  approveReferral,
+  rejectReferral,
   distributeLeaderboardReward,
   reviewMissionClaim,
 } from "@/hooks/use-portal";
@@ -256,7 +258,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       // Auto-evaluate referral qualification for worker if they have a pending referral
       if (approvedCount > 0) {
-        evaluateReferralQualificationAndReward(sub.workerId).catch((e) =>
+        evaluateReferralQualification(sub.workerId).catch((e) =>
           console.warn("[AdminDashboard] Referral auto-eval notice:", e)
         );
       }
@@ -518,8 +520,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     try {
       let count = 0;
       for (const refItem of referrals.data) {
-        if (refItem.status === "PENDING") {
-          await evaluateReferralQualificationAndReward(refItem.referredWorkerId);
+        if (refItem.status === "PENDING" || refItem.status === "QUALIFIED") {
+          await evaluateReferralQualification(refItem.referredWorkerId);
           count++;
         }
       }
@@ -528,6 +530,30 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       toast.error(err instanceof Error ? err.message : "Gagal mengevaluasi referral.");
     } finally {
       setEvaluatingRefs(false);
+    }
+  }
+
+  async function handleApproveReferral(refId: string) {
+    setBusyId(refId);
+    try {
+      await approveReferral(refId);
+      toast.success("Referral berhasil disetujui & hadiah Rp500 telah dicairkan ke pengundang!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyetujui referral.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleRejectReferral(refId: string) {
+    setBusyId(refId);
+    try {
+      await rejectReferral(refId, "Ditolak oleh admin");
+      toast.success("Referral berhasil ditolak.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menolak referral.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -1032,16 +1058,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
             )}
 
-            {/* REFERRAL CONTROL */}
+            {/* REFERRAL APPROVAL & CONTROL */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="w-5 h-5 text-amber-600" /> Pengaturan Sistem Referral
+                      <Users className="w-5 h-5 text-amber-600" /> Pengaturan & Approval Referral
                     </CardTitle>
                     <CardDescription>
-                      Atur syarat kualifikasi dan hadiah referral pekerja.
+                      Atur syarat kualifikasi, kelola approval referral qualified, dan cairkan hadiah Rp500 ke pengundang.
                     </CardDescription>
                   </div>
                   <Button
@@ -1054,12 +1080,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs">Hadiah Referral / Pekerja Qualified (Rp)</Label>
                     <FormattedNumberInput
-                      value={rules.data.referralReward ?? 10000}
+                      value={rules.data.referralReward ?? 500}
                       onChange={(val) =>
                         saveSettings("rules", { referralReward: val }).then(() =>
                           toast.success("Hadiah referral disimpan!")
@@ -1093,6 +1119,106 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       className="mt-1 h-8 text-xs"
                     />
                   </div>
+                </div>
+
+                {/* TABLE DAFTAR REFERRAL APPROVAL */}
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-bold text-gray-900">
+                      Daftar Hubungan & Approval Referral ({referrals.data.length})
+                    </Label>
+                  </div>
+
+                  {referrals.data.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6 border border-dashed rounded-lg">
+                      Belum ada data pendaftaran referral.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {referrals.data.map((ref) => {
+                        const targetAcc = rules.data.referralMinAcc ?? 5;
+                        const currentAcc = ref.currentAccCount ?? 0;
+                        const rewardAmt = ref.rewardAmount ?? rules.data.referralReward ?? 500;
+
+                        const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
+                        const isQualified = ref.status === "QUALIFIED";
+                        const isRejected = ref.status === "REJECTED";
+                        const isCanApprove = isQualified || (ref.status === "PENDING" && currentAcc >= targetAcc);
+
+                        let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
+                        let statusText = "Pending (Belum Cukup ACC)";
+
+                        if (isPaid) {
+                          statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
+                          statusText = "Disetujui / Paid";
+                        } else if (isQualified || isCanApprove) {
+                          statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
+                          statusText = "Pending Approval";
+                        } else if (isRejected) {
+                          statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
+                          statusText = "Ditolak";
+                        }
+
+                        return (
+                          <div key={ref.id} className="p-3 bg-gray-50/70 border border-gray-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-bold text-gray-900">
+                                  Pengundang: <span className="text-amber-800">{ref.referrerName || workerName(ref.referrerId)}</span> ({shortId(ref.referrerId)})
+                                </span>
+                                <span>→</span>
+                                <span className="font-bold text-gray-900">
+                                  Yang Diundang: <span className="text-blue-800">{ref.referredWorkerName || workerName(ref.referredWorkerId)}</span> ({shortId(ref.referredWorkerId)})
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-3 text-gray-600 font-medium">
+                                <span>Referral ID: <code className="bg-gray-200 px-1 py-0.5 rounded text-[11px]">{shortId(ref.id)}</code></span>
+                                <span>Progress: <strong className="text-gray-900">{currentAcc}/{targetAcc} ACC</strong></span>
+                                <span>Reward: <strong className="text-amber-700">{formatMoney(rewardAmt)}</strong></span>
+                              </div>
+
+                              <div className="text-[11px] text-gray-400 flex flex-wrap gap-2">
+                                <span>Daftar: {formatDateTime(ref.createdAt)}</span>
+                                {ref.qualifiedAt ? <span>· Qualified: {formatDateTime(ref.qualifiedAt)}</span> : null}
+                                {ref.rewardedAt ? <span>· Paid: {formatDateTime(ref.rewardedAt)}</span> : null}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge className={`text-[11px] font-medium ${statusBadgeClass}`}>
+                                {statusText}
+                              </Badge>
+
+                              {isCanApprove && (
+                                <div className="flex gap-1.5 ml-2">
+                                  <Button
+                                    size="sm"
+                                    disabled={busyId === ref.id}
+                                    onClick={() => handleApproveReferral(ref.id)}
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-2.5 gap-1"
+                                  >
+                                    {busyId === ref.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                                    ACC
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={busyId === ref.id}
+                                    onClick={() => handleRejectReferral(ref.id)}
+                                    className="text-xs h-7 px-2.5 gap-1"
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                    Tolak
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -901,41 +901,69 @@ describe("Authentication & Security Rule Logic Unit Tests", () => {
 });
 
 // Engagement Transaction Helpers for Testing
-async function evaluateReferralTx(tx: any, referredWorkerId: string, accumulatedAccCount: number) {
+async function evaluateReferralQualificationTx(tx: any, referredWorkerId: string, accumulatedAccCount: number) {
   const refPath = `referrals/${referredWorkerId}`;
   const refSnap = await tx.get({ path: refPath });
   if (!refSnap.exists()) return;
 
   const referral = refSnap.data();
-  if (referral.status === "REWARDED") return;
+  if (referral.referrerId === referral.referredWorkerId) return;
 
   const rulesSnap = await tx.get({ path: "settings/rules" });
   const rules = rulesSnap.exists() ? rulesSnap.data() : {};
   const minAcc = rules.referralMinAcc ?? 5;
-  const rewardAmt = rules.referralReward ?? 10000;
 
-  if (accumulatedAccCount < minAcc) return;
+  const updates: Record<string, any> = { currentAccCount: accumulatedAccCount };
+
+  if (referral.status === "PENDING" && accumulatedAccCount >= minAcc) {
+    updates.status = "QUALIFIED";
+    updates.qualifiedAt = "TIMESTAMP";
+  }
+
+  tx.update({ path: refPath }, updates);
+}
+
+async function approveReferralTx(tx: any, referralId: string) {
+  const refPath = `referrals/${referralId}`;
+  const refSnap = await tx.get({ path: refPath });
+  if (!refSnap.exists()) throw new Error("Data referral tidak ditemukan.");
+
+  const referral = refSnap.data();
+  if (referral.status === "PAID" || referral.status === "REWARDED") {
+    throw new Error("Referral ini sudah pernah disetujui / dibayar.");
+  }
+  if (referral.status === "REJECTED") {
+    throw new Error("Referral ini sudah ditolak.");
+  }
+
+  const rulesSnap = await tx.get({ path: "settings/rules" });
+  const rules = rulesSnap.exists() ? rulesSnap.data() : {};
+  const rewardAmt = rules.referralReward ?? 500;
 
   const referrerPath = `users/${referral.referrerId}`;
   const referrerSnap = await tx.get({ path: referrerPath });
-  if (!referrerSnap.exists()) return;
+  if (!referrerSnap.exists()) throw new Error("Profil pengundang tidak ditemukan.");
 
   const currentBalance = referrerSnap.data().balance ?? 0;
 
   tx.update({ path: refPath }, {
-    status: "REWARDED",
+    status: "PAID",
     rewardAmount: rewardAmt,
+    rewardedAt: "TIMESTAMP",
   });
 
   tx.update({ path: referrerPath }, {
     balance: currentBalance + rewardAmt,
   });
 
-  tx.set({ path: `rewardLedger/${referredWorkerId}_ref` }, {
+  tx.set({ path: `rewardLedger/${referralId}_ref` }, {
     workerId: referral.referrerId,
+    workerName: referrerSnap.data().name,
     rewardType: "referral",
     amount: rewardAmt,
-    sourceRefId: referredWorkerId,
+    sourceRefId: referralId,
+    description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || referralId}`,
+    createdAt: "TIMESTAMP",
   });
 }
 
@@ -1016,59 +1044,207 @@ async function distributeLeaderboardTx(tx: any, workerId: string, periodKey: str
 }
 
 
-describe("New Worker Engagement & Earning Unit Tests (A-S)", () => {
-  it("A & B. Registration with referral code creates relationship & registration alone yields 0 reward", () => {
-    const referrerId = "referrer_100";
-    const referredId = "referred_200";
+describe("Mandatory Referral Flow & Security Unit Tests (TEST 1 - TEST 8)", () => {
+  it("TEST 1 — Registration with referral: Worker B registers using referral A (status=PENDING, reward=500, balance untouched)", () => {
+    const store: Record<string, any> = {
+      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 0 },
+    };
 
-    // Self referral check
-    expect(referrerId === referredId).toBe(false);
+    function registerReferralSim(referrerId: string, referredId: string, referredName: string) {
+      if (referrerId === referredId) return;
+      if (!store[`users/${referrerId}`]) return; // Invalid referral check
 
-    // Initial state after registration: referral doc status is PENDING, referrer balance unchanged
-    const store = {
-      [`users/${referrerId}`]: { balance: 0 },
-      [`users/${referredId}`]: { balance: 0, referredBy: referrerId },
-      [`referrals/${referredId}`]: {
+      store[`referrals/${referredId}`] = {
+        id: referredId,
         referrerId,
+        referrerName: store[`users/${referrerId}`].name,
         referredWorkerId: referredId,
+        referredWorkerName: referredName,
+        currentAccCount: 0,
+        status: "PENDING",
+        rewardAmount: 500,
+      };
+    }
+
+    registerReferralSim("worker_A", "worker_B", "Budi123");
+
+    const ref = store["referrals/worker_B"];
+    expect(ref).toBeDefined();
+    expect(ref.referrerId).toBe("worker_A");
+    expect(ref.referredWorkerId).toBe("worker_B");
+    expect(ref.status).toBe("PENDING");
+    expect(ref.rewardAmount).toBe(500);
+
+    // Referrer balance untouched
+    expect(store["users/worker_A"].balance).toBe(0);
+  });
+
+  it("TEST 2 — 4 ACC: B has 4 ACC (progress=4/5, not qualified, reward paid=0)", async () => {
+    const store = {
+      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
+      "users/worker_A": { balance: 0 },
+      "referrals/worker_B": {
+        id: "worker_B",
+        referrerId: "worker_A",
+        referredWorkerId: "worker_B",
+        currentAccCount: 0,
         status: "PENDING",
       },
     };
 
-    expect(store[`users/${referrerId}`].balance).toBe(0);
-    expect(store[`referrals/${referredId}`].status).toBe("PENDING");
+    const tx = createMockTransaction(store);
+    await evaluateReferralQualificationTx(tx, "worker_B", 4);
+
+    const ref = store["referrals/worker_B"];
+    expect(ref.currentAccCount).toBe(4);
+    expect(ref.status).toBe("PENDING"); // Not qualified yet!
+    expect(store["users/worker_A"].balance).toBe(0); // Reward paid = 0
   });
 
-  it("C & D. Qualification triggers referral reward & duplicate qualification cannot grant duplicate reward", async () => {
+  it("TEST 3 — 5 ACC: B reaches 5 ACC (progress=5/5, qualified=true, pending approval, reward paid=0)", async () => {
     const store = {
-      "settings/rules": { referralEnabled: true, referralMinAcc: 5, referralReward: 10000 },
-      "users/referrer_A": { balance: 0 },
-      "users/referred_B": { balance: 0 },
-      "referrals/referred_B": { referrerId: "referrer_A", referredWorkerId: "referred_B", status: "PENDING" },
+      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
+      "users/worker_A": { balance: 0 },
+      "referrals/worker_B": {
+        id: "worker_B",
+        referrerId: "worker_A",
+        referredWorkerId: "worker_B",
+        currentAccCount: 4,
+        status: "PENDING",
+      },
     };
 
-    // First evaluation: 5 ACC -> Qualified & Rewarded
-    const tx1 = createMockTransaction(store);
-    await evaluateReferralTx(tx1, "referred_B", 5);
+    const tx = createMockTransaction(store);
+    await evaluateReferralQualificationTx(tx, "worker_B", 5);
 
-    expect(store["users/referrer_A"].balance).toBe(10000);
-    expect(store["referrals/referred_B"].status).toBe("REWARDED");
-
-    // Second evaluation with 10 ACC: status is already REWARDED, balance remains 10000 (no double reward)
-    const tx2 = createMockTransaction(store);
-    await evaluateReferralTx(tx2, "referred_B", 10);
-
-    expect(store["users/referrer_A"].balance).toBe(10000); // Unchanged!
+    const ref = store["referrals/worker_B"];
+    expect(ref.currentAccCount).toBe(5);
+    expect(ref.status).toBe("QUALIFIED"); // Pending Admin Approval
+    expect(store["users/worker_A"].balance).toBe(0); // NO AUTO-PAY! Reward paid = 0
   });
 
-  it("E. Invalid / self referral is safely rejected", () => {
-    const workerId = "worker_self";
+  it("TEST 4 — Admin approve: Admin approves qualified referral (referral approved/paid, A balance +500, ledger +500)", async () => {
+    const store = {
+      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
+      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 1000 },
+      "referrals/worker_B": {
+        id: "worker_B",
+        referrerId: "worker_A",
+        referredWorkerId: "worker_B",
+        referredWorkerName: "Budi123",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await approveReferralTx(tx, "worker_B");
+
+    const ref = store["referrals/worker_B"];
+    const referrer = store["users/worker_A"];
+    const ledger = store["rewardLedger/worker_B_ref"];
+
+    expect(ref.status).toBe("PAID");
+    expect(ref.rewardAmount).toBe(500);
+
+    // Balance credited: 1000 + 500 = 1500
+    expect(referrer.balance).toBe(1500);
+
+    // Ledger entry created
+    expect(ledger).toBeDefined();
+    expect(ledger.amount).toBe(500);
+    expect(ledger.rewardType).toBe("referral");
+    expect(ledger.workerId).toBe("worker_A");
+  });
+
+  it("TEST 5 — Duplicate approval: Admin tries to approve same referral again (balance not increased again, ledger not duplicated)", async () => {
+    const store = {
+      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
+      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 1500 },
+      "referrals/worker_B": {
+        id: "worker_B",
+        referrerId: "worker_A",
+        referredWorkerId: "worker_B",
+        referredWorkerName: "Budi123",
+        currentAccCount: 5,
+        status: "PAID", // Already approved & paid!
+        rewardAmount: 500,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await expect(approveReferralTx(tx, "worker_B")).rejects.toThrow("Referral ini sudah pernah disetujui / dibayar.");
+
+    // Balance remains unchanged
+    expect(store["users/worker_A"].balance).toBe(1500);
+  });
+
+  it("TEST 6 — Self referral: A tries referral on self (rejected, no reward)", async () => {
     function canRegisterReferral(referrer: string, referred: string) {
       if (!referrer || !referred) return false;
       if (referrer === referred) return false;
       return true;
     }
-    expect(canRegisterReferral(workerId, workerId)).toBe(false);
+
+    expect(canRegisterReferral("worker_A", "worker_A")).toBe(false);
+
+    const store = {
+      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
+      "users/worker_A": { balance: 0 },
+      "referrals/worker_A": {
+        id: "worker_A",
+        referrerId: "worker_A",
+        referredWorkerId: "worker_A",
+        status: "PENDING",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    await evaluateReferralQualificationTx(tx, "worker_A", 10);
+
+    // Status remains PENDING/unqualified for self referral
+    expect(store["referrals/worker_A"].status).toBe("PENDING");
+    expect(store["users/worker_A"].balance).toBe(0);
+  });
+
+  it("TEST 7 — Worker privacy: Worker B cannot read Worker A's referrals", () => {
+    function canWorkerReadReferral(requestAuthUid: string, referralData: { referrerId: string; referredWorkerId: string }, isAdmin = false) {
+      if (isAdmin) return true;
+      return requestAuthUid === referralData.referrerId || requestAuthUid === referralData.referredWorkerId;
+    }
+
+    const refA = { referrerId: "worker_A", referredWorkerId: "worker_X" };
+
+    // Worker A can read Worker A's referral
+    expect(canWorkerReadReferral("worker_A", refA)).toBe(true);
+
+    // Worker B CANNOT read Worker A's referral
+    expect(canWorkerReadReferral("worker_B", refA)).toBe(false);
+  });
+
+  it("TEST 8 — Invalid referral: Invalid referral code does not create false referral relationship", () => {
+    const store: Record<string, any> = {
+      "users/worker_A": { uid: "worker_A", name: "Sena" },
+    };
+
+    function registerReferralWithValidation(referrerId: string, referredId: string, referredName: string) {
+      if (referrerId === referredId) return false;
+      if (!store[`users/${referrerId}`]) return false; // Invalid referral code!
+
+      store[`referrals/${referredId}`] = {
+        id: referredId,
+        referrerId,
+        referredWorkerId: referredId,
+        referredWorkerName: referredName,
+        status: "PENDING",
+      };
+      return true;
+    }
+
+    // Attempting register with invalid referral code "INVALID_999"
+    const success = registerReferralWithValidation("INVALID_999", "worker_C", "Cici");
+    expect(success).toBe(false);
+    expect(store["referrals/worker_C"]).toBeUndefined(); // No false relationship created!
   });
 
   it("F, G, H, I. Mission progress calculation, incomplete gives 0 reward, completed rewards once, duplicate claim rejected", async () => {

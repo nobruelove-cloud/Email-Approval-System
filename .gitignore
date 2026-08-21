@@ -61,3 +61,4 @@ tmp/
 attached_assets/
 *.zip
 typecheck_output.log
+dev.log
