@@ -710,6 +710,32 @@ export default function LoginPage() {
                 Buka tab Penarikan Saldo di dashboard Anda, masukkan jumlah nominal saldo yang ingin ditarik, lalu tentukan metode pembayaran yang diinginkan seperti E-Wallet (DANA, OVO, GoPay) atau Transfer Bank.
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-6" className="bg-neutral-900/90 border border-neutral-800 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+                Kenapa pencairan harus menunggu 1–2 hari kerja?
+              </AccordionTrigger>
+              <AccordionContent className="text-neutral-300 text-xs sm:text-sm leading-relaxed space-y-2">
+                <p>
+                  Pencairan membutuhkan waktu 1–2 hari kerja karena setiap akun Gmail yang disetor perlu melalui proses pemeriksaan terlebih dahulu. Jumlah akun yang masuk cukup banyak, sehingga setiap akun harus dicek secara teliti untuk memastikan akun memenuhi prosedur dan dapat lolos ACC.
+                </p>
+                <p>
+                  Pemeriksaan ini juga dilakukan untuk menghindari kendala saat proses ACC, seperti akun yang terkena verifikasi nomor atau masalah lain yang tidak sesuai dengan prosedur.
+                </p>
+                <p>
+                  Setelah akun selesai diperiksa dan berhasil di-ACC, proses pencairan dana akan dilanjutkan sesuai prosedur.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7" className="bg-neutral-900/90 border border-neutral-800 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+                Kapan dana saya dicairkan?
+              </AccordionTrigger>
+              <AccordionContent className="text-neutral-300 text-xs sm:text-sm leading-relaxed">
+                Dana diproses setelah akun selesai diperiksa dan berhasil di-ACC. Estimasi proses pencairan adalah 1–2 hari kerja setelah akun berhasil di-ACC.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>
