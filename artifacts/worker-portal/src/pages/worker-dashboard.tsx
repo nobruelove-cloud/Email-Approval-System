@@ -478,6 +478,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* REFERRAL SYSTEM */}
           <TabsContent value="referral" className="space-y-4">
+            {/* DAFTAR REWARD REFERRAL (READ-ONLY) */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  🎁 Daftar Reward Referral
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Semakin banyak email ACC dari pekerja yang Anda undang, semakin besar bonus reward referral yang Anda dapatkan.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {activeReferralTiers.map((t, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-lg text-center"
+                    >
+                      <p className="text-xs text-gray-600 font-medium">{t.minAcc} ACC</p>
+                      <p className="text-base font-extrabold text-amber-700 mt-1">
+                        {formatMoney(t.reward)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
