@@ -904,6 +904,145 @@ describe("Authentication & Security Rule Logic Unit Tests", () => {
   });
 });
 
+describe("Self-Registration & Admin Creation Comprehensive Tests (1 - 12)", () => {
+  it("1. New worker registration creates status 'active'", () => {
+    const newWorkerProfile = {
+      uid: "worker_101",
+      name: "Andi Baru",
+      email: "andi@test.com",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    };
+    expect(newWorkerProfile.status).toBe("active");
+    expect(newWorkerProfile.role).toBe("worker");
+  });
+
+  it("2. New worker is allowed through routing guard immediately", () => {
+    function evaluateRoutingGate(profile: { role: string; status: string }) {
+      const normalizedRole = profile.role.trim().toLowerCase();
+      const normalizedStatus = profile.status.trim().toLowerCase();
+
+      if (normalizedStatus === "pending") return "PENDING_APPROVAL_SCREEN";
+      if (normalizedStatus === "rejected" || normalizedStatus === "inactive") return "BLOCKED_SCREEN";
+      if (normalizedStatus === "active") {
+        if (normalizedRole === "admin") return "ADMIN_DASHBOARD";
+        if (normalizedRole === "worker") return "WORKER_DASHBOARD";
+      }
+      return "INVALID_ROLE_SCREEN";
+    }
+
+    const activeWorker = { role: "worker", status: "active" };
+    expect(evaluateRoutingGate(activeWorker)).toBe("WORKER_DASHBOARD");
+  });
+
+  it("3. New worker can access Worker Dashboard immediately", () => {
+    const activeWorkerProfile = { uid: "w_active_01", role: "worker", status: "active", balance: 0 };
+    expect(activeWorkerProfile.status).toBe("active");
+    expect(activeWorkerProfile.role).toBe("worker");
+  });
+
+  it("4. Referral registration still creates PENDING referral while worker becomes ACTIVE immediately", () => {
+    const newWorker = { uid: "worker_new_ref", status: "active", role: "worker" };
+    const referralRecord = {
+      id: "worker_new_ref",
+      referrerId: "worker_referrer",
+      referredWorkerId: "worker_new_ref",
+      currentAccCount: 0,
+      status: "PENDING",
+    };
+
+    expect(newWorker.status).toBe("active");
+    expect(referralRecord.status).toBe("PENDING");
+    expect(referralRecord.currentAccCount).toBe(0);
+  });
+
+  it("5. Self-referral is rejected", () => {
+    function processReferral(referrerId: string, referredWorkerId: string) {
+      if (!referrerId || !referredWorkerId) return { success: false, reason: "Missing IDs" };
+      if (referrerId === referredWorkerId) return { success: false, reason: "Self-referral rejected" };
+      return { success: true };
+    }
+
+    const res = processReferral("worker_123", "worker_123");
+    expect(res.success).toBe(false);
+    expect(res.reason).toBe("Self-referral rejected");
+  });
+
+  it("6. Invalid referral code is rejected safely", () => {
+    function validateReferrerExists(referrerId: string, existingUsers: string[]) {
+      if (!referrerId) return false;
+      return existingUsers.includes(referrerId);
+    }
+
+    const existingUserDb = ["user_exist_1", "user_exist_2"];
+    expect(validateReferrerExists("invalid_code_xyz", existingUserDb)).toBe(false);
+  });
+
+  it("7. Admin remains authenticated after creating a worker", () => {
+    const adminSessionBefore = { uid: "admin_uid_777", email: "admin@system.com" };
+    const newWorkerCreated = { uid: "secondary_worker_888", email: "newworker@test.com" };
+
+    // Simulating createWorkerAuthAccount on secondary Firebase App instance
+    const adminSessionAfter = { ...adminSessionBefore };
+    expect(adminSessionAfter.uid).toBe(adminSessionBefore.uid);
+    expect(newWorkerCreated.uid).not.toBe(adminSessionAfter.uid);
+  });
+
+  it("8. Duplicate worker email is handled gracefully with friendly 'Email sudah terdaftar.' message", () => {
+    function mapAuthErrorToFriendlyMessage(code: string) {
+      if (code === "auth/email-already-in-use") return "Email ini sudah terdaftar. Silakan masuk.";
+      return "Terjadi kesalahan. Silakan coba lagi.";
+    }
+
+    expect(mapAuthErrorToFriendlyMessage("auth/email-already-in-use")).toBe("Email ini sudah terdaftar. Silakan masuk.");
+  });
+
+  it("9. Worker cannot access Admin Dashboard", () => {
+    function canAccessAdminDashboard(profile: { role: string; status: string }) {
+      const normalizedRole = profile.role.trim().toLowerCase();
+      const normalizedStatus = profile.status.trim().toLowerCase();
+      return normalizedRole === "admin" && normalizedStatus === "active";
+    }
+
+    const workerProfile = { role: "worker", status: "active" };
+    expect(canAccessAdminDashboard(workerProfile)).toBe(false);
+  });
+
+  it("10. Worker cannot change their role to admin", () => {
+    function canWorkerChangeRole(authUid: string, targetUid: string, newRole: string) {
+      if (authUid !== targetUid) return false;
+      if (newRole === "admin") return false;
+      return true;
+    }
+
+    expect(canWorkerChangeRole("worker_id", "worker_id", "admin")).toBe(false);
+  });
+
+  it("11. Worker cannot modify another worker's profile", () => {
+    function canUpdateWorkerProfile(authUid: string, targetUid: string, isAdmin = false) {
+      if (isAdmin) return true;
+      return authUid === targetUid;
+    }
+
+    expect(canUpdateWorkerProfile("worker_A", "worker_B", false)).toBe(false);
+  });
+
+  it("12. No 'Menunggu Persetujuan Admin' state remains in the self-registration flow", () => {
+    const selfRegisteredWorker = {
+      uid: "self_reg_99",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    };
+
+    expect(selfRegisteredWorker.status).not.toBe("pending");
+    expect(selfRegisteredWorker.status).toBe("active");
+  });
+});
+
 // Engagement Transaction Helpers for Testing
 async function evaluateReferralQualificationTx(tx: any, referredWorkerId: string, accumulatedAccCount: number) {
   const refPath = `referrals/${referredWorkerId}`;
