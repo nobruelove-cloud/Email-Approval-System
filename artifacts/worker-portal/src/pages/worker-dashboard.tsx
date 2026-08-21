@@ -48,7 +48,7 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -59,6 +59,7 @@ import {
   getReferralRewardForAccCount,
   getReferralTierForAccCount,
   getNextReferralTierForAccCount,
+  getOperatingStatus,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -127,6 +128,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   }, [rules.data.supportConfig]);
 
   const isSupportEnabled = supportConfig.enabled !== false;
+
+  const operatingHoursConfig = useMemo(() => {
+    return rules.data.operatingHours ?? DEFAULT_OPERATING_HOURS;
+  }, [rules.data.operatingHours]);
+
+  const operatingStatus = useMemo(() => {
+    return getOperatingStatus(operatingHoursConfig);
+  }, [operatingHoursConfig]);
 
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
@@ -265,6 +274,66 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* JAM OPERASIONAL CARD */}
+        <Card className="bg-white border-gray-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                🕐 Jam Operasional
+              </CardTitle>
+              {operatingStatus.isDisabled ? (
+                <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300 font-medium text-xs">
+                  {operatingStatus.statusText}
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className={
+                    operatingStatus.isOpen
+                      ? "bg-green-50 text-green-800 border-green-300 font-semibold text-xs"
+                      : "bg-red-50 text-red-800 border-red-300 font-semibold text-xs"
+                  }
+                >
+                  {operatingStatus.statusText}
+                </Badge>
+              )}
+            </div>
+            <CardDescription className="text-xs">
+              Jadwal jam operasional layanan (WIB - Asia/Jakarta).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {[
+                { key: "monday" as const, label: "Senin" },
+                { key: "tuesday" as const, label: "Selasa" },
+                { key: "wednesday" as const, label: "Rabu" },
+                { key: "thursday" as const, label: "Kamis" },
+                { key: "friday" as const, label: "Jumat" },
+                { key: "saturday" as const, label: "Sabtu" },
+                { key: "sunday" as const, label: "Minggu" },
+              ].map((d) => {
+                const dayCfg = operatingHoursConfig?.days?.[d.key];
+                const isDayActive = dayCfg?.enabled;
+                const scheduleText = isDayActive ? `${dayCfg.open} - ${dayCfg.close}` : "Tutup";
+
+                return (
+                  <div
+                    key={d.key}
+                    className="flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-100"
+                  >
+                    <span className="font-semibold text-gray-700">{d.label}</span>
+                    <span className={isDayActive ? "font-mono font-medium text-gray-900" : "font-medium text-red-600"}>
+                      {scheduleText}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
         {isSupportEnabled && (
           <Card className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-blue-200">
             <CardHeader className="pb-2">

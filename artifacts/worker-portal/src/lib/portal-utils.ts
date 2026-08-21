@@ -1,5 +1,13 @@
 import { Timestamp } from "firebase/firestore";
-import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type TierConfig, type ReferralTierConfig } from "./portal-types";
+import {
+  DEFAULT_TIERS,
+  DEFAULT_REFERRAL_TIERS,
+  DEFAULT_OPERATING_HOURS,
+  type EmailSubmission,
+  type TierConfig,
+  type ReferralTierConfig,
+  type OperatingHoursConfig,
+} from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
   if (!value) return fallback;
@@ -114,6 +122,128 @@ export function validateTierConfigs(tiers: TierConfig[]): string | null {
   }
 
   return null;
+}
+
+/**
+ * Validates HH:mm time string format strictly (00:00 - 23:59).
+ */
+export function validateTimeString(time: string): boolean {
+  if (typeof time !== "string") return false;
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time);
+}
+
+/**
+ * Validates OperatingHoursConfig object.
+ * Returns null if valid, or "Jam operasional tidak valid." if invalid.
+ */
+export function validateOperatingHours(config: OperatingHoursConfig): string | null {
+  if (!config || typeof config !== "object" || !config.days) {
+    return "Jam operasional tidak valid.";
+  }
+
+  const dayKeys: (keyof OperatingHoursConfig["days"])[] = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ];
+
+  for (const dayKey of dayKeys) {
+    const day = config.days[dayKey];
+    if (!day) {
+      return "Jam operasional tidak valid.";
+    }
+    if (day.enabled) {
+      if (!validateTimeString(day.open) || !validateTimeString(day.close)) {
+        return "Jam operasional tidak valid.";
+      }
+      const [openH, openM] = day.open.split(":").map(Number);
+      const [closeH, closeM] = day.close.split(":").map(Number);
+      const openMinutes = openH * 60 + openM;
+      const closeMinutes = closeH * 60 + closeM;
+
+      if (openMinutes >= closeMinutes) {
+        return "Jam operasional tidak valid.";
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculates operating status based on Asia/Jakarta timezone or configured timezone.
+ */
+export function getOperatingStatus(
+  config?: OperatingHoursConfig,
+  nowDate?: Date,
+): { isOpen: boolean; isDisabled: boolean; statusText: string } {
+  const activeConfig = config ?? DEFAULT_OPERATING_HOURS;
+  if (!activeConfig || activeConfig.enabled === false) {
+    return { isOpen: false, isDisabled: true, statusText: "Jam operasional tidak tersedia." };
+  }
+
+  const date = nowDate || new Date();
+  const tz = activeConfig.timezone || "Asia/Jakarta";
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const parts = formatter.formatToParts(date);
+    let weekdayStr = "";
+    let hourStr = "";
+    let minuteStr = "";
+
+    for (const part of parts) {
+      if (part.type === "weekday") weekdayStr = part.value.toLowerCase();
+      if (part.type === "hour") hourStr = part.value;
+      if (part.type === "minute") minuteStr = part.value;
+    }
+
+    const dayKeyMap: Record<string, keyof OperatingHoursConfig["days"]> = {
+      monday: "monday",
+      tuesday: "tuesday",
+      wednesday: "wednesday",
+      thursday: "thursday",
+      friday: "friday",
+      saturday: "saturday",
+      sunday: "sunday",
+    };
+
+    const dayKey = dayKeyMap[weekdayStr];
+    const dayCfg = dayKey ? activeConfig.days?.[dayKey] : null;
+
+    if (!dayCfg || !dayCfg.enabled) {
+      return { isOpen: false, isDisabled: false, statusText: "🔴 Sedang Tutup" };
+    }
+
+    const curH = parseInt(hourStr, 10);
+    const curM = parseInt(minuteStr, 10);
+    const currMin = curH * 60 + curM;
+
+    const [openH, openM] = dayCfg.open.split(":").map((v) => parseInt(v, 10));
+    const [closeH, closeM] = dayCfg.close.split(":").map((v) => parseInt(v, 10));
+
+    const openMin = openH * 60 + openM;
+    const closeMin = closeH * 60 + closeM;
+
+    if (currMin >= openMin && currMin < closeMin) {
+      return { isOpen: true, isDisabled: false, statusText: "🟢 Sedang Buka" };
+    } else {
+      return { isOpen: false, isDisabled: false, statusText: "🔴 Sedang Tutup" };
+    }
+  } catch (e) {
+    console.error("[getOperatingStatus] Error formatting date:", e);
+    return { isOpen: false, isDisabled: false, statusText: "🔴 Sedang Tutup" };
+  }
 }
 
 /**
