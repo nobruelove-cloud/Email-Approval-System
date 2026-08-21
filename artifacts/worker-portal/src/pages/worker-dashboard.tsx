@@ -18,6 +18,9 @@ import {
   Check,
   HelpCircle,
   MessageCircle,
+  User,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -136,6 +139,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const operatingStatus = useMemo(() => {
     return getOperatingStatus(operatingHoursConfig);
   }, [operatingHoursConfig]);
+
+  // Profile fields display with robust fallbacks
+  const displayName = profile?.name && profile.name.trim() ? profile.name.trim() : "Worker";
+  const displayEmail = profile?.email && profile.email.trim() ? profile.email.trim() : "-";
+  const displayPhone = profile?.phone && profile.phone.trim() ? profile.phone.trim() : "Belum ditambahkan";
 
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
@@ -366,7 +374,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-3 w-full mb-6">
+          <TabsList className="grid grid-cols-4 w-full mb-6">
+            <TabsTrigger value="profile" className="gap-1 text-xs">
+              <User className="w-3.5 h-3.5" /> Profil
+            </TabsTrigger>
             <TabsTrigger value="submit" className="gap-1 text-xs">
               <Send className="w-3.5 h-3.5" /> Setor
             </TabsTrigger>
@@ -377,6 +388,47 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <Wallet className="w-3.5 h-3.5" /> Tarik
             </TabsTrigger>
           </TabsList>
+
+          {/* PROFIL SAYA */}
+          <TabsContent value="profile" className="space-y-4">
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  Profil Saya
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Informasi akun worker yang sedang terhubung.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-gray-400" /> Nama
+                    </p>
+                    <p className="text-sm font-bold text-gray-900">{displayName}</p>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" /> Email
+                    </p>
+                    <p className="text-sm font-bold text-gray-900 break-all">{displayEmail}</p>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" /> Nomor HP
+                    </p>
+                    <p className={`text-sm font-bold ${displayPhone === "Belum ditambahkan" || displayPhone === "-" ? "text-gray-400 font-normal italic" : "text-gray-900"}`}>
+                      {displayPhone}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">
