@@ -147,6 +147,13 @@ export type ReferralTierConfig = {
   reward: number;
 };
 
+export type SupportConfig = {
+  enabled: boolean;
+  title: string;
+  description: string;
+  telegramUrl: string;
+};
+
 export const DEFAULT_REFERRAL_TIERS: ReferralTierConfig[] = [
   { minAcc: 5, reward: 500 },
   { minAcc: 10, reward: 1000 },
@@ -182,6 +189,9 @@ export type PortalRules = {
   // Reward Budget Settings
   rewardBudgetEnabled?: boolean;
   rewardBudget?: number;
+
+  // Support / Help Center Settings
+  supportConfig?: SupportConfig;
 
   updatedAt?: unknown;
 };
@@ -242,4 +252,11 @@ export const DEFAULT_RULES: PortalRules = {
 
   rewardBudgetEnabled: false,
   rewardBudget: 1000000,
+
+  supportConfig: {
+    enabled: true,
+    title: "Pusat Bantuan",
+    description: "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
+    telegramUrl: "",
+  },
 };

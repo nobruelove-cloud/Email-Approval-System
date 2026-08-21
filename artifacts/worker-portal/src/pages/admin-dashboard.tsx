@@ -72,7 +72,7 @@ import {
   distributeLeaderboardReward,
   reviewMissionClaim,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -84,6 +84,7 @@ import {
   getReferralRewardForAccCount,
   getReferralTierForAccCount,
   validateReferralTiers,
+  isValidTelegramUrl,
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
 } from "@/lib/portal-utils";
@@ -201,6 +202,51 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       toast.error(err instanceof Error ? err.message : "Gagal menambahkan tier referral.");
     } finally {
       setSavingRefTiers(false);
+    }
+  }
+
+  // Support / Help Center configuration state
+  const [supportTitle, setSupportTitle] = useState<string | null>(null);
+  const [supportTelegramUrl, setSupportTelegramUrl] = useState<string | null>(null);
+  const [supportDescription, setSupportDescription] = useState<string | null>(null);
+  const [supportEnabled, setSupportEnabled] = useState<boolean | null>(null);
+  const [savingSupport, setSavingSupport] = useState(false);
+
+  const activeSupportConfig = useMemo(() => {
+    return rules.data.supportConfig ?? DEFAULT_RULES.supportConfig!;
+  }, [rules.data.supportConfig]);
+
+  const currentSupportTitle = supportTitle ?? activeSupportConfig.title ?? "Customer Service";
+  const currentSupportTelegramUrl = supportTelegramUrl ?? activeSupportConfig.telegramUrl ?? "";
+  const currentSupportDescription = supportDescription ?? activeSupportConfig.description ?? "Ada kendala? Hubungi Customer Service kami melalui Telegram.";
+  const currentSupportEnabled = supportEnabled ?? (activeSupportConfig.enabled !== false);
+
+  async function handleSaveSupportConfig() {
+    const trimmedUrl = currentSupportTelegramUrl.trim();
+    if (!isValidTelegramUrl(trimmedUrl)) {
+      toast.error("Masukkan link Telegram yang valid.");
+      return;
+    }
+
+    setSavingSupport(true);
+    try {
+      const updatedSupportConfig: SupportConfig = {
+        enabled: currentSupportEnabled,
+        title: currentSupportTitle.trim() || "Customer Service",
+        description: currentSupportDescription.trim() || "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
+        telegramUrl: trimmedUrl,
+      };
+
+      await saveSettings("rules", {
+        ...rules.data,
+        supportConfig: updatedSupportConfig,
+      });
+
+      toast.success("Pengaturan pusat bantuan berhasil disimpan.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengaturan pusat bantuan.");
+    } finally {
+      setSavingSupport(false);
     }
   }
 
@@ -1561,6 +1607,69 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <Button onClick={handleSaveRules} disabled={savingRules} className="bg-amber-600 hover:bg-amber-700 gap-2">
                     {savingRules && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan Pengaturan Aturan & Tier
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* PUSAT BANTUAN / CUSTOMER SERVICE */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Pusat Bantuan / Customer Service</CardTitle>
+                  <CardDescription>
+                    Atur tautan dan informasi Customer Service Telegram yang tampil untuk seluruh pekerja.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Nama layanan</Label>
+                    <Input
+                      value={currentSupportTitle}
+                      onChange={(e) => setSupportTitle(e.target.value)}
+                      placeholder="Customer Service"
+                      className="mt-1.5 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label>Link Telegram</Label>
+                    <Input
+                      value={currentSupportTelegramUrl}
+                      onChange={(e) => setSupportTelegramUrl(e.target.value)}
+                      placeholder="https://t.me/username"
+                      className="mt-1.5 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label>Deskripsi</Label>
+                    <Textarea
+                      rows={3}
+                      value={currentSupportDescription}
+                      onChange={(e) => setSupportDescription(e.target.value)}
+                      placeholder="Ada kendala? Hubungi Customer Service kami melalui Telegram."
+                      className="mt-1.5 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={currentSupportEnabled ? "ON" : "OFF"}
+                      onValueChange={(val) => setSupportEnabled(val === "ON")}
+                    >
+                      <SelectTrigger className="mt-1.5 w-36 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ON">ON</SelectItem>
+                        <SelectItem value="OFF">OFF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleSaveSupportConfig}
+                    disabled={savingSupport}
+                    className="bg-amber-600 hover:bg-amber-700 gap-2 text-xs"
+                  >
+                    {savingSupport && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Simpan
                   </Button>
                 </CardContent>
               </Card>
