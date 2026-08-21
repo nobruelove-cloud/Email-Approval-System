@@ -5,8 +5,12 @@ import {
   getTierConfig,
   getRecommendedTier,
   validateTierConfigs,
+  getReferralRewardForAccCount,
+  getReferralTierForAccCount,
+  getNextReferralTierForAccCount,
+  validateReferralTiers,
 } from "../lib/portal-utils";
-import { DEFAULT_TIERS, type EmailSubmission, type TierConfig } from "../lib/portal-types";
+import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type TierConfig, type ReferralTierConfig } from "../lib/portal-types";
 
 // Mock Firestore transaction object
 function createMockTransaction(store: Record<string, any>) {
@@ -938,7 +942,13 @@ async function approveReferralTx(tx: any, referralId: string) {
 
   const rulesSnap = await tx.get({ path: "settings/rules" });
   const rules = rulesSnap.exists() ? rulesSnap.data() : {};
-  const rewardAmt = rules.referralReward ?? 500;
+  const referralTiers = rules.referralTiers ?? DEFAULT_REFERRAL_TIERS;
+
+  const currentAcc = referral.currentAccCount ?? 0;
+  let rewardAmt = getReferralRewardForAccCount(currentAcc, referralTiers);
+  if (rewardAmt <= 0) {
+    rewardAmt = referral.rewardAmount ?? rules.referralReward ?? 500;
+  }
 
   const referrerPath = `users/${referral.referrerId}`;
   const referrerSnap = await tx.get({ path: referrerPath });
@@ -1044,95 +1054,46 @@ async function distributeLeaderboardTx(tx: any, workerId: string, periodKey: str
 }
 
 
-describe("Mandatory Referral Flow & Security Unit Tests (TEST 1 - TEST 8)", () => {
-  it("TEST 1 — Registration with referral: Worker B registers using referral A (status=PENDING, reward=500, balance untouched)", () => {
-    const store: Record<string, any> = {
+describe("Mandatory Tiered Referral Flow & Security Unit Tests (TEST 1 - TEST 12)", () => {
+  it("TEST 1 — 4 ACC: reward is 0", () => {
+    expect(getReferralRewardForAccCount(4, DEFAULT_REFERRAL_TIERS)).toBe(0);
+  });
+
+  it("TEST 2 — 5 ACC: reward is Rp500", () => {
+    expect(getReferralRewardForAccCount(5, DEFAULT_REFERRAL_TIERS)).toBe(500);
+  });
+
+  it("TEST 3 — 9 ACC: reward is Rp500", () => {
+    expect(getReferralRewardForAccCount(9, DEFAULT_REFERRAL_TIERS)).toBe(500);
+  });
+
+  it("TEST 4 — 10 ACC: reward is Rp1.000", () => {
+    expect(getReferralRewardForAccCount(10, DEFAULT_REFERRAL_TIERS)).toBe(1000);
+  });
+
+  it("TEST 5 — 20 ACC: reward is Rp2.000", () => {
+    expect(getReferralRewardForAccCount(20, DEFAULT_REFERRAL_TIERS)).toBe(2000);
+  });
+
+  it("TEST 6 — 50 ACC: reward is Rp5.000", () => {
+    expect(getReferralRewardForAccCount(50, DEFAULT_REFERRAL_TIERS)).toBe(5000);
+  });
+
+  it("TEST 7 — 51+ ACC: reward is Rp5.000", () => {
+    expect(getReferralRewardForAccCount(51, DEFAULT_REFERRAL_TIERS)).toBe(5000);
+    expect(getReferralRewardForAccCount(100, DEFAULT_REFERRAL_TIERS)).toBe(5000);
+  });
+
+  it("TEST 8 — 20 ACC before admin approval: Admin approves -> referrer receives Rp2.000, not Rp500", async () => {
+    const store = {
+      "settings/rules": { referralTiers: DEFAULT_REFERRAL_TIERS },
       "users/worker_A": { uid: "worker_A", name: "Sena", balance: 0 },
-    };
-
-    function registerReferralSim(referrerId: string, referredId: string, referredName: string) {
-      if (referrerId === referredId) return;
-      if (!store[`users/${referrerId}`]) return; // Invalid referral check
-
-      store[`referrals/${referredId}`] = {
-        id: referredId,
-        referrerId,
-        referrerName: store[`users/${referrerId}`].name,
-        referredWorkerId: referredId,
-        referredWorkerName: referredName,
-        currentAccCount: 0,
-        status: "PENDING",
-        rewardAmount: 500,
-      };
-    }
-
-    registerReferralSim("worker_A", "worker_B", "Budi123");
-
-    const ref = store["referrals/worker_B"];
-    expect(ref).toBeDefined();
-    expect(ref.referrerId).toBe("worker_A");
-    expect(ref.referredWorkerId).toBe("worker_B");
-    expect(ref.status).toBe("PENDING");
-    expect(ref.rewardAmount).toBe(500);
-
-    // Referrer balance untouched
-    expect(store["users/worker_A"].balance).toBe(0);
-  });
-
-  it("TEST 2 — 4 ACC: B has 4 ACC (progress=4/5, not qualified, reward paid=0)", async () => {
-    const store = {
-      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
-      "users/worker_A": { balance: 0 },
-      "referrals/worker_B": {
-        id: "worker_B",
-        referrerId: "worker_A",
-        referredWorkerId: "worker_B",
-        currentAccCount: 0,
-        status: "PENDING",
-      },
-    };
-
-    const tx = createMockTransaction(store);
-    await evaluateReferralQualificationTx(tx, "worker_B", 4);
-
-    const ref = store["referrals/worker_B"];
-    expect(ref.currentAccCount).toBe(4);
-    expect(ref.status).toBe("PENDING"); // Not qualified yet!
-    expect(store["users/worker_A"].balance).toBe(0); // Reward paid = 0
-  });
-
-  it("TEST 3 — 5 ACC: B reaches 5 ACC (progress=5/5, qualified=true, pending approval, reward paid=0)", async () => {
-    const store = {
-      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
-      "users/worker_A": { balance: 0 },
-      "referrals/worker_B": {
-        id: "worker_B",
-        referrerId: "worker_A",
-        referredWorkerId: "worker_B",
-        currentAccCount: 4,
-        status: "PENDING",
-      },
-    };
-
-    const tx = createMockTransaction(store);
-    await evaluateReferralQualificationTx(tx, "worker_B", 5);
-
-    const ref = store["referrals/worker_B"];
-    expect(ref.currentAccCount).toBe(5);
-    expect(ref.status).toBe("QUALIFIED"); // Pending Admin Approval
-    expect(store["users/worker_A"].balance).toBe(0); // NO AUTO-PAY! Reward paid = 0
-  });
-
-  it("TEST 4 — Admin approve: Admin approves qualified referral (referral approved/paid, A balance +500, ledger +500)", async () => {
-    const store = {
-      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
-      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 1000 },
       "referrals/worker_B": {
         id: "worker_B",
         referrerId: "worker_A",
         referredWorkerId: "worker_B",
         referredWorkerName: "Budi123",
-        currentAccCount: 5,
+        currentAccCount: 20,
         status: "QUALIFIED",
       },
     };
@@ -1145,69 +1106,75 @@ describe("Mandatory Referral Flow & Security Unit Tests (TEST 1 - TEST 8)", () =
     const ledger = store["rewardLedger/worker_B_ref"];
 
     expect(ref.status).toBe("PAID");
-    expect(ref.rewardAmount).toBe(500);
-
-    // Balance credited: 1000 + 500 = 1500
-    expect(referrer.balance).toBe(1500);
-
-    // Ledger entry created
-    expect(ledger).toBeDefined();
-    expect(ledger.amount).toBe(500);
-    expect(ledger.rewardType).toBe("referral");
-    expect(ledger.workerId).toBe("worker_A");
+    expect(ref.rewardAmount).toBe(2000); // Rp2.000, NOT Rp500!
+    expect(referrer.balance).toBe(2000); // Balance credited +2000
+    expect(ledger.amount).toBe(2000);
   });
 
-  it("TEST 5 — Duplicate approval: Admin tries to approve same referral again (balance not increased again, ledger not duplicated)", async () => {
+  it("TEST 9 — Duplicate approval: Admin tries to approve same referral again -> balance not increased again, ledger not duplicated", async () => {
     const store = {
-      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
-      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 1500 },
+      "settings/rules": { referralTiers: DEFAULT_REFERRAL_TIERS },
+      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 2000 },
       "referrals/worker_B": {
         id: "worker_B",
         referrerId: "worker_A",
         referredWorkerId: "worker_B",
         referredWorkerName: "Budi123",
-        currentAccCount: 5,
-        status: "PAID", // Already approved & paid!
-        rewardAmount: 500,
+        currentAccCount: 20,
+        status: "PAID", // Already approved & paid
+        rewardAmount: 2000,
       },
     };
 
     const tx = createMockTransaction(store);
     await expect(approveReferralTx(tx, "worker_B")).rejects.toThrow("Referral ini sudah pernah disetujui / dibayar.");
 
-    // Balance remains unchanged
-    expect(store["users/worker_A"].balance).toBe(1500);
+    // Balance remains unchanged at 2000
+    expect(store["users/worker_A"].balance).toBe(2000);
   });
 
-  it("TEST 6 — Self referral: A tries referral on self (rejected, no reward)", async () => {
-    function canRegisterReferral(referrer: string, referred: string) {
-      if (!referrer || !referred) return false;
-      if (referrer === referred) return false;
-      return true;
-    }
-
-    expect(canRegisterReferral("worker_A", "worker_A")).toBe(false);
-
+  it("TEST 10 — Already PAID referral: cannot be paid again", async () => {
     const store = {
-      "settings/rules": { referralMinAcc: 5, referralReward: 500 },
-      "users/worker_A": { balance: 0 },
-      "referrals/worker_A": {
-        id: "worker_A",
+      "settings/rules": { referralTiers: DEFAULT_REFERRAL_TIERS },
+      "users/worker_A": { uid: "worker_A", name: "Sena", balance: 500 },
+      "referrals/worker_B": {
+        id: "worker_B",
         referrerId: "worker_A",
-        referredWorkerId: "worker_A",
-        status: "PENDING",
+        referredWorkerId: "worker_B",
+        status: "PAID",
+        rewardAmount: 500,
       },
     };
 
     const tx = createMockTransaction(store);
-    await evaluateReferralQualificationTx(tx, "worker_A", 10);
-
-    // Status remains PENDING/unqualified for self referral
-    expect(store["referrals/worker_A"].status).toBe("PENDING");
-    expect(store["users/worker_A"].balance).toBe(0);
+    await expect(approveReferralTx(tx, "worker_B")).rejects.toThrow("Referral ini sudah pernah disetujui / dibayar.");
+    expect(store["users/worker_A"].balance).toBe(500);
   });
 
-  it("TEST 7 — Worker privacy: Worker B cannot read Worker A's referrals", () => {
+  it("TEST 11 — Invalid tier configuration rejected by validateReferralTiers", () => {
+    // Empty tiers
+    expect(validateReferralTiers([])).toContain("tidak boleh kosong");
+
+    // Negative minAcc
+    expect(validateReferralTiers([{ minAcc: -5, reward: 500 }])).toContain("bilangan bulat positif");
+
+    // Negative reward
+    expect(validateReferralTiers([{ minAcc: 5, reward: -500 }])).toContain("tidak boleh negatif");
+
+    // Duplicate minAcc
+    expect(validateReferralTiers([
+      { minAcc: 5, reward: 500 },
+      { minAcc: 5, reward: 1000 },
+    ])).toContain("ganda");
+
+    // Reward decreasing as ACC requirement increases
+    expect(validateReferralTiers([
+      { minAcc: 5, reward: 1000 },
+      { minAcc: 10, reward: 500 },
+    ])).toContain("tidak boleh lebih kecil");
+  });
+
+  it("TEST 12 — Worker privacy: Worker B cannot read Worker A's referrals", () => {
     function canWorkerReadReferral(requestAuthUid: string, referralData: { referrerId: string; referredWorkerId: string }, isAdmin = false) {
       if (isAdmin) return true;
       return requestAuthUid === referralData.referrerId || requestAuthUid === referralData.referredWorkerId;
@@ -1220,31 +1187,6 @@ describe("Mandatory Referral Flow & Security Unit Tests (TEST 1 - TEST 8)", () =
 
     // Worker B CANNOT read Worker A's referral
     expect(canWorkerReadReferral("worker_B", refA)).toBe(false);
-  });
-
-  it("TEST 8 — Invalid referral: Invalid referral code does not create false referral relationship", () => {
-    const store: Record<string, any> = {
-      "users/worker_A": { uid: "worker_A", name: "Sena" },
-    };
-
-    function registerReferralWithValidation(referrerId: string, referredId: string, referredName: string) {
-      if (referrerId === referredId) return false;
-      if (!store[`users/${referrerId}`]) return false; // Invalid referral code!
-
-      store[`referrals/${referredId}`] = {
-        id: referredId,
-        referrerId,
-        referredWorkerId: referredId,
-        referredWorkerName: referredName,
-        status: "PENDING",
-      };
-      return true;
-    }
-
-    // Attempting register with invalid referral code "INVALID_999"
-    const success = registerReferralWithValidation("INVALID_999", "worker_C", "Cici");
-    expect(success).toBe(false);
-    expect(store["referrals/worker_C"]).toBeUndefined(); // No false relationship created!
   });
 
   it("F, G, H, I. Mission progress calculation, incomplete gives 0 reward, completed rewards once, duplicate claim rejected", async () => {

@@ -72,7 +72,7 @@ import {
   distributeLeaderboardReward,
   reviewMissionClaim,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -81,6 +81,9 @@ import {
   getTierConfig,
   shortId,
   validateTierConfigs,
+  getReferralRewardForAccCount,
+  getReferralTierForAccCount,
+  validateReferralTiers,
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
 } from "@/lib/portal-utils";
@@ -134,6 +137,72 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const activeTiersList = useMemo(() => {
     return Array.isArray(rules.data.tiers) && rules.data.tiers.length > 0 ? rules.data.tiers : DEFAULT_TIERS;
   }, [rules.data.tiers]);
+
+  const activeReferralTiers = useMemo(() => {
+    return Array.isArray(rules.data.referralTiers) && rules.data.referralTiers.length > 0
+      ? rules.data.referralTiers
+      : DEFAULT_REFERRAL_TIERS;
+  }, [rules.data.referralTiers]);
+
+  // Referral tier management state
+  const [isAddingRefTier, setIsAddingRefTier] = useState(false);
+  const [newRefMinAcc, setNewRefMinAcc] = useState<number | "">("");
+  const [newRefReward, setNewRefReward] = useState<number | "">("");
+  const [savingRefTiers, setSavingRefTiers] = useState(false);
+
+  function handleRemoveReferralTier(index: number) {
+    if (activeReferralTiers.length <= 1) {
+      toast.error("Minimal harus ada 1 tier referral.");
+      return;
+    }
+    const updated = activeReferralTiers.filter((_, idx) => idx !== index);
+    const valErr = validateReferralTiers(updated);
+    if (valErr) {
+      toast.error(valErr);
+      return;
+    }
+    saveSettings("rules", { referralTiers: updated }).then(() => {
+      toast.success("Tier referral berhasil dihapus!");
+    }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan tier referral.");
+    });
+  }
+
+  async function handleAddReferralTierSubmit() {
+    if (newRefMinAcc === "" || typeof newRefMinAcc !== "number" || newRefMinAcc <= 0) {
+      toast.error("Minimal ACC harus berupa bilangan bulat positif.");
+      return;
+    }
+    if (newRefReward === "" || typeof newRefReward !== "number" || newRefReward < 0) {
+      toast.error("Reward harus berupa angka non-negatif.");
+      return;
+    }
+
+    const newTier: ReferralTierConfig = {
+      minAcc: newRefMinAcc,
+      reward: newRefReward,
+    };
+
+    const updated = [...activeReferralTiers, newTier].sort((a, b) => a.minAcc - b.minAcc);
+    const valErr = validateReferralTiers(updated);
+    if (valErr) {
+      toast.error(valErr);
+      return;
+    }
+
+    setSavingRefTiers(true);
+    try {
+      await saveSettings("rules", { referralTiers: updated });
+      toast.success("Tier referral baru berhasil ditambahkan!");
+      setIsAddingRefTier(false);
+      setNewRefMinAcc("");
+      setNewRefReward("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menambahkan tier referral.");
+    } finally {
+      setSavingRefTiers(false);
+    }
+  }
 
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -537,7 +606,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     setBusyId(refId);
     try {
       await approveReferral(refId);
-      toast.success("Referral berhasil disetujui & hadiah Rp500 telah dicairkan ke pengundang!");
+      toast.success("Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyetujui referral.");
     } finally {
@@ -1067,7 +1136,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       <Users className="w-5 h-5 text-amber-600" /> Pengaturan & Approval Referral
                     </CardTitle>
                     <CardDescription>
-                      Atur syarat kualifikasi, kelola approval referral qualified, dan cairkan hadiah Rp500 ke pengundang.
+                      Atur tier kualifikasi referral, kelola approval referral qualified, dan cairkan hadiah ke pengundang.
                     </CardDescription>
                   </div>
                   <Button
@@ -1081,44 +1150,112 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs">Hadiah Referral / Pekerja Qualified (Rp)</Label>
-                    <FormattedNumberInput
-                      value={rules.data.referralReward ?? 500}
-                      onChange={(val) =>
-                        saveSettings("rules", { referralReward: val }).then(() =>
-                          toast.success("Hadiah referral disimpan!")
-                        )
-                      }
-                      className="mt-1 h-8 text-xs"
-                    />
+                {/* TIER REWARD REFERRAL CONFIGURATION */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-bold text-gray-900">Tier Reward Referral</Label>
+                      <p className="text-xs text-gray-500">Atur syarat minimal ACC dan hadiah reward untuk setiap tier referral.</p>
+                    </div>
+                    {!isAddingRefTier && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsAddingRefTier(true)}
+                        className="gap-1 text-xs h-8 border-amber-300 text-amber-800 hover:bg-amber-50"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Tambah Tier
+                      </Button>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-xs">Syarat Min. Email ACC Qualified</Label>
-                    <Input
-                      type="number"
-                      value={rules.data.referralMinAcc ?? 5}
-                      onChange={(e) =>
-                        saveSettings("rules", { referralMinAcc: Number(e.target.value) }).then(() =>
-                          toast.success("Syarat min. ACC referral disimpan!")
-                        )
-                      }
-                      className="mt-1 h-8 text-xs"
-                    />
+
+                  {/* TABLE DISPLAY */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold">
+                        <tr>
+                          <th className="px-3 py-2">Minimal ACC</th>
+                          <th className="px-3 py-2">Reward</th>
+                          <th className="px-3 py-2 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {activeReferralTiers.map((t, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="px-3 py-2.5 font-bold text-gray-900">{t.minAcc} ACC</td>
+                            <td className="px-3 py-2.5 font-bold text-amber-700">{formatMoney(t.reward)}</td>
+                            <td className="px-3 py-2.5 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveReferralTier(idx)}
+                                className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div>
-                    <Label className="text-xs">Syarat Min. Pendapatan (Rp)</Label>
-                    <FormattedNumberInput
-                      value={rules.data.referralMinEarnings ?? 0}
-                      onChange={(val) =>
-                        saveSettings("rules", { referralMinEarnings: val }).then(() =>
-                          toast.success("Syarat min. pendapatan referral disimpan!")
-                        )
-                      }
-                      className="mt-1 h-8 text-xs"
-                    />
-                  </div>
+
+                  {/* + TAMBAH TIER FORM */}
+                  {isAddingRefTier && (
+                    <Card className="border-amber-200 bg-amber-50/40">
+                      <CardContent className="pt-4 space-y-3">
+                        <p className="text-xs font-bold text-amber-900">Tambah Tier Referral Baru</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">Minimal ACC</Label>
+                            <Input
+                              type="number"
+                              placeholder="Contoh: 100"
+                              value={newRefMinAcc}
+                              onChange={(e) => setNewRefMinAcc(e.target.value === "" ? "" : Number(e.target.value))}
+                              className="mt-1 h-8 text-xs bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Reward (Rp)</Label>
+                            <FormattedNumberInput
+                              value={newRefReward === "" ? 0 : newRefReward}
+                              onChange={(val) => setNewRefReward(val)}
+                              placeholder="Contoh: 10000"
+                              className="mt-1 h-8 text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setIsAddingRefTier(false);
+                              setNewRefMinAcc("");
+                              setNewRefReward("");
+                            }}
+                            className="h-8 text-xs"
+                          >
+                            Batal
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={savingRefTiers}
+                            onClick={handleAddReferralTierSubmit}
+                            className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
+                          >
+                            {savingRefTiers && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Simpan
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
 
                 {/* TABLE DAFTAR REFERRAL APPROVAL */}
@@ -1136,27 +1273,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {referrals.data.map((ref) => {
-                        const targetAcc = rules.data.referralMinAcc ?? 5;
                         const currentAcc = ref.currentAccCount ?? 0;
-                        const rewardAmt = ref.rewardAmount ?? rules.data.referralReward ?? 500;
+                        const qualTier = getReferralTierForAccCount(currentAcc, activeReferralTiers);
+                        const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
+                        const lowestMinAcc = sortedTiers[0]?.minAcc ?? rules.data.referralMinAcc ?? 5;
 
                         const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
                         const isQualified = ref.status === "QUALIFIED";
                         const isRejected = ref.status === "REJECTED";
-                        const isCanApprove = isQualified || (ref.status === "PENDING" && currentAcc >= targetAcc);
+                        const isCanApprove = isQualified || (ref.status === "PENDING" && currentAcc >= lowestMinAcc);
+
+                        const rewardAmt = isPaid
+                          ? (ref.rewardAmount ?? getReferralRewardForAccCount(currentAcc, activeReferralTiers))
+                          : getReferralRewardForAccCount(currentAcc, activeReferralTiers);
 
                         let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
-                        let statusText = "Pending (Belum Cukup ACC)";
+                        let statusText = "PENDING";
 
                         if (isPaid) {
                           statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
-                          statusText = "Disetujui / Paid";
+                          statusText = "PAID";
                         } else if (isQualified || isCanApprove) {
                           statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                          statusText = "Pending Approval";
+                          statusText = "QUALIFIED";
                         } else if (isRejected) {
                           statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
-                          statusText = "Ditolak";
+                          statusText = "REJECTED";
                         }
 
                         return (
@@ -1173,9 +1315,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </div>
 
                               <div className="flex flex-wrap items-center gap-3 text-gray-600 font-medium">
-                                <span>Referral ID: <code className="bg-gray-200 px-1 py-0.5 rounded text-[11px]">{shortId(ref.id)}</code></span>
-                                <span>Progress: <strong className="text-gray-900">{currentAcc}/{targetAcc} ACC</strong></span>
-                                <span>Reward: <strong className="text-amber-700">{formatMoney(rewardAmt)}</strong></span>
+                                <span>ACC: <strong className="text-gray-900">{currentAcc}</strong></span>
+                                <span>Tier: <strong className="text-blue-900">{qualTier ? `${qualTier.minAcc} ACC` : "-"}</strong></span>
+                                <span>{isPaid ? "Reward Paid" : "Reward"}: <strong className="text-amber-700">{formatMoney(rewardAmt)}</strong></span>
                               </div>
 
                               <div className="text-[11px] text-gray-400 flex flex-wrap gap-2">

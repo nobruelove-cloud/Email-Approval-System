@@ -19,6 +19,7 @@ import {
 import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
 import {
   DEFAULT_TIERS,
+  DEFAULT_REFERRAL_TIERS,
   type EmailSubmission,
   type PortalUser,
   type Withdrawal,
@@ -26,8 +27,9 @@ import {
   type WithdrawalStatus,
   type UserStatus,
   type TierConfig,
+  type ReferralTierConfig,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, shortId } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, shortId } from "@/lib/portal-utils";
 
 import { useRef } from "react";
 
@@ -780,7 +782,9 @@ export async function evaluateReferralQualification(referredWorkerId: string) {
     const rulesRef = doc(firestore, "settings", "rules");
     const rulesSnap = await tx.get(rulesRef);
     const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const minAcc = rulesData?.referralMinAcc ?? 5;
+    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+    const sortedTiers = [...referralTiers].sort((a, b) => a.minAcc - b.minAcc);
+    const minAcc = sortedTiers[0]?.minAcc ?? rulesData?.referralMinAcc ?? 5;
 
     const updates: Record<string, unknown> = {
       currentAccCount: actualAccCount,
@@ -827,7 +831,13 @@ export async function approveReferral(referralId: string) {
     const rulesRef = doc(firestore, "settings", "rules");
     const rulesSnap = await tx.get(rulesRef);
     const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const rewardAmt = rulesData?.referralReward ?? 500;
+    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+    const currentAcc = referral.currentAccCount ?? 0;
+    let rewardAmt = getReferralRewardForAccCount(currentAcc, referralTiers);
+    if (rewardAmt <= 0) {
+      rewardAmt = referral.rewardAmount ?? rulesData?.referralReward ?? 500;
+    }
 
     const referrerRef = doc(firestore, "users", referral.referrerId);
     const referrerSnap = await tx.get(referrerRef);

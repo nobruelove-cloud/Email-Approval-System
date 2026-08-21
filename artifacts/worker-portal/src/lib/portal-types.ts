@@ -142,6 +142,18 @@ export type Withdrawal = {
   note?: string;
 };
 
+export type ReferralTierConfig = {
+  minAcc: number;
+  reward: number;
+};
+
+export const DEFAULT_REFERRAL_TIERS: ReferralTierConfig[] = [
+  { minAcc: 5, reward: 500 },
+  { minAcc: 10, reward: 1000 },
+  { minAcc: 20, reward: 2000 },
+  { minAcc: 50, reward: 5000 },
+];
+
 // Stored at settings/rules in Firestore. Editable from the admin dashboard,
 // read live everywhere via useSettings("rules", DEFAULT_RULES).
 export type PortalRules = {
@@ -158,6 +170,7 @@ export type PortalRules = {
   referralReward?: number;
   referralMinAcc?: number;
   referralMinEarnings?: number;
+  referralTiers?: ReferralTierConfig[];
 
   // Mission Settings
   missions?: MissionConfig[];
@@ -197,6 +210,7 @@ export const DEFAULT_RULES: PortalRules = {
   referralReward: 500,
   referralMinAcc: 5,
   referralMinEarnings: 0,
+  referralTiers: DEFAULT_REFERRAL_TIERS,
 
   missions: [
     {
