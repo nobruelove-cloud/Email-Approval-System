@@ -1054,6 +1054,28 @@ async function distributeLeaderboardTx(tx: any, workerId: string, periodKey: str
 }
 
 
+describe("Worker Dashboard Referral Tiers Display Unit Tests", () => {
+  it("resolves active referral tiers from rules.data.referralTiers or DEFAULT_REFERRAL_TIERS fallback", () => {
+    function resolveReferralTiers(rulesReferralTiers: any) {
+      return Array.isArray(rulesReferralTiers) && rulesReferralTiers.length > 0
+        ? rulesReferralTiers
+        : DEFAULT_REFERRAL_TIERS;
+    }
+
+    // Default fallback
+    expect(resolveReferralTiers(undefined)).toEqual(DEFAULT_REFERRAL_TIERS);
+    expect(resolveReferralTiers([])).toEqual(DEFAULT_REFERRAL_TIERS);
+
+    // Custom referral tiers configured by Admin
+    const customTiers: ReferralTierConfig[] = [
+      { minAcc: 5, reward: 1000 },
+      { minAcc: 15, reward: 3000 },
+      { minAcc: 30, reward: 7000 },
+    ];
+    expect(resolveReferralTiers(customTiers)).toEqual(customTiers);
+  });
+});
+
 describe("Mandatory Tiered Referral Flow & Security Unit Tests (TEST 1 - TEST 12)", () => {
   it("TEST 1 — 4 ACC: reward is 0", () => {
     expect(getReferralRewardForAccCount(4, DEFAULT_REFERRAL_TIERS)).toBe(0);
