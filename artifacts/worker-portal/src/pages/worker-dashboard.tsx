@@ -16,6 +16,8 @@ import {
   Users,
   Copy,
   Check,
+  HelpCircle,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -119,6 +121,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       ? rules.data.referralTiers
       : DEFAULT_REFERRAL_TIERS;
   }, [rules.data.referralTiers]);
+
+  const supportConfig = useMemo(() => {
+    return rules.data.supportConfig ?? DEFAULT_RULES.supportConfig!;
+  }, [rules.data.supportConfig]);
+
+  const isSupportEnabled = supportConfig.enabled !== false;
 
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
@@ -256,7 +264,38 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {isSupportEnabled && (
+          <Card className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-blue-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-blue-900">
+                <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                {supportConfig.title || "Pusat Bantuan"}
+              </CardTitle>
+              <CardDescription className="text-xs text-blue-800/90 whitespace-pre-wrap">
+                {supportConfig.description || "Ada kendala saat menggunakan platform? Hubungi Customer Service kami melalui Telegram."}
+              </CardDescription>
+            </CardHeader>
+            {supportConfig.telegramUrl ? (
+              <CardContent className="pt-1">
+                <Button
+                  asChild
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs h-9 font-medium"
+                >
+                  <a
+                    href={supportConfig.telegramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Hubungi CS Telegram
+                  </a>
+                </Button>
+              </CardContent>
+            ) : null}
+          </Card>
+        )}
+
         <Tabs defaultValue="submit">
           <TabsList className="grid grid-cols-3 w-full mb-6">
             <TabsTrigger value="submit" className="gap-1 text-xs">

@@ -117,6 +117,26 @@ export function validateTierConfigs(tiers: TierConfig[]): string | null {
 }
 
 /**
+ * Validates whether a URL is a valid Telegram HTTPS URL.
+ * Accepts formats like https://t.me/username or https://telegram.me/username.
+ * Rejects http://, javascript:, data:, and unrelated domains.
+ */
+export function isValidTelegramUrl(url: string): boolean {
+  if (typeof url !== "string") return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.hostname !== "t.me" && parsed.hostname !== "telegram.me") return false;
+    if (!parsed.pathname || parsed.pathname.length <= 1) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns total reward for a given ACC count based on highest reached tier.
  */
 export function getReferralRewardForAccCount(accCount: number, referralTiers?: ReferralTierConfig[]): number {

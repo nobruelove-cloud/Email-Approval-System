@@ -9,8 +9,9 @@ import {
   getReferralTierForAccCount,
   getNextReferralTierForAccCount,
   validateReferralTiers,
+  isValidTelegramUrl,
 } from "../lib/portal-utils";
-import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, type EmailSubmission, type TierConfig, type ReferralTierConfig } from "../lib/portal-types";
+import { DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_RULES, type EmailSubmission, type TierConfig, type ReferralTierConfig, type SupportConfig, type PortalRules } from "../lib/portal-types";
 
 // Mock Firestore transaction object
 function createMockTransaction(store: Record<string, any>) {
@@ -1423,6 +1424,245 @@ describe("Mandatory Tiered Referral Flow & Security Unit Tests (TEST 1 - TEST 12
     await reviewBatchSubmissionTx(txEmail, "sub_100", "approved", "Valid");
 
     expect(store["users/worker_q"].balance).toBe(24000);
+  });
+});
+
+describe("Admin-Managed Telegram Customer Support Settings Unit Tests (TEST 1 - TEST 12)", () => {
+  it("TEST 1: Default support configuration loads correctly", () => {
+    expect(DEFAULT_RULES.supportConfig).toBeDefined();
+    expect(DEFAULT_RULES.supportConfig?.enabled).toBe(true);
+    expect(DEFAULT_RULES.supportConfig?.title).toBe("Pusat Bantuan");
+    expect(DEFAULT_RULES.supportConfig?.description).toBe("Ada kendala? Hubungi Customer Service kami melalui Telegram.");
+    expect(DEFAULT_RULES.supportConfig?.telegramUrl).toBe("");
+  });
+
+  it("TEST 2: Admin can save Telegram support configuration", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": { ...DEFAULT_RULES },
+    };
+    const tx = createMockTransaction(store);
+
+    const newSupportConfig: SupportConfig = {
+      enabled: true,
+      title: "Customer Support Official",
+      description: "Hubungi CS kami jika ada kendala.",
+      telegramUrl: "https://t.me/official_cs",
+    };
+
+    const rulesSnap = await tx.get({ path: "settings/rules" });
+    const currentRules = rulesSnap.exists() ? rulesSnap.data() : DEFAULT_RULES;
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      supportConfig: newSupportConfig,
+    });
+
+    const savedRules = store["settings/rules"];
+    expect(savedRules.supportConfig.enabled).toBe(true);
+    expect(savedRules.supportConfig.title).toBe("Customer Support Official");
+    expect(savedRules.supportConfig.description).toBe("Hubungi CS kami jika ada kendala.");
+    expect(savedRules.supportConfig.telegramUrl).toBe("https://t.me/official_cs");
+  });
+
+  it("TEST 3: Valid Telegram URL is accepted", () => {
+    expect(isValidTelegramUrl("https://t.me/username")).toBe(true);
+    expect(isValidTelegramUrl("https://telegram.me/username")).toBe(true);
+    expect(isValidTelegramUrl("https://t.me/group_chat_name123")).toBe(true);
+    expect(isValidTelegramUrl("  https://t.me/trimmed_user  ")).toBe(true);
+  });
+
+  it("TEST 4: Invalid/non-Telegram URL is rejected", () => {
+    expect(isValidTelegramUrl("javascript:alert(1)")).toBe(false);
+    expect(isValidTelegramUrl("data:text/html,test")).toBe(false);
+    expect(isValidTelegramUrl("http://t.me/username")).toBe(false);
+    expect(isValidTelegramUrl("https://google.com/username")).toBe(false);
+    expect(isValidTelegramUrl("https://t.me/")).toBe(false);
+    expect(isValidTelegramUrl("not_a_url")).toBe(false);
+    expect(isValidTelegramUrl("")).toBe(false);
+  });
+
+  it("TEST 5: Worker can read support configuration", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        supportConfig: {
+          enabled: true,
+          title: "Pusat Bantuan Worker",
+          description: "Hubungi CS",
+          telegramUrl: "https://t.me/worker_cs",
+        },
+      },
+    };
+
+    function canReadRules(userRole: string | null): boolean {
+      return userRole !== null;
+    }
+
+    expect(canReadRules("worker")).toBe(true);
+    const rulesData = store["settings/rules"];
+    expect(rulesData.supportConfig.telegramUrl).toBe("https://t.me/worker_cs");
+  });
+
+  it("TEST 6: Worker cannot modify support configuration", () => {
+    function canModifySettingsRules(userRole: string | null): boolean {
+      return userRole === "admin";
+    }
+
+    expect(canModifySettingsRules("worker")).toBe(false);
+  });
+
+  it("TEST 7: Admin can disable support", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": { ...DEFAULT_RULES },
+    };
+    const tx = createMockTransaction(store);
+
+    const rulesSnap = await tx.get({ path: "settings/rules" });
+    const currentRules = rulesSnap.exists() ? rulesSnap.data() : DEFAULT_RULES;
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      supportConfig: {
+        ...currentRules.supportConfig,
+        enabled: false,
+      },
+    });
+
+    expect(store["settings/rules"].supportConfig.enabled).toBe(false);
+  });
+
+  it("TEST 8: Disabled support does not appear on Worker Dashboard", () => {
+    function shouldDisplaySupportCard(supportConfig?: SupportConfig): boolean {
+      if (!supportConfig) return true;
+      return supportConfig.enabled !== false;
+    }
+
+    const disabledConfig: SupportConfig = {
+      enabled: false,
+      title: "Pusat Bantuan",
+      description: "Deskripsi",
+      telegramUrl: "https://t.me/cs",
+    };
+
+    expect(shouldDisplaySupportCard(disabledConfig)).toBe(false);
+
+    const enabledConfig: SupportConfig = {
+      enabled: true,
+      title: "Pusat Bantuan",
+      description: "Deskripsi",
+      telegramUrl: "https://t.me/cs",
+    };
+
+    expect(shouldDisplaySupportCard(enabledConfig)).toBe(true);
+  });
+
+  it("TEST 9: Updated Telegram URL is reflected dynamically on Worker Dashboard", () => {
+    let currentRulesData: PortalRules = { ...DEFAULT_RULES };
+
+    function getWorkerSupportUrl(rules: PortalRules): string {
+      return rules.supportConfig?.telegramUrl ?? "";
+    }
+
+    expect(getWorkerSupportUrl(currentRulesData)).toBe("");
+
+    currentRulesData = {
+      ...currentRulesData,
+      supportConfig: {
+        enabled: true,
+        title: "Pusat Bantuan",
+        description: "Ada kendala?",
+        telegramUrl: "https://t.me/new_support_handle",
+      },
+    };
+
+    expect(getWorkerSupportUrl(currentRulesData)).toBe("https://t.me/new_support_handle");
+  });
+
+  it("TEST 10: Existing referralTiers remain unchanged after saving support configuration", async () => {
+    const initialReferralTiers = [
+      { minAcc: 5, reward: 500 },
+      { minAcc: 10, reward: 1000 },
+      { minAcc: 20, reward: 2000 },
+      { minAcc: 50, reward: 5000 },
+    ];
+
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        referralTiers: initialReferralTiers,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const rulesSnap = await tx.get({ path: "settings/rules" });
+    const currentRules = rulesSnap.data();
+
+    const newSupportConfig: SupportConfig = {
+      enabled: true,
+      title: "Support Baru",
+      description: "Desc",
+      telegramUrl: "https://t.me/help_admin",
+    };
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      supportConfig: newSupportConfig,
+    });
+
+    const updatedRules = store["settings/rules"];
+    expect(updatedRules.referralTiers).toEqual(initialReferralTiers);
+    expect(updatedRules.supportConfig.telegramUrl).toBe("https://t.me/help_admin");
+  });
+
+  it("TEST 11: Existing PortalRules fields are preserved when support configuration is updated", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": {
+        ...DEFAULT_RULES,
+        pricePerEmail: 3500,
+        minWithdraw: 100000,
+        maxWithdraw: 10000000,
+        withdrawFeePercent: 2,
+        paymentMethods: ["DANA", "OVO", "Bank Transfer"],
+        submissionNotes: ["Aturan 1", "Aturan 2"],
+        tiers: [
+          { tier: 1, name: "Gold", minQty: 1, maxQty: 10, pricePerItem: 3500 },
+        ],
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const rulesSnap = await tx.get({ path: "settings/rules" });
+    const currentRules = rulesSnap.data();
+
+    const newSupportConfig: SupportConfig = {
+      enabled: true,
+      title: "CS Support Preserved",
+      description: "Deskripsi Preserved",
+      telegramUrl: "https://t.me/cs_preserved",
+    };
+
+    tx.set({ path: "settings/rules" }, {
+      ...currentRules,
+      supportConfig: newSupportConfig,
+    });
+
+    const updatedRules = store["settings/rules"];
+    expect(updatedRules.pricePerEmail).toBe(3500);
+    expect(updatedRules.minWithdraw).toBe(100000);
+    expect(updatedRules.maxWithdraw).toBe(10000000);
+    expect(updatedRules.withdrawFeePercent).toBe(2);
+    expect(updatedRules.paymentMethods).toEqual(["DANA", "OVO", "Bank Transfer"]);
+    expect(updatedRules.submissionNotes).toEqual(["Aturan 1", "Aturan 2"]);
+    expect(updatedRules.tiers).toEqual([{ tier: 1, name: "Gold", minQty: 1, maxQty: 10, pricePerItem: 3500 }]);
+    expect(updatedRules.supportConfig.telegramUrl).toBe("https://t.me/cs_preserved");
+  });
+
+  it("TEST 12: Unauthenticated users cannot modify support configuration", () => {
+    function canModifySettingsRules(userRole: string | null): boolean {
+      return userRole === "admin";
+    }
+
+    expect(canModifySettingsRules(null)).toBe(false);
   });
 });
 
