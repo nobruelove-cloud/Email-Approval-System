@@ -14,9 +14,6 @@ import {
   Loader2,
   Users,
   CheckCircle2,
-  ArrowRight,
-  UserPlus,
-  LogIn,
   Zap,
   Gift,
   HelpCircle,
@@ -29,6 +26,8 @@ import {
   Wallet,
   Send,
   ChevronRight,
+  UserPlus,
+  LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -235,27 +234,27 @@ export default function LoginPage() {
   const referralTiers = (rules.data?.referralTiers ?? DEFAULT_RULES.referralTiers) as ReferralTierConfig[];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-amber-950/20 to-slate-900 text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-900">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-amber-500/20 selection:text-amber-900">
       {/* 1. Header Navigation Bar */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-amber-500/10 transition-all">
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 border-b border-gray-200/80 shadow-xs transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <a href="#hero" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 fill-slate-950" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white font-black shadow-sm group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 fill-white" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-base text-slate-100 leading-none">Portal Worker</span>
-              <span className="text-[10px] text-amber-400 font-medium tracking-wider uppercase mt-0.5">Email Approval</span>
+              <span className="font-bold text-base text-gray-900 leading-none">Portal Worker</span>
+              <span className="text-[10px] text-amber-700 font-semibold tracking-wider uppercase mt-0.5">Email Approval</span>
             </div>
           </a>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#hero" className="hover:text-amber-400 transition-colors">Beranda</a>
-            <a href="#cara-kerja" className="hover:text-amber-400 transition-colors">Cara Kerja</a>
-            <a href="#keuntungan" className="hover:text-amber-400 transition-colors">Keuntungan</a>
-            <a href="#faq" className="hover:text-amber-400 transition-colors">FAQ</a>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+            <a href="#hero" className="hover:text-amber-700 transition-colors">Beranda</a>
+            <a href="#cara-kerja" className="hover:text-amber-700 transition-colors">Cara Kerja</a>
+            <a href="#keuntungan" className="hover:text-amber-700 transition-colors">Keuntungan</a>
+            <a href="#faq" className="hover:text-amber-700 transition-colors">FAQ</a>
           </nav>
 
           {/* Desktop Auth Buttons */}
@@ -263,13 +262,13 @@ export default function LoginPage() {
             <Button
               variant="ghost"
               onClick={() => scrollToAuth("login")}
-              className="text-slate-300 hover:text-amber-400 hover:bg-slate-800/60"
+              className="text-gray-700 hover:text-amber-700 hover:bg-gray-100"
             >
               Masuk
             </Button>
             <Button
               onClick={() => scrollToAuth("register")}
-              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-semibold shadow-md shadow-amber-500/20"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm"
             >
               Daftar Sekarang
             </Button>
@@ -280,13 +279,13 @@ export default function LoginPage() {
             <Button
               size="sm"
               onClick={() => scrollToAuth("register")}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-xs px-3 h-8"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-3 h-8"
             >
               Daftar
             </Button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-300 hover:bg-slate-800 focus:outline-none"
+              className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -296,46 +295,46 @@ export default function LoginPage() {
 
         {/* Mobile Nav Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-slate-900/95 border-b border-amber-500/10 px-4 pt-3 pb-5 space-y-3">
+          <div className="md:hidden bg-white border-b border-gray-200 px-4 pt-3 pb-5 space-y-3 shadow-md">
             <a
               href="#hero"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium"
+              className="block py-2 text-gray-700 hover:text-amber-700 font-medium"
             >
               Beranda
             </a>
             <a
               href="#cara-kerja"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium"
+              className="block py-2 text-gray-700 hover:text-amber-700 font-medium"
             >
               Cara Kerja
             </a>
             <a
               href="#keuntungan"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium"
+              className="block py-2 text-gray-700 hover:text-amber-700 font-medium"
             >
               Keuntungan
             </a>
             <a
               href="#faq"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium"
+              className="block py-2 text-gray-700 hover:text-amber-700 font-medium"
             >
               FAQ
             </a>
-            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+            <div className="pt-2 border-t border-gray-200 flex flex-col gap-2">
               <Button
                 variant="outline"
                 onClick={() => scrollToAuth("login")}
-                className="w-full justify-center border-slate-700 text-slate-200"
+                className="w-full justify-center border-gray-300 text-gray-700"
               >
                 Masuk ke Akun
               </Button>
               <Button
                 onClick={() => scrollToAuth("register")}
-                className="w-full justify-center bg-amber-500 text-slate-950 font-semibold"
+                className="w-full justify-center bg-amber-600 hover:bg-amber-700 text-white font-semibold"
               >
                 Daftar Akun Baru
               </Button>
@@ -352,18 +351,18 @@ export default function LoginPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold tracking-wide uppercase shadow-sm">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-xs font-semibold tracking-wide uppercase shadow-2xs">
+              <Zap className="w-3.5 h-3.5 text-amber-600" />
               <span>Platform Kerja Sampingan Terpercaya</span>
             </div>
 
             {/* Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
-              Mulai Dapatkan Penghasilan dari <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 bg-clip-text text-transparent">Rumah</span>
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900 leading-[1.15]">
+              Mulai Dapatkan Penghasilan dari <span className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 bg-clip-text text-transparent">Rumah</span>
             </h1>
 
             {/* Supporting Text */}
-            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
               Gabung sebagai worker, selesaikan pekerjaan yang tersedia, dan kelola saldo serta penghasilan Anda langsung melalui dashboard.
             </p>
 
@@ -372,7 +371,7 @@ export default function LoginPage() {
               <Button
                 size="lg"
                 onClick={() => scrollToAuth("register")}
-                className="w-full sm:w-auto bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-bold px-8 h-12 text-base rounded-xl shadow-lg shadow-amber-500/25 hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 h-12 text-base rounded-xl shadow-md shadow-amber-600/10 transition-all flex items-center justify-center gap-2"
               >
                 <UserPlus className="w-5 h-5" />
                 <span>Daftar sebagai Worker</span>
@@ -381,26 +380,26 @@ export default function LoginPage() {
                 size="lg"
                 variant="outline"
                 onClick={() => scrollToAuth("login")}
-                className="w-full sm:w-auto border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-200 hover:text-amber-400 px-7 h-12 text-base rounded-xl transition-all flex items-center justify-center gap-2"
+                className="w-full sm:w-auto border-gray-300 bg-white hover:bg-gray-50 text-gray-800 hover:text-amber-700 px-7 h-12 text-base rounded-xl transition-all flex items-center justify-center gap-2"
               >
-                <LogIn className="w-5 h-5 text-amber-400" />
+                <LogIn className="w-5 h-5 text-amber-600" />
                 <span>Sudah punya akun? Masuk</span>
               </Button>
             </div>
 
             {/* Feature Badges */}
-            <div className="pt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left border-t border-slate-800/80 max-w-2xl mx-auto">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-800">
-                <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
-                <span className="text-xs text-slate-300 font-medium">Registrasi Cepat & Akun Instan</span>
+            <div className="pt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left border-t border-gray-200/80 max-w-2xl mx-auto">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 shadow-2xs">
+                <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="text-xs text-gray-700 font-medium">Registrasi Cepat & Akun Instan</span>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-800">
-                <Wallet className="w-5 h-5 text-amber-400 shrink-0" />
-                <span className="text-xs text-slate-300 font-medium">Penarikan E-Wallet & Bank</span>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 shadow-2xs">
+                <Wallet className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="text-xs text-gray-700 font-medium">Penarikan E-Wallet & Bank</span>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-800">
-                <TrendingUp className="w-5 h-5 text-amber-400 shrink-0" />
-                <span className="text-xs text-slate-300 font-medium">Sistem Bonus & Tier Transparan</span>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 shadow-2xs">
+                <TrendingUp className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="text-xs text-gray-700 font-medium">Sistem Bonus & Tier Transparan</span>
               </div>
             </div>
           </div>
@@ -408,68 +407,68 @@ export default function LoginPage() {
       </section>
 
       {/* 3. Registration Guide Section */}
-      <section id="cara-kerja" className="py-16 bg-slate-950/60 border-y border-slate-800/60">
+      <section id="cara-kerja" className="py-16 bg-white border-y border-gray-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Mulai dalam 3 Langkah</h2>
-            <p className="text-slate-400 mt-2 text-sm sm:text-base">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Mulai dalam 3 Langkah</h2>
+            <p className="text-gray-500 mt-2 text-sm sm:text-base">
               Proses pendaftaran yang dirancang ringkas agar Anda bisa langsung mulai bekerja tanpa penundaan.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Step 01 */}
-            <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800 relative hover:border-amber-500/40 transition-all group">
+            <div className="bg-gray-50/80 rounded-2xl p-6 border border-gray-200 relative hover:border-amber-400/80 transition-all group shadow-2xs">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl font-black text-amber-400/80 font-mono">01</span>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                <span className="text-2xl font-black text-amber-600/80 font-mono">01</span>
+                <div className="p-2.5 rounded-xl bg-amber-100/60 text-amber-800 group-hover:scale-110 transition-transform">
                   <UserPlus className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Buat Akun</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Buat Akun</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
                 Daftarkan akun worker menggunakan data yang diperlukan.
               </p>
             </div>
 
             {/* Step 02 */}
-            <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800 relative hover:border-amber-500/40 transition-all group">
+            <div className="bg-gray-50/80 rounded-2xl p-6 border border-gray-200 relative hover:border-amber-400/80 transition-all group shadow-2xs">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl font-black text-amber-400/80 font-mono">02</span>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                <span className="text-2xl font-black text-amber-600/80 font-mono">02</span>
+                <div className="p-2.5 rounded-xl bg-amber-100/60 text-amber-800 group-hover:scale-110 transition-transform">
                   <LayoutDashboard className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Masuk ke Dashboard</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Masuk ke Dashboard</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
                 Setelah pendaftaran berhasil, akun worker dapat langsung digunakan.
               </p>
             </div>
 
             {/* Step 03 */}
-            <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800 relative hover:border-amber-500/40 transition-all group">
+            <div className="bg-gray-50/80 rounded-2xl p-6 border border-gray-200 relative hover:border-amber-400/80 transition-all group shadow-2xs">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl font-black text-amber-400/80 font-mono">03</span>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                <span className="text-2xl font-black text-amber-600/80 font-mono">03</span>
+                <div className="p-2.5 rounded-xl bg-amber-100/60 text-amber-800 group-hover:scale-110 transition-transform">
                   <Send className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Kerjakan Tugas</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Kerjakan Tugas</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
                 Gunakan dashboard untuk mengirim pekerjaan dan melihat statusnya.
               </p>
             </div>
 
             {/* Step 04 */}
-            <div className="bg-slate-900/80 rounded-2xl p-6 border border-slate-800 relative hover:border-amber-500/40 transition-all group">
+            <div className="bg-gray-50/80 rounded-2xl p-6 border border-gray-200 relative hover:border-amber-400/80 transition-all group shadow-2xs">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl font-black text-amber-400/80 font-mono">04</span>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                <span className="text-2xl font-black text-amber-600/80 font-mono">04</span>
+                <div className="p-2.5 rounded-xl bg-amber-100/60 text-amber-800 group-hover:scale-110 transition-transform">
                   <Wallet className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Kelola Penghasilan</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Kelola Penghasilan</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
                 Pantau saldo, referral, dan ajukan penarikan melalui dashboard.
               </p>
             </div>
@@ -480,27 +479,27 @@ export default function LoginPage() {
       {/* 4. Registration & Login Highlight Section */}
       <section className="py-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 rounded-3xl p-8 sm:p-10 border border-amber-500/20 shadow-2xl relative overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-amber-500/10 rounded-3xl p-8 sm:p-10 border border-amber-200/80 shadow-xs relative overflow-hidden">
             <div className="text-center max-w-xl mx-auto mb-8">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Sudah siap mulai?</h2>
-              <p className="text-slate-300 text-sm sm:text-base mt-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Sudah siap mulai?</h2>
+              <p className="text-gray-600 text-sm sm:text-base mt-2">
                 Pilih opsi di bawah ini untuk mengakses layanan platform.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Option 1: Daftar */}
-              <div className="bg-slate-950/70 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:border-amber-400/80 transition-all shadow-2xs">
                 <div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-4">
                     <UserPlus className="w-5 h-5" />
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-1">Daftar Akun Baru</h3>
-                  <p className="text-slate-400 text-sm mb-6">Belum punya akun? Buat akun worker baru.</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Daftar Akun Baru</h3>
+                  <p className="text-gray-500 text-sm mb-6">Belum punya akun? Buat akun worker baru.</p>
                 </div>
                 <Button
                   onClick={() => scrollToAuth("register")}
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold flex items-center justify-between"
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center justify-between"
                 >
                   <span>Daftar Akun Baru</span>
                   <ChevronRight className="w-4 h-4" />
@@ -508,18 +507,18 @@ export default function LoginPage() {
               </div>
 
               {/* Option 2: Masuk */}
-              <div className="bg-slate-950/70 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between hover:border-amber-500/50 transition-all">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col justify-between hover:border-amber-400/80 transition-all shadow-2xs">
                 <div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-4">
                     <LogIn className="w-5 h-5" />
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-1">Masuk ke Akun</h3>
-                  <p className="text-slate-400 text-sm mb-6">Sudah terdaftar? Langsung masuk ke dashboard Anda.</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Masuk ke Akun</h3>
+                  <p className="text-gray-500 text-sm mb-6">Sudah terdaftar? Langsung masuk ke dashboard Anda.</p>
                 </div>
                 <Button
                   variant="outline"
                   onClick={() => scrollToAuth("login")}
-                  className="w-full border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-200 hover:text-amber-400 font-bold flex items-center justify-between"
+                  className="w-full border-gray-300 bg-white hover:bg-gray-50 text-gray-800 hover:text-amber-700 font-bold flex items-center justify-between"
                 >
                   <span>Masuk ke Dashboard</span>
                   <ChevronRight className="w-4 h-4" />
@@ -531,53 +530,53 @@ export default function LoginPage() {
       </section>
 
       {/* 5. Explain What Happens After Registration */}
-      <section className="py-16 bg-slate-950/60 border-y border-slate-800/60">
+      <section className="py-16 bg-white border-y border-gray-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Apa yang terjadi setelah mendaftar?</h2>
-            <p className="text-slate-400 text-sm sm:text-base mt-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Apa yang terjadi setelah mendaftar?</h2>
+            <p className="text-gray-500 text-sm sm:text-base mt-2">
               Sistem kami terintegrasi secara langsung sehingga Anda tidak perlu menunggu lama untuk beraktivitas.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex gap-4 items-start">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 font-bold text-sm">
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 flex gap-4 items-start shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold text-sm">
                 1
               </div>
               <div>
-                <h4 className="font-semibold text-white text-sm">Akun berhasil dibuat</h4>
-                <p className="text-slate-400 text-xs mt-1">Data kredensial dan pendaftaran Anda tersimpan secara aman.</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Akun berhasil dibuat</h4>
+                <p className="text-gray-600 text-xs mt-1">Data kredensial dan pendaftaran Anda tersimpan secara aman.</p>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex gap-4 items-start">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 font-bold text-sm">
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 flex gap-4 items-start shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold text-sm">
                 2
               </div>
               <div>
-                <h4 className="font-semibold text-white text-sm">Profil worker dibuat otomatis</h4>
-                <p className="text-slate-400 text-xs mt-1">Profil akun worker, tier dasar, dan catatan saldo awal dikonfigurasi instan.</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Profil worker dibuat otomatis</h4>
+                <p className="text-gray-600 text-xs mt-1">Profil akun worker, tier dasar, dan catatan saldo awal dikonfigurasi instan.</p>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex gap-4 items-start">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 font-bold text-sm">
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 flex gap-4 items-start shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold text-sm">
                 3
               </div>
               <div>
-                <h4 className="font-semibold text-white text-sm">Worker langsung dapat mengakses dashboard</h4>
-                <p className="text-slate-400 text-xs mt-1">Akses langsung terbuka tanpa hambatan atau penundaan.</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Worker langsung dapat mengakses dashboard</h4>
+                <p className="text-gray-600 text-xs mt-1">Akses langsung terbuka tanpa hambatan atau penundaan.</p>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex gap-4 items-start">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 font-bold text-sm">
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 flex gap-4 items-start shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold text-sm">
                 4
               </div>
               <div>
-                <h4 className="font-semibold text-white text-sm">Worker dapat mulai menggunakan fitur yang tersedia</h4>
-                <p className="text-slate-400 text-xs mt-1">Mulai menyetor pekerjaan, memantau riwayat, dan membagikan link referral.</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Worker dapat mulai menggunakan fitur yang tersedia</h4>
+                <p className="text-gray-600 text-xs mt-1">Mulai menyetor pekerjaan, memantau riwayat, dan membagikan link referral.</p>
               </div>
             </div>
           </div>
@@ -587,20 +586,20 @@ export default function LoginPage() {
       {/* 6. Referral Explanation */}
       <section id="keuntungan" className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-8 sm:p-10 rounded-3xl border border-slate-800 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-8 sm:p-10 rounded-3xl border border-amber-200 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
                 <Gift className="w-3.5 h-3.5" />
                 <span>Program Kemitraan</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Bonus Referral</h2>
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Bonus Referral</h2>
+              <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
                 Undang worker baru melalui link referral Anda dan dapatkan bonus berdasarkan pencapaian ACC referral. Semakin banyak teman yang aktif dan mencapai target verifikasi email, semakin besar potensi komisi tambahan yang dapat Anda kumpulkan!
               </p>
               <div className="pt-2">
                 <Button
                   onClick={() => scrollToAuth("register")}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold"
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
                 >
                   Dapatkan Link Referral Anda
                 </Button>
@@ -608,24 +607,24 @@ export default function LoginPage() {
             </div>
 
             {/* Dynamic Referral Tiers Card */}
-            <div className="lg:col-span-5 bg-slate-900/90 rounded-2xl p-6 border border-slate-800">
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-400" />
+            <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
                 <span>Tingkat Reward Referral</span>
               </h3>
               <div className="space-y-3">
                 {referralTiers && referralTiers.length > 0 ? (
                   referralTiers.map((t, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-amber-50/50 border border-amber-200/80">
                       <div className="flex items-center gap-2.5">
-                        <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-medium text-slate-200">{t.minAcc} Email ACC Referral</span>
+                        <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                        <span className="text-xs font-medium text-gray-700">{t.minAcc} Email ACC Referral</span>
                       </div>
-                      <span className="text-xs font-bold text-amber-400">{formatMoney(t.reward)}</span>
+                      <span className="text-xs font-extrabold text-amber-700">{formatMoney(t.reward)}</span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-400">Reward referral dikalkulasikan sesuai aturan aktif sistem.</p>
+                  <p className="text-xs text-gray-500">Reward referral dikalkulasikan sesuai aturan aktif sistem.</p>
                 )}
               </div>
             </div>
@@ -634,59 +633,59 @@ export default function LoginPage() {
       </section>
 
       {/* 7. FAQ Section */}
-      <section id="faq" className="py-16 bg-slate-950/60 border-t border-slate-800/60">
+      <section id="faq" className="py-16 bg-white border-t border-gray-200/80">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold mb-3">
-              <HelpCircle className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold mb-3">
+              <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
               <span>Pusat Bantuan</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Pertanyaan Sering Diajukan</h2>
-            <p className="text-slate-400 text-sm mt-2">Segala hal yang perlu Anda ketahui sebelum dan sesudah mendaftar.</p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Pertanyaan Sering Diajukan</h2>
+            <p className="text-gray-500 text-sm mt-2">Segala hal yang perlu Anda ketahui sebelum dan sesudah mendaftar.</p>
           </div>
 
           <Accordion type="single" collapsible className="w-full space-y-4">
-            <AccordionItem value="item-1" className="bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-slate-200 hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+            <AccordionItem value="item-1" className="bg-gray-50/80 border border-gray-200 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-gray-900 hover:text-amber-700 font-semibold text-sm sm:text-base text-left">
                 Bagaimana cara membuat akun?
               </AccordionTrigger>
-              <AccordionContent className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              <AccordionContent className="text-gray-600 text-xs sm:text-sm leading-relaxed">
                 Isi formulir pendaftaran di bagian atas halaman ini dengan nama lengkap, email, dan kata sandi Anda. Proses pendaftaran selesai dalam hitungan detik.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-2" className="bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-slate-200 hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+            <AccordionItem value="item-2" className="bg-gray-50/80 border border-gray-200 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-gray-900 hover:text-amber-700 font-semibold text-sm sm:text-base text-left">
                 Apakah setelah daftar saya bisa langsung masuk?
               </AccordionTrigger>
-              <AccordionContent className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              <AccordionContent className="text-gray-600 text-xs sm:text-sm leading-relaxed">
                 Ya, pendaftaran langsung aktif secara otomatis dan memberikan Anda akses penuh ke dashboard worker tanpa hambatan.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-3" className="bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-slate-200 hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+            <AccordionItem value="item-3" className="bg-gray-50/80 border border-gray-200 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-gray-900 hover:text-amber-700 font-semibold text-sm sm:text-base text-left">
                 Bagaimana cara mengirim pekerjaan?
               </AccordionTrigger>
-              <AccordionContent className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              <AccordionContent className="text-gray-600 text-xs sm:text-sm leading-relaxed">
                 Setelah masuk ke dashboard worker, pilih menu Setor Email, lalu salin daftar email sesuai petunjuk format. Sistem akan menyimpan dan memverifikasi pekerjaan Anda.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4" className="bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-slate-200 hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+            <AccordionItem value="item-4" className="bg-gray-50/80 border border-gray-200 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-gray-900 hover:text-amber-700 font-semibold text-sm sm:text-base text-left">
                 Bagaimana sistem referral bekerja?
               </AccordionTrigger>
-              <AccordionContent className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              <AccordionContent className="text-gray-600 text-xs sm:text-sm leading-relaxed">
                 Bagikan link referral unik yang terdapat di dashboard Anda. Ketika teman mendaftar melalui link tersebut dan berhasil mencapai target email terverifikasi (ACC), Anda berhak mengklaim bonus referral.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-5" className="bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-slate-200 hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+            <AccordionItem value="item-5" className="bg-gray-50/80 border border-gray-200 rounded-2xl px-5 py-1">
+              <AccordionTrigger className="text-gray-900 hover:text-amber-700 font-semibold text-sm sm:text-base text-left">
                 Bagaimana cara melakukan penarikan saldo?
               </AccordionTrigger>
-              <AccordionContent className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              <AccordionContent className="text-gray-600 text-xs sm:text-sm leading-relaxed">
                 Buka tab Penarikan Saldo di dashboard Anda, masukkan jumlah nominal saldo yang ingin ditarik, lalu tentukan metode pembayaran yang diinginkan seperti E-Wallet (DANA, OVO, GoPay) atau Transfer Bank.
               </AccordionContent>
             </AccordionItem>
@@ -695,20 +694,20 @@ export default function LoginPage() {
       </section>
 
       {/* 8. Integrated Form Section */}
-      <section id="auth-section" ref={authSectionRef} className="py-20 bg-slate-900 scroll-mt-20">
+      <section id="auth-section" ref={authSectionRef} className="py-20 bg-gray-50 scroll-mt-20">
         <div className="max-w-md mx-auto px-4">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white">Akses Portal Worker</h2>
-            <p className="text-sm text-slate-400 mt-1">Masuk atau buat akun baru untuk mengelola pekerjaan Anda.</p>
+            <h2 className="text-2xl font-bold text-gray-900">Akses Portal Worker</h2>
+            <p className="text-sm text-gray-500 mt-1">Masuk atau buat akun baru untuk mengelola pekerjaan Anda.</p>
           </div>
 
           {!firebaseConfigured && (
-            <Card className="mb-4 border-red-900/50 bg-red-950/40 text-red-200">
+            <Card className="mb-4 border-amber-300 bg-amber-50 text-amber-900">
               <CardContent className="pt-6 flex gap-3 text-sm">
-                <ShieldAlert className="w-5 h-5 shrink-0 text-red-400" />
+                <ShieldAlert className="w-5 h-5 shrink-0 text-amber-600" />
                 <div>
-                  <p className="font-semibold text-red-300">Firebase belum dikonfigurasi</p>
-                  <p className="text-red-400/90 mt-1 text-xs">
+                  <p className="font-semibold text-amber-900">Firebase belum dikonfigurasi</p>
+                  <p className="text-amber-800 mt-1 text-xs">
                     Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
                   </p>
                 </div>
@@ -716,14 +715,14 @@ export default function LoginPage() {
             </Card>
           )}
 
-          <Card className="bg-slate-950 border-slate-800 shadow-2xl text-slate-100">
+          <Card className="bg-white border-gray-200 shadow-md text-gray-900">
             <CardHeader className="pb-4">
               <Tabs value={mode} onValueChange={(v) => setMode(v as "login" | "register")}>
-                <TabsList className="grid grid-cols-2 w-full bg-slate-900 border border-slate-800">
-                  <TabsTrigger value="login" className="data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-semibold text-xs sm:text-sm">
+                <TabsList className="grid grid-cols-2 w-full bg-gray-100 border border-gray-200">
+                  <TabsTrigger value="login" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white font-semibold text-xs sm:text-sm">
                     Masuk
                   </TabsTrigger>
-                  <TabsTrigger value="register" className="data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-semibold text-xs sm:text-sm">
+                  <TabsTrigger value="register" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white font-semibold text-xs sm:text-sm">
                     Daftar
                   </TabsTrigger>
                 </TabsList>
@@ -732,13 +731,13 @@ export default function LoginPage() {
             <CardContent>
               {mode === "login" ? (
                 <>
-                  <CardTitle className="text-lg mb-1 text-white">Masuk ke Akun</CardTitle>
-                  <CardDescription className="mb-4 text-slate-400 text-xs">Gunakan email dan kata sandi terdaftar.</CardDescription>
+                  <CardTitle className="text-lg mb-1 text-gray-900">Masuk ke Akun</CardTitle>
+                  <CardDescription className="mb-4 text-gray-500 text-xs">Gunakan email dan kata sandi terdaftar.</CardDescription>
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div>
-                      <Label htmlFor="login-email" className="text-slate-300 text-xs">Email</Label>
+                      <Label htmlFor="login-email" className="text-gray-700 text-xs">Email</Label>
                       <div className="relative mt-1.5">
-                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="login-email"
                           type="email"
@@ -747,14 +746,14 @@ export default function LoginPage() {
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           placeholder="nama@email.com"
-                          className="pl-9 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="login-password" className="text-slate-300 text-xs">Kata Sandi</Label>
+                      <Label htmlFor="login-password" className="text-gray-700 text-xs">Kata Sandi</Label>
                       <div className="relative mt-1.5">
-                        <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="login-password"
                           type="password"
@@ -763,7 +762,7 @@ export default function LoginPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="pl-9 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
@@ -772,12 +771,12 @@ export default function LoginPage() {
                         type="button"
                         disabled={resetBusy || busy || !firebaseConfigured}
                         onClick={handleForgotPassword}
-                        className="text-xs text-amber-400 hover:underline disabled:opacity-50"
+                        className="text-xs text-amber-700 hover:underline disabled:opacity-50 font-medium"
                       >
                         {resetBusy ? "Mengirim tautan reset..." : "Lupa kata sandi?"}
                       </button>
                     </div>
-                    <Button type="submit" disabled={busy || !firebaseConfigured} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold">
+                    <Button type="submit" disabled={busy || !firebaseConfigured} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold">
                       {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Masuk ke Dashboard
                     </Button>
@@ -785,15 +784,15 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <CardTitle className="text-lg mb-1 text-white">Buat Akun Baru</CardTitle>
-                  <CardDescription className="mb-4 text-slate-400 text-xs">
+                  <CardTitle className="text-lg mb-1 text-gray-900">Buat Akun Baru</CardTitle>
+                  <CardDescription className="mb-4 text-gray-500 text-xs">
                     Daftar akun worker baru untuk langsung menyetor email.
                   </CardDescription>
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div>
-                      <Label htmlFor="reg-name" className="text-slate-300 text-xs">Nama Lengkap</Label>
+                      <Label htmlFor="reg-name" className="text-gray-700 text-xs">Nama Lengkap</Label>
                       <div className="relative mt-1.5">
-                        <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="reg-name"
                           required
@@ -801,42 +800,42 @@ export default function LoginPage() {
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Nama Anda"
-                          className="pl-9 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="reg-phone" className="text-slate-300 text-xs">Nomor HP (opsional)</Label>
+                      <Label htmlFor="reg-phone" className="text-gray-700 text-xs">Nomor HP (opsional)</Label>
                       <div className="relative mt-1.5">
-                        <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="reg-phone"
                           disabled={!firebaseConfigured}
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="08xxxxxxxxxx"
-                          className="pl-9 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="reg-ref" className="text-slate-300 text-xs">Kode Referral (opsional)</Label>
+                      <Label htmlFor="reg-ref" className="text-gray-700 text-xs">Kode Referral (opsional)</Label>
                       <div className="relative mt-1.5">
-                        <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="reg-ref"
                           disabled={!firebaseConfigured}
                           value={refCode}
                           onChange={(e) => setRefCode(e.target.value)}
                           placeholder="Contoh: WORKER123"
-                          className="pl-9 font-mono text-xs bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 font-mono text-xs bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="reg-email" className="text-slate-300 text-xs">Email</Label>
+                      <Label htmlFor="reg-email" className="text-gray-700 text-xs">Email</Label>
                       <div className="relative mt-1.5">
-                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         <Input
                           id="reg-email"
                           type="email"
@@ -845,13 +844,13 @@ export default function LoginPage() {
                           value={regEmail}
                           onChange={(e) => setRegEmail(e.target.value)}
                           placeholder="nama@email.com"
-                          className="pl-9 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600"
+                          className="pl-9 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400"
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="reg-password" className="text-slate-300 text-xs">Kata Sandi</Label>
+                        <Label htmlFor="reg-password" className="text-gray-700 text-xs">Kata Sandi</Label>
                         <Input
                           id="reg-password"
                           type="password"
@@ -860,11 +859,11 @@ export default function LoginPage() {
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
                           placeholder="Min. 6 karakter"
-                          className="mt-1.5 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600 text-xs"
+                          className="mt-1.5 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400 text-xs"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="reg-confirm" className="text-slate-300 text-xs">Ulangi Sandi</Label>
+                        <Label htmlFor="reg-confirm" className="text-gray-700 text-xs">Ulangi Sandi</Label>
                         <Input
                           id="reg-confirm"
                           type="password"
@@ -873,11 +872,11 @@ export default function LoginPage() {
                           value={regConfirm}
                           onChange={(e) => setRegConfirm(e.target.value)}
                           placeholder="Ulangi kata sandi"
-                          className="mt-1.5 bg-slate-900 border-slate-800 text-slate-100 focus:border-amber-500 placeholder:text-slate-600 text-xs"
+                          className="mt-1.5 bg-white border-gray-200 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 placeholder:text-gray-400 text-xs"
                         />
                       </div>
                     </div>
-                    <Button type="submit" disabled={busy || !firebaseConfigured} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold">
+                    <Button type="submit" disabled={busy || !firebaseConfigured} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold">
                       {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Daftar Akun
                     </Button>
@@ -890,7 +889,7 @@ export default function LoginPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 bg-slate-950 border-t border-slate-900 text-center text-xs text-slate-500">
+      <footer className="py-8 bg-white border-t border-gray-200 text-center text-xs text-gray-500">
         <p>© {new Date().getFullYear()} Email Approval System. All rights reserved.</p>
       </footer>
     </div>
