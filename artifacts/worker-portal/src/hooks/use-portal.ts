@@ -335,15 +335,86 @@ export function useWorkerData(uid?: string) {
   const submissions = useCollection<EmailSubmission>(
     "emailSubmissions",
     uid ? [where("workerId", "==", uid)] : [],
-    !!uid,
+    !!uid && uid !== "worker_demo",
     { field: "submittedAt", direction: "desc" },
   );
   const withdrawals = useCollection<Withdrawal>(
     "withdrawals",
     uid ? [where("workerId", "==", uid)] : [],
-    !!uid,
+    !!uid && uid !== "worker_demo",
     { field: "requestedAt", direction: "desc" },
   );
+
+  if (uid === "worker_demo") {
+    return {
+      submissions: {
+        loading: false,
+        error: "",
+        data: [
+          {
+            id: "batch_123456",
+            workerId: "worker_demo",
+            workerName: "Ahmad Worker",
+            itemCount: 5,
+            approvedItemCount: 4,
+            rejectedItemCount: 1,
+            appliedTier: 1,
+            appliedPricePerItem: 2000,
+            totalAmount: 8000,
+            status: "approved",
+            submittedAt: { toMillis: () => Date.now() - 3600000 },
+            items: [
+              { email: "user1@example.com", status: "approved" },
+              { email: "user2@example.com", status: "approved" },
+              { email: "user3@example.com", status: "approved" },
+              { email: "user4@example.com", status: "approved" },
+              { email: "user5@example.com", status: "rejected" },
+            ],
+          },
+          {
+            id: "batch_123457",
+            workerId: "worker_demo",
+            workerName: "Ahmad Worker",
+            itemCount: 3,
+            appliedTier: 1,
+            currentPricePerItem: 2000,
+            status: "pending",
+            submittedAt: { toMillis: () => Date.now() - 7200000 },
+            items: [
+              { email: "test1@example.com", status: "pending" },
+              { email: "test2@example.com", status: "pending" },
+              { email: "test3@example.com", status: "pending" },
+            ],
+          },
+        ] as EmailSubmission[],
+      },
+      withdrawals: {
+        loading: false,
+        error: "",
+        data: [
+          {
+            id: "wd_987654",
+            workerId: "worker_demo",
+            amount: 50000,
+            method: "DANA",
+            account: "081234567890",
+            status: "success",
+            requestedAt: { toMillis: () => Date.now() - 86400000 },
+          },
+          {
+            id: "wd_987655",
+            workerId: "worker_demo",
+            amount: 25000,
+            method: "GoPay",
+            account: "081234567890",
+            status: "pending",
+            requestedAt: { toMillis: () => Date.now() - 43200000 },
+          },
+        ] as Withdrawal[],
+      },
+    };
+  }
+
   return { submissions, withdrawals };
 }
 
@@ -372,20 +443,43 @@ export function useWorkerEngagementData(uid?: string) {
   const referrals = useCollection<import("@/lib/portal-types").Referral>(
     "referrals",
     uid ? [where("referrerId", "==", uid)] : [],
-    !!uid,
+    !!uid && uid !== "worker_demo",
     { field: "createdAt", direction: "desc" },
   );
   const missionClaims = useCollection<import("@/lib/portal-types").MissionClaim>(
     "missionClaims",
     uid ? [where("workerId", "==", uid)] : [],
-    !!uid,
+    !!uid && uid !== "worker_demo",
   );
   const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>(
     "rewardLedger",
     uid ? [where("workerId", "==", uid)] : [],
-    !!uid,
+    !!uid && uid !== "worker_demo",
     { field: "createdAt", direction: "desc" },
   );
+
+  if (uid === "worker_demo") {
+    return {
+      referrals: { loading: false, error: "", data: [] },
+      missionClaims: { loading: false, error: "", data: [] },
+      rewardLedger: {
+        loading: false,
+        error: "",
+        data: [
+          {
+            id: "rw_111",
+            workerId: "worker_demo",
+            rewardType: "referral" as const,
+            amount: 5000,
+            sourceRefId: "ref_1",
+            description: "Hadiah Referral dari Budi",
+            createdAt: { toMillis: () => Date.now() - 172800000 },
+          },
+        ],
+      },
+    };
+  }
+
   return { referrals, missionClaims, rewardLedger };
 }
 

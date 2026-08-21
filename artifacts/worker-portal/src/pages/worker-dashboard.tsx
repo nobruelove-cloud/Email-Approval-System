@@ -115,6 +115,66 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     return { total, pending, qualified, earnings };
   }, [engagement.referrals.data, engagement.rewardLedger.data]);
 
+  // Unified Transaction History derived from existing withdrawals & reward ledger
+  const transactionHistory = useMemo(() => {
+    const list: Array<{
+      id: string;
+      date: unknown;
+      type: string;
+      description: string;
+      amount: number;
+      isCredit: boolean;
+      status: string;
+      note?: string;
+    }> = [];
+
+    // 1. Withdrawals
+    withdrawals.data.forEach((w) => {
+      list.push({
+        id: `wd-${w.id}`,
+        date: w.requestedAt,
+        type: "Penarikan Saldo",
+        description: `${w.method} · ${w.account}`,
+        amount: w.amount,
+        isCredit: false,
+        status: w.status,
+        note: w.note,
+      });
+    });
+
+    // 2. Reward Ledger Entries (Referral, Mission, Leaderboard)
+    engagement.rewardLedger.data.forEach((r) => {
+      const typeLabel =
+        r.rewardType === "referral"
+          ? "Bonus Referral"
+          : r.rewardType === "mission"
+          ? "Bonus Misi"
+          : "Bonus Klasemen";
+      list.push({
+        id: `rw-${r.id}`,
+        date: r.createdAt,
+        type: typeLabel,
+        description: r.description || typeLabel,
+        amount: r.amount,
+        isCredit: true,
+        status: "success",
+      });
+    });
+
+    // Sort descending by timestamp
+    return list.sort((a, b) => {
+      const at =
+        a.date && typeof a.date === "object" && "toMillis" in (a.date as any)
+          ? (a.date as any).toMillis()
+          : Number(a.date) || 0;
+      const bt =
+        b.date && typeof b.date === "object" && "toMillis" in (b.date as any)
+          ? (b.date as any).toMillis()
+          : Number(b.date) || 0;
+      return bt - at;
+    });
+  }, [withdrawals.data, engagement.rewardLedger.data]);
+
   // Active Tier configuration
   const currentTierConfig = useMemo(() => {
     return getTierConfig(profile.tier ?? 1, rules.data.tiers);
@@ -553,85 +613,180 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardContent>
             </Card>
 
-            {/* RIWAYAT SETORAN (GROUPED BY BATCH WITH PER-ITEM STATS) */}
-            <Card>
+            {/* 1. RIWAYAT STORAN EMAIL */}
+            <Card className="bg-white border-gray-200">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <History className="w-4 h-4 text-amber-600" />
-                  Riwayat Setoran Email
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                  <span>📧</span> Riwayat Storan Email
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  Daftar batch email yang telah Anda kirim beserta status persetujuannya.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {submissions.loading && <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>}
+              <CardContent>
+                {submissions.loading && (
+                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
+                )}
                 {!submissions.loading && submissions.data.length === 0 && (
                   <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
                 )}
-                {submissions.data.map((item) => {
-                  const baseItems = Array.isArray(item.items) && item.items.length > 0
-                    ? item.items
-                    : item.email
-                      ? [{ email: item.email, password: item.password, status: item.status === "available" || item.status === "approved" ? "approved" : item.status === "rejected" ? "rejected" : "pending" }]
-                      : [];
+                {!submissions.loading && submissions.data.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
+                          <th className="py-2.5 px-3 font-semibold">Tanggal & ID</th>
+                          <th className="py-2.5 px-3 font-semibold">Jumlah Email</th>
+                          <th className="py-2.5 px-3 font-semibold">Tier & Harga</th>
+                          <th className="py-2.5 px-3 font-semibold">Rincian Status</th>
+                          <th className="py-2.5 px-3 font-semibold">Total Saldo</th>
+                          <th className="py-2.5 px-3 font-semibold">Status</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {submissions.data.map((item) => {
+                          const baseItems =
+                            Array.isArray(item.items) && item.items.length > 0
+                              ? item.items
+                              : item.email
+                              ? [
+                                  {
+                                    email: item.email,
+                                    password: item.password,
+                                    status:
+                                      item.status === "available" || item.status === "approved"
+                                        ? "approved"
+                                        : item.status === "rejected"
+                                        ? "rejected"
+                                        : "pending",
+                                  },
+                                ]
+                              : [];
 
-                  const count = baseItems.length || getItemCountOfSubmission(item);
-                  const approvedCount = item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-                  const rejectedCount = item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-                  const pendingCount = count - approvedCount - rejectedCount;
+                          const count = baseItems.length || getItemCountOfSubmission(item);
+                          const approvedCount =
+                            item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+                          const rejectedCount =
+                            item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+                          const pendingCount = count - approvedCount - rejectedCount;
 
-                  const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
-                  const tierCfg = getTierConfig(tierNum, rules.data.tiers);
-                  const pricePerItem = item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-                  const earnedAmount = item.totalAmount ?? (approvedCount * pricePerItem);
+                          const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
+                          const tierCfg = getTierConfig(tierNum, rules.data.tiers);
+                          const pricePerItem =
+                            item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
+                          const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
 
-                  return (
-                    <Card key={item.id} className="border-gray-200">
-                      <CardContent className="pt-4 flex items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-gray-900">{count} Total Email</span>
-                            <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
-                              {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                            </Badge>
-                          </div>
+                          return (
+                            <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <p className="font-semibold text-gray-900">#{shortId(item.id)}</p>
+                                <p className="text-[11px] text-gray-400">{formatDateTime(item.submittedAt)}</p>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
+                                {count} Email
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
+                                  {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <div className="space-y-0.5 text-[11px]">
+                                  <p className="text-green-600 font-medium">ACC: {approvedCount}</p>
+                                  <p className="text-red-600 font-medium">Ditolak: {rejectedCount}</p>
+                                  {pendingCount > 0 && (
+                                    <p className="text-amber-600 font-medium">Menunggu: {pendingCount}</p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <p className="font-bold text-amber-700">{formatMoney(earnedAmount)}</p>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <StatusBadge status={item.status} />
+                                {item.reviewNote && (
+                                  <p className="text-[11px] text-gray-500 italic mt-1 max-w-[150px] truncate" title={item.reviewNote}>
+                                    Catatan: {item.reviewNote}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDetailSubmission(item)}
+                                  className="text-xs h-7 gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Lihat Email
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                          <div className="flex items-center gap-2 text-xs font-medium">
-                            <span className="text-green-600">Disetujui: {approvedCount}</span>
-                            <span className="text-gray-300">|</span>
-                            <span className="text-red-600">Ditolak: {rejectedCount}</span>
-                            {pendingCount > 0 && (
-                              <>
-                                <span className="text-gray-300">|</span>
-                                <span className="text-amber-600">Menunggu: {pendingCount}</span>
-                              </>
-                            )}
-                          </div>
-
-                          <p className="text-xs text-amber-700 font-bold">
-                            Total Saldo Didapat: {formatMoney(earnedAmount)}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
-                          </p>
-                          {item.reviewNote && (
-                            <p className="text-xs text-gray-500 italic">Catatan: {item.reviewNote}</p>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <StatusBadge status={item.status} />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setDetailSubmission(item)}
-                            className="text-xs h-7 gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> Lihat Email
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+            {/* 2. RIWAYAT TRANSAKSI */}
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                  <span>💰</span> Riwayat Transaksi
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Riwayat transaksi penarikan saldo dan penerimaan bonus reward.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(withdrawals.loading || engagement.rewardLedger.loading) && (
+                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
+                )}
+                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat transaksi.</p>
+                )}
+                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
+                          <th className="py-2.5 px-3 font-semibold">Tanggal</th>
+                          <th className="py-2.5 px-3 font-semibold">Jenis Transaksi</th>
+                          <th className="py-2.5 px-3 font-semibold">Keterangan</th>
+                          <th className="py-2.5 px-3 font-semibold">Nominal</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {transactionHistory.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="py-3 px-3 align-top whitespace-nowrap text-gray-500">
+                              {formatDateTime(tx.date)}
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
+                              {tx.type}
+                            </td>
+                            <td className="py-3 px-3 align-top">
+                              <p className="text-gray-800 font-medium">{tx.description}</p>
+                              {tx.note && <p className="text-[11px] text-gray-400 italic mt-0.5">Catatan: {tx.note}</p>}
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap font-bold">
+                              <span className={tx.isCredit ? "text-green-600" : "text-red-600"}>
+                                {tx.isCredit ? "+" : "-"} {formatMoney(tx.amount)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap text-right">
+                              <StatusBadge status={tx.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -857,36 +1012,62 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardContent>
             </Card>
 
-            {/* RIWAYAT PENARIKAN */}
-            <Card>
+            {/* RIWAYAT TRANSAKSI / PENARIKAN */}
+            <Card className="bg-white border-gray-200">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <History className="w-4 h-4 text-amber-600" />
-                  Riwayat Penarikan Saldo
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                  <span>💰</span> Riwayat Transaksi
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  Riwayat penarikan saldo dan penerimaan bonus reward Anda.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {withdrawals.loading && <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>}
-                {!withdrawals.loading && withdrawals.data.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada penarikan.</p>
+              <CardContent>
+                {(withdrawals.loading || engagement.rewardLedger.loading) && (
+                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
                 )}
-                {withdrawals.data.map((item) => (
-                  <Card key={item.id} className="border-gray-200">
-                    <CardContent className="pt-4 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-sm text-gray-900">{formatMoney(item.amount)}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {item.method} · {item.account}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
-                        </p>
-                        {item.note && <p className="text-xs text-gray-500 mt-1 italic">Catatan: {item.note}</p>}
-                      </div>
-                      <StatusBadge status={item.status} />
-                    </CardContent>
-                  </Card>
-                ))}
+                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat transaksi.</p>
+                )}
+                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
+                          <th className="py-2.5 px-3 font-semibold">Tanggal</th>
+                          <th className="py-2.5 px-3 font-semibold">Jenis Transaksi</th>
+                          <th className="py-2.5 px-3 font-semibold">Keterangan</th>
+                          <th className="py-2.5 px-3 font-semibold">Nominal</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {transactionHistory.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="py-3 px-3 align-top whitespace-nowrap text-gray-500">
+                              {formatDateTime(tx.date)}
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
+                              {tx.type}
+                            </td>
+                            <td className="py-3 px-3 align-top">
+                              <p className="text-gray-800 font-medium">{tx.description}</p>
+                              {tx.note && <p className="text-[11px] text-gray-400 italic mt-0.5">Catatan: {tx.note}</p>}
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap font-bold">
+                              <span className={tx.isCredit ? "text-green-600" : "text-red-600"}>
+                                {tx.isCredit ? "+" : "-"} {formatMoney(tx.amount)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-nowrap text-right">
+                              <StatusBadge status={tx.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -51,6 +51,18 @@ function PortalGate() {
     };
     return <AdminDashboard profile={mockAdminProfile} onLogout={() => {}} />;
   }
+  if (urlParams && urlParams.get("preview") === "worker") {
+    const mockWorkerProfile: import("@/lib/portal-types").PortalUser = {
+      uid: "worker_demo",
+      name: "Ahmad Worker",
+      email: "worker@example.com",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 125000,
+    };
+    return <WorkerDashboard profile={mockWorkerProfile} onLogout={() => {}} />;
+  }
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
