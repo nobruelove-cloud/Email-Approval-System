@@ -14,6 +14,7 @@ import {
   addDoc,
   deleteDoc,
   runTransaction,
+  Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
 import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
@@ -28,8 +29,10 @@ import {
   type UserStatus,
   type TierConfig,
   type ReferralTierConfig,
+  type FinancialTransaction,
+  type FinancialTransactionType,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, shortId } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId } from "@/lib/portal-utils";
 
 import { useRef } from "react";
 
@@ -1092,4 +1095,145 @@ export function useSettings<T>(name: string, initial: T) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
   return { data, setData, loading, error };
+}
+
+export async function addFinancialTransaction(payload: {
+  type: FinancialTransactionType;
+  amount: number;
+  description: string;
+  note?: string;
+  transactionDate: Date | string | number;
+}) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const amountNum = Number(payload.amount);
+  if (isNaN(amountNum) || amountNum <= 0) {
+    throw new Error("Jumlah harus berupa angka valid lebih besar dari 0.");
+  }
+  if (!payload.description || !payload.description.trim()) {
+    throw new Error("Keterangan transaksi wajib diisi.");
+  }
+
+  const txDate = payload.transactionDate
+    ? new Date(payload.transactionDate)
+    : new Date();
+
+  if (isNaN(txDate.getTime())) {
+    throw new Error("Tanggal transaksi tidak valid.");
+  }
+
+  const period = getMonthlyPeriodKey(txDate);
+
+  const newDocRef = doc(collection(db, "financialTransactions"));
+  const dataToSave: Record<string, unknown> = {
+    id: newDocRef.id,
+    type: payload.type,
+    amount: amountNum,
+    description: payload.description.trim(),
+    transactionDate: Timestamp.fromDate(txDate),
+    period,
+    createdAt: serverTimestamp(),
+    createdBy: auth?.currentUser?.uid ?? "admin",
+  };
+
+  if (payload.note && payload.note.trim()) {
+    dataToSave.note = payload.note.trim();
+  }
+
+  await setDoc(newDocRef, dataToSave);
+  return newDocRef.id;
+}
+
+export async function updateFinancialTransaction(
+  id: string,
+  payload: Partial<{
+    type: FinancialTransactionType;
+    amount: number;
+    description: string;
+    note?: string;
+    transactionDate: Date | string | number;
+  }>
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  if (!id) throw new Error("ID transaksi tidak valid.");
+
+  const updates: Record<string, unknown> = {};
+
+  if (payload.amount !== undefined) {
+    const amountNum = Number(payload.amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      throw new Error("Jumlah harus berupa angka valid lebih besar dari 0.");
+    }
+    updates.amount = amountNum;
+  }
+
+  if (payload.description !== undefined) {
+    if (!payload.description.trim()) {
+      throw new Error("Keterangan transaksi wajib diisi.");
+    }
+    updates.description = payload.description.trim();
+  }
+
+  if (payload.type !== undefined) {
+    updates.type = payload.type;
+  }
+
+  if (payload.note !== undefined) {
+    updates.note = payload.note.trim() || null;
+  }
+
+  if (payload.transactionDate !== undefined) {
+    const txDate = new Date(payload.transactionDate);
+    if (isNaN(txDate.getTime())) {
+      throw new Error("Tanggal transaksi tidak valid.");
+    }
+    updates.transactionDate = Timestamp.fromDate(txDate);
+    updates.period = getMonthlyPeriodKey(txDate);
+  }
+
+  updates.updatedAt = serverTimestamp();
+
+  await updateDoc(doc(db, "financialTransactions", id), updates);
+}
+
+export async function deleteFinancialTransaction(id: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  if (!id) throw new Error("ID transaksi tidak valid.");
+  return deleteDoc(doc(db, "financialTransactions", id));
+}
+
+export function useFinancialData(selectedPeriod?: string) {
+  const constraints: QueryConstraint[] = selectedPeriod
+    ? [where("period", "==", selectedPeriod)]
+    : [];
+
+  const { data, loading, error } = useCollection<FinancialTransaction>(
+    "financialTransactions",
+    constraints,
+    true,
+    { field: "transactionDate", direction: "desc" }
+  );
+
+  const summary = useMemo(() => {
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    data.forEach((tx) => {
+      const amt = Number(tx.amount) || 0;
+      if (tx.type === "income") {
+        totalIncome += amt;
+      } else if (tx.type === "expense") {
+        totalExpense += amt;
+      }
+    });
+
+    const netBalance = totalIncome - totalExpense;
+
+    return {
+      totalIncome,
+      totalExpense,
+      netBalance,
+    };
+  }, [data]);
+
+  return { transactions: data, summary, loading, error };
 }

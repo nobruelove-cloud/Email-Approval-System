@@ -125,6 +125,77 @@ export function validateTierConfigs(tiers: TierConfig[]): string | null {
 }
 
 /**
+ * Returns a YYYY-MM period key string based on transaction date.
+ */
+export function getMonthlyPeriodKey(inputDate?: Date | unknown): string {
+  if (!inputDate) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const date = inputDate instanceof Timestamp ? inputDate.toDate() : inputDate instanceof Date ? inputDate : new Date(inputDate as string | number);
+  if (Number.isNaN(date.getTime())) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+/**
+ * Formats a "YYYY-MM" string into Indonesian month and year (e.g., "2026-08" -> "Agustus 2026").
+ */
+export function formatMonthYear(periodKey: string): string {
+  if (!periodKey || typeof periodKey !== "string" || !/^\d{4}-\d{2}$/.test(periodKey.trim())) {
+    return periodKey || "Periode Tidak Valid";
+  }
+  const [yearStr, monthStr] = periodKey.trim().split("-");
+  const monthNum = parseInt(monthStr, 10);
+  const yearNum = parseInt(yearStr, 10);
+  if (isNaN(monthNum) || monthNum < 1 || monthNum > 12 || isNaN(yearNum)) {
+    return periodKey;
+  }
+  const dummyDate = new Date(yearNum, monthNum - 1, 1);
+  return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(dummyDate);
+}
+
+/**
+ * Returns sorted unique monthly period options for UI select dropdown.
+ * Generates options for recent past months (default 12 months), the current month, and the active selected month.
+ */
+export function getPeriodOptions(
+  transactions: { period: string }[] = [],
+  activePeriod?: string,
+  monthsCount = 12
+): { value: string; label: string }[] {
+  const periodSet = new Set<string>();
+
+  // Add current month and past N months
+  const now = new Date();
+  for (let i = 0; i < monthsCount; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    periodSet.add(getMonthlyPeriodKey(d));
+  }
+
+  if (activePeriod && /^\d{4}-\d{2}$/.test(activePeriod.trim())) {
+    periodSet.add(activePeriod.trim());
+  }
+
+  transactions.forEach((tx) => {
+    if (tx.period && typeof tx.period === "string" && /^\d{4}-\d{2}$/.test(tx.period.trim())) {
+      periodSet.add(tx.period.trim());
+    }
+  });
+
+  const sortedPeriods = Array.from(periodSet).sort((a, b) => b.localeCompare(a));
+
+  return sortedPeriods.map((period) => ({
+    value: period,
+    label: formatMonthYear(period),
+  }));
+}
+
+/**
  * Validates HH:mm time string format strictly (00:00 - 23:59).
  */
 export function validateTimeString(time: string): boolean {

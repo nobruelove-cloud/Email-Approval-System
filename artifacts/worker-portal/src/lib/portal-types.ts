@@ -93,6 +93,20 @@ export type RewardLedgerEntry = {
   createdAt?: unknown;
 };
 
+export type FinancialTransactionType = "income" | "expense";
+
+export type FinancialTransaction = {
+  id: string;
+  type: FinancialTransactionType;
+  amount: number;
+  description: string;
+  note?: string;
+  transactionDate: unknown;
+  period: string; // "YYYY-MM"
+  createdAt?: unknown;
+  createdBy?: string;
+};
+
 export type EmailItemStatus = "pending" | "approved" | "rejected";
 
 export type EmailBatchItem = {
