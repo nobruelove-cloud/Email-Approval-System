@@ -1,3 +1,19 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Dark Background with smooth rounded corners -->
+  <rect width="512" height="512" rx="96" fill="#0f0f11"/>
+
+  <!-- Outer Portal Ring (Amber / Orange) -->
+  <circle cx="256" cy="256" r="168" fill="none" stroke="#d97706" stroke-width="4" opacity="0.3"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#f59e0b" stroke-width="38" stroke-linecap="round"/>
+
+  <!-- Worker Silhouette (White) -->
+  <!-- Head -->
+  <circle cx="256" cy="180" r="44" fill="#ffffff"/>
+  <!-- Body/Torso -->
+  <path d="M 160 310 C 160 242, 352 242, 352 310 C 352 328, 160 328, 160 310 Z" fill="#ffffff"/>
+
+  <!-- Verification Badge with Checkmark (Bottom Right) -->
+  <circle cx="360" cy="360" r="72" fill="#0f0f11"/>
+  <circle cx="360" cy="360" r="62" fill="#f59e0b"/>
+  <path d="M 332 360 L 352 380 L 390 340" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
