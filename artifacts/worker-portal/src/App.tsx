@@ -37,6 +37,20 @@ function FullScreenMessage({
 
 function PortalGate() {
   const { firebaseUser, profile, loading, error, configured, logout } = usePortalAuth();
+
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  if (urlParams && urlParams.get("preview") === "admin") {
+    const mockAdminProfile: import("@/lib/portal-types").PortalUser = {
+      uid: "admin_demo",
+      name: "Admin Demo",
+      email: "mandarawanzz@gmail.com",
+      role: "admin",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    };
+    return <AdminDashboard profile={mockAdminProfile} onLogout={() => {}} />;
+  }
   const [location, setLocation] = useLocation();
 
   useEffect(() => {

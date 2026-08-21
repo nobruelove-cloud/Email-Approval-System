@@ -19,6 +19,13 @@ import {
   Gift,
   Target,
   Trophy,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  PlusCircle,
+  MinusCircle,
+  Edit3,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,6 +66,10 @@ import {
   useAdminData,
   useCollection,
   useSettings,
+  useFinancialData,
+  addFinancialTransaction,
+  updateFinancialTransaction,
+  deleteFinancialTransaction,
   reviewSubmission,
   updateEmailStockStatus,
   reviewWithdrawal,
@@ -72,8 +83,9 @@ import {
   distributeLeaderboardReward,
   reviewMissionClaim,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType } from "@/lib/portal-types";
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
   getItemCountOfSubmission,
@@ -88,6 +100,10 @@ import {
   validateOperatingHours,
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
+  getMonthlyPeriodKey,
+  getDailyPeriodKey,
+  formatMonthYear,
+  getPeriodOptions,
 } from "@/lib/portal-utils";
 
 function StatusBadge({ status }: { status: string }) {
@@ -119,6 +135,107 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // --- Keuangan / Financial Tracking state ---
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(() => getMonthlyPeriodKey(new Date()));
+  const { transactions: finTransactions, summary: finSummary, loading: finLoading, error: finError } = useFinancialData(selectedPeriod);
+
+  const periodOptions = useMemo(() => {
+    return getPeriodOptions(finTransactions, selectedPeriod);
+  }, [finTransactions, selectedPeriod]);
+
+  const [finModalOpen, setFinModalOpen] = useState(false);
+  const [editingFinTx, setEditingFinTx] = useState<FinancialTransaction | null>(null);
+  const [finType, setFinType] = useState<FinancialTransactionType>("income");
+  const [finDescription, setFinDescription] = useState("");
+  const [finAmount, setFinAmount] = useState<number>(0);
+  const [finDate, setFinDate] = useState<string>(() => getDailyPeriodKey(new Date()));
+  const [finNote, setFinNote] = useState("");
+  const [finSaving, setFinSaving] = useState(false);
+  const [deletingFinTxId, setDeletingFinTxId] = useState<string | null>(null);
+
+  function openAddFinModal(type: FinancialTransactionType) {
+    setEditingFinTx(null);
+    setFinType(type);
+    setFinDescription("");
+    setFinAmount(0);
+    setFinDate(getDailyPeriodKey(new Date()));
+    setFinNote("");
+    setFinModalOpen(true);
+  }
+
+  function openEditFinModal(tx: FinancialTransaction) {
+    setEditingFinTx(tx);
+    setFinType(tx.type);
+    setFinDescription(tx.description);
+    setFinAmount(tx.amount);
+    setFinDate(getDailyPeriodKey(tx.transactionDate));
+    setFinNote(tx.note ?? "");
+    setFinModalOpen(true);
+  }
+
+  async function handleSaveFinTransaction(e: React.FormEvent) {
+    e.preventDefault();
+    if (!finDescription.trim()) {
+      toast.error("Jenis/Keterangan transaksi wajib diisi.");
+      return;
+    }
+    if (isNaN(finAmount) || finAmount <= 0) {
+      toast.error("Jumlah transaksi harus berupa angka valid lebih besar dari 0.");
+      return;
+    }
+    if (!finDate || isNaN(new Date(finDate).getTime())) {
+      toast.error("Tanggal transaksi tidak valid.");
+      return;
+    }
+
+    setFinSaving(true);
+    try {
+      if (editingFinTx) {
+        await updateFinancialTransaction(editingFinTx.id, {
+          type: finType,
+          amount: finAmount,
+          description: finDescription,
+          note: finNote,
+          transactionDate: finDate,
+        });
+        toast.success("Transaksi keuangan berhasil diperbarui.");
+      } else {
+        await addFinancialTransaction({
+          type: finType,
+          amount: finAmount,
+          description: finDescription,
+          note: finNote,
+          transactionDate: finDate,
+        });
+        toast.success(`${finType === "income" ? "Pemasukan" : "Pengeluaran"} berhasil dicatat!`);
+      }
+
+      const targetPeriod = getMonthlyPeriodKey(finDate);
+      if (targetPeriod !== selectedPeriod) {
+        setSelectedPeriod(targetPeriod);
+      }
+
+      setFinModalOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan transaksi keuangan.");
+    } finally {
+      setFinSaving(false);
+    }
+  }
+
+  async function handleDeleteFinTransaction(id: string) {
+    setBusyId(id);
+    try {
+      await deleteFinancialTransaction(id);
+      toast.success("Transaksi keuangan berhasil dihapus.");
+      setDeletingFinTxId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus transaksi.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const pendingMissionClaims = useMemo(
     () => missionClaims.data.filter((c) => c.status === "pending"),
@@ -753,8 +870,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue="overview">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full mb-6">
+          <TabsList className="grid grid-cols-4 sm:grid-cols-7 w-full mb-6">
             <TabsTrigger value="overview">Ringkasan</TabsTrigger>
+            <TabsTrigger value="finance" className="gap-1 text-xs font-semibold">
+              <DollarSign className="w-3.5 h-3.5" /> Keuangan
+            </TabsTrigger>
             <TabsTrigger value="submissions" className="gap-1 text-xs">
               <FileText className="w-3.5 h-3.5" /> Batch & Stok
               {stats.pendingSubmissions > 0 && (
@@ -801,6 +921,300 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* TAB KEUANGAN ADMIN */}
+          <TabsContent value="finance" className="space-y-6">
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                      <DollarSign className="w-5 h-5 text-amber-600" /> Keuangan
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      Laporan pemasukan, pengeluaran, dan saldo bersih per periode bulanan ({formatMonthYear(selectedPeriod)}).
+                    </CardDescription>
+                  </div>
+
+                  {/* FILTER PERIODE BULAN */}
+                  <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 shrink-0">
+                    <Calendar className="w-4 h-4 text-gray-500 ml-1" />
+                    <Label className="text-xs font-semibold text-gray-700">Periode:</Label>
+                    <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                      <SelectTrigger className="h-8 w-44 text-xs font-bold bg-white border-gray-300">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periodOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* RINGKASAN SUMMARY CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-green-50/80 border border-green-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-green-800">Pemasukan</span>
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-xl font-black text-green-700">{formatMoney(finSummary.totalIncome)}</p>
+                    <p className="text-[11px] text-green-600/80">Periode {formatMonthYear(selectedPeriod)}</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-red-50/80 border border-red-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-red-800">Pengeluaran</span>
+                      <TrendingDown className="w-4 h-4 text-red-600" />
+                    </div>
+                    <p className="text-xl font-black text-red-700">{formatMoney(finSummary.totalExpense)}</p>
+                    <p className="text-[11px] text-red-600/80">Periode {formatMonthYear(selectedPeriod)}</p>
+                  </div>
+
+                  <div className={`p-4 rounded-xl border space-y-1 ${finSummary.netBalance >= 0 ? "bg-amber-50/80 border-amber-200/80 text-amber-900" : "bg-rose-50/80 border-rose-200/80 text-rose-900"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold">Saldo Bersih</span>
+                      <Wallet className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <p className={`text-xl font-black ${finSummary.netBalance >= 0 ? "text-amber-700" : "text-rose-700"}`}>
+                      {formatMoney(finSummary.netBalance)}
+                    </p>
+                    <p className="text-[11px] text-gray-500">Pemasukan - Pengeluaran</p>
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS: CATAT PEMASUKAN & PENGELUARAN */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                  <div className="text-sm font-bold text-gray-900">
+                    Riwayat Keuangan — {formatMonthYear(selectedPeriod)}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => openAddFinModal("income")}
+                      className="bg-green-600 hover:bg-green-700 text-white text-xs h-9 gap-1.5 shadow-sm"
+                    >
+                      <PlusCircle className="w-4 h-4" /> Catat Pemasukan
+                    </Button>
+                    <Button
+                      onClick={() => openAddFinModal("expense")}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 gap-1.5 shadow-sm"
+                    >
+                      <MinusCircle className="w-4 h-4" /> Catat Pengeluaran
+                    </Button>
+                  </div>
+                </div>
+
+                {/* DAFTAR TRANSAKSI KEUANGAN */}
+                {finLoading && <p className="text-sm text-gray-400 text-center py-8">Memuat laporan keuangan...</p>}
+                {finError && (
+                  <div className="p-6 bg-red-50 border border-red-200 text-red-700 text-xs text-center rounded-lg">
+                    Gagal memuat laporan keuangan. Silakan coba lagi.
+                  </div>
+                )}
+                {!finLoading && !finError && finTransactions.length === 0 && (
+                  <div className="p-10 border border-dashed border-gray-200 text-center rounded-xl bg-gray-50/50 space-y-1">
+                    <p className="text-sm font-semibold text-gray-600">Belum ada transaksi pada periode ini.</p>
+                    <p className="text-xs text-gray-400">Gunakan tombol di atas untuk mencatat pemasukan atau pengeluaran manual.</p>
+                  </div>
+                )}
+                {!finLoading && !finError && finTransactions.length > 0 && (
+                  <div className="space-y-3">
+                    {finTransactions.map((tx) => {
+                      const isIncome = tx.type === "income";
+                      return (
+                        <div
+                          key={tx.id}
+                          className="p-3.5 bg-white border border-gray-200 rounded-xl flex items-center justify-between gap-3 hover:border-gray-300 transition-colors shadow-2xs"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-gray-900 break-words">{tx.description}</span>
+                              <Badge
+                                variant="outline"
+                                className={`text-[11px] font-semibold ${
+                                  isIncome
+                                    ? "bg-green-50 text-green-800 border-green-300"
+                                    : "bg-red-50 text-red-800 border-red-300"
+                                }`}
+                              >
+                                {isIncome ? "Pemasukan" : "Pengeluaran"}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <span>Tanggal: {formatDate(tx.transactionDate)}</span>
+                              {tx.note && <span className="italic truncate max-w-xs">Catatan: {tx.note}</span>}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className={`text-base font-black ${isIncome ? "text-green-600" : "text-red-600"}`}>
+                              {isIncome ? "+" : "-"} {formatMoney(tx.amount)}
+                            </span>
+
+                            <div className="flex items-center gap-1 border-l border-gray-100 pl-2">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => openEditFinModal(tx)}
+                                className="h-8 w-8 text-gray-500 hover:text-amber-700 hover:bg-amber-50"
+                                title="Edit Transaksi"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </Button>
+
+                              <AlertDialog
+                                open={deletingFinTxId === tx.id}
+                                onOpenChange={(open) => setDeletingFinTxId(open ? tx.id : null)}
+                              >
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                    title="Hapus Transaksi"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Hapus Transaksi Keuangan?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Apakah Anda yakin ingin menghapus transaksi "{tx.description}" ({formatMoney(tx.amount)})?
+                                      Tindakan ini tidak dapat dibatalkan.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteFinTransaction(tx.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Hapus Transaksi
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* DIALOG TAMBAH / EDIT TRANSAKSI KEUANGAN */}
+            <Dialog open={finModalOpen} onOpenChange={setFinModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingFinTx ? "Edit Transaksi Keuangan" : finType === "income" ? "Catat Pemasukan" : "Catat Pengeluaran"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingFinTx ? "Perbarui detail transaksi keuangan." : "Masukkan detail transaksi keuangan untuk laporan bulanan."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={handleSaveFinTransaction} className="space-y-4 pt-2">
+                  <div>
+                    <Label className="text-xs">Tipe Transaksi</Label>
+                    <Select
+                      value={finType}
+                      onValueChange={(val: FinancialTransactionType) => setFinType(val)}
+                    >
+                      <SelectTrigger className="mt-1 h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="income" className="text-xs font-semibold text-green-700">
+                          Pemasukan (+)
+                        </SelectItem>
+                        <SelectItem value="expense" className="text-xs font-semibold text-red-700">
+                          Pengeluaran (-)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fin-desc" className="text-xs">Jenis / Keterangan Transaksi *</Label>
+                    <Input
+                      id="fin-desc"
+                      placeholder={finType === "income" ? "Contoh: Penjualan Storage Gmail" : "Contoh: Pembayaran Worker / Biaya Operasional"}
+                      value={finDescription}
+                      onChange={(e) => setFinDescription(e.target.value)}
+                      className="mt-1 h-9 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fin-amount" className="text-xs">Jumlah Nominal (Rp) *</Label>
+                    <FormattedNumberInput
+                      id="fin-amount"
+                      value={finAmount}
+                      onChange={(val) => setFinAmount(val)}
+                      placeholder="Contoh: 500.000"
+                      className="mt-1 h-9 text-xs font-bold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fin-date" className="text-xs">Tanggal Transaksi *</Label>
+                    <Input
+                      id="fin-date"
+                      type="date"
+                      value={finDate}
+                      onChange={(e) => setFinDate(e.target.value)}
+                      className="mt-1 h-9 text-xs font-mono"
+                      required
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Periode otomatis ditentukan berdasarkan tanggal ({getMonthlyPeriodKey(finDate)}).
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fin-note" className="text-xs">Catatan Tambahan (opsional)</Label>
+                    <Input
+                      id="fin-note"
+                      placeholder="Contoh: Pembayaran customer via DANA / Invoice #102"
+                      value={finNote}
+                      onChange={(e) => setFinNote(e.target.value)}
+                      className="mt-1 h-9 text-xs"
+                    />
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setFinModalOpen(false)}
+                      className="text-xs h-9"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={finSaving}
+                      className={`${finType === "income" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"} text-white text-xs h-9 gap-1.5`}
+                    >
+                      {finSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {editingFinTx ? "Simpan Perubahan" : "Simpan Transaksi"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* KELOLA BATCH SETORAN & STOK EMAIL */}

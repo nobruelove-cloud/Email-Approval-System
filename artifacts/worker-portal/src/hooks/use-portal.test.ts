@@ -13,7 +13,11 @@ import {
   validateTimeString,
   validateOperatingHours,
   getOperatingStatus,
+  getMonthlyPeriodKey,
+  formatMonthYear,
+  getPeriodOptions,
 } from "../lib/portal-utils";
+import { type FinancialTransaction } from "../lib/portal-types";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -2200,5 +2204,124 @@ describe("Race Condition & Lifecycle State Machine Regression Tests", () => {
     const profile = harness.getState().profile;
     expect(profile?.role).toBe("worker");
     expect(profile?.status).toBe("active");
+  });
+});
+
+describe("Admin Monthly Financial Tracking Unit Tests", () => {
+  it("getMonthlyPeriodKey derives YYYY-MM correctly from dates", () => {
+    const d1 = new Date(2026, 7, 21); // 21 August 2026
+    expect(getMonthlyPeriodKey(d1)).toBe("2026-08");
+
+    const d2 = new Date(2026, 8, 1); // 1 September 2026
+    expect(getMonthlyPeriodKey(d2)).toBe("2026-09");
+
+    const d3 = new Date(2026, 9, 10); // 10 October 2026
+    expect(getMonthlyPeriodKey(d3)).toBe("2026-10");
+  });
+
+  it("formatMonthYear formats YYYY-MM into Indonesian Month and Year", () => {
+    expect(formatMonthYear("2026-08")).toBe("Agustus 2026");
+    expect(formatMonthYear("2026-09")).toBe("September 2026");
+    expect(formatMonthYear("2026-10")).toBe("Oktober 2026");
+  });
+
+  it("getPeriodOptions builds sorted unique period list including current and active month", () => {
+    const transactions = [
+      { period: "2026-08" },
+      { period: "2026-09" },
+      { period: "2026-07" },
+    ];
+    const options = getPeriodOptions(transactions, "2026-10");
+    const values = options.map((o) => o.value);
+
+    expect(values).toContain("2026-08");
+    expect(values).toContain("2026-09");
+    expect(values).toContain("2026-07");
+    expect(values).toContain("2026-10");
+    // Sorted descending
+    expect(values[0] >= values[1]).toBe(true);
+  });
+
+  it("calculates summary correctly: Saldo Bersih = Total Pemasukan - Total Pengeluaran (Prompt Example)", () => {
+    const transactions: FinancialTransaction[] = [
+      {
+        id: "tx1",
+        type: "income",
+        amount: 5000000,
+        description: "Penjualan Storage Gmail",
+        transactionDate: "2026-08-21",
+        period: "2026-08",
+      },
+      {
+        id: "tx2",
+        type: "expense",
+        amount: 2000000,
+        description: "Pembayaran Worker",
+        transactionDate: "2026-08-21",
+        period: "2026-08",
+      },
+    ];
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    transactions.forEach((tx) => {
+      if (tx.type === "income") totalIncome += tx.amount;
+      if (tx.type === "expense") totalExpense += tx.amount;
+    });
+
+    const netBalance = totalIncome - totalExpense;
+
+    expect(totalIncome).toBe(5000000);
+    expect(totalExpense).toBe(2000000);
+    expect(netBalance).toBe(3000000);
+  });
+
+  it("filters transactions strictly by period (August vs September)", () => {
+    const allTransactions: FinancialTransaction[] = [
+      {
+        id: "tx_aug",
+        type: "income",
+        amount: 500000,
+        description: "Setoran Agustus",
+        transactionDate: "2026-08-21",
+        period: "2026-08",
+      },
+      {
+        id: "tx_sep",
+        type: "income",
+        amount: 1000000,
+        description: "Setoran September",
+        transactionDate: "2026-09-01",
+        period: "2026-09",
+      },
+    ];
+
+    const augTx = allTransactions.filter((tx) => tx.period === "2026-08");
+    const sepTx = allTransactions.filter((tx) => tx.period === "2026-09");
+
+    expect(augTx.length).toBe(1);
+    expect(augTx[0].amount).toBe(500000);
+
+    expect(sepTx.length).toBe(1);
+    expect(sepTx[0].amount).toBe(1000000);
+  });
+
+  it("validates manual transaction inputs (amount > 0 and description required)", () => {
+    function validateFinancialInput(description: string, amount: number) {
+      if (!description || !description.trim()) {
+        return "Keterangan wajib diisi.";
+      }
+      if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
+        return "Jumlah harus berupa angka valid lebih besar dari 0.";
+      }
+      return null;
+    }
+
+    expect(validateFinancialInput("", 500000)).toBe("Keterangan wajib diisi.");
+    expect(validateFinancialInput("Penjualan", 0)).toBe("Jumlah harus berupa angka valid lebih besar dari 0.");
+    expect(validateFinancialInput("Penjualan", -100)).toBe("Jumlah harus berupa angka valid lebih besar dari 0.");
+    expect(validateFinancialInput("Penjualan", NaN)).toBe("Jumlah harus berupa angka valid lebih besar dari 0.");
+    expect(validateFinancialInput("Penjualan Storage", 500000)).toBeNull();
   });
 });

@@ -257,6 +257,45 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST J: Worker financialTransactions access (read & write) fails ---');
+  const finTxId = 'fin_tx_123';
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'financialTransactions', finTxId), {
+        type: 'income',
+        amount: 500000,
+        description: 'Unauthorized Income',
+        period: '2026-08',
+      })
+    );
+    await assertFails(getDoc(doc(existingWorkerDb, 'financialTransactions', finTxId)));
+    console.log('[PASS] Worker access to financialTransactions correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker access to financialTransactions was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST K: Admin financialTransactions access (read & write) succeeds ---');
+  const adminDb = testEnv.authenticatedContext(adminUid).firestore();
+  try {
+    await assertSucceeds(
+      setDoc(doc(adminDb, 'financialTransactions', finTxId), {
+        id: finTxId,
+        type: 'income',
+        amount: 500000,
+        description: 'Penjualan Storage Gmail',
+        period: '2026-08',
+        transactionDate: new Date(),
+        createdAt: serverTimestamp(),
+      })
+    );
+    await assertSucceeds(getDoc(doc(adminDb, 'financialTransactions', finTxId)));
+    console.log('[PASS] Admin access to financialTransactions succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin access to financialTransactions failed:', err);
+    process.exitCode = 1;
+  }
+
 
   await testEnv.cleanup();
   console.log('\nAll regression tests completed.');
