@@ -434,61 +434,20 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-4 w-full mb-6">
-            <TabsTrigger value="profile" className="gap-1 text-xs">
-              <User className="w-3.5 h-3.5" /> Profil
+          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto p-1 mb-6">
+            <TabsTrigger value="submit" className="gap-1.5 text-xs py-2">
+              <Send className="w-3.5 h-3.5" /> STORAN EMAIL
             </TabsTrigger>
-            <TabsTrigger value="submit" className="gap-1 text-xs">
-              <Send className="w-3.5 h-3.5" /> Setor
+            <TabsTrigger value="withdraw" className="gap-1.5 text-xs py-2">
+              <Wallet className="w-3.5 h-3.5" /> PENARIKAN
             </TabsTrigger>
-            <TabsTrigger value="referral" className="gap-1 text-xs">
-              <Users className="w-3.5 h-3.5" /> Referral
+            <TabsTrigger value="referral" className="gap-1.5 text-xs py-2">
+              <Users className="w-3.5 h-3.5" /> REFERRAL
             </TabsTrigger>
-            <TabsTrigger value="withdraw" className="gap-1 text-xs">
-              <Wallet className="w-3.5 h-3.5" /> Tarik
+            <TabsTrigger value="history" className="gap-1.5 text-xs py-2">
+              <History className="w-3.5 h-3.5" /> RIWAYAT STORAN EMAIL
             </TabsTrigger>
           </TabsList>
-
-          {/* PROFIL SAYA */}
-          <TabsContent value="profile" className="space-y-4">
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="w-4 h-4 text-amber-600" />
-                  Profil Saya
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Informasi akun worker yang sedang terhubung.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-gray-400" /> Nama
-                    </p>
-                    <p className="text-sm font-bold text-gray-900">{displayName}</p>
-                  </div>
-
-                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-gray-400" /> Email
-                    </p>
-                    <p className="text-sm font-bold text-gray-900 break-all">{displayEmail}</p>
-                  </div>
-
-                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-gray-400" /> Nomor HP
-                    </p>
-                    <p className={`text-sm font-bold ${displayPhone === "Belum ditambahkan" || displayPhone === "-" ? "text-gray-400 font-normal italic" : "text-gray-900"}`}>
-                      {displayPhone}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">
@@ -610,124 +569,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     Kirim Batch ({emailList.length} Item)
                   </Button>
                 </form>
-              </CardContent>
-            </Card>
-
-            {/* RIWAYAT STORAN EMAIL */}
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                  <span>📧</span> Riwayat Storan Email
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Daftar batch email yang telah Anda kirim beserta status persetujuannya.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {submissions.loading && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!submissions.loading && submissions.data.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
-                )}
-                {!submissions.loading && submissions.data.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                          <th className="py-2.5 px-3 font-semibold">Tanggal & ID</th>
-                          <th className="py-2.5 px-3 font-semibold">Jumlah Email</th>
-                          <th className="py-2.5 px-3 font-semibold">Tier & Harga</th>
-                          <th className="py-2.5 px-3 font-semibold">Rincian Status</th>
-                          <th className="py-2.5 px-3 font-semibold">Total Saldo</th>
-                          <th className="py-2.5 px-3 font-semibold">Status</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {submissions.data.map((item) => {
-                          const baseItems =
-                            Array.isArray(item.items) && item.items.length > 0
-                              ? item.items
-                              : item.email
-                              ? [
-                                  {
-                                    email: item.email,
-                                    password: item.password,
-                                    status:
-                                      item.status === "available" || item.status === "approved"
-                                        ? "approved"
-                                        : item.status === "rejected"
-                                        ? "rejected"
-                                        : "pending",
-                                  },
-                                ]
-                              : [];
-
-                          const count = baseItems.length || getItemCountOfSubmission(item);
-                          const approvedCount =
-                            item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-                          const rejectedCount =
-                            item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-                          const pendingCount = count - approvedCount - rejectedCount;
-
-                          const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
-                          const tierCfg = getTierConfig(tierNum, rules.data.tiers);
-                          const pricePerItem =
-                            item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-                          const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
-
-                          return (
-                            <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-semibold text-gray-900">#{shortId(item.id)}</p>
-                                <p className="text-[11px] text-gray-400">{formatDateTime(item.submittedAt)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
-                                {count} Email
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
-                                  {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <div className="space-y-0.5 text-[11px]">
-                                  <p className="text-green-600 font-medium">ACC: {approvedCount}</p>
-                                  <p className="text-red-600 font-medium">Ditolak: {rejectedCount}</p>
-                                  {pendingCount > 0 && (
-                                    <p className="text-amber-600 font-medium">Menunggu: {pendingCount}</p>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-bold text-amber-700">{formatMoney(earnedAmount)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <StatusBadge status={item.status} />
-                                {item.reviewNote && (
-                                  <p className="text-[11px] text-gray-500 italic mt-1 max-w-[150px] truncate" title={item.reviewNote}>
-                                    Catatan: {item.reviewNote}
-                                  </p>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDetailSubmission(item)}
-                                  className="text-xs h-7 gap-1"
-                                >
-                                  <Eye className="w-3.5 h-3.5" /> Lihat Email
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1005,6 +846,126 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             </td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* RIWAYAT STORAN EMAIL (TAB BARU) */}
+          <TabsContent value="history" className="space-y-4">
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                  <span>📧</span> Riwayat Storan Email
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Daftar batch email yang telah Anda kirim beserta status persetujuannya.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {submissions.loading && (
+                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
+                )}
+                {!submissions.loading && submissions.data.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
+                )}
+                {!submissions.loading && submissions.data.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
+                          <th className="py-2.5 px-3 font-semibold">Tanggal & ID</th>
+                          <th className="py-2.5 px-3 font-semibold">Jumlah Email</th>
+                          <th className="py-2.5 px-3 font-semibold">Tier & Harga</th>
+                          <th className="py-2.5 px-3 font-semibold">Rincian Status</th>
+                          <th className="py-2.5 px-3 font-semibold">Total Saldo</th>
+                          <th className="py-2.5 px-3 font-semibold">Status</th>
+                          <th className="py-2.5 px-3 font-semibold text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {submissions.data.map((item) => {
+                          const baseItems =
+                            Array.isArray(item.items) && item.items.length > 0
+                              ? item.items
+                              : item.email
+                              ? [
+                                  {
+                                    email: item.email,
+                                    password: item.password,
+                                    status:
+                                      item.status === "available" || item.status === "approved"
+                                        ? "approved"
+                                        : item.status === "rejected"
+                                        ? "rejected"
+                                        : "pending",
+                                  },
+                                ]
+                              : [];
+
+                          const count = baseItems.length || getItemCountOfSubmission(item);
+                          const approvedCount =
+                            item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+                          const rejectedCount =
+                            item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+                          const pendingCount = count - approvedCount - rejectedCount;
+
+                          const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
+                          const tierCfg = getTierConfig(tierNum, rules.data.tiers);
+                          const pricePerItem =
+                            item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
+                          const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
+
+                          return (
+                            <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <p className="font-semibold text-gray-900">#{shortId(item.id)}</p>
+                                <p className="text-[11px] text-gray-400">{formatDateTime(item.submittedAt)}</p>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
+                                {count} Email
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
+                                  {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <div className="space-y-0.5 text-[11px]">
+                                  <p className="text-green-600 font-medium">ACC: {approvedCount}</p>
+                                  <p className="text-red-600 font-medium">Ditolak: {rejectedCount}</p>
+                                  {pendingCount > 0 && (
+                                    <p className="text-amber-600 font-medium">Menunggu: {pendingCount}</p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <p className="font-bold text-amber-700">{formatMoney(earnedAmount)}</p>
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap">
+                                <StatusBadge status={item.status} />
+                                {item.reviewNote && (
+                                  <p className="text-[11px] text-gray-500 italic mt-1 max-w-[150px] truncate" title={item.reviewNote}>
+                                    Catatan: {item.reviewNote}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 align-top whitespace-nowrap text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDetailSubmission(item)}
+                                  className="text-xs h-7 gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Lihat Email
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
