@@ -22,7 +22,8 @@ export default defineConfig(async ({ mode }) => {
     'VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID',
     'VITE_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET',
     'VITE_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID',
-    'VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID'
+    'VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID',
+    'VITE_FIRESTORE_DIAGNOSTICS'
   ];
 
   console.log('=== Vercel Build-time Environment Diagnostics ===');
@@ -77,6 +78,9 @@ export default defineConfig(async ({ mode }) => {
       ),
       'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
         mergedEnv.VITE_FIREBASE_APP_ID || mergedEnv.FIREBASE_APP_ID || '',
+      ),
+      'import.meta.env.VITE_FIRESTORE_DIAGNOSTICS': JSON.stringify(
+        mergedEnv.VITE_FIRESTORE_DIAGNOSTICS || 'false',
       ),
     },
     envPrefix: ['VITE_', 'FIREBASE_'],
