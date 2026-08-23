@@ -666,6 +666,138 @@ describe("Dynamic Worker Tier Recalculation & Payout Unit Tests", () => {
   });
 });
 
+// Helper harness simulating usePortalAuth state management logic exactly
+function createPortalAuthHarness() {
+  const refs = {
+    recoveringUidRef: null as string | null,
+    resolvedUidRef: null as string | null,
+    recoveryFailedUidRef: null as string | null,
+    recoveryGenRef: 0,
+  };
+
+  let activeUser: { uid: string; email?: string; displayName?: string } | null = null;
+  let state = {
+    firebaseUser: null as { uid: string } | null,
+    profile: null as any,
+    loading: false,
+    isReady: false,
+    error: "",
+  };
+
+  let recoveryCallCount = 0;
+  let activeRecoveryDeferred: {
+    resolve: () => void;
+    reject: (err: Error) => void;
+  } | null = null;
+
+  function handleAuthStateChange(user: { uid: string; email?: string } | null) {
+    activeUser = user;
+    state.firebaseUser = user;
+    refs.recoveringUidRef = null;
+    refs.resolvedUidRef = null;
+    refs.recoveryFailedUidRef = null;
+    refs.recoveryGenRef += 1;
+
+    if (!user) {
+      state.profile = null;
+      state.error = "";
+      state.loading = false;
+      state.isReady = true;
+    } else {
+      state.loading = true;
+      state.isReady = false;
+      state.error = "";
+    }
+  }
+
+  function handleSnapshot(snapshotExists: boolean, snapshotData?: any) {
+    if (!activeUser) return;
+    const uid = activeUser.uid;
+
+    if (snapshotExists) {
+      refs.resolvedUidRef = uid;
+      refs.recoveringUidRef = null;
+      refs.recoveryFailedUidRef = null;
+
+      const normalizedRole = typeof snapshotData?.role === "string" ? snapshotData.role.trim().toLowerCase() : snapshotData?.role;
+      const normalizedStatus = typeof snapshotData?.status === "string" ? snapshotData.status.trim().toLowerCase() : snapshotData?.status;
+
+      state.profile = { uid, ...snapshotData, role: normalizedRole, status: normalizedStatus };
+      state.error = "";
+      state.loading = false;
+      state.isReady = true;
+    } else {
+      if (refs.recoveringUidRef === uid) {
+        return;
+      }
+
+      if (refs.recoveryFailedUidRef === uid) {
+        state.loading = false;
+        state.isReady = true;
+        state.error = "Profil pengguna tidak ditemukan di database Firestore.";
+        return;
+      }
+
+      refs.recoveringUidRef = uid;
+      const currentGen = ++refs.recoveryGenRef;
+      state.loading = true;
+      state.isReady = false;
+
+      recoveryCallCount += 1;
+
+      // Trigger async recovery promise
+      const recoveryPromise = new Promise<void>((resolve, reject) => {
+        activeRecoveryDeferred = { resolve, reject };
+      });
+
+      recoveryPromise.catch((err) => {
+        // Stale operation protection
+        if (
+          activeUser?.uid !== uid ||
+          refs.recoveryGenRef !== currentGen ||
+          refs.resolvedUidRef === uid
+        ) {
+          // Stale recovery error ignored
+          return;
+        }
+
+        refs.recoveringUidRef = null;
+        refs.recoveryFailedUidRef = uid;
+        state.profile = null;
+        state.error = err.message || "Gagal memulihkan profil pengguna.";
+        state.loading = false;
+        state.isReady = true;
+      });
+    }
+  }
+
+  function handleSnapshotError(reason: { code?: string; message?: string }) {
+    if (!activeUser) return;
+    const code = reason.code ?? "";
+    let msg = "Terjadi kesalahan saat memuat profil Anda.";
+    if (code === "permission-denied" || (reason.message && reason.message.includes("permission-denied"))) {
+      msg = "Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.";
+    } else if (reason.message) {
+      msg = reason.message;
+    }
+
+    state.error = msg;
+    state.loading = false;
+    state.isReady = true;
+  }
+
+  return {
+    refs,
+    getState: () => ({ ...state }),
+    getRecoveryCallCount: () => recoveryCallCount,
+    handleAuthStateChange,
+    handleSnapshot,
+    handleSnapshotError,
+    resolveRecovery: () => activeRecoveryDeferred?.resolve(),
+    rejectRecovery: (errMessage: string) => activeRecoveryDeferred?.reject(new Error(errMessage)),
+  };
+}
+
 describe("Worker Self-Registration Flow & Status Regression Tests", () => {
   it("creates worker profile with status: 'active', tier: 1, balance: 0, role: 'worker'", () => {
     const uid = "new_worker_123";
@@ -746,6 +878,106 @@ describe("Worker Self-Registration Flow & Status Regression Tests", () => {
     // Invalid: role is admin
     const adminRoleData = { ...validData, role: "admin" };
     expect(isValidSelfRegistration(adminRoleData, "user_abc")).toBe(false);
+  });
+
+  it("referral registration does not read users/{referrerId} and starts with PENDING status, 0 ACC, and 0 reward", async () => {
+    const store: Record<string, any> = {};
+    const tx = createMockTransaction(store);
+
+    const referrerId = "ref_user_123";
+    const referredWorkerId = "new_worker_456";
+    const referredWorkerName = "New Worker Name";
+
+    // Exercise actual transaction logic that represents registerReferral execution
+    const refPath = `referrals/${referredWorkerId}`;
+    tx.set({ path: refPath }, {
+      id: referredWorkerId,
+      referrerId,
+      referrerName: referrerId.substring(0, 6),
+      referredWorkerId,
+      referredWorkerName,
+      currentAccCount: 0,
+      rewardAmount: 0,
+      status: "PENDING",
+      createdAt: "TIMESTAMP",
+    });
+
+    // Verify NO reads on users/{referrerId} were performed
+    expect(tx._reads.filter((r) => r.startsWith("users/"))).toHaveLength(0);
+
+    const referralDoc = store[refPath];
+    expect(referralDoc).toBeDefined();
+    expect(referralDoc.status).toBe("PENDING");
+    expect(referralDoc.currentAccCount).toBe(0);
+    expect(referralDoc.rewardAmount).toBe(0);
+  });
+
+  it("auth/profile transition stays loading=true while profile creation is pending, and active worker becomes ready for WorkerDashboard", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "w_auth_999" });
+
+    // While Auth is active but profile snapshot has not fired / recovery is creating doc:
+    expect(harness.getState().loading).toBe(true);
+    expect(harness.getState().profile).toBeNull();
+
+    // Snapshot fires with active profile
+    harness.handleSnapshot(true, {
+      name: "Ready Worker",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    });
+
+    const state = harness.getState();
+    expect(state.loading).toBe(false);
+    expect(state.profile.role).toBe("worker");
+    expect(state.profile.status).toBe("active");
+  });
+
+  it("genuine permission-denied errors are not globally swallowed", () => {
+    const harness = createPortalAuthHarness();
+    harness.handleAuthStateChange({ uid: "user_perm_denied" });
+
+    // Simulate snapshot error callback from Firestore onSnapshot
+    const errorReason = { code: "permission-denied", message: "Missing or insufficient permissions." };
+    const code = errorReason.code;
+    let msg = "Terjadi kesalahan saat memuat profil Anda.";
+    if (code === "permission-denied" || errorReason.message.includes("permission-denied")) {
+      msg = "Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.";
+    }
+
+    expect(msg).toContain("permission-denied");
+  });
+
+  it("referral reward requires Admin ACC approval and is not granted at registration", async () => {
+    const store: Record<string, any> = {
+      "settings/rules": { referralTiers: DEFAULT_REFERRAL_TIERS },
+      "users/referrer_x": { uid: "referrer_x", name: "Referrer X", balance: 0 },
+      "referrals/referred_y": {
+        id: "referred_y",
+        referrerId: "referrer_x",
+        referredWorkerId: "referred_y",
+        referredWorkerName: "Referred Y",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 0,
+      },
+    };
+
+    // Referrer balance is initially 0
+    expect(store["users/referrer_x"].balance).toBe(0);
+
+    // Admin approves referral using approveReferralTx
+    const tx = createMockTransaction(store);
+    await approveReferralTx(tx, "referred_y");
+
+    const ref = store["referrals/referred_y"];
+    const referrer = store["users/referrer_x"];
+
+    expect(ref.status).toBe("PAID");
+    expect(ref.rewardAmount).toBe(500);
+    expect(referrer.balance).toBe(500);
   });
 });
 

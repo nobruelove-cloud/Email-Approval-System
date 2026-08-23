@@ -40,6 +40,7 @@ export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
   const [loading, setLoading] = useState(firebaseConfigured);
+  const [isReady, setIsReady] = useState(!firebaseConfigured);
   const [error, setError] = useState("");
 
   const profileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +65,7 @@ export function usePortalAuth() {
   useEffect(() => {
     if (!auth || !db) {
       setLoading(false);
+      setIsReady(true);
       return;
     }
     const firestore = db;
@@ -89,10 +91,12 @@ export function usePortalAuth() {
         setProfile(null);
         setError("");
         setLoading(false);
+        setIsReady(true);
         return;
       }
 
       setLoading(true);
+      setIsReady(false);
       setError("");
 
       console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
@@ -103,6 +107,7 @@ export function usePortalAuth() {
         setLoading((prevLoading) => {
           if (prevLoading) {
             setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
+            setIsReady(true);
             return false;
           }
           return prevLoading;
@@ -129,6 +134,7 @@ export function usePortalAuth() {
             setProfile(null);
             setError("");
             setLoading(false);
+            setIsReady(false);
             return;
           }
 
@@ -152,6 +158,7 @@ export function usePortalAuth() {
             setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
+            setIsReady(true);
           } else {
             console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Initiating automatic profile recovery...`);
             if (recoveringUidRef.current === user.uid) {
@@ -163,12 +170,14 @@ export function usePortalAuth() {
               console.warn(`[PortalAuth] Auto-recovery previously failed for users/${user.uid}. Skipping repeated recovery attempt.`);
               setLoading(false);
               setError("Profil pengguna tidak ditemukan di database Firestore.");
+              setIsReady(true);
               return;
             }
 
             recoveringUidRef.current = user.uid;
             const currentGen = ++recoveryGenRef.current;
             setLoading(true);
+            setIsReady(false);
 
             const defaultName = user.displayName || (user.email ? user.email.split("@")[0] : "Worker");
             const defaultEmail = user.email || "";
@@ -200,6 +209,7 @@ export function usePortalAuth() {
               setProfile(null);
               setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
               setLoading(false);
+              setIsReady(true);
             });
           }
         },
@@ -213,6 +223,7 @@ export function usePortalAuth() {
             setProfile(null);
             setError("");
             setLoading(false);
+            setIsReady(false);
             return;
           }
 
@@ -225,6 +236,7 @@ export function usePortalAuth() {
 
           setError(msg);
           setLoading(false);
+          setIsReady(true);
         },
       );
 
@@ -244,6 +256,7 @@ export function usePortalAuth() {
   const logout = async () => {
     console.log("[PortalAuth] Initiating logout...");
     setLoading(true);
+    setIsReady(false);
     setError("");
 
     // Unsubscribe Firestore profile listener BEFORE signing out to avoid permission errors
@@ -264,6 +277,7 @@ export function usePortalAuth() {
       setProfile(null);
       setError("");
       setLoading(false);
+      setIsReady(true);
     }
   };
 
@@ -271,6 +285,7 @@ export function usePortalAuth() {
     firebaseUser,
     profile,
     loading,
+    isReady,
     error,
     configured: firebaseConfigured,
     logout,
@@ -808,31 +823,23 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   }
 
   const firestore = db;
-
-  // Validate referrer user existence in Firestore
-  const referrerRef = doc(firestore, "users", referrerId);
-  const referrerSnap = await getDoc(referrerRef);
-  if (!referrerSnap.exists()) {
-    console.warn("[registerReferral] Referrer user does not exist in database.");
-    return;
-  }
-
-  const referrerData = referrerSnap.data() as PortalUser;
-  const referrerName = referrerData.name || shortId(referrerId);
-
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
-  await setDoc(refDoc, {
-    id: referredWorkerId,
-    referrerId,
-    referrerName,
-    referredWorkerId,
-    referredWorkerName,
-    currentAccCount: 0,
-    rewardAmount: 0,
-    status: "PENDING",
-    createdAt: serverTimestamp(),
-  }, { merge: true });
+  await setDoc(
+    refDoc,
+    {
+      id: referredWorkerId,
+      referrerId,
+      referrerName: shortId(referrerId),
+      referredWorkerId,
+      referredWorkerName,
+      currentAccCount: 0,
+      rewardAmount: 0,
+      status: "PENDING",
+      createdAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 /**

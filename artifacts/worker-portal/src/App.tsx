@@ -36,7 +36,7 @@ function FullScreenMessage({
 }
 
 function PortalGate() {
-  const { firebaseUser, profile, loading, error, configured, logout } = usePortalAuth();
+  const { firebaseUser, profile, loading, isReady, error, configured, logout } = usePortalAuth();
 
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   if (urlParams && urlParams.get("preview") === "admin") {
@@ -83,7 +83,7 @@ function PortalGate() {
     return <LoginPage />;
   }
 
-  if (loading) {
+  if (loading || !isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
