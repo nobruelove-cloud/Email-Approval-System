@@ -797,7 +797,7 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
  * Registers a referral relationship upon worker registration.
  * Registration alone generates ZERO reward.
  * Self-referral is rejected.
- * Validates that referrer exists before creating false relationships.
+ * Uses referrerId as-is to avoid unauthorized cross-user profile reads under firestore.rules.
  */
 export async function registerReferral(referrerId: string, referredWorkerId: string, referredWorkerName: string) {
   if (!db) throw new Error("Firebase is not configured.");
@@ -808,18 +808,7 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   }
 
   const firestore = db;
-
-  // Validate referrer user existence in Firestore
-  const referrerRef = doc(firestore, "users", referrerId);
-  const referrerSnap = await getDoc(referrerRef);
-  if (!referrerSnap.exists()) {
-    console.warn("[registerReferral] Referrer user does not exist in database.");
-    return;
-  }
-
-  const referrerData = referrerSnap.data() as PortalUser;
-  const referrerName = referrerData.name || shortId(referrerId);
-
+  const referrerName = shortId(referrerId);
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
   await setDoc(refDoc, {
