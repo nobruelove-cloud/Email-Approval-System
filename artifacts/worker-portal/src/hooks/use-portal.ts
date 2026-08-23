@@ -65,6 +65,7 @@ export function usePortalAuth() {
   useEffect(() => {
     if (!auth || !db) {
       setLoading(false);
+      setIsReady(true);
       return;
     }
     const firestore = db;
@@ -116,11 +117,6 @@ export function usePortalAuth() {
       const unsubscribe = onSnapshot(
         doc(firestore, "users", user.uid),
         (snapshot) => {
-          if (profileTimerRef.current) {
-            clearTimeout(profileTimerRef.current);
-            profileTimerRef.current = null;
-          }
-
           console.log(
             `[PortalAuth] Profile snapshot fired for users/${user.uid}: exists=${snapshot.exists()}, authUID=${auth?.currentUser?.uid}`,
           );
@@ -138,10 +134,7 @@ export function usePortalAuth() {
           }
 
           if (snapshot.exists()) {
-            if (missingDocTimerRef.current) {
-              clearTimeout(missingDocTimerRef.current);
-              missingDocTimerRef.current = null;
-            }
+            clearAllTimers();
             resolvedUidRef.current = user.uid;
             recoveringUidRef.current = null;
             recoveryFailedUidRef.current = null;
@@ -160,21 +153,43 @@ export function usePortalAuth() {
             setIsReady(true);
           } else {
             console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Initiating automatic profile recovery...`);
-            if (recoveringUidRef.current === user.uid) {
-              console.log(`[PortalAuth] Auto-recovery already in progress for users/${user.uid}. Waiting for snapshot update.`);
-              return;
-            }
 
             if (recoveryFailedUidRef.current === user.uid) {
               console.warn(`[PortalAuth] Auto-recovery previously failed for users/${user.uid}. Skipping repeated recovery attempt.`);
+              clearAllTimers();
               setLoading(false);
               setIsReady(true);
               setError("Profil pengguna tidak ditemukan di database Firestore.");
               return;
             }
 
+            const currentGen = recoveryGenRef.current;
+
+            if (!missingDocTimerRef.current) {
+              missingDocTimerRef.current = setTimeout(() => {
+                console.warn(`[PortalAuth] Missing document timer reached (7s) for users/${user.uid}.`);
+                if (
+                  auth?.currentUser?.uid === user.uid &&
+                  recoveryGenRef.current === currentGen &&
+                  resolvedUidRef.current !== user.uid
+                ) {
+                  clearAllTimers();
+                  recoveringUidRef.current = null;
+                  recoveryFailedUidRef.current = user.uid;
+                  setProfile(null);
+                  setError("Profil pengguna tidak ditemukan di database Firestore.");
+                  setLoading(false);
+                  setIsReady(true);
+                }
+              }, 7000);
+            }
+
+            if (recoveringUidRef.current === user.uid) {
+              console.log(`[PortalAuth] Auto-recovery already in progress for users/${user.uid}. Waiting for snapshot update or timeout.`);
+              return;
+            }
+
             recoveringUidRef.current = user.uid;
-            const currentGen = ++recoveryGenRef.current;
             setLoading(true);
 
             const defaultName = user.displayName || (user.email ? user.email.split("@")[0] : "Worker");
@@ -202,6 +217,7 @@ export function usePortalAuth() {
                 return;
               }
 
+              clearAllTimers();
               recoveringUidRef.current = null;
               recoveryFailedUidRef.current = user.uid;
               setProfile(null);
@@ -253,6 +269,12 @@ export function usePortalAuth() {
 
   const logout = async () => {
     console.log("[PortalAuth] Initiating logout...");
+    clearAllTimers();
+    recoveringUidRef.current = null;
+    resolvedUidRef.current = null;
+    recoveryFailedUidRef.current = null;
+    recoveryGenRef.current += 1;
+
     setLoading(true);
     setError("");
 
