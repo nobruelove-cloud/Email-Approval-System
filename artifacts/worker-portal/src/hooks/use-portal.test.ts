@@ -402,6 +402,232 @@ describe("2. usePortalAuth Production Hook Real Regression Tests", () => {
       vi.useRealTimers();
     }
   });
+
+  it("PRODUCTION REGRESSION TEST: READY state is strictly maintained and NEVER regresses to LOADING on subsequent snapshot, timer, or re-render", () => {
+    vi.useFakeTimers();
+    try {
+      const { result, rerender } = renderHook(() => usePortalAuth());
+
+      act(() => {
+        const user = { uid: "stable_worker_1", email: "stable@test.com" };
+        mockAuthObj.currentUser = user as any;
+        authCallback?.(user);
+      });
+
+      // Step 1: Initial snapshot resolves profile
+      act(() => {
+        snapshotSuccessCb?.({
+          exists: () => true,
+          data: () => ({
+            name: "Stable Worker",
+            email: "stable@test.com",
+            role: "worker",
+            status: "active",
+            tier: 1,
+            balance: 10000,
+          }),
+        });
+      });
+
+      // Verify READY state
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.profile?.name).toBe("Stable Worker");
+
+      // Step 2: Component re-renders
+      rerender();
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+
+      // Step 3: Subsequent Firestore snapshot fires (e.g. balance update from background)
+      act(() => {
+        snapshotSuccessCb?.({
+          exists: () => true,
+          data: () => ({
+            name: "Stable Worker",
+            email: "stable@test.com",
+            role: "worker",
+            status: "active",
+            tier: 1,
+            balance: 20000,
+          }),
+        });
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.profile?.balance).toBe(20000);
+
+      // Step 4: Advance timers (10s fallback profileTimerRef, 7s missingDocTimerRef)
+      act(() => {
+        vi.advanceTimersByTime(15000);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.error).toBe("");
+
+      // Step 5: Unexpected missing document snapshot or error event firing on resolved session
+      act(() => {
+        snapshotSuccessCb?.({
+          exists: () => false,
+          data: () => undefined,
+        });
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.profile?.name).toBe("Stable Worker");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Scenario C: Firestore snapshot update (e.g. live balance update) updates state cleanly without toggling loading back to true", () => {
+    const { result } = renderHook(() => usePortalAuth());
+
+    act(() => {
+      const user = { uid: "live_worker", email: "live@test.com" };
+      mockAuthObj.currentUser = user as any;
+      authCallback?.(user);
+    });
+
+    act(() => {
+      snapshotSuccessCb?.({
+        exists: () => true,
+        data: () => ({
+          name: "Live Worker",
+          email: "live@test.com",
+          role: "worker",
+          status: "active",
+          tier: 1,
+          balance: 0,
+        }),
+      });
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+
+    // Live update occurs (e.g., admin approved email batch, balance changed to 5000)
+    act(() => {
+      snapshotSuccessCb?.({
+        exists: () => true,
+        data: () => ({
+          name: "Live Worker",
+          email: "live@test.com",
+          role: "worker",
+          status: "active",
+          tier: 2,
+          balance: 5000,
+        }),
+      });
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.profile?.balance).toBe(5000);
+    expect(result.current.profile?.tier).toBe(2);
+  });
+
+  it("Scenario D: Stale fallback timer after successful resolution cannot change READY back to LOADING or set error", () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => usePortalAuth());
+
+      act(() => {
+        const user = { uid: "fast_worker", email: "fast@test.com" };
+        mockAuthObj.currentUser = user as any;
+        authCallback?.(user);
+      });
+
+      // Snapshot resolves quickly (e.g. at 1s)
+      act(() => {
+        snapshotSuccessCb?.({
+          exists: () => true,
+          data: () => ({
+            name: "Fast Worker",
+            email: "fast@test.com",
+            role: "worker",
+            status: "active",
+            tier: 1,
+            balance: 1000,
+          }),
+        });
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+
+      // Fast forward past the 10-second timeout threshold
+      act(() => {
+        vi.advanceTimersByTime(12000);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.error).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Scenario F: UID change initializes independently and resets state for the new user", () => {
+    const { result } = renderHook(() => usePortalAuth());
+
+    // First user logs in
+    act(() => {
+      const user1 = { uid: "user_a", email: "usera@test.com" };
+      mockAuthObj.currentUser = user1 as any;
+      authCallback?.(user1);
+    });
+
+    act(() => {
+      snapshotSuccessCb?.({
+        exists: () => true,
+        data: () => ({
+          name: "User A",
+          email: "usera@test.com",
+          role: "worker",
+          status: "active",
+          tier: 1,
+          balance: 0,
+        }),
+      });
+    });
+
+    expect(result.current.profile?.name).toBe("User A");
+    expect(result.current.loading).toBe(false);
+
+    // Auth changes to a second user
+    act(() => {
+      const user2 = { uid: "user_b", email: "userb@test.com" };
+      mockAuthObj.currentUser = user2 as any;
+      authCallback?.(user2);
+    });
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.isReady).toBe(false);
+
+    act(() => {
+      snapshotSuccessCb?.({
+        exists: () => true,
+        data: () => ({
+          name: "User B",
+          email: "userb@test.com",
+          role: "admin",
+          status: "active",
+          tier: 1,
+          balance: 0,
+        }),
+      });
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.profile?.name).toBe("User B");
+    expect(result.current.profile?.role).toBe("admin");
+  });
 });
 
 describe("3. PortalGate Production Component Real Component Tests", () => {
