@@ -829,6 +829,7 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
     referredWorkerId,
     referredWorkerName,
     currentAccCount: 0,
+    rewardAmount: 0,
     status: "PENDING",
     createdAt: serverTimestamp(),
   }, { merge: true });

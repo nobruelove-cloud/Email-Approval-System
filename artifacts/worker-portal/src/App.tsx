@@ -121,9 +121,14 @@ function PortalGate() {
     );
   }
 
+  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
   const userStatus = typeof profile.status === "string" ? profile.status.trim().toLowerCase() : profile.status;
 
   if (userStatus === "pending") {
+    if (userRole === "worker") {
+      // Self-registered workers enter WorkerDashboard immediately without waiting for admin approval
+      return <WorkerDashboard profile={{ ...profile, status: "active" }} onLogout={() => logout()} />;
+    }
     return (
       <FullScreenMessage
         icon={<Clock className="w-8 h-8 text-amber-600" />}
@@ -156,8 +161,6 @@ function PortalGate() {
       />
     );
   }
-
-  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
 
   if (userRole === "admin") {
     return <AdminDashboard profile={profile} onLogout={() => logout()} />;
