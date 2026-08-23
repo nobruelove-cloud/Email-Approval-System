@@ -45,6 +45,7 @@ export function shortId(id: string) {
  * Returns item count for a submission (supports both batch items array and single legacy email submission)
  */
 export function getItemCountOfSubmission(sub: EmailSubmission): number {
+  if (!sub) return 0;
   if (typeof sub.itemCount === "number" && sub.itemCount > 0) {
     return sub.itemCount;
   }

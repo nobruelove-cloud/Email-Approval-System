@@ -36,8 +36,9 @@ service cloud.firestore {
       allow read: if isSelf(uid) || isAdmin();
 
       // Self-registration: a signed-in user may create ONLY their own
-      // profile, and only as an unprivileged worker — they
-      // cannot grant themselves admin, custom tier, or balance.
+      // profile, and only as an unprivileged active worker — they
+      // cannot grant themselves admin, custom tier, or initial balance.
+      // Workers get immediate active status upon self-registration.
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
