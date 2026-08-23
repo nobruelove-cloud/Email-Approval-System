@@ -969,12 +969,14 @@ describe("Self-Registration & Admin Creation Comprehensive Tests (1 - 12)", () =
       referrerId: "worker_referrer",
       referredWorkerId: "worker_new_ref",
       currentAccCount: 0,
+      rewardAmount: 0,
       status: "PENDING",
     };
 
     expect(newWorker.status).toBe("active");
     expect(referralRecord.status).toBe("PENDING");
     expect(referralRecord.currentAccCount).toBe(0);
+    expect(referralRecord.rewardAmount).toBe(0);
   });
 
   it("5. Self-referral is rejected", () => {

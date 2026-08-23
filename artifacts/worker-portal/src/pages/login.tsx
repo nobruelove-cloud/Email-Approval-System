@@ -173,16 +173,36 @@ export default function LoginPage() {
       console.log(`[Auth] Firebase Auth account created. UID: ${uid}, Path: users/${uid}. Creating Firestore profile...`);
 
       const cleanRef = refCode.trim();
-      await createPortalUser(uid, {
-        name: name.trim(),
-        email: regEmail.trim(),
-        phone: phone.trim() || undefined,
-        referredBy: cleanRef || undefined,
-        role: "worker",
-        status: "active",
-        tier: 1,
-        balance: 0,
-      });
+
+      try {
+        await createPortalUser(uid, {
+          name: name.trim(),
+          email: regEmail.trim(),
+          phone: phone.trim() || undefined,
+          referredBy: cleanRef || undefined,
+          role: "worker",
+          status: "active",
+          tier: 1,
+          balance: 0,
+        });
+      } catch (profileErr) {
+        console.error("[Auth] Profile creation failed after Auth account creation:", profileErr);
+        if (createdUserCredential?.user) {
+          console.warn(`[Auth] Attempting Auth cleanup for UID: ${uid}`);
+          try {
+            await createdUserCredential.user.delete();
+            console.log("[Auth] Orphaned Auth user deleted successfully.");
+          } catch (deleteErr) {
+            console.error("[Auth] Could not delete Auth user, signing out to prevent unprofiled session:", deleteErr);
+            try {
+              await auth.signOut();
+            } catch {
+              // ignore signout error
+            }
+          }
+        }
+        throw profileErr;
+      }
 
       if (cleanRef) {
         try {
@@ -193,25 +213,10 @@ export default function LoginPage() {
         }
       }
 
-      console.log(`[Auth] Firestore profile created successfully for UID: ${uid}`);
+      console.log(`[Auth] Active worker profile created successfully for UID: ${uid}`);
       toast.success("Pendaftaran berhasil! Akun Anda telah aktif.");
     } catch (err) {
       console.error("[Auth] Register error:", err);
-
-      if (createdUserCredential?.user) {
-        console.warn(`[Auth] Profile creation failed after Auth creation. Attempting cleanup for UID: ${createdUserCredential.user.uid}`);
-        try {
-          await createdUserCredential.user.delete();
-          console.log("[Auth] Orphaned Auth user deleted successfully.");
-        } catch (cleanupErr) {
-          console.error("[Auth] Failed to delete orphaned Auth user:", cleanupErr);
-          try {
-            await auth.signOut();
-          } catch {
-            // ignore signout error
-          }
-        }
-      }
 
       let code = (err as { code?: string }).code ?? "";
       if (!code && err instanceof Error) {

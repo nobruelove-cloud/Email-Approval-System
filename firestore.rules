@@ -119,7 +119,9 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.referredWorkerId == request.auth.uid &&
         request.resource.data.referrerId != request.auth.uid &&
-        request.resource.data.status == 'PENDING';
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.currentAccCount == 0 &&
+        request.resource.data.rewardAmount == 0;
       allow update, delete: if isAdmin();
     }
 
