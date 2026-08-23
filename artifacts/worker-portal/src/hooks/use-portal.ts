@@ -36,6 +36,83 @@ import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCo
 
 import { useRef } from "react";
 
+let globalResolvedUid: string | null = null;
+let globalDashboardMounted = false;
+
+export function markDashboardMounted(mounted: boolean) {
+  globalDashboardMounted = mounted;
+}
+
+export function isProfileResolvedGlobally(uid?: string | null): boolean {
+  if (!uid) return false;
+  return globalResolvedUid === uid;
+}
+
+export interface FirestoreDiagnosticPayload {
+  operation: "onSnapshot" | "getDoc" | "getDocs" | "setDoc" | "updateDoc" | "runTransaction" | string;
+  path: string;
+  collection?: string;
+  docId?: string;
+  queryConstraints?: string[];
+  hook: string;
+  code: string;
+  message: string;
+  uid?: string | null;
+  authState?: "authenticated" | "unauthenticated";
+  profileResolved?: boolean;
+  dashboardMounted?: boolean;
+}
+
+export function formatQueryConstraint(c: QueryConstraint | string): string {
+  if (typeof c === "string") return c;
+  const cAny = c as any;
+  if (cAny && typeof cAny === "object") {
+    if (cAny._field && cAny._op) {
+      const fieldPath = cAny._field?.segments ? cAny._field.segments.join(".") : cAny._field?.path || "field";
+      return `where("${fieldPath}", "${cAny._op}", ${JSON.stringify(cAny._value)})`;
+    }
+    if (cAny.type) {
+      return `${cAny.type}(...)`;
+    }
+  }
+  return String(c);
+}
+
+export function logFirestoreDiagnostic(payload: FirestoreDiagnosticPayload) {
+  const isEnabled = import.meta.env.VITE_FIRESTORE_DIAGNOSTICS === "true" || import.meta.env.DEV;
+  if (!isEnabled) {
+    return null;
+  }
+
+  const currentUid = payload.uid ?? auth?.currentUser?.uid ?? null;
+  const authState = payload.authState ?? (auth?.currentUser ? "authenticated" : "unauthenticated");
+  const profileResolved = payload.profileResolved ?? (currentUid ? globalResolvedUid === currentUid : false);
+  const dashboardMounted = payload.dashboardMounted ?? globalDashboardMounted;
+
+  const formattedConstraints = (payload.queryConstraints ?? []).map((c) =>
+    typeof c === "string" ? c : formatQueryConstraint(c as any)
+  );
+
+  const entry = {
+    timestamp: new Date().toISOString(),
+    uid: currentUid,
+    authState,
+    operation: payload.operation,
+    path: payload.path,
+    collection: payload.collection ?? payload.path.split("/")[0],
+    docId: payload.docId ?? (payload.path.includes("/") ? payload.path.split("/").slice(1).join("/") : undefined),
+    queryConstraints: formattedConstraints,
+    hook: payload.hook,
+    code: payload.code,
+    message: payload.message,
+    profileResolved,
+    dashboardMounted,
+  };
+
+  console.error("[FirestoreDiagnostic]", entry);
+  return entry;
+}
+
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
@@ -88,6 +165,7 @@ export function usePortalAuth() {
       recoveryGenRef.current += 1;
 
       if (!user) {
+        globalResolvedUid = null;
         setProfile(null);
         setError("");
         setLoading(false);
@@ -133,6 +211,7 @@ export function usePortalAuth() {
           if (snapshot.exists()) {
             clearAllTimers();
             resolvedUidRef.current = user.uid;
+            globalResolvedUid = user.uid;
             recoveringUidRef.current = null;
             recoveryFailedUidRef.current = null;
 
@@ -212,6 +291,7 @@ export function usePortalAuth() {
               .then(() => {
                 console.log(`[PortalAuth] Automatic profile recovery succeeded for users/${user.uid}.`);
                 resolvedUidRef.current = user.uid;
+                globalResolvedUid = user.uid;
                 recoveringUidRef.current = null;
                 recoveryFailedUidRef.current = null;
               })
@@ -243,7 +323,22 @@ export function usePortalAuth() {
         (reason) => {
           clearAllTimers();
 
-          const code = (reason as { code?: string })?.code ?? "";
+          const code = (reason as { code?: string })?.code ?? "unknown";
+          const message = reason instanceof Error ? reason.message : String(reason);
+
+          logFirestoreDiagnostic({
+            operation: "onSnapshot",
+            path: `users/${user.uid}`,
+            collection: "users",
+            docId: user.uid,
+            hook: "usePortalAuth",
+            code,
+            message,
+            uid: user.uid,
+            authState: "authenticated",
+            profileResolved: resolvedUidRef.current === user.uid,
+          });
+
           console.error(`[PortalAuth] Profile snapshot error for users/${user.uid} [code: ${code}]:`, reason);
 
           if (!auth?.currentUser || auth.currentUser.uid !== user.uid) {
@@ -293,6 +388,7 @@ export function usePortalAuth() {
     clearAllTimers();
     recoveringUidRef.current = null;
     resolvedUidRef.current = null;
+    globalResolvedUid = null;
     recoveryFailedUidRef.current = null;
     recoveryGenRef.current += 1;
 
@@ -337,6 +433,7 @@ export function useCollection<T>(
   constraints: QueryConstraint[] = [],
   enabled = true,
   sortBy?: { field: keyof T & string; direction?: "asc" | "desc" },
+  hookName = "useCollection",
 ) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(enabled && !!db);
@@ -372,6 +469,22 @@ export function useCollection<T>(
       },
       (reason) => {
         if (!isMounted) return;
+        const errCode = (reason as { code?: string })?.code ?? "unknown";
+        const errMsg = reason instanceof Error ? reason.message : String(reason);
+
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: collectionName,
+          collection: collectionName,
+          queryConstraints: constraints.map(formatQueryConstraint),
+          hook: hookName,
+          code: errCode,
+          message: errMsg,
+          uid: auth?.currentUser?.uid ?? null,
+          authState: auth?.currentUser ? "authenticated" : "unauthenticated",
+          profileResolved: auth?.currentUser?.uid ? globalResolvedUid === auth.currentUser.uid : false,
+        });
+
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca data ini.");
         setLoading(false);
       },
@@ -392,12 +505,14 @@ export function useWorkerData(uid?: string) {
     uid ? [where("workerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
     { field: "submittedAt", direction: "desc" },
+    "useWorkerData (emailSubmissions)",
   );
   const withdrawals = useCollection<Withdrawal>(
     "withdrawals",
     uid ? [where("workerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
     { field: "requestedAt", direction: "desc" },
+    "useWorkerData (withdrawals)",
   );
 
   if (uid === "worker_demo") {
@@ -476,23 +591,23 @@ export function useWorkerData(uid?: string) {
 }
 
 export function useAdminData() {
-  const users = useCollection<PortalUser>("users", [], true, { field: "createdAt", direction: "desc" });
+  const users = useCollection<PortalUser>("users", [], true, { field: "createdAt", direction: "desc" }, "useAdminData (users)");
   const submissions = useCollection<EmailSubmission>("emailSubmissions", [], true, {
     field: "submittedAt",
     direction: "desc",
-  });
+  }, "useAdminData (emailSubmissions)");
   const withdrawals = useCollection<Withdrawal>("withdrawals", [], true, {
     field: "requestedAt",
     direction: "desc",
-  });
+  }, "useAdminData (withdrawals)");
   const referrals = useCollection<import("@/lib/portal-types").Referral>("referrals", [], true, {
     field: "createdAt",
     direction: "desc",
-  });
+  }, "useAdminData (referrals)");
   const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>("rewardLedger", [], true, {
     field: "createdAt",
     direction: "desc",
-  });
+  }, "useAdminData (rewardLedger)");
   return { users, submissions, withdrawals, referrals, rewardLedger };
 }
 
@@ -502,17 +617,21 @@ export function useWorkerEngagementData(uid?: string) {
     uid ? [where("referrerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
     { field: "createdAt", direction: "desc" },
+    "useWorkerEngagementData (referrals)",
   );
   const missionClaims = useCollection<import("@/lib/portal-types").MissionClaim>(
     "missionClaims",
     uid ? [where("workerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
+    undefined,
+    "useWorkerEngagementData (missionClaims)",
   );
   const rewardLedger = useCollection<import("@/lib/portal-types").RewardLedgerEntry>(
     "rewardLedger",
     uid ? [where("workerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
     { field: "createdAt", direction: "desc" },
+    "useWorkerEngagementData (rewardLedger)",
   );
 
   if (uid === "worker_demo") {
@@ -1215,6 +1334,22 @@ export function useSettings<T>(name: string, initial: T) {
       },
       (reason) => {
         if (!isMounted) return;
+        const errCode = (reason as { code?: string })?.code ?? "unknown";
+        const errMsg = reason instanceof Error ? reason.message : String(reason);
+
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: `settings/${name}`,
+          collection: "settings",
+          docId: name,
+          hook: "useSettings",
+          code: errCode,
+          message: errMsg,
+          uid: auth?.currentUser?.uid ?? null,
+          authState: auth?.currentUser ? "authenticated" : "unauthenticated",
+          profileResolved: auth?.currentUser?.uid ? globalResolvedUid === auth.currentUser.uid : false,
+        });
+
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca pengaturan.");
         setLoading(false);
       },

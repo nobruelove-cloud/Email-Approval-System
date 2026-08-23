@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Send,
@@ -50,6 +50,7 @@ import {
   useSettings,
   createSubmission,
   createWithdrawal,
+  markDashboardMounted,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
 import {
@@ -85,6 +86,13 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export default function WorkerDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
+  useEffect(() => {
+    markDashboardMounted(true);
+    return () => {
+      markDashboardMounted(false);
+    };
+  }, []);
+
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
