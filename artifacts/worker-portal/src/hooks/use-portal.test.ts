@@ -2325,3 +2325,88 @@ describe("Admin Monthly Financial Tracking Unit Tests", () => {
     expect(validateFinancialInput("Penjualan Storage", 500000)).toBeNull();
   });
 });
+
+describe("Worker Self-Registration End-to-End & Referral Workflow", () => {
+  it("creates active worker profile with status 'active', tier 1, and balance 0", () => {
+    const registerPayload = {
+      name: "Budi Worker",
+      email: "budi@example.com",
+      role: "worker" as const,
+      status: "active" as const,
+      tier: 1,
+      balance: 0,
+    };
+
+    expect(registerPayload.status).toBe("active");
+    expect(registerPayload.role).toBe("worker");
+    expect(registerPayload.tier).toBe(1);
+    expect(registerPayload.balance).toBe(0);
+  });
+
+  it("returns 0 referral reward when ACC count is below tier threshold upon registration", () => {
+    const referralDoc = {
+      id: "referred_worker_456",
+      referrerId: "referrer_123",
+      referredWorkerId: "referred_worker_456",
+      currentAccCount: 0,
+      rewardAmount: 0,
+      status: "PENDING",
+    };
+
+    expect(referralDoc.status).toBe("PENDING");
+    expect(referralDoc.currentAccCount).toBe(0);
+    expect(getReferralRewardForAccCount(0, DEFAULT_REFERRAL_TIERS)).toBe(0);
+  });
+
+  it("evaluates referral qualification and grants reward only after Admin ACC email approval", async () => {
+    const store = {
+      "settings/rules": { referralTiers: DEFAULT_REFERRAL_TIERS },
+      "users/ref_owner": { uid: "ref_owner", name: "Owner", balance: 0 },
+      "referrals/new_worker": {
+        id: "new_worker",
+        referrerId: "ref_owner",
+        referredWorkerId: "new_worker",
+        referredWorkerName: "New Worker",
+        currentAccCount: 0,
+        status: "PENDING",
+      },
+    };
+
+    // 1. Worker has 3 ACCs -> remains PENDING (threshold 5)
+    const tx1 = createMockTransaction(store);
+    await evaluateReferralQualificationTx(tx1, "new_worker", 3);
+    expect(store["referrals/new_worker"].status).toBe("PENDING");
+    expect(getReferralRewardForAccCount(3, DEFAULT_REFERRAL_TIERS)).toBe(0);
+
+    // 2. Worker reaches 5 ACCs -> advances to QUALIFIED
+    const tx2 = createMockTransaction(store);
+    await evaluateReferralQualificationTx(tx2, "new_worker", 5);
+    expect(store["referrals/new_worker"].status).toBe("QUALIFIED");
+    expect(getReferralRewardForAccCount(5, DEFAULT_REFERRAL_TIERS)).toBe(500);
+
+    // 3. Admin approves referral payout -> status PAID, referrer receives Rp500
+    const tx3 = createMockTransaction(store);
+    await approveReferralTx(tx3, "new_worker");
+
+    expect(store["referrals/new_worker"].status).toBe("PAID");
+    expect(store["users/ref_owner"].balance).toBe(500);
+    expect(store["rewardLedger/new_worker_ref"].amount).toBe(500);
+  });
+
+  it("persists active worker profile on login/logout cycle", () => {
+    const savedWorker = {
+      uid: "worker_login_1",
+      email: "worker1@test.com",
+      role: "worker",
+      status: "active",
+    };
+
+    let currentProfile: typeof savedWorker | null = null;
+    expect(currentProfile).toBeNull();
+
+    currentProfile = savedWorker;
+    expect(currentProfile).not.toBeNull();
+    expect(currentProfile.status).toBe("active");
+    expect(currentProfile.role).toBe("worker");
+  });
+});

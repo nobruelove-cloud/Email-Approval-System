@@ -121,14 +121,15 @@ function PortalGate() {
     );
   }
 
+  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
   const userStatus = typeof profile.status === "string" ? profile.status.trim().toLowerCase() : profile.status;
 
-  if (userStatus === "pending") {
+  if (userRole !== "worker" && userStatus === "pending") {
     return (
       <FullScreenMessage
         icon={<Clock className="w-8 h-8 text-amber-600" />}
         title="Menunggu Persetujuan Admin"
-        description="Akun Anda sudah terdaftar dan sedang menunggu persetujuan admin. Silakan cek kembali nanti."
+        description="Akun Anda sedang menunggu persetujuan admin. Silakan cek kembali nanti."
         action={
           <Button variant="outline" onClick={() => logout()}>
             Keluar
@@ -156,8 +157,6 @@ function PortalGate() {
       />
     );
   }
-
-  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
 
   if (userRole === "admin") {
     return <AdminDashboard profile={profile} onLogout={() => logout()} />;

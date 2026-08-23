@@ -148,7 +148,10 @@ export function usePortalAuth() {
               status: data?.status,
             });
             const normalizedRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : data?.role;
-            const normalizedStatus = typeof data?.status === "string" ? data.status.trim().toLowerCase() : data?.status;
+            let normalizedStatus = typeof data?.status === "string" ? data.status.trim().toLowerCase() : data?.status;
+            if (normalizedRole === "worker" && (normalizedStatus === "pending" || normalizedStatus === "approved" || !normalizedStatus)) {
+              normalizedStatus = "active";
+            }
             setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
