@@ -130,11 +130,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
     // 1. Withdrawals
     withdrawals.data.forEach((w) => {
+      const holderName = w.accountHolderName ?? w.accountName ?? "Belum tersedia";
       list.push({
         id: `wd-${w.id}`,
         date: w.requestedAt,
         type: "Penarikan Saldo",
-        description: `${w.method} · ${w.account}`,
+        description: `${w.method} · ${w.account} (a.n. ${holderName})`,
         amount: w.amount,
         isCredit: false,
         status: w.status,
@@ -276,10 +277,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState(rules.data.paymentMethods[0] ?? "DANA");
   const [account, setAccount] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
   async function handleWithdraw(e: React.FormEvent) {
     e.preventDefault();
+    if (!account.trim()) {
+      toast.error("Nomor rekening / e-wallet wajib diisi.");
+      return;
+    }
+    if (!accountHolderName.trim()) {
+      toast.error("Atas Nama (nama pemilik rekening/wallet) wajib diisi.");
+      return;
+    }
     const value = amount;
     if (!value || value <= 0) {
       toast.error("Masukkan jumlah penarikan yang valid.");
@@ -297,17 +307,20 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       toast.error("Saldo Anda tidak mencukupi.");
       return;
     }
-    if (!account.trim()) {
-      toast.error("Nomor tujuan wajib diisi.");
-      return;
-    }
 
     setWithdrawing(true);
     try {
-      await createWithdrawal({ workerId: profile.uid, amount: value, method, account: account.trim() });
+      await createWithdrawal({
+        workerId: profile.uid,
+        amount: value,
+        method,
+        account: account.trim(),
+        accountHolderName: accountHolderName.trim(),
+      });
       toast.success("Permintaan penarikan berhasil dikirim!");
       setAmount(0);
       setAccount("");
+      setAccountHolderName("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim permintaan penarikan.");
     } finally {
@@ -746,17 +759,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <CardContent>
                 <form onSubmit={handleWithdraw} className="space-y-4">
                   <div>
-                    <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      id="amount"
-                      value={amount}
-                      onChange={(val) => setAmount(val)}
-                      placeholder="Contoh: 100.000"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
                     <Label>Metode Pembayaran</Label>
                     <Select value={method} onValueChange={setMethod}>
                       <SelectTrigger className="mt-1.5">
@@ -772,12 +774,34 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="account">Nomor Tujuan</Label>
+                    <Label htmlFor="account">Nomor Rekening / Nomor E-Wallet</Label>
                     <Input
                       id="account"
                       value={account}
                       onChange={(e) => setAccount(e.target.value)}
                       placeholder={`Nomor HP ${method} / Rekening`}
+                      className="mt-1.5"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="accountHolderName">Atas Nama</Label>
+                    <Input
+                      id="accountHolderName"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      placeholder="Masukkan nama pemilik rekening/wallet"
+                      className="mt-1.5"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
+                    <FormattedNumberInput
+                      id="amount"
+                      value={amount}
+                      onChange={(val) => setAmount(val)}
+                      placeholder="Contoh: 100.000"
                       className="mt-1.5"
                       required
                     />

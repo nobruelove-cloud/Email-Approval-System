@@ -1350,21 +1350,26 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             {!withdrawals.loading && withdrawals.data.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">Belum ada penarikan.</p>
             )}
-            {withdrawals.data.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="font-medium text-sm text-gray-900">{formatMoney(item.amount)}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {workerName(item.workerId)} · {item.method} · {item.account}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
-                      </p>
+            {withdrawals.data.map((item) => {
+              const holderName = item.accountHolderName ?? item.accountName ?? "Belum tersedia";
+              return (
+                <Card key={item.id}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <p className="font-bold text-base text-gray-900">{item.method}</p>
+                        <div className="text-xs text-gray-600 mt-1 space-y-0.5">
+                          <p>Pekerja: <strong className="text-gray-900">{workerName(item.workerId)}</strong></p>
+                          <p>No. Rekening / Wallet: <strong className="text-gray-900">{item.account}</strong></p>
+                          <p>Atas Nama: <strong className="text-gray-900">{holderName}</strong></p>
+                          <p>Jumlah: <strong className="text-amber-700 font-bold">{formatMoney(item.amount)}</strong></p>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
+                        </p>
+                      </div>
+                      <StatusBadge status={item.status} />
                     </div>
-                    <StatusBadge status={item.status} />
-                  </div>
                   {(item.status === "pending" || item.status === "processing") && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       <Input
@@ -1408,7 +1413,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   {item.note && <p className="text-xs text-gray-500 mt-2 italic">Catatan: {item.note}</p>}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </TabsContent>
 
           {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
