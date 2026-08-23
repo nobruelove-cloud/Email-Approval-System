@@ -359,6 +359,51 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST P: Worker querying emailSubmissions where workerId == self succeeds ---');
+  const { getDocs, query, collection, where } = await import('firebase/firestore');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'emailSubmissions'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query emailSubmissions for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query emailSubmissions for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST Q: Worker querying withdrawals where workerId == self succeeds ---');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'withdrawals'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query withdrawals for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query withdrawals for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST R: Worker querying referrals where referrerId == self succeeds ---');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'referrals'), where('referrerId', '==', newWorkerUid))));
+    console.log('[PASS] Query referrals for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query referrals for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST S: Worker querying missionClaims where workerId == self succeeds ---');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'missionClaims'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query missionClaims for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query missionClaims for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST T: Worker querying rewardLedger where workerId == self succeeds ---');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'rewardLedger'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query rewardLedger for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query rewardLedger for self failed:', err);
+    process.exitCode = 1;
+  }
 
   await testEnv.cleanup();
   console.log('\nAll regression tests completed.');

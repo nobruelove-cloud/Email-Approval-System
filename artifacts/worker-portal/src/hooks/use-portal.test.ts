@@ -1247,4 +1247,106 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     );
     expect(mockSetDoc.mock.calls[0][2]).toBeUndefined();
   });
+
+  it("Test G — 60-Second Dashboard Lifecycle Stability: Existing Worker stays mounted and ready for 60+ seconds", () => {
+    vi.useFakeTimers();
+    try {
+      mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+        const user = { uid: "existing_worker_60s", email: "existing60s@test.com" };
+        mockAuthObj.currentUser = user as any;
+        cb(user);
+        return () => {};
+      });
+
+      mockOnSnapshot.mockImplementation((refObj: any, successCb: any) => {
+        if (refObj?.path === "users/existing_worker_60s") {
+          successCb({
+            exists: () => true,
+            data: () => ({
+              uid: "existing_worker_60s",
+              name: "Long Living Worker",
+              email: "existing60s@test.com",
+              role: "worker",
+              status: "active",
+              tier: 1,
+              balance: 15000,
+            }),
+          });
+        } else if (refObj?.path?.startsWith("settings/")) {
+          successCb({
+            exists: () => true,
+            data: () => DEFAULT_RULES,
+          });
+        } else {
+          successCb({ docs: [] });
+        }
+        return () => {};
+      });
+
+      render(React.createElement(PortalGate));
+
+      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+
+      // Advance timers by 65 seconds
+      act(() => {
+        vi.advanceTimersByTime(65000);
+      });
+
+      expect(screen.queryByTestId("portal-loader")).toBeNull();
+      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Test H — 60-Second Dashboard Lifecycle Stability: New Worker + Referral Code remains mounted and ready for 60+ seconds", () => {
+    vi.useFakeTimers();
+    try {
+      mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+        const user = { uid: "new_ref_60s", email: "newref60s@test.com" };
+        mockAuthObj.currentUser = user as any;
+        cb(user);
+        return () => {};
+      });
+
+      mockOnSnapshot.mockImplementation((refObj: any, successCb: any) => {
+        if (refObj?.path === "users/new_ref_60s") {
+          successCb({
+            exists: () => true,
+            data: () => ({
+              uid: "new_ref_60s",
+              name: "New Worker 60s",
+              email: "newref60s@test.com",
+              role: "worker",
+              status: "active",
+              tier: 1,
+              balance: 0,
+              referredBy: "REF_CODE_99",
+            }),
+          });
+        } else if (refObj?.path?.startsWith("settings/")) {
+          successCb({ exists: () => true, data: () => DEFAULT_RULES });
+        } else {
+          successCb({ docs: [] });
+        }
+        return () => {};
+      });
+
+      render(React.createElement(PortalGate));
+
+      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+
+      // Advance timers by 65 seconds
+      act(() => {
+        vi.advanceTimersByTime(65000);
+      });
+
+      expect(screen.queryByTestId("portal-loader")).toBeNull();
+      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
