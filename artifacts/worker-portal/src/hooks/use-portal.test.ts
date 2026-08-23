@@ -96,6 +96,15 @@ import {
   evaluateReferralQualification,
   approveReferral,
   reviewSubmission,
+  logFirestoreDiagnostic,
+  formatQueryConstraint,
+  formatQueryConstraints,
+  getDocWithDiagnostic,
+  getDocsWithDiagnostic,
+  setDocWithDiagnostic,
+  updateDocWithDiagnostic,
+  deleteDocWithDiagnostic,
+  runTransactionWithDiagnostic,
 } from "./use-portal";
 
 // Mock Firebase store for Firestore transaction testing
@@ -1347,6 +1356,239 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe("Firestore Diagnostic Instrumentation Suite", () => {
+  let consoleErrorSpy: any;
+  let consoleLogSpy: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    consoleLogSpy.mockRestore();
+  });
+
+  it("Test A — onSnapshot permission-denied produces structured [FirestoreDiagnostic] payload", () => {
+    let snapshotErrorCb: ((err: any) => void) | null = null;
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "diag_user_a", email: "diaga@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any, errorCb?: any) => {
+      if (refObj?.path === "users/diag_user_a") {
+        snapshotErrorCb = errorCb;
+      }
+      return () => {};
+    });
+
+    renderHook(() => usePortalAuth());
+
+    const permErr = new Error("FirebaseError: [code=permission-denied]: Missing or insufficient permissions.");
+    (permErr as any).code = "permission-denied";
+
+    act(() => {
+      snapshotErrorCb?.(permErr);
+    });
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("onSnapshot");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("users/diag_user_a");
+    expect(payload.collection).toBe("users");
+    expect(payload.docId).toBe("diag_user_a");
+    expect(payload.hook).toBe("usePortalAuth");
+    expect(payload.timestamp).toBeDefined();
+    expect(payload.authState).toBe("authenticated");
+    expect(payload.uid).toBe("diag_user_a");
+    expect(typeof payload.profileResolved).toBe("boolean");
+    expect(typeof payload.dashboardMounted).toBe("boolean");
+  });
+
+  it("Test B — getDoc permission-denied produces structured [FirestoreDiagnostic] payload", async () => {
+    const docRef = { path: "users/target_doc_b", id: "target_doc_b" };
+    const permErr = new Error("Permission denied for getDoc");
+    (permErr as any).code = "permission-denied";
+
+    mockGetDoc.mockRejectedValueOnce(permErr);
+
+    await expect(getDocWithDiagnostic(docRef as any, "testHookB")).rejects.toThrow("Permission denied for getDoc");
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("getDoc");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("users/target_doc_b");
+    expect(payload.hook).toBe("testHookB");
+  });
+
+  it("Test C — getDocs permission-denied produces structured [FirestoreDiagnostic] payload", async () => {
+    const queryRef = { path: "emailSubmissions" };
+    const permErr = new Error("Permission denied for getDocs");
+    (permErr as any).code = "permission-denied";
+
+    vi.mocked(await import("firebase/firestore")).getDocs = vi.fn().mockRejectedValueOnce(permErr);
+
+    const queryDesc = [{ field: "workerId", operator: "==", value: "worker_c" }];
+
+    await expect(getDocsWithDiagnostic(queryRef, queryDesc, "testHookC", "emailSubmissions")).rejects.toThrow("Permission denied for getDocs");
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("getDocs");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("emailSubmissions");
+    expect(payload.hook).toBe("testHookC");
+    expect(payload.query).toEqual([{ type: "where", field: "workerId", operator: "==", value: "worker_c" }]);
+  });
+
+  it("Test D — setDoc permission-denied produces structured [FirestoreDiagnostic] payload", async () => {
+    const docRef = { path: "referrals/referred_d", id: "referred_d" };
+    const permErr = new Error("Permission denied for setDoc");
+    (permErr as any).code = "permission-denied";
+
+    mockSetDoc.mockRejectedValueOnce(permErr);
+
+    await expect(setDocWithDiagnostic(docRef as any, { test: 1 }, undefined, "testHookD")).rejects.toThrow("Permission denied for setDoc");
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("setDoc");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("referrals/referred_d");
+    expect(payload.hook).toBe("testHookD");
+  });
+
+  it("Test E — updateDoc permission-denied produces structured [FirestoreDiagnostic] payload", async () => {
+    const docRef = { path: "users/worker_e", id: "worker_e" };
+    const permErr = new Error("Permission denied for updateDoc");
+    (permErr as any).code = "permission-denied";
+
+    vi.mocked(await import("firebase/firestore")).updateDoc = vi.fn().mockRejectedValueOnce(permErr);
+
+    await expect(updateDocWithDiagnostic(docRef as any, { balance: 100 }, "testHookE")).rejects.toThrow("Permission denied for updateDoc");
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("updateDoc");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("users/worker_e");
+    expect(payload.hook).toBe("testHookE");
+  });
+
+  it("Test F — runTransaction permission-denied produces structured [FirestoreDiagnostic] payload", async () => {
+    const permErr = new Error("Permission denied for runTransaction");
+    (permErr as any).code = "permission-denied";
+
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockRejectedValueOnce(permErr);
+
+    await expect(
+      runTransactionWithDiagnostic(
+        {},
+        async () => {},
+        "testHookF",
+        "emailSubmissions/sub_f"
+      )
+    ).rejects.toThrow("Permission denied for runTransaction");
+
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    expect(diagCall).toBeDefined();
+
+    const payload = diagCall[1];
+    expect(payload.operation).toBe("runTransaction");
+    expect(payload.code).toBe("permission-denied");
+    expect(payload.path).toBe("emailSubmissions/sub_f");
+    expect(payload.hook).toBe("testHookF");
+  });
+
+  it("Query Constraint Formatting — extracts structured objects and NEVER produces [object Object] or logs passwords", () => {
+    const rawConstraints = [
+      { field: "workerId", operator: "==", value: "uid_123" },
+      { _field: "status", _op: "==", _val: "active" },
+      { field: "password", operator: "==", value: "secret_pass_123" },
+    ];
+
+    const formatted = formatQueryConstraints(rawConstraints);
+    const serialized = JSON.stringify(formatted);
+
+    expect(serialized).not.toContain("[object Object]");
+    expect(serialized).not.toContain("secret_pass_123");
+    expect(formatted).toEqual([
+      { type: "where", field: "workerId", operator: "==", value: "uid_123" },
+      { type: "where", field: "status", operator: "==", value: "active" },
+      { type: "where", field: "password", operator: "==", value: "[REDACTED]" },
+    ]);
+  });
+
+  it("Diagnostic Flag — VITE_FIRESTORE_DIAGNOSTICS flag controls verbose tracing while preserving error logs", () => {
+    const originalEnv = import.meta.env.VITE_FIRESTORE_DIAGNOSTICS;
+
+    try {
+      // 1. Enable diagnostics flag
+      (import.meta.env as any).VITE_FIRESTORE_DIAGNOSTICS = "true";
+
+      logFirestoreDiagnostic({
+        operation: "onSnapshot",
+        path: "users/flag_test",
+        hook: "testFlagVerbose",
+        message: "Verbose trace message",
+      });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith("[FirestoreDiagnostic]", expect.objectContaining({
+        operation: "onSnapshot",
+        path: "users/flag_test",
+        message: "Verbose trace message",
+      }));
+
+      consoleLogSpy.mockClear();
+
+      // 2. Disable diagnostics flag
+      (import.meta.env as any).VITE_FIRESTORE_DIAGNOSTICS = "false";
+
+      logFirestoreDiagnostic({
+        operation: "onSnapshot",
+        path: "users/flag_test",
+        hook: "testFlagVerbose",
+        message: "Should not log verbose trace",
+      });
+
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      // Errors must still log even when flag is false
+      logFirestoreDiagnostic({
+        operation: "getDoc",
+        path: "users/flag_test",
+        hook: "testFlagError",
+        error: new Error("Error occurs when flag is false"),
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith("[FirestoreDiagnostic]", expect.objectContaining({
+        operation: "getDoc",
+        path: "users/flag_test",
+        code: "error",
+      }));
+    } finally {
+      (import.meta.env as any).VITE_FIRESTORE_DIAGNOSTICS = originalEnv;
     }
   });
 });
