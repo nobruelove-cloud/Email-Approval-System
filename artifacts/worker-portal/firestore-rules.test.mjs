@@ -296,6 +296,69 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST L: Worker creating valid referral relationship for themselves succeeds ---');
+  const refDocId = newWorkerUid;
+  try {
+    await assertSucceeds(
+      setDoc(doc(newWorkerDb, 'referrals', refDocId), {
+        id: refDocId,
+        referrerId: workerUid,
+        referrerName: 'Worker User',
+        referredWorkerId: newWorkerUid,
+        referredWorkerName: 'New Worker',
+        currentAccCount: 0,
+        rewardAmount: 0,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating valid referral relationship succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating valid referral relationship failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST M: Worker attempting create referral for another worker fails ---');
+  try {
+    await assertFails(
+      setDoc(doc(newWorkerDb, 'referrals', otherWorkerUid), {
+        id: otherWorkerUid,
+        referrerId: workerUid,
+        referrerName: 'Worker User',
+        referredWorkerId: otherWorkerUid,
+        referredWorkerName: 'Spoofed Referred',
+        currentAccCount: 0,
+        rewardAmount: 0,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting create referral for another worker correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting create referral for another worker was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST N: Worker reading non-existent referral document for themselves succeeds ---');
+  const nonExistentSelfRefUid = 'unregistered_ref_worker_123';
+  const nonExistentSelfDb = testEnv.authenticatedContext(nonExistentSelfRefUid).firestore();
+  try {
+    await assertSucceeds(getDoc(doc(nonExistentSelfDb, 'referrals', nonExistentSelfRefUid)));
+    console.log('[PASS] Worker reading non-existent referral document for themselves succeeded (no permission-denied).');
+  } catch (err) {
+    console.error('[FAIL] Worker reading non-existent referral document for themselves failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- TEST O: Worker reading referral document of an unrelated worker fails ---');
+  try {
+    await assertFails(getDoc(doc(newWorkerDb, 'referrals', otherWorkerUid)));
+    console.log('[PASS] Worker reading referral document of an unrelated worker correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading referral document of an unrelated worker was not rejected:', err);
+    process.exitCode = 1;
+  }
+
 
   await testEnv.cleanup();
   console.log('\nAll regression tests completed.');

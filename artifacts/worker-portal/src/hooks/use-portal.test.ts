@@ -1016,3 +1016,235 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
     expect(store["withdrawals/wd_test_1"].method).toBe("BCA");
   });
 });
+
+describe("Production Bug Regression Suite: Referral Registration Flow & Error Isolation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("Test A — New Worker + Referral Code: Auth and Dashboard remain ready even if referral listener receives permission-denied", () => {
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "new_ref_worker_1", email: "newref@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any, errorCb?: any) => {
+      if (refObj?.path === "users/new_ref_worker_1") {
+        successCb({
+          exists: () => true,
+          data: () => ({
+            uid: "new_ref_worker_1",
+            name: "New Ref Worker",
+            email: "newref@test.com",
+            role: "worker",
+            status: "active",
+            tier: 1,
+            balance: 0,
+            referredBy: "referrer_101",
+          }),
+        });
+      } else if (refObj?.path?.startsWith("referrals")) {
+        if (errorCb) {
+          const err = new Error("FirebaseError: [code=permission-denied]: Missing or insufficient permissions.");
+          (err as any).code = "permission-denied";
+          errorCb(err);
+        }
+      } else if (refObj?.path?.startsWith("settings/")) {
+        successCb({
+          exists: () => true,
+          data: () => DEFAULT_RULES,
+        });
+      } else {
+        successCb({ docs: [] });
+      }
+      return () => {};
+    });
+
+    render(React.createElement(PortalGate));
+
+    expect(screen.queryByTestId("portal-loader")).toBeNull();
+    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
+  });
+
+  it("Test B — Referral Query Permission Denied: referral hook handles its error, auth remains valid, Dashboard stays visible", () => {
+    let profileSuccessCb: ((snapshot: any) => void) | null = null;
+
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "ref_worker_2", email: "ref2@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any) => {
+      if (refObj?.path === "users/ref_worker_2") {
+        profileSuccessCb = successCb;
+      }
+      return () => {};
+    });
+
+    const { result } = renderHook(() => usePortalAuth());
+
+    act(() => {
+      profileSuccessCb?.({
+        exists: () => true,
+        data: () => ({
+          uid: "ref_worker_2",
+          name: "Ref Worker 2",
+          email: "ref2@test.com",
+          role: "worker",
+          status: "active",
+          tier: 1,
+          balance: 0,
+        }),
+      });
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.profile?.name).toBe("Ref Worker 2");
+
+    // Feature query error occurs
+    act(() => {
+      // Unrelated feature error does not touch usePortalAuth
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.error).toBe("");
+    expect(result.current.profile?.name).toBe("Ref Worker 2");
+  });
+
+  it("Test C — Profile Permission Denied: genuine worker-profile error produces error state for unauthenticated/unresolved session", () => {
+    let snapshotErrorCb: ((error: any) => void) | null = null;
+
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "unresolved_user", email: "unresolved@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any, errorCb?: any) => {
+      if (refObj?.path === "users/unresolved_user") {
+        snapshotErrorCb = errorCb;
+      }
+      return () => {};
+    });
+
+    const { result } = renderHook(() => usePortalAuth());
+
+    act(() => {
+      const err = new Error("Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.");
+      (err as any).code = "permission-denied";
+      snapshotErrorCb?.(err);
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.error).toContain("permission-denied");
+  });
+
+  it("Test D — Referral Code Without Referral Data: Worker remains authenticated and Dashboard remains stable when optional referral data is missing", () => {
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "worker_no_ref_data", email: "norefdata@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any) => {
+      if (refObj?.path === "users/worker_no_ref_data") {
+        successCb({
+          exists: () => true,
+          data: () => ({
+            uid: "worker_no_ref_data",
+            name: "Worker No Ref Data",
+            email: "norefdata@test.com",
+            role: "worker",
+            status: "active",
+            tier: 1,
+            balance: 0,
+            referredBy: "some_ref_code",
+          }),
+        });
+      } else if (refObj?.path?.startsWith("settings/")) {
+        successCb({
+          exists: () => true,
+          data: () => DEFAULT_RULES,
+        });
+      } else {
+        successCb({ docs: [] });
+      }
+      return () => {};
+    });
+
+    render(React.createElement(PortalGate));
+
+    expect(screen.queryByTestId("portal-loader")).toBeNull();
+    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
+  });
+
+  it("Test E — Existing Worker: Existing worker without new referral registration continues to work normally", () => {
+    mockOnAuthStateChanged.mockImplementation((authObj: any, cb: any) => {
+      const user = { uid: "existing_worker_55", email: "existing@test.com" };
+      mockAuthObj.currentUser = user as any;
+      cb(user);
+      return () => {};
+    });
+
+    mockOnSnapshot.mockImplementation((refObj: any, successCb: any) => {
+      if (refObj?.path === "users/existing_worker_55") {
+        successCb({
+          exists: () => true,
+          data: () => ({
+            uid: "existing_worker_55",
+            name: "Existing Worker",
+            email: "existing@test.com",
+            role: "worker",
+            status: "active",
+            tier: 2,
+            balance: 50000,
+          }),
+        });
+      } else if (refObj?.path?.startsWith("settings/")) {
+        successCb({
+          exists: () => true,
+          data: () => DEFAULT_RULES,
+        });
+      } else {
+        successCb({ docs: [] });
+      }
+      return () => {};
+    });
+
+    render(React.createElement(PortalGate));
+
+    expect(screen.queryByTestId("portal-loader")).toBeNull();
+    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getByText(/Existing Worker/)).toBeDefined();
+  });
+
+  it("Test F — Referral Security: registerReferral writes to referrals/referredWorkerId without setDoc merge", async () => {
+    mockSetDoc.mockResolvedValueOnce(undefined);
+
+    await registerReferral("referrer_999", "worker_888", "New Referred");
+
+    expect(mockSetDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "referrals/worker_888" }),
+      expect.objectContaining({
+        id: "worker_888",
+        referrerId: "referrer_999",
+        referredWorkerId: "worker_888",
+        status: "PENDING",
+        currentAccCount: 0,
+        rewardAmount: 0,
+      })
+    );
+    expect(mockSetDoc.mock.calls[0][2]).toBeUndefined();
+  });
+});
