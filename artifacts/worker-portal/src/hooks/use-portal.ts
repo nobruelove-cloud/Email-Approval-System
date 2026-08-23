@@ -36,6 +36,303 @@ import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCo
 
 import { useRef } from "react";
 
+export interface FirestoreDiagnosticPayload {
+  timestamp: string;
+  uid: string | null;
+  authState: "authenticated" | "unauthenticated";
+  operation: "onSnapshot" | "getDoc" | "getDocs" | "setDoc" | "updateDoc" | "deleteDoc" | "runTransaction" | "addDoc";
+  path: string | null;
+  collection: string | null;
+  docId: string | null;
+  query: Array<Record<string, unknown>> | null;
+  hook: string;
+  code: string | null;
+  message: string;
+  profileResolved: boolean;
+  dashboardMounted: boolean;
+}
+
+let globalProfileResolved = false;
+
+export function setProfileResolvedState(resolved: boolean) {
+  globalProfileResolved = resolved;
+}
+
+export function isProfileResolved(): boolean {
+  return globalProfileResolved;
+}
+
+export function isDashboardMounted(): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  return (
+    window.location.pathname.includes("/dashboard") ||
+    !!document.getElementById("worker-dashboard") ||
+    !!document.getElementById("admin-dashboard") ||
+    !!document.querySelector("[data-dashboard='true']")
+  );
+}
+
+function extractCollectionFromPath(path?: string | null): string | null {
+  if (!path) return null;
+  const parts = path.split("/").filter(Boolean);
+  return parts.length > 0 ? parts[0] : null;
+}
+
+function extractDocIdFromPath(path?: string | null): string | null {
+  if (!path) return null;
+  const parts = path.split("/").filter(Boolean);
+  return parts.length > 1 ? parts[1] : null;
+}
+
+function extractPathFromParams(collectionName?: string | null, docId?: string | null): string | null {
+  if (collectionName && docId) return `${collectionName}/${docId}`;
+  if (collectionName) return collectionName;
+  return null;
+}
+
+function sanitizeDiagnosticString(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/apiKey=[^\s&]+/gi, "apiKey=[REDACTED]")
+    .replace(/password=[^\s&]+/gi, "password=[REDACTED]")
+    .replace(/token=[^\s&]+/gi, "token=[REDACTED]");
+}
+
+export function formatQueryConstraint(constraint: any): Record<string, unknown> {
+  if (!constraint || typeof constraint !== "object") {
+    return { value: String(constraint) };
+  }
+
+  if (constraint.field !== undefined || constraint.operator !== undefined || constraint.value !== undefined) {
+    const fieldName = String(constraint.field ?? "unknown_field");
+    const isSensitive = /password|token|secret|key|auth/i.test(fieldName);
+    return {
+      type: String(constraint.type ?? "where"),
+      field: fieldName,
+      operator: String(constraint.operator ?? constraint.op ?? "=="),
+      value: isSensitive ? "[REDACTED]" : constraint.value !== undefined ? constraint.value : null,
+    };
+  }
+
+  let fieldName: string | undefined;
+  if (typeof constraint._field === "string") {
+    fieldName = constraint._field;
+  } else if (constraint._field && typeof constraint._field.path?.getSegments === "function") {
+    fieldName = constraint._field.path.getSegments().join(".");
+  } else if (constraint._field && Array.isArray(constraint._field.segments)) {
+    fieldName = constraint._field.segments.join(".");
+  } else if (typeof constraint.field === "string") {
+    fieldName = constraint.field;
+  }
+
+  const op = String(constraint._op ?? constraint.op ?? constraint.operator ?? "==");
+  let val = constraint._val !== undefined ? constraint._val : constraint.val !== undefined ? constraint.val : constraint.value;
+
+  const finalField = fieldName || "unknown_field";
+  const isSensitive = /password|token|secret|key|auth/i.test(finalField);
+  if (isSensitive) {
+    val = "[REDACTED]";
+  }
+
+  const typeStr = String(constraint.type ?? constraint._type ?? "where");
+
+  return {
+    type: typeStr,
+    field: finalField,
+    operator: op,
+    value: val !== undefined ? val : "unknown_value",
+  };
+}
+
+export function formatQueryConstraints(constraints: unknown[]): Array<Record<string, unknown>> {
+  if (!Array.isArray(constraints)) return [];
+  return constraints.map((c) => formatQueryConstraint(c));
+}
+
+export function logFirestoreDiagnostic(details: {
+  operation: FirestoreDiagnosticPayload["operation"];
+  path?: string | null;
+  collection?: string | null;
+  docId?: string | null;
+  query?: unknown[] | null;
+  hook: string;
+  error?: unknown;
+  message?: string;
+}): FirestoreDiagnosticPayload {
+  const isDiagnosticsEnabled = import.meta.env.VITE_FIRESTORE_DIAGNOSTICS === "true";
+  const err = details.error;
+  const isError = err !== undefined && err !== null;
+
+  const code = (err as { code?: string })?.code ?? (isError ? "error" : null);
+  const rawMessage = details.message || (err instanceof Error ? err.message : String(err || "Success"));
+  const cleanMessage = sanitizeDiagnosticString(rawMessage);
+
+  const path = details.path ?? extractPathFromParams(details.collection, details.docId);
+  const collection = details.collection ?? extractCollectionFromPath(path);
+  const docId = details.docId ?? extractDocIdFromPath(path);
+
+  const payload: FirestoreDiagnosticPayload = {
+    timestamp: new Date().toISOString(),
+    uid: auth?.currentUser?.uid || null,
+    authState: auth?.currentUser ? "authenticated" : "unauthenticated",
+    operation: details.operation,
+    path,
+    collection,
+    docId,
+    query: details.query ? formatQueryConstraints(details.query) : null,
+    hook: details.hook,
+    code,
+    message: cleanMessage,
+    profileResolved: isProfileResolved(),
+    dashboardMounted: isDashboardMounted(),
+  };
+
+  if (isError) {
+    console.error("[FirestoreDiagnostic]", payload);
+  } else if (isDiagnosticsEnabled) {
+    console.log("[FirestoreDiagnostic]", payload);
+  }
+
+  return payload;
+}
+
+export async function getDocWithDiagnostic(docRef: any, hook = "getDoc") {
+  const path = docRef?.path || (typeof docRef?.id === "string" ? docRef.id : null);
+  try {
+    const snap = await getDoc(docRef);
+    logFirestoreDiagnostic({
+      operation: "getDoc",
+      path,
+      hook,
+      message: `getDoc retrieved: exists=${snap.exists()}`,
+    });
+    return snap;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "getDoc",
+      path,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
+export async function getDocsWithDiagnostic(queryRef: any, constraints: unknown[] = [], hook = "getDocs", path?: string) {
+  try {
+    const snaps = await getDocs(queryRef);
+    logFirestoreDiagnostic({
+      operation: "getDocs",
+      path: path || "collection",
+      query: constraints,
+      hook,
+      message: `getDocs retrieved ${snaps.size} docs`,
+    });
+    return snaps;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "getDocs",
+      path: path || "collection",
+      query: constraints,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
+export async function setDocWithDiagnostic(docRef: any, data: any, options?: any, hook = "setDoc") {
+  const path = docRef?.path || (typeof docRef?.id === "string" ? docRef.id : null);
+  try {
+    const res = await (options ? setDoc(docRef, data, options) : setDoc(docRef, data));
+    logFirestoreDiagnostic({
+      operation: "setDoc",
+      path,
+      hook,
+      message: `setDoc succeeded on ${path}`,
+    });
+    return res;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "setDoc",
+      path,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
+export async function updateDocWithDiagnostic(docRef: any, data: any, hook = "updateDoc") {
+  const path = docRef?.path || (typeof docRef?.id === "string" ? docRef.id : null);
+  try {
+    const res = await updateDoc(docRef, data);
+    logFirestoreDiagnostic({
+      operation: "updateDoc",
+      path,
+      hook,
+      message: `updateDoc succeeded on ${path}`,
+    });
+    return res;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "updateDoc",
+      path,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
+export async function deleteDocWithDiagnostic(docRef: any, hook = "deleteDoc") {
+  const path = docRef?.path || (typeof docRef?.id === "string" ? docRef.id : null);
+  try {
+    const res = await deleteDoc(docRef);
+    logFirestoreDiagnostic({
+      operation: "deleteDoc",
+      path,
+      hook,
+      message: `deleteDoc succeeded on ${path}`,
+    });
+    return res;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "deleteDoc",
+      path,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
+export async function runTransactionWithDiagnostic<T>(
+  firestore: any,
+  updateFunction: (transaction: any) => Promise<T>,
+  hook = "runTransaction",
+  path?: string,
+): Promise<T> {
+  try {
+    const result = await runTransaction(firestore, updateFunction);
+    logFirestoreDiagnostic({
+      operation: "runTransaction",
+      path,
+      hook,
+      message: `runTransaction succeeded`,
+    });
+    return result;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "runTransaction",
+      path,
+      hook,
+      error: err,
+    });
+    throw err;
+  }
+}
+
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
@@ -92,6 +389,7 @@ export function usePortalAuth() {
         setError("");
         setLoading(false);
         setIsReady(true);
+        setProfileResolvedState(false);
         return;
       }
 
@@ -123,6 +421,7 @@ export function usePortalAuth() {
             clearAllTimers();
             resolvedUidRef.current = null;
             recoveringUidRef.current = null;
+            setProfileResolvedState(false);
             setProfile(null);
             setError("");
             setLoading(false);
@@ -133,6 +432,7 @@ export function usePortalAuth() {
           if (snapshot.exists()) {
             clearAllTimers();
             resolvedUidRef.current = user.uid;
+            setProfileResolvedState(true);
             recoveringUidRef.current = null;
             recoveryFailedUidRef.current = null;
 
@@ -243,6 +543,15 @@ export function usePortalAuth() {
         (reason) => {
           clearAllTimers();
 
+          logFirestoreDiagnostic({
+            operation: "onSnapshot",
+            path: `users/${user.uid}`,
+            collection: "users",
+            docId: user.uid,
+            hook: "usePortalAuth",
+            error: reason,
+          });
+
           const code = (reason as { code?: string })?.code ?? "";
           console.error(`[PortalAuth] Profile snapshot error for users/${user.uid} [code: ${code}]:`, reason);
 
@@ -315,6 +624,7 @@ export function usePortalAuth() {
     } finally {
       setFirebaseUser(null);
       setProfile(null);
+      setProfileResolvedState(false);
       setError("");
       setLoading(false);
       setIsReady(true);
@@ -341,7 +651,8 @@ export function useCollection<T>(
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(enabled && !!db);
   const [error, setError] = useState("");
-  const constraintsKey = JSON.stringify(constraints.map((constraint) => String(constraint)));
+  const formattedConstraints = formatQueryConstraints(constraints);
+  const constraintsKey = JSON.stringify(formattedConstraints);
 
   useEffect(() => {
     if (!db || !enabled) {
@@ -372,6 +683,14 @@ export function useCollection<T>(
       },
       (reason) => {
         if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: collectionName,
+          collection: collectionName,
+          query: constraints,
+          hook: `useCollection:${collectionName}`,
+          error: reason,
+        });
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca data ini.");
         setLoading(false);
       },
@@ -542,11 +861,30 @@ export function useWorkerEngagementData(uid?: string) {
 
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
   if (!db) throw new Error("Firebase is not configured.");
-  return addDoc(collection(db, "emailSubmissions"), {
-    ...payload,
-    submittedAt: serverTimestamp(),
-    status: "pending" as SubmissionStatus,
-  });
+  try {
+    const res = await addDoc(collection(db, "emailSubmissions"), {
+      ...payload,
+      submittedAt: serverTimestamp(),
+      status: "pending" as SubmissionStatus,
+    });
+    logFirestoreDiagnostic({
+      operation: "addDoc",
+      path: "emailSubmissions",
+      collection: "emailSubmissions",
+      hook: "createSubmission",
+      message: `Submission created: ${res.id}`,
+    });
+    return res;
+  } catch (err) {
+    logFirestoreDiagnostic({
+      operation: "addDoc",
+      path: "emailSubmissions",
+      collection: "emailSubmissions",
+      hook: "createSubmission",
+      error: err,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -567,10 +905,12 @@ export async function reviewSubmission(
   const firestore = db;
   let workerIdToEvaluate = "";
 
-  await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
-    const submissionRef = doc(firestore, "emailSubmissions", submissionId);
-    const submissionSnap = await tx.get(submissionRef);
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // 1. ALL READS FIRST
+      const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+      const submissionSnap = await tx.get(submissionRef);
     if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
     const submission = submissionSnap.data() as EmailSubmission;
     if (submission.status !== "pending") {
@@ -637,7 +977,10 @@ export async function reviewSubmission(
         tier: appliedTier,
       });
     }
-  });
+  },
+  "reviewSubmission",
+  `emailSubmissions/${submissionId}`
+  );
 
   // Automatically evaluate referral qualification if worker has a pending referral
   if (workerIdToEvaluate) {
@@ -661,31 +1004,36 @@ export async function updateEmailStockStatus(
 ) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
-  await runTransaction(firestore, async (tx) => {
-    const submissionRef = doc(firestore, "emailSubmissions", submissionId);
-    const submissionSnap = await tx.get(submissionRef);
-    if (!submissionSnap.exists()) throw new Error("Email tidak ditemukan.");
-    const submission = submissionSnap.data() as EmailSubmission;
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+      const submissionSnap = await tx.get(submissionRef);
+      if (!submissionSnap.exists()) throw new Error("Email tidak ditemukan.");
+      const submission = submissionSnap.data() as EmailSubmission;
 
-    if (submission.status === "pending") {
-      throw new Error("Setoran masih berstatus pending. Harap tinjau setoran terlebih dahulu.");
-    }
+      if (submission.status === "pending") {
+        throw new Error("Setoran masih berstatus pending. Harap tinjau setoran terlebih dahulu.");
+      }
 
-    const updates: Record<string, unknown> = {
-      status: newStatus,
-      updatedAt: serverTimestamp(),
-    };
+      const updates: Record<string, unknown> = {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+      };
 
-    if (note !== undefined) {
-      updates.reviewNote = note;
-    }
+      if (note !== undefined) {
+        updates.reviewNote = note;
+      }
 
-    if (newStatus === "sold") {
-      updates.soldAt = serverTimestamp();
-    }
+      if (newStatus === "sold") {
+        updates.soldAt = serverTimestamp();
+      }
 
-    tx.update(submissionRef, updates);
-  });
+      tx.update(submissionRef, updates);
+    },
+    "updateEmailStockStatus",
+    `emailSubmissions/${submissionId}`
+  );
 }
 
 /**
@@ -708,27 +1056,32 @@ export async function createWithdrawal(payload: {
     throw new Error("Nama pemilik rekening/wallet wajib diisi.");
   }
 
-  await runTransaction(firestore, async (tx) => {
-    const userRef = doc(firestore, "users", payload.workerId);
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
-    const user = userSnap.data() as PortalUser;
-    const balance = user.balance ?? 0;
-    if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
-    if (balance < payload.amount) throw new Error("Saldo tidak mencukupi.");
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const userRef = doc(firestore, "users", payload.workerId);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+      const user = userSnap.data() as PortalUser;
+      const balance = user.balance ?? 0;
+      if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
+      if (balance < payload.amount) throw new Error("Saldo tidak mencukupi.");
 
-    tx.update(userRef, { balance: balance - payload.amount });
-    const withdrawalRef = doc(collection(firestore, "withdrawals"));
-    tx.set(withdrawalRef, {
-      workerId: payload.workerId,
-      amount: payload.amount,
-      method: payload.method,
-      account: payload.account,
-      accountHolderName: trimmedHolderName,
-      status: "pending" as WithdrawalStatus,
-      requestedAt: serverTimestamp(),
-    });
-  });
+      tx.update(userRef, { balance: balance - payload.amount });
+      const withdrawalRef = doc(collection(firestore, "withdrawals"));
+      tx.set(withdrawalRef, {
+        workerId: payload.workerId,
+        amount: payload.amount,
+        method: payload.method,
+        account: payload.account,
+        accountHolderName: trimmedHolderName,
+        status: "pending" as WithdrawalStatus,
+        requestedAt: serverTimestamp(),
+      });
+    },
+    "createWithdrawal",
+    "withdrawals"
+  );
 }
 
 /**
@@ -739,31 +1092,36 @@ export async function createWithdrawal(payload: {
 export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalStatus, note: string) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
-  await runTransaction(firestore, async (tx) => {
-    const withdrawalRef = doc(firestore, "withdrawals", withdrawalId);
-    const withdrawalSnap = await tx.get(withdrawalRef);
-    if (!withdrawalSnap.exists()) throw new Error("Penarikan tidak ditemukan.");
-    const withdrawal = withdrawalSnap.data() as Withdrawal;
-    if (withdrawal.status !== "pending" && withdrawal.status !== "processing") {
-      throw new Error("Penarikan ini sudah selesai diproses.");
-    }
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const withdrawalRef = doc(firestore, "withdrawals", withdrawalId);
+      const withdrawalSnap = await tx.get(withdrawalRef);
+      if (!withdrawalSnap.exists()) throw new Error("Penarikan tidak ditemukan.");
+      const withdrawal = withdrawalSnap.data() as Withdrawal;
+      if (withdrawal.status !== "pending" && withdrawal.status !== "processing") {
+        throw new Error("Penarikan ini sudah selesai diproses.");
+      }
 
-    const isRejected = status === "rejected";
-    const userRef = isRejected ? doc(firestore, "users", withdrawal.workerId) : null;
-    const userSnap = userRef ? await tx.get(userRef) : null;
+      const isRejected = status === "rejected";
+      const userRef = isRejected ? doc(firestore, "users", withdrawal.workerId) : null;
+      const userSnap = userRef ? await tx.get(userRef) : null;
 
-    tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
+      tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
 
-    if (isRejected && userRef && userSnap && userSnap.exists()) {
-      const current = (userSnap.data() as PortalUser).balance ?? 0;
-      tx.update(userRef, { balance: current + withdrawal.amount });
-    }
-  });
+      if (isRejected && userRef && userSnap && userSnap.exists()) {
+        const current = (userSnap.data() as PortalUser).balance ?? 0;
+        tx.update(userRef, { balance: current + withdrawal.amount });
+      }
+    },
+    "reviewWithdrawal",
+    `withdrawals/${withdrawalId}`
+  );
 }
 
 export async function updatePortalUser(uid: string, data: Partial<PortalUser>) {
   if (!db) throw new Error("Firebase is not configured.");
-  return updateDoc(doc(db, "users", uid), data);
+  return updateDocWithDiagnostic(doc(db, "users", uid), data, "updatePortalUser");
 }
 
 export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid">) {
@@ -780,7 +1138,12 @@ export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid"
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
-      await setDoc(doc(db, "users", uid), { uid, ...cleanData, createdAt: serverTimestamp() });
+      await setDocWithDiagnostic(
+        doc(db, "users", uid),
+        { uid, ...cleanData, createdAt: serverTimestamp() },
+        undefined,
+        "createPortalUser"
+      );
       console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
       return;
     } catch (err) {
@@ -821,7 +1184,7 @@ export async function createWorkerAccount(data: {
 
 export async function deletePortalUser(uid: string) {
   if (!db) throw new Error("Firebase is not configured.");
-  return deleteDoc(doc(db, "users", uid));
+  return deleteDocWithDiagnostic(doc(db, "users", uid), "deletePortalUser");
 }
 
 export async function saveSettings(name: string, data: Record<string, unknown>) {
@@ -838,7 +1201,12 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
     console.warn("[saveSettings] Force token refresh warning:", tokenErr);
   }
 
-  return setDoc(doc(db, "settings", name), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  return setDocWithDiagnostic(
+    doc(db, "settings", name),
+    { ...data, updatedAt: serverTimestamp() },
+    { merge: true },
+    "saveSettings"
+  );
 }
 
 /**
@@ -858,17 +1226,22 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   const firestore = db;
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
-  await setDoc(refDoc, {
-    id: referredWorkerId,
-    referrerId,
-    referrerName: shortId(referrerId),
-    referredWorkerId,
-    referredWorkerName,
-    currentAccCount: 0,
-    rewardAmount: 0,
-    status: "PENDING",
-    createdAt: serverTimestamp(),
-  });
+  return setDocWithDiagnostic(
+    refDoc,
+    {
+      id: referredWorkerId,
+      referrerId,
+      referrerName: shortId(referrerId),
+      referredWorkerId,
+      referredWorkerName,
+      currentAccCount: 0,
+      rewardAmount: 0,
+      status: "PENDING",
+      createdAt: serverTimestamp(),
+    },
+    undefined,
+    "registerReferral"
+  );
 }
 
 /**
@@ -885,7 +1258,12 @@ export async function evaluateReferralQualification(referredWorkerId: string) {
     collection(firestore, "emailSubmissions"),
     where("workerId", "==", referredWorkerId),
   );
-  const subSnaps = await getDocs(submissionsQuery);
+  const subSnaps = await getDocsWithDiagnostic(
+    submissionsQuery,
+    [where("workerId", "==", referredWorkerId)],
+    "evaluateReferralQualification",
+    "emailSubmissions"
+  );
 
   let actualAccCount = 0;
   subSnaps.forEach((docSnap) => {
@@ -902,36 +1280,41 @@ export async function evaluateReferralQualification(referredWorkerId: string) {
     }
   });
 
-  await runTransaction(firestore, async (tx) => {
-    const referralRef = doc(firestore, "referrals", referredWorkerId);
-    const referralSnap = await tx.get(referralRef);
-    if (!referralSnap.exists()) return;
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const referralRef = doc(firestore, "referrals", referredWorkerId);
+      const referralSnap = await tx.get(referralRef);
+      if (!referralSnap.exists()) return;
 
-    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-    if (referral.referrerId === referral.referredWorkerId) {
-      console.warn("[evaluateReferral] Self-referral rejected.");
-      return;
-    }
+      const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+      if (referral.referrerId === referral.referredWorkerId) {
+        console.warn("[evaluateReferral] Self-referral rejected.");
+        return;
+      }
 
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
-    const sortedTiers = [...referralTiers].sort((a, b) => a.minAcc - b.minAcc);
-    const minAcc = sortedTiers[0]?.minAcc ?? rulesData?.referralMinAcc ?? 5;
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+      const sortedTiers = [...referralTiers].sort((a, b) => a.minAcc - b.minAcc);
+      const minAcc = sortedTiers[0]?.minAcc ?? rulesData?.referralMinAcc ?? 5;
 
-    const updates: Record<string, unknown> = {
-      currentAccCount: actualAccCount,
-    };
+      const updates: Record<string, unknown> = {
+        currentAccCount: actualAccCount,
+      };
 
-    // If still PENDING and reached minimum ACC, advance status to QUALIFIED
-    if (referral.status === "PENDING" && actualAccCount >= minAcc) {
-      updates.status = "QUALIFIED";
-      updates.qualifiedAt = serverTimestamp();
-    }
+      // If still PENDING and reached minimum ACC, advance status to QUALIFIED
+      if (referral.status === "PENDING" && actualAccCount >= minAcc) {
+        updates.status = "QUALIFIED";
+        updates.qualifiedAt = serverTimestamp();
+      }
 
-    tx.update(referralRef, updates);
-  });
+      tx.update(referralRef, updates);
+    },
+    "evaluateReferralQualification",
+    `referrals/${referredWorkerId}`
+  );
 }
 
 // Alias for backwards compatibility if needed
@@ -945,65 +1328,70 @@ export async function approveReferral(referralId: string) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
-  await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
-    const referralRef = doc(firestore, "referrals", referralId);
-    const referralSnap = await tx.get(referralRef);
-    if (!referralSnap.exists()) {
-      throw new Error("Data referral tidak ditemukan.");
-    }
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // 1. ALL READS FIRST
+      const referralRef = doc(firestore, "referrals", referralId);
+      const referralSnap = await tx.get(referralRef);
+      if (!referralSnap.exists()) {
+        throw new Error("Data referral tidak ditemukan.");
+      }
 
-    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-    if (referral.status === "PAID" || referral.status === "REWARDED") {
-      throw new Error("Referral ini sudah pernah disetujui / dibayar.");
-    }
+      const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+      if (referral.status === "PAID" || referral.status === "REWARDED") {
+        throw new Error("Referral ini sudah pernah disetujui / dibayar.");
+      }
 
-    if (referral.status === "REJECTED") {
-      throw new Error("Referral ini sudah ditolak.");
-    }
+      if (referral.status === "REJECTED") {
+        throw new Error("Referral ini sudah ditolak.");
+      }
 
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
 
-    const currentAcc = referral.currentAccCount ?? 0;
-    let rewardAmt = getReferralRewardForAccCount(currentAcc, referralTiers);
-    if (rewardAmt <= 0) {
-      rewardAmt = referral.rewardAmount ?? rulesData?.referralReward ?? 500;
-    }
+      const currentAcc = referral.currentAccCount ?? 0;
+      let rewardAmt = getReferralRewardForAccCount(currentAcc, referralTiers);
+      if (rewardAmt <= 0) {
+        rewardAmt = referral.rewardAmount ?? rulesData?.referralReward ?? 500;
+      }
 
-    const referrerRef = doc(firestore, "users", referral.referrerId);
-    const referrerSnap = await tx.get(referrerRef);
-    if (!referrerSnap.exists()) {
-      throw new Error("Profil pengundang tidak ditemukan.");
-    }
+      const referrerRef = doc(firestore, "users", referral.referrerId);
+      const referrerSnap = await tx.get(referrerRef);
+      if (!referrerSnap.exists()) {
+        throw new Error("Profil pengundang tidak ditemukan.");
+      }
 
-    const currentBalance = (referrerSnap.data() as PortalUser).balance ?? 0;
-    const referrerName = (referrerSnap.data() as PortalUser).name || referral.referrerName || shortId(referral.referrerId);
+      const currentBalance = (referrerSnap.data() as PortalUser).balance ?? 0;
+      const referrerName = (referrerSnap.data() as PortalUser).name || referral.referrerName || shortId(referral.referrerId);
 
-    // 2. ALL WRITES AFTER READS
-    tx.update(referralRef, {
-      status: "PAID",
-      rewardAmount: rewardAmt,
-      rewardedAt: serverTimestamp(),
-    });
+      // 2. ALL WRITES AFTER READS
+      tx.update(referralRef, {
+        status: "PAID",
+        rewardAmount: rewardAmt,
+        rewardedAt: serverTimestamp(),
+      });
 
-    tx.update(referrerRef, {
-      balance: currentBalance + rewardAmt,
-    });
+      tx.update(referrerRef, {
+        balance: currentBalance + rewardAmt,
+      });
 
-    const ledgerRef = doc(collection(firestore, "rewardLedger"));
-    tx.set(ledgerRef, {
-      workerId: referral.referrerId,
-      workerName: referrerName,
-      rewardType: "referral",
-      amount: rewardAmt,
-      sourceRefId: referralId,
-      description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
-      createdAt: serverTimestamp(),
-    });
-  });
+      const ledgerRef = doc(collection(firestore, "rewardLedger"));
+      tx.set(ledgerRef, {
+        workerId: referral.referrerId,
+        workerName: referrerName,
+        rewardType: "referral",
+        amount: rewardAmt,
+        sourceRefId: referralId,
+        description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
+        createdAt: serverTimestamp(),
+      });
+    },
+    "approveReferral",
+    `referrals/${referralId}`
+  );
 }
 
 /**
@@ -1013,24 +1401,29 @@ export async function rejectReferral(referralId: string, reviewNote?: string) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
-  await runTransaction(firestore, async (tx) => {
-    const referralRef = doc(firestore, "referrals", referralId);
-    const referralSnap = await tx.get(referralRef);
-    if (!referralSnap.exists()) {
-      throw new Error("Data referral tidak ditemukan.");
-    }
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const referralRef = doc(firestore, "referrals", referralId);
+      const referralSnap = await tx.get(referralRef);
+      if (!referralSnap.exists()) {
+        throw new Error("Data referral tidak ditemukan.");
+      }
 
-    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-    if (referral.status === "PAID" || referral.status === "REWARDED") {
-      throw new Error("Referral yang sudah dibayar tidak dapat ditolak.");
-    }
+      const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+      if (referral.status === "PAID" || referral.status === "REWARDED") {
+        throw new Error("Referral yang sudah dibayar tidak dapat ditolak.");
+      }
 
-    tx.update(referralRef, {
-      status: "REJECTED",
-      reviewNote: reviewNote || "Ditolak oleh admin",
-      updatedAt: serverTimestamp(),
-    });
-  });
+      tx.update(referralRef, {
+        status: "REJECTED",
+        reviewNote: reviewNote || "Ditolak oleh admin",
+        updatedAt: serverTimestamp(),
+      });
+    },
+    "rejectReferral",
+    `referrals/${referralId}`
+  );
 }
 
 /**
@@ -1047,15 +1440,20 @@ export async function createMissionClaimRequest(
   const claimId = `${workerId}_${missionId}_${periodKey}`;
   const claimRef = doc(db, "missionClaims", claimId);
 
-  return setDoc(claimRef, {
-    id: claimId,
-    workerId,
-    missionId,
-    periodKey,
-    workerName,
-    status: "pending",
-    requestedAt: serverTimestamp(),
-  }, { merge: true });
+  return setDocWithDiagnostic(
+    claimRef,
+    {
+      id: claimId,
+      workerId,
+      missionId,
+      periodKey,
+      workerName,
+      status: "pending",
+      requestedAt: serverTimestamp(),
+    },
+    { merge: true },
+    "createMissionClaimRequest"
+  );
 }
 
 /**
@@ -1070,71 +1468,76 @@ export async function reviewMissionClaim(
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
-  await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
-    const claimRef = doc(firestore, "missionClaims", claimId);
-    const claimSnap = await tx.get(claimRef);
-    if (!claimSnap.exists()) throw new Error("Klaim misi tidak ditemukan.");
-    const claim = claimSnap.data() as { workerId: string; missionId: string; periodKey: string; status: string; workerName?: string };
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // 1. ALL READS FIRST
+      const claimRef = doc(firestore, "missionClaims", claimId);
+      const claimSnap = await tx.get(claimRef);
+      if (!claimSnap.exists()) throw new Error("Klaim misi tidak ditemukan.");
+      const claim = claimSnap.data() as { workerId: string; missionId: string; periodKey: string; status: string; workerName?: string };
 
-    if (claim.status === "approved") {
-      throw new Error("Klaim misi ini sudah pernah disetujui.");
-    }
-
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
-    const missions = (rulesData?.missions ?? []) as import("@/lib/portal-types").MissionConfig[];
-    const mission = missions.find((m) => m.id === claim.missionId);
-
-    if (!mission || !mission.enabled) {
-      throw new Error("Misi tidak ditemukan atau sedang nonaktif.");
-    }
-
-    const userRef = doc(firestore, "users", claim.workerId);
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
-
-    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-
-    // Budget check
-    const budgetEnabled = rulesData?.rewardBudgetEnabled ?? false;
-    const currentBudget = rulesData?.rewardBudget ?? 0;
-
-    if (decision === "approved" && budgetEnabled && currentBudget < mission.rewardAmount) {
-      throw new Error("Anggaran hadiah misi tidak mencukupi.");
-    }
-
-    // 2. ALL WRITES AFTER READS
-    tx.update(claimRef, {
-      status: decision,
-      rewardAmount: decision === "approved" ? mission.rewardAmount : 0,
-      processedAt: serverTimestamp(),
-    });
-
-    if (decision === "approved") {
-      tx.update(userRef, {
-        balance: currentBalance + mission.rewardAmount,
-      });
-
-      if (budgetEnabled) {
-        tx.update(rulesRef, {
-          rewardBudget: currentBudget - mission.rewardAmount,
-        });
+      if (claim.status === "approved") {
+        throw new Error("Klaim misi ini sudah pernah disetujui.");
       }
 
-      const ledgerRef = doc(collection(firestore, "rewardLedger"));
-      tx.set(ledgerRef, {
-        workerId: claim.workerId,
-        workerName: claim.workerName || (userSnap.data() as PortalUser).name,
-        rewardType: "mission",
-        amount: mission.rewardAmount,
-        sourceRefId: claimId,
-        description: `Hadiah Misi (${claim.periodKey}): ${mission.title}`,
-        createdAt: serverTimestamp(),
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const missions = (rulesData?.missions ?? []) as import("@/lib/portal-types").MissionConfig[];
+      const mission = missions.find((m) => m.id === claim.missionId);
+
+      if (!mission || !mission.enabled) {
+        throw new Error("Misi tidak ditemukan atau sedang nonaktif.");
+      }
+
+      const userRef = doc(firestore, "users", claim.workerId);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+
+      const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+
+      // Budget check
+      const budgetEnabled = rulesData?.rewardBudgetEnabled ?? false;
+      const currentBudget = rulesData?.rewardBudget ?? 0;
+
+      if (decision === "approved" && budgetEnabled && currentBudget < mission.rewardAmount) {
+        throw new Error("Anggaran hadiah misi tidak mencukupi.");
+      }
+
+      // 2. ALL WRITES AFTER READS
+      tx.update(claimRef, {
+        status: decision,
+        rewardAmount: decision === "approved" ? mission.rewardAmount : 0,
+        processedAt: serverTimestamp(),
       });
-    }
-  });
+
+      if (decision === "approved") {
+        tx.update(userRef, {
+          balance: currentBalance + mission.rewardAmount,
+        });
+
+        if (budgetEnabled) {
+          tx.update(rulesRef, {
+            rewardBudget: currentBudget - mission.rewardAmount,
+          });
+        }
+
+        const ledgerRef = doc(collection(firestore, "rewardLedger"));
+        tx.set(ledgerRef, {
+          workerId: claim.workerId,
+          workerName: claim.workerName || (userSnap.data() as PortalUser).name,
+          rewardType: "mission",
+          amount: mission.rewardAmount,
+          sourceRefId: claimId,
+          description: `Hadiah Misi (${claim.periodKey}): ${mission.title}`,
+          createdAt: serverTimestamp(),
+        });
+      }
+    },
+    "reviewMissionClaim",
+    `missionClaims/${claimId}`
+  );
 }
 
 /**
@@ -1152,48 +1555,53 @@ export async function distributeLeaderboardReward(
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
-  await runTransaction(firestore, async (tx) => {
-    // 1. ALL READS FIRST
-    const payoutId = `${periodKey}_rank${rank}_${workerId}`;
-    const payoutRef = doc(firestore, "leaderboardPayouts", payoutId);
-    const payoutSnap = await tx.get(payoutRef);
-    if (payoutSnap.exists()) {
-      throw new Error("Hadiah klasemen untuk peringkat ini sudah pernah dicairkan.");
-    }
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // 1. ALL READS FIRST
+      const payoutId = `${periodKey}_rank${rank}_${workerId}`;
+      const payoutRef = doc(firestore, "leaderboardPayouts", payoutId);
+      const payoutSnap = await tx.get(payoutRef);
+      if (payoutSnap.exists()) {
+        throw new Error("Hadiah klasemen untuk peringkat ini sudah pernah dicairkan.");
+      }
 
-    const userRef = doc(firestore, "users", workerId);
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
+      const userRef = doc(firestore, "users", workerId);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
 
-    const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
+      const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
 
-    // 2. ALL WRITES AFTER READS
-    tx.set(payoutRef, {
-      id: payoutId,
-      workerId,
-      workerName: workerName || (userSnap.data() as PortalUser).name,
-      periodKey,
-      rank,
-      validAccCount,
-      rewardAmount,
-      paidAt: serverTimestamp(),
-    });
+      // 2. ALL WRITES AFTER READS
+      tx.set(payoutRef, {
+        id: payoutId,
+        workerId,
+        workerName: workerName || (userSnap.data() as PortalUser).name,
+        periodKey,
+        rank,
+        validAccCount,
+        rewardAmount,
+        paidAt: serverTimestamp(),
+      });
 
-    tx.update(userRef, {
-      balance: currentBalance + rewardAmount,
-    });
+      tx.update(userRef, {
+        balance: currentBalance + rewardAmount,
+      });
 
-    const ledgerRef = doc(collection(firestore, "rewardLedger"));
-    tx.set(ledgerRef, {
-      workerId,
-      workerName: workerName || (userSnap.data() as PortalUser).name,
-      rewardType: "leaderboard",
-      amount: rewardAmount,
-      sourceRefId: payoutId,
-      description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
-      createdAt: serverTimestamp(),
-    });
-  });
+      const ledgerRef = doc(collection(firestore, "rewardLedger"));
+      tx.set(ledgerRef, {
+        workerId,
+        workerName: workerName || (userSnap.data() as PortalUser).name,
+        rewardType: "leaderboard",
+        amount: rewardAmount,
+        sourceRefId: payoutId,
+        description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
+        createdAt: serverTimestamp(),
+      });
+    },
+    "distributeLeaderboardReward",
+    `leaderboardPayouts/${periodKey}_rank${rank}_${workerId}`
+  );
 }
 
 export function useSettings<T>(name: string, initial: T) {
@@ -1215,6 +1623,14 @@ export function useSettings<T>(name: string, initial: T) {
       },
       (reason) => {
         if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: `settings/${name}`,
+          collection: "settings",
+          docId: name,
+          hook: `useSettings:${name}`,
+          error: reason,
+        });
         setError(reason instanceof Error ? reason.message : "Tidak bisa membaca pengaturan.");
         setLoading(false);
       },
@@ -1270,7 +1686,12 @@ export async function addFinancialTransaction(payload: {
     dataToSave.note = payload.note.trim();
   }
 
-  await setDoc(newDocRef, dataToSave);
+  await setDocWithDiagnostic(
+    newDocRef,
+    dataToSave,
+    undefined,
+    "addFinancialTransaction"
+  );
   return newDocRef.id;
 }
 
@@ -1323,13 +1744,20 @@ export async function updateFinancialTransaction(
 
   updates.updatedAt = serverTimestamp();
 
-  await updateDoc(doc(db, "financialTransactions", id), updates);
+  await updateDocWithDiagnostic(
+    doc(db, "financialTransactions", id),
+    updates,
+    "updateFinancialTransaction"
+  );
 }
 
 export async function deleteFinancialTransaction(id: string) {
   if (!db) throw new Error("Firebase is not configured.");
   if (!id) throw new Error("ID transaksi tidak valid.");
-  return deleteDoc(doc(db, "financialTransactions", id));
+  return deleteDocWithDiagnostic(
+    doc(db, "financialTransactions", id),
+    "deleteFinancialTransaction"
+  );
 }
 
 export function useFinancialData(selectedPeriod?: string) {

@@ -78,6 +78,9 @@ export default defineConfig(async ({ mode }) => {
       'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(
         mergedEnv.VITE_FIREBASE_APP_ID || mergedEnv.FIREBASE_APP_ID || '',
       ),
+      'import.meta.env.VITE_FIRESTORE_DIAGNOSTICS': JSON.stringify(
+        mergedEnv.VITE_FIRESTORE_DIAGNOSTICS || '',
+      ),
     },
     envPrefix: ['VITE_', 'FIREBASE_'],
     plugins: [
