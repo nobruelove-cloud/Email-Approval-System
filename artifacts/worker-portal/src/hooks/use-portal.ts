@@ -40,6 +40,7 @@ export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<PortalUser | null>(null);
   const [loading, setLoading] = useState(firebaseConfigured);
+  const [isReady, setIsReady] = useState(!firebaseConfigured);
   const [error, setError] = useState("");
 
   const profileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,10 +90,12 @@ export function usePortalAuth() {
         setProfile(null);
         setError("");
         setLoading(false);
+        setIsReady(true);
         return;
       }
 
       setLoading(true);
+      setIsReady(false);
       setError("");
 
       console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
@@ -103,6 +106,7 @@ export function usePortalAuth() {
         setLoading((prevLoading) => {
           if (prevLoading) {
             setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
+            setIsReady(true);
             return false;
           }
           return prevLoading;
@@ -129,6 +133,7 @@ export function usePortalAuth() {
             setProfile(null);
             setError("");
             setLoading(false);
+            setIsReady(true);
             return;
           }
 
@@ -152,6 +157,7 @@ export function usePortalAuth() {
             setProfile({ uid: user.uid, ...data, role: normalizedRole, status: normalizedStatus } as PortalUser);
             setError("");
             setLoading(false);
+            setIsReady(true);
           } else {
             console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Initiating automatic profile recovery...`);
             if (recoveringUidRef.current === user.uid) {
@@ -162,6 +168,7 @@ export function usePortalAuth() {
             if (recoveryFailedUidRef.current === user.uid) {
               console.warn(`[PortalAuth] Auto-recovery previously failed for users/${user.uid}. Skipping repeated recovery attempt.`);
               setLoading(false);
+              setIsReady(true);
               setError("Profil pengguna tidak ditemukan di database Firestore.");
               return;
             }
@@ -200,6 +207,7 @@ export function usePortalAuth() {
               setProfile(null);
               setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
               setLoading(false);
+              setIsReady(true);
             });
           }
         },
@@ -213,6 +221,7 @@ export function usePortalAuth() {
             setProfile(null);
             setError("");
             setLoading(false);
+            setIsReady(true);
             return;
           }
 
@@ -225,6 +234,7 @@ export function usePortalAuth() {
 
           setError(msg);
           setLoading(false);
+          setIsReady(true);
         },
       );
 
@@ -264,6 +274,7 @@ export function usePortalAuth() {
       setProfile(null);
       setError("");
       setLoading(false);
+      setIsReady(true);
     }
   };
 
@@ -271,6 +282,7 @@ export function usePortalAuth() {
     firebaseUser,
     profile,
     loading,
+    isReady,
     error,
     configured: firebaseConfigured,
     logout,
@@ -808,24 +820,12 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
   }
 
   const firestore = db;
-
-  // Validate referrer user existence in Firestore
-  const referrerRef = doc(firestore, "users", referrerId);
-  const referrerSnap = await getDoc(referrerRef);
-  if (!referrerSnap.exists()) {
-    console.warn("[registerReferral] Referrer user does not exist in database.");
-    return;
-  }
-
-  const referrerData = referrerSnap.data() as PortalUser;
-  const referrerName = referrerData.name || shortId(referrerId);
-
   const refDoc = doc(firestore, "referrals", referredWorkerId);
 
   await setDoc(refDoc, {
     id: referredWorkerId,
     referrerId,
-    referrerName,
+    referrerName: shortId(referrerId),
     referredWorkerId,
     referredWorkerName,
     currentAccCount: 0,
