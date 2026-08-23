@@ -410,6 +410,7 @@ export function useWorkerData(uid?: string) {
             amount: 50000,
             method: "DANA",
             account: "081234567890",
+            accountHolderName: "Ahmad Worker",
             status: "success",
             requestedAt: { toMillis: () => Date.now() - 86400000 },
           },
@@ -419,6 +420,7 @@ export function useWorkerData(uid?: string) {
             amount: 25000,
             method: "GoPay",
             account: "081234567890",
+            accountHolderName: "Ahmad Worker",
             status: "pending",
             requestedAt: { toMillis: () => Date.now() - 43200000 },
           },
@@ -654,9 +656,15 @@ export async function createWithdrawal(payload: {
   amount: number;
   method: string;
   account: string;
+  accountHolderName: string;
 }) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
+  const trimmedHolderName = payload.accountHolderName ? payload.accountHolderName.trim() : "";
+  if (!trimmedHolderName) {
+    throw new Error("Nama pemilik rekening/wallet wajib diisi.");
+  }
+
   await runTransaction(firestore, async (tx) => {
     const userRef = doc(firestore, "users", payload.workerId);
     const userSnap = await tx.get(userRef);
@@ -673,6 +681,7 @@ export async function createWithdrawal(payload: {
       amount: payload.amount,
       method: payload.method,
       account: payload.account,
+      accountHolderName: trimmedHolderName,
       status: "pending" as WithdrawalStatus,
       requestedAt: serverTimestamp(),
     });

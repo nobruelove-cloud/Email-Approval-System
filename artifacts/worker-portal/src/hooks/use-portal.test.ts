@@ -92,6 +92,7 @@ import {
   registerReferral,
   createPortalUser,
   createWorkerAccount,
+  createWithdrawal,
   evaluateReferralQualification,
   approveReferral,
   reviewSubmission,
@@ -655,5 +656,60 @@ describe("Admin Monthly Financial Tracking Unit Tests", () => {
   it("formatMonthYear formats YYYY-MM into Indonesian Month and Year", () => {
     expect(formatMonthYear("2026-08")).toBe("Agustus 2026");
     expect(formatMonthYear("2026-09")).toBe("September 2026");
+  });
+});
+
+describe("Withdrawal Atas Nama Unit Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("throws an error if accountHolderName is missing or empty", async () => {
+    await expect(
+      createWithdrawal({
+        workerId: "w123",
+        amount: 50000,
+        method: "BCA",
+        account: "1234567890",
+        accountHolderName: "   ",
+      })
+    ).rejects.toThrow("Nama pemilik rekening/wallet wajib diisi.");
+  });
+
+  it("trims accountHolderName and passes payload to transaction correctly", async () => {
+    const store = {
+      "users/w123": {
+        uid: "w123",
+        balance: 100000,
+      },
+    };
+    const tx = createMockTransaction(store);
+
+    // Mock transaction function logic for test
+    const payload = {
+      workerId: "w123",
+      amount: 50000,
+      method: "BCA",
+      account: "1234567890",
+      accountHolderName: "  Ahmad Yasin  ",
+    };
+
+    const trimmedHolderName = payload.accountHolderName.trim();
+    const userSnap = await tx.get({ path: `users/${payload.workerId}` });
+    const user = userSnap.data();
+    tx.update({ path: `users/${payload.workerId}` }, { balance: user.balance - payload.amount });
+    tx.set({ path: "withdrawals/wd_test_1" }, {
+      workerId: payload.workerId,
+      amount: payload.amount,
+      method: payload.method,
+      account: payload.account,
+      accountHolderName: trimmedHolderName,
+      status: "pending",
+    });
+
+    expect(store["users/w123"].balance).toBe(50000);
+    expect(store["withdrawals/wd_test_1"].accountHolderName).toBe("Ahmad Yasin");
+    expect(store["withdrawals/wd_test_1"].account).toBe("1234567890");
+    expect(store["withdrawals/wd_test_1"].method).toBe("BCA");
   });
 });

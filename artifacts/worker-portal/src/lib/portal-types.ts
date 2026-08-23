@@ -150,6 +150,7 @@ export type Withdrawal = {
   method: string;
   account: string;
   accountName?: string;
+  accountHolderName?: string;
   status: WithdrawalStatus;
   requestedAt?: unknown;
   processedAt?: unknown;
