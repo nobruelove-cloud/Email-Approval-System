@@ -115,7 +115,12 @@ service cloud.firestore {
 
     // ---- referrals/{id} ----
     match /referrals/{id} {
-      allow read: if isAdmin() || (isSignedIn() && (resource.data.referrerId == request.auth.uid || resource.data.referredWorkerId == request.auth.uid));
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          id == request.auth.uid ||
+          (resource != null && (resource.data.referrerId == request.auth.uid || resource.data.referredWorkerId == request.auth.uid))
+        )
+      );
       allow create: if isSignedIn() &&
         request.resource.data.referredWorkerId == request.auth.uid &&
         request.resource.data.referrerId != request.auth.uid &&

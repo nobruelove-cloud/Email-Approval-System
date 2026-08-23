@@ -91,7 +91,7 @@ export function PortalGate() {
     );
   }
 
-  if (error) {
+  if (error && !profile) {
     return (
       <FullScreenMessage
         icon={<ShieldAlert className="w-8 h-8 text-red-600" />}
