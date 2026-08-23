@@ -1,8 +1,0 @@
-[build]
-  command = "pnpm --filter @workspace/worker-portal run build"
-  publish = "artifacts/worker-portal/dist/public"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
