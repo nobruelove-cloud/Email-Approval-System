@@ -104,14 +104,11 @@ export function usePortalAuth() {
       // Set a 10-second safety fallback timeout in case Firestore listener hangs
       profileTimerRef.current = setTimeout(() => {
         console.warn(`[PortalAuth] Profile listener timeout reached (10s) for users/${user.uid}.`);
-        setLoading((prevLoading) => {
-          if (prevLoading) {
-            setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
-            setIsReady(true);
-            return false;
-          }
-          return prevLoading;
-        });
+        if (auth?.currentUser?.uid === user.uid && resolvedUidRef.current !== user.uid) {
+          setError("Gagal memuat profil: Waktu koneksi habis. Silakan coba lagi.");
+          setLoading(false);
+          setIsReady(true);
+        }
       }, 10000);
 
       const unsubscribe = onSnapshot(
@@ -154,6 +151,12 @@ export function usePortalAuth() {
           } else {
             console.warn(`[PortalAuth] Document users/${user.uid} does NOT exist in Firestore. Initiating automatic profile recovery...`);
 
+            // If profile was already resolved previously for this UID, ignore missing doc snapshots
+            if (resolvedUidRef.current === user.uid) {
+              console.warn(`[PortalAuth] Document missing snapshot ignored for already resolved user ${user.uid}.`);
+              return;
+            }
+
             if (recoveryFailedUidRef.current === user.uid) {
               console.warn(`[PortalAuth] Auto-recovery previously failed for users/${user.uid}. Skipping repeated recovery attempt.`);
               clearAllTimers();
@@ -190,7 +193,10 @@ export function usePortalAuth() {
             }
 
             recoveringUidRef.current = user.uid;
-            setLoading(true);
+            // Only set loading true if not already resolved for this UID
+            if (resolvedUidRef.current !== user.uid) {
+              setLoading(true);
+            }
 
             const defaultName = user.displayName || (user.email ? user.email.split("@")[0] : "Worker");
             const defaultEmail = user.email || "";
@@ -238,6 +244,12 @@ export function usePortalAuth() {
             setError("");
             setLoading(false);
             setIsReady(true);
+            return;
+          }
+
+          // If session was already resolved, do not regress to error screen or loading unless uid changes
+          if (resolvedUidRef.current === user.uid) {
+            console.warn(`[PortalAuth] Profile snapshot error ignored for already resolved user ${user.uid}.`);
             return;
           }
 
