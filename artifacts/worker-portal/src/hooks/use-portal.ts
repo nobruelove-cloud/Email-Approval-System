@@ -18,6 +18,17 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
+
+export function formatAuthSnapshotError(reason: { code?: string; message?: string } | unknown): string {
+  const code = (reason as { code?: string })?.code ?? "";
+  if (code === "permission-denied" || (reason instanceof Error && reason.message.includes("permission-denied"))) {
+    return "Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.";
+  }
+  if (reason instanceof Error && reason.message) {
+    return reason.message;
+  }
+  return "Terjadi kesalahan saat memuat profil Anda.";
+}
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -227,14 +238,7 @@ export function usePortalAuth() {
             return;
           }
 
-          let msg = "Terjadi kesalahan saat memuat profil Anda.";
-          if (code === "permission-denied" || (reason instanceof Error && reason.message.includes("permission-denied"))) {
-            msg = "Akses ditolak (permission-denied). Silakan periksa koneksi atau hubungi admin.";
-          } else if (reason instanceof Error && reason.message) {
-            msg = reason.message;
-          }
-
-          setError(msg);
+          setError(formatAuthSnapshotError(reason));
           setLoading(false);
           setIsReady(true);
         },
