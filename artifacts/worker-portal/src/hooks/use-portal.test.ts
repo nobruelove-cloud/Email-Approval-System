@@ -325,6 +325,83 @@ describe("2. usePortalAuth Production Hook Real Regression Tests", () => {
     expect(result.current.isReady).toBe(true);
     expect(result.current.error).toContain("permission-denied");
   });
+
+  it("logout during active profile loading unsubscribes listener and resets to unauthenticated state with loading false and isReady true", async () => {
+    const { result } = renderHook(() => usePortalAuth());
+
+    act(() => {
+      const user = { uid: "logout_user", email: "logout@test.com" };
+      mockAuthObj.currentUser = user as any;
+      authCallback?.(user);
+    });
+
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(result.current.firebaseUser).toBeNull();
+    expect(result.current.profile).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isReady).toBe(true);
+  });
+
+  it("auth initialization fallback timer resolves loading state if snapshot hangs", () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => usePortalAuth());
+
+      act(() => {
+        const user = { uid: "hanging_user", email: "hanging@test.com" };
+        mockAuthObj.currentUser = user as any;
+        authCallback?.(user);
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.error).toContain("Waktu koneksi habis");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("missing profile document eventually reaches a terminal state with error message", () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => usePortalAuth());
+
+      act(() => {
+        const user = { uid: "missing_doc_user", email: "missing@test.com" };
+        mockAuthObj.currentUser = user as any;
+        authCallback?.(user);
+      });
+
+      act(() => {
+        snapshotSuccessCb?.({
+          exists: () => false,
+          data: () => undefined,
+        });
+      });
+
+      // Advance missing doc timer
+      act(() => {
+        vi.advanceTimersByTime(7000);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.error).toBe("Profil pengguna tidak ditemukan di database Firestore.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("3. PortalGate Production Component Real Component Tests", () => {
