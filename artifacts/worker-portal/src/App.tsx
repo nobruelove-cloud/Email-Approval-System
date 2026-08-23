@@ -162,8 +162,6 @@ function PortalGate() {
     );
   }
 
-  const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
-
   if (userRole === "admin") {
     return <AdminDashboard profile={profile} onLogout={() => logout()} />;
   }
