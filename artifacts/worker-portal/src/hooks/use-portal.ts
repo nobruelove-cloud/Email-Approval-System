@@ -208,29 +208,36 @@ export function usePortalAuth() {
               status: "active",
               tier: 1,
               balance: 0,
-            }).catch((err) => {
-              console.error(`[PortalAuth] Automatic profile recovery failed for users/${user.uid}:`, err);
+            })
+              .then(() => {
+                console.log(`[PortalAuth] Automatic profile recovery succeeded for users/${user.uid}.`);
+                resolvedUidRef.current = user.uid;
+                recoveringUidRef.current = null;
+                recoveryFailedUidRef.current = null;
+              })
+              .catch((err) => {
+                console.error(`[PortalAuth] Automatic profile recovery failed for users/${user.uid}:`, err);
 
-              // Stale operation protection: check if user changed, new recovery started, or profile was already resolved
-              if (
-                auth?.currentUser?.uid !== user.uid ||
-                recoveryGenRef.current !== currentGen ||
-                resolvedUidRef.current === user.uid
-              ) {
-                console.warn(
-                  `[PortalAuth] Stale recovery rejection ignored for users/${user.uid}. Active user: ${auth?.currentUser?.uid}, Resolved UID: ${resolvedUidRef.current}`,
-                );
-                return;
-              }
+                // Stale operation protection: check if user changed, new recovery started, or profile was already resolved
+                if (
+                  auth?.currentUser?.uid !== user.uid ||
+                  recoveryGenRef.current !== currentGen ||
+                  resolvedUidRef.current === user.uid
+                ) {
+                  console.warn(
+                    `[PortalAuth] Stale recovery rejection ignored for users/${user.uid}. Active user: ${auth?.currentUser?.uid}, Resolved UID: ${resolvedUidRef.current}`,
+                  );
+                  return;
+                }
 
-              clearAllTimers();
-              recoveringUidRef.current = null;
-              recoveryFailedUidRef.current = user.uid;
-              setProfile(null);
-              setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
-              setLoading(false);
-              setIsReady(true);
-            });
+                clearAllTimers();
+                recoveringUidRef.current = null;
+                recoveryFailedUidRef.current = user.uid;
+                setProfile(null);
+                setError(err instanceof Error ? err.message : "Gagal memulihkan profil pengguna.");
+                setLoading(false);
+                setIsReady(true);
+              });
           }
         },
         (reason) => {
@@ -247,9 +254,11 @@ export function usePortalAuth() {
             return;
           }
 
-          // If session was already resolved, do not regress to error screen or loading unless uid changes
-          if (resolvedUidRef.current === user.uid) {
-            console.warn(`[PortalAuth] Profile snapshot error ignored for already resolved user ${user.uid}.`);
+          // If session was already resolved or auto-recovery is actively in progress for this UID, ignore transient re-auth errors
+          if (resolvedUidRef.current === user.uid || recoveringUidRef.current === user.uid) {
+            console.warn(
+              `[PortalAuth] Profile snapshot error ignored for active user ${user.uid} (resolved: ${resolvedUidRef.current === user.uid}, recovering: ${recoveringUidRef.current === user.uid}).`
+            );
             return;
           }
 
@@ -765,15 +774,6 @@ export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid"
 
   console.log(`[createPortalUser] Initiating profile creation for path: users/${uid}`);
 
-  if (auth?.currentUser && auth.currentUser.uid === uid) {
-    try {
-      console.log(`[createPortalUser] Forcing token refresh for user UID: ${uid}`);
-      await auth.currentUser.getIdToken(true);
-    } catch (tokenErr) {
-      console.warn("[createPortalUser] Token refresh warning prior to document creation:", tokenErr);
-    }
-  }
-
   const maxAttempts = 3;
   let lastError: unknown = null;
 
@@ -789,13 +789,6 @@ export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid"
       if (attempt < maxAttempts) {
         const delay = attempt * 500;
         await new Promise((resolve) => setTimeout(resolve, delay));
-        if (auth?.currentUser && auth.currentUser.uid === uid) {
-          try {
-            await auth.currentUser.getIdToken(true);
-          } catch {
-            // ignore token refresh error on retry
-          }
-        }
       }
     }
   }
