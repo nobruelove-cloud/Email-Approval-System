@@ -90,6 +90,7 @@ vi.mock("../lib/firebase", async () => {
 import {
   usePortalAuth,
   registerReferral,
+  claimReferralCode,
   createPortalUser,
   createWorkerAccount,
   createWithdrawal,
@@ -1618,5 +1619,78 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
     await expect(sendRemoteDiagnostic(payload)).resolves.toBeUndefined();
 
     fetchSpy.mockRestore();
+  });
+});
+
+describe("Invitation Code Claim Post-Registration Unit Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. Rejects empty or whitespace invitation code input", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+    await expect(claimReferralCode(worker, "   ")).rejects.toThrow("Kode undangan tidak boleh kosong.");
+  });
+
+  it("2. Rejects self-referral (claiming own UID)", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+    await expect(claimReferralCode(worker, "worker101")).rejects.toThrow("Kamu tidak dapat menggunakan kode undangan milik sendiri.");
+  });
+
+  it("3. Rejects worker who already has referredBy set", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0, referredBy: "inviter999" } as any;
+    await expect(claimReferralCode(worker, "inviter888")).rejects.toThrow("Kode undangan sudah pernah digunakan dan tidak dapat diubah.");
+  });
+
+  it("4. Rejects worker who already has an existing referral document", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ id: "worker101", referrerId: "existing_inviter" }),
+    });
+
+    await expect(claimReferralCode(worker, "new_inviter")).rejects.toThrow("Kode undangan sudah pernah digunakan dan tidak dapat diubah.");
+  });
+
+  it("5. Rejects non-existent invitation code (referrer profile not found)", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+    // myRefDoc -> does not exist
+    mockGetDoc.mockResolvedValueOnce({ exists: () => false });
+    // referrerDoc -> does not exist
+    mockGetDoc.mockResolvedValueOnce({ exists: () => false });
+
+    await expect(claimReferralCode(worker, "non_existent_code")).rejects.toThrow("Kode undangan tidak ditemukan.");
+  });
+
+  it("6. Successfully claims valid invitation code and updates worker profile and creates referral record without immediate reward", async () => {
+    const worker = { uid: "worker101", name: "Worker 101", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+    // myRefDoc -> does not exist
+    mockGetDoc.mockResolvedValueOnce({ exists: () => false });
+    // referrerDoc -> exists
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ uid: "inviter_boss", name: "Budi Inviter", role: "worker", status: "active", tier: 1, balance: 0 }),
+    });
+
+    vi.mocked(await import("firebase/firestore")).updateDoc = vi.fn().mockResolvedValue(undefined);
+    mockSetDoc.mockResolvedValue(undefined);
+
+    const result = await claimReferralCode(worker, "inviter_boss");
+
+    expect(result.referrerId).toBe("inviter_boss");
+    expect(result.referrerName).toBe("Budi Inviter");
+
+    // Verify setDoc created referrals/worker101 with PENDING status, 0 currentAccCount, and 0 rewardAmount
+    expect(mockSetDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "referrals/worker101" }),
+      expect.objectContaining({
+        id: "worker101",
+        referrerId: "inviter_boss",
+        referredWorkerId: "worker101",
+        status: "PENDING",
+        currentAccCount: 0,
+        rewardAmount: 0,
+      })
+    );
   });
 });

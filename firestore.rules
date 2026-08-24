@@ -33,7 +33,8 @@ service cloud.firestore {
 
     // ---- users/{uid} ----
     match /users/{uid} {
-      allow read: if isSelf(uid) || isAdmin();
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
 
       // Self-registration: a signed-in user may create ONLY their own
       // profile, and only as an unprivileged worker — they
@@ -75,6 +76,7 @@ service cloud.firestore {
         request.resource.data.role == resource.data.role &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.tier == resource.data.tier &&
+        (!('referredBy' in resource.data) || resource.data.referredBy == null || resource.data.referredBy == '' || request.resource.data.referredBy == resource.data.referredBy) &&
         request.resource.data.balance >= 0 &&
         request.resource.data.balance <= resource.data.balance
       );

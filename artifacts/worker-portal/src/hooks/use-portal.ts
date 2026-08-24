@@ -862,6 +862,55 @@ export function useWorkerEngagementData(uid?: string) {
   return { referrals, missionClaims, rewardLedger };
 }
 
+export function useMyReferral(uid?: string) {
+  const [data, setData] = useState<import("@/lib/portal-types").Referral | null>(null);
+  const [loading, setLoading] = useState(!!uid && !!db && uid !== "worker_demo");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!db || !uid || uid === "worker_demo") {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const refDoc = doc(db, "referrals", uid);
+
+    const unsubscribe = onSnapshot(
+      refDoc,
+      (snapshot) => {
+        if (!isMounted) return;
+        if (snapshot && typeof snapshot.exists === "function" && snapshot.exists()) {
+          setData({ id: snapshot.id, ...snapshot.data() } as import("@/lib/portal-types").Referral);
+        } else {
+          setData(null);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: `referrals/${uid}`,
+          collection: "referrals",
+          docId: uid,
+          hook: "useMyReferral",
+          error: err,
+        });
+        setError(err instanceof Error ? err.message : "Gagal memuat data referral.");
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [uid]);
+
+  return { data, loading, error };
+}
+
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
   if (!db) throw new Error("Firebase is not configured.");
   try {
@@ -1245,6 +1294,68 @@ export async function registerReferral(referrerId: string, referredWorkerId: str
     undefined,
     "registerReferral"
   );
+}
+
+/**
+ * Claims an invitation code post-registration for a worker without an existing inviter.
+ * Strictly validates empty code, self-referral, existing referral relationship, and referrer existence.
+ */
+export async function claimReferralCode(currentWorker: PortalUser, rawCode: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+
+  const cleanCode = (rawCode || "").trim();
+  if (!cleanCode) {
+    throw new Error("Kode undangan tidak boleh kosong.");
+  }
+
+  const normalizedCode = cleanCode;
+
+  if (currentWorker.referredBy) {
+    throw new Error("Kode undangan sudah pernah digunakan dan tidak dapat diubah.");
+  }
+
+  if (normalizedCode === currentWorker.uid) {
+    throw new Error("Kamu tidak dapat menggunakan kode undangan milik sendiri.");
+  }
+
+  const firestore = db;
+
+  // Check existing referral document
+  const myRefDoc = await getDocWithDiagnostic(doc(firestore, "referrals", currentWorker.uid), "claimReferralCode:checkExisting");
+  if (myRefDoc.exists()) {
+    throw new Error("Kode undangan sudah pernah digunakan dan tidak dapat diubah.");
+  }
+
+  // Look up target referrer user profile
+  const referrerDoc = await getDocWithDiagnostic(doc(firestore, "users", normalizedCode), "claimReferralCode:checkReferrer");
+  if (!referrerDoc.exists()) {
+    throw new Error("Kode undangan tidak ditemukan.");
+  }
+
+  const referrerData = referrerDoc.data() as PortalUser;
+  const referrerName = referrerData.name || shortId(normalizedCode);
+
+  // Link referral on worker profile
+  await updateDocWithDiagnostic(
+    doc(firestore, "users", currentWorker.uid),
+    { referredBy: normalizedCode },
+    "claimReferralCode:updateWorker"
+  );
+
+  // Create referral record
+  await registerReferral(normalizedCode, currentWorker.uid, currentWorker.name || shortId(currentWorker.uid));
+
+  // Evaluate any existing past submission ACC count for qualification
+  try {
+    await evaluateReferralQualification(currentWorker.uid);
+  } catch (err) {
+    console.warn("[claimReferralCode] Qualification evaluation notice:", err);
+  }
+
+  return {
+    referrerId: normalizedCode,
+    referrerName,
+  };
 }
 
 /**
