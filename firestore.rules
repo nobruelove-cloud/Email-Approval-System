@@ -35,9 +35,19 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSelf(uid) || isAdmin();
 
-      // Self-registration: a signed-in user may create ONLY their own
-      // profile, and only as an unprivileged worker — they
-      // cannot grant themselves admin, custom tier, or balance.
+      // Self-registration rule:
+      // 1. Self-registration requires isSelf(uid).
+      // 2. Required fields: uid, name, email, role, status, tier, balance, createdAt
+      // 3. Optional fields: phone, referredBy
+      // 4. Allowed keys must be strictly: ['uid', 'name', 'email', 'phone', 'referredBy', 'role', 'status', 'tier', 'balance', 'createdAt']
+      // 5. role must equal "worker"
+      // 6. status MUST equal "active" (NOT "pending")
+      // 7. tier MUST equal 1
+      // 8. balance MUST equal 0
+      // 9. createdAt MUST be timestamp
+      // 10. phone, if present, must be string
+      // 11. referredBy, if present, must be string
+      // 12. uid must equal document UID (request.auth.uid)
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
@@ -56,11 +66,15 @@ service cloud.firestore {
         request.resource.data.createdAt is timestamp
       );
 
-      // Admin can update anything (approvals, tier, balance adjustments).
-      // A worker may touch their own contact info and may DECREASE (never
-      // increase) their own balance — that's what the withdraw-request
-      // transaction does client-side. Role, status and tier are always
-      // admin-controlled. A worker can never self-credit their balance.
+      // User update rule:
+      // - Admin can update any user profile field.
+      // - Worker self-update enforces:
+      //   * isSelf(uid)
+      //   * role is immutable (request.resource.data.role == resource.data.role)
+      //   * status is immutable (request.resource.data.status == resource.data.status)
+      //   * tier is immutable (request.resource.data.tier == resource.data.tier)
+      //   * balance may only decrease or stay equal, never increase (request.resource.data.balance <= resource.data.balance && >= 0)
+      //   * workers cannot grant themselves administrative privileges or credit their own balance.
       allow update: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.role == resource.data.role &&
