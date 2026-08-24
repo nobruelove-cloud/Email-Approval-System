@@ -106,6 +106,7 @@ import {
   deleteDocWithDiagnostic,
   runTransactionWithDiagnostic,
 } from "./use-portal";
+import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
 
 // Mock Firebase store for Firestore transaction testing
 function createMockTransaction(store: Record<string, any>) {
@@ -1590,5 +1591,32 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
     } finally {
       (import.meta.env as any).VITE_FIRESTORE_DIAGNOSTICS = originalEnv;
     }
+  });
+
+  it("Remote Diagnostic Transmission & Error Isolation — sendRemoteDiagnostic never suppresses errors even if network fails", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementationOnce(() =>
+      Promise.reject(new Error("Network connection offline"))
+    );
+
+    const payload = logFirestoreDiagnostic({
+      operation: "onSnapshot",
+      path: "users/test_offline",
+      hook: "testOfflineHook",
+      error: new Error("FirebaseError: [code=permission-denied]: Missing or insufficient permissions."),
+    });
+
+    expect(payload.code).toBe("error");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/diagnostics",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    // Ensure calling sendRemoteDiagnostic directly with broken network does not throw
+    await expect(sendRemoteDiagnostic(payload)).resolves.toBeUndefined();
+
+    fetchSpy.mockRestore();
   });
 });

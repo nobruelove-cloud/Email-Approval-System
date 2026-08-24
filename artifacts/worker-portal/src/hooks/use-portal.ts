@@ -33,6 +33,7 @@ import {
   type FinancialTransactionType,
 } from "@/lib/portal-types";
 import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId } from "@/lib/portal-utils";
+import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
 
 import { useRef } from "react";
 
@@ -189,8 +190,10 @@ export function logFirestoreDiagnostic(details: {
 
   if (isError) {
     console.error("[FirestoreDiagnostic]", payload);
+    sendRemoteDiagnostic(payload);
   } else if (isDiagnosticsEnabled) {
     console.log("[FirestoreDiagnostic]", payload);
+    sendRemoteDiagnostic(payload);
   }
 
   return payload;
