@@ -55,7 +55,17 @@ async function main() {
     });
   });
 
-  console.log('\n--- TEST A: Valid worker self-profile creation succeeds ---');
+  console.log('\n--- CASE A: Self profile read upon login ---');
+  const existingWorkerDb = testEnv.authenticatedContext(workerUid).firestore();
+  try {
+    await assertSucceeds(getDoc(doc(existingWorkerDb, 'users', workerUid)));
+    console.log('[PASS] Case A: Self profile read upon login succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Case A: Self profile read upon login failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- CASE B: Self-registration without optional fields (phone/referredBy) ---');
   const newWorkerDb = testEnv.authenticatedContext(newWorkerUid).firestore();
   try {
     await assertSucceeds(
@@ -70,9 +80,101 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Valid worker self-profile creation succeeded.');
+    console.log('[PASS] Case B: Self-registration without optional fields succeeded.');
   } catch (err) {
-    console.error('[FAIL] Valid worker self-profile creation failed:', err);
+    console.error('[FAIL] Case B: Self-registration without optional fields failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- CASE C: Self-registration with optional fields (phone and referredBy) ---');
+  const workerWithOptionalUid = 'worker_opt_789';
+  const workerWithOptionalDb = testEnv.authenticatedContext(workerWithOptionalUid).firestore();
+  try {
+    await assertSucceeds(
+      setDoc(doc(workerWithOptionalDb, 'users', workerWithOptionalUid), {
+        uid: workerWithOptionalUid,
+        name: 'Worker With Optionals',
+        email: 'optionals@example.com',
+        phone: '081234567890',
+        referredBy: 'referrer_123',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Case C: Self-registration with optional fields succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Case C: Self-registration with optional fields failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker attempting status: "pending" fails ---');
+  const pendingUserUid = 'pending_user_123';
+  const pendingUserDb = testEnv.authenticatedContext(pendingUserUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(pendingUserDb, 'users', pendingUserUid), {
+        uid: pendingUserUid,
+        name: 'Pending Worker',
+        email: 'pending@example.com',
+        role: 'worker',
+        status: 'pending',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting status "pending" correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting status "pending" was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker attempting disallowed extra fields fails ---');
+  const extraFieldUid = 'extra_field_user';
+  const extraFieldDb = testEnv.authenticatedContext(extraFieldUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(extraFieldDb, 'users', extraFieldUid), {
+        uid: extraFieldUid,
+        name: 'Extra Field User',
+        email: 'extra@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+        customField: 'unauthorized_payload',
+      })
+    );
+    console.log('[PASS] Worker attempting disallowed extra fields correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting disallowed extra fields was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker attempting invalid field types (non-string phone) fails ---');
+  const invalidPhoneUid = 'invalid_phone_user';
+  const invalidPhoneDb = testEnv.authenticatedContext(invalidPhoneUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(invalidPhoneDb, 'users', invalidPhoneUid), {
+        uid: invalidPhoneUid,
+        name: 'Invalid Phone User',
+        email: 'invalidphone@example.com',
+        phone: 81234567890, // number instead of string
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting non-string phone correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting non-string phone was not rejected:', err);
     process.exitCode = 1;
   }
 
@@ -163,7 +265,6 @@ async function main() {
   }
 
   console.log('\n--- TEST F: Worker attempting to overwrite an existing profile with role escalation, tier escalation, or balance increase fails ---');
-  const existingWorkerDb = testEnv.authenticatedContext(workerUid).firestore();
   try {
     await assertFails(
       setDoc(doc(existingWorkerDb, 'users', workerUid), {
