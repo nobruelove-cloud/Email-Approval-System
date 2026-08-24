@@ -678,6 +678,14 @@ export function useCollection<T>(
             return (at - bt) * dir;
           });
         }
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: collectionName,
+          collection: collectionName,
+          query: constraints,
+          hook: `useCollection:${collectionName}`,
+          message: `useCollection snapshot retrieved ${rows.length} docs`,
+        });
         setData(rows);
         setLoading(false);
       },
@@ -1619,6 +1627,14 @@ export function useSettings<T>(name: string, initial: T) {
       (snapshot) => {
         if (!isMounted) return;
         if (snapshot.exists()) setData({ ...initial, ...(snapshot.data() as T) });
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: `settings/${name}`,
+          collection: "settings",
+          docId: name,
+          hook: `useSettings:${name}`,
+          message: `useSettings snapshot retrieved for settings/${name}`,
+        });
         setLoading(false);
       },
       (reason) => {
