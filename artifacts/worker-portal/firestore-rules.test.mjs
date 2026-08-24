@@ -55,7 +55,17 @@ async function main() {
     });
   });
 
-  console.log('\n--- TEST A: Valid worker self-profile creation succeeds ---');
+  console.log('\n--- CASE A: Existing worker login without referral (Self-read profile) ---');
+  const existingWorkerDbForRead = testEnv.authenticatedContext(workerUid).firestore();
+  try {
+    await assertSucceeds(getDoc(doc(existingWorkerDbForRead, 'users', workerUid)));
+    console.log('[PASS] Case A: Existing worker reading own profile succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Case A: Existing worker reading own profile failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- CASE B: New worker registration without referral ---');
   const newWorkerDb = testEnv.authenticatedContext(newWorkerUid).firestore();
   try {
     await assertSucceeds(
@@ -70,13 +80,57 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Valid worker self-profile creation succeeded.');
+    console.log('[PASS] Case B: New worker registration with status "active" succeeded.');
   } catch (err) {
-    console.error('[FAIL] Valid worker self-profile creation failed:', err);
+    console.error('[FAIL] Case B: New worker registration with status "active" failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST B: Worker attempting role: "admin" fails ---');
+  console.log('\n--- CASE C: New worker registration with valid referral ---');
+  const refWorkerUid = 'ref_worker_789';
+  const refWorkerDb = testEnv.authenticatedContext(refWorkerUid).firestore();
+  try {
+    await assertSucceeds(
+      setDoc(doc(refWorkerDb, 'users', refWorkerUid), {
+        uid: refWorkerUid,
+        name: 'Referred Worker',
+        email: 'referredworker@example.com',
+        phone: '08123456789',
+        referredBy: workerUid,
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Case C: New worker registration with referredBy string succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Case C: New worker registration with referredBy string failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 1: Different UID creation fails ---');
+  try {
+    await assertFails(
+      setDoc(doc(newWorkerDb, 'users', otherWorkerUid), {
+        uid: otherWorkerUid,
+        name: 'Spoofed User',
+        email: 'spoof@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Negative Case: Different UID creation correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Case: Different UID creation was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 2: Role "admin" fails ---');
   const badRoleUid = 'bad_role_user';
   const badRoleDb = testEnv.authenticatedContext(badRoleUid).firestore();
   try {
@@ -92,13 +146,35 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting role: "admin" correctly rejected.');
+    console.log('[PASS] Negative Case: Role "admin" correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting role: "admin" was not rejected:', err);
+    console.error('[FAIL] Negative Case: Role "admin" was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST C: Worker attempting tier > 1 fails ---');
+  console.log('\n--- NEGATIVE CASE 3: Status "pending" fails ---');
+  const badStatusUid = 'bad_status_user';
+  const badStatusDb = testEnv.authenticatedContext(badStatusUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badStatusDb, 'users', badStatusUid), {
+        uid: badStatusUid,
+        name: 'Bad Status User',
+        email: 'badstatus@example.com',
+        role: 'worker',
+        status: 'pending',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Negative Case: Status "pending" correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Case: Status "pending" was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 4: Tier 5 fails ---');
   const badTierUid = 'bad_tier_user';
   const badTierDb = testEnv.authenticatedContext(badTierUid).firestore();
   try {
@@ -114,13 +190,13 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting tier > 1 correctly rejected.');
+    console.log('[PASS] Negative Case: Tier 5 correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting tier > 1 was not rejected:', err);
+    console.error('[FAIL] Negative Case: Tier 5 was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST D: Worker attempting balance > 0 fails ---');
+  console.log('\n--- NEGATIVE CASE 5: Balance > 0 fails ---');
   const badBalanceUid = 'bad_balance_user';
   const badBalanceDb = testEnv.authenticatedContext(badBalanceUid).firestore();
   try {
@@ -136,19 +212,45 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting balance > 0 correctly rejected.');
+    console.log('[PASS] Negative Case: Balance > 0 correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting balance > 0 was not rejected:', err);
+    console.error('[FAIL] Negative Case: Balance > 0 was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST E: Worker attempting to create uid != request.auth.uid fails ---');
+  console.log('\n--- NEGATIVE CASE 6: Arbitrary extra field fails ---');
+  const extraFieldUid = 'extra_field_user';
+  const extraFieldDb = testEnv.authenticatedContext(extraFieldUid).firestore();
   try {
     await assertFails(
-      setDoc(doc(newWorkerDb, 'users', otherWorkerUid), {
-        uid: otherWorkerUid,
-        name: 'Spoofed User',
-        email: 'spoof@example.com',
+      setDoc(doc(extraFieldDb, 'users', extraFieldUid), {
+        uid: extraFieldUid,
+        name: 'Extra Field User',
+        email: 'extrafield@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+        arbitraryField: 'hacked_value',
+      })
+    );
+    console.log('[PASS] Negative Case: Arbitrary extra field correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Case: Arbitrary extra field was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 7: Invalid phone type (number instead of string) fails ---');
+  const badPhoneUid = 'bad_phone_user';
+  const badPhoneDb = testEnv.authenticatedContext(badPhoneUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badPhoneDb, 'users', badPhoneUid), {
+        uid: badPhoneUid,
+        name: 'Bad Phone User',
+        email: 'badphone@example.com',
+        phone: 8123456789,
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -156,9 +258,54 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting create for another UID correctly rejected.');
+    console.log('[PASS] Negative Case: Invalid phone type correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting create for another UID was not rejected:', err);
+    console.error('[FAIL] Negative Case: Invalid phone type was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 8: Invalid referredBy type (array instead of string) fails ---');
+  const badRefUid = 'bad_ref_user';
+  const badRefDb = testEnv.authenticatedContext(badRefUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badRefDb, 'users', badRefUid), {
+        uid: badRefUid,
+        name: 'Bad Ref User',
+        email: 'badref@example.com',
+        referredBy: ['ref1', 'ref2'],
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Negative Case: Invalid referredBy type correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Case: Invalid referredBy type was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE CASE 9: Invalid createdAt (string instead of timestamp) fails ---');
+  const badCreatedUid = 'bad_created_user';
+  const badCreatedDb = testEnv.authenticatedContext(badCreatedUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badCreatedDb, 'users', badCreatedUid), {
+        uid: badCreatedUid,
+        name: 'Bad Created User',
+        email: 'badcreated@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: '2026-08-24T00:00:00Z',
+      })
+    );
+    console.log('[PASS] Negative Case: Invalid createdAt correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Case: Invalid createdAt was not rejected:', err);
     process.exitCode = 1;
   }
 
