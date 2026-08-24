@@ -40,15 +40,23 @@ service cloud.firestore {
       // cannot grant themselves admin, custom tier, or balance.
       allow create: if isAdmin() || (
         isSelf(uid) &&
-        request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
-        request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'referredBy', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
+        request.resource.data.keys().hasAll([
+          'uid', 'name', 'email', 'role', 'status',
+          'tier', 'balance', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'name', 'email', 'phone', 'referredBy',
+          'role', 'status', 'tier', 'balance', 'createdAt'
+        ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
         request.resource.data.email is string &&
         request.resource.data.email.size() > 0 &&
-        (!('phone' in request.resource.data) || request.resource.data.phone is string) &&
-        (!('referredBy' in request.resource.data) || request.resource.data.referredBy is string) &&
+        (!('phone' in request.resource.data) ||
+          request.resource.data.phone is string) &&
+        (!('referredBy' in request.resource.data) ||
+          request.resource.data.referredBy is string) &&
         request.resource.data.role == 'worker' &&
         request.resource.data.status == 'active' &&
         request.resource.data.tier == 1 &&
@@ -63,6 +71,7 @@ service cloud.firestore {
       // admin-controlled. A worker can never self-credit their balance.
       allow update: if isAdmin() || (
         isSelf(uid) &&
+        request.resource.data.uid == uid &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.tier == resource.data.tier &&
