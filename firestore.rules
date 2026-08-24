@@ -41,26 +41,12 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll([
-          'uid',
-          'name',
-          'email',
-          'role',
-          'status',
-          'tier',
-          'balance',
-          'createdAt'
+          'uid', 'name', 'email', 'role', 'status',
+          'tier', 'balance', 'createdAt'
         ]) &&
         request.resource.data.keys().hasOnly([
-          'uid',
-          'name',
-          'email',
-          'phone',
-          'referredBy',
-          'role',
-          'status',
-          'tier',
-          'balance',
-          'createdAt'
+          'uid', 'name', 'email', 'phone', 'referredBy',
+          'role', 'status', 'tier', 'balance', 'createdAt'
         ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.name is string &&
@@ -85,6 +71,7 @@ service cloud.firestore {
       // admin-controlled. A worker can never self-credit their balance.
       allow update: if isAdmin() || (
         isSelf(uid) &&
+        request.resource.data.uid == uid &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.tier == resource.data.tier &&

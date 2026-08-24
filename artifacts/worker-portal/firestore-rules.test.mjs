@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, getDocs, query, collection, where } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
 const rulesContent = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../firestore.rules'), 'utf8');
@@ -414,8 +414,198 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- Additional Collection Security Rules Regression Tests (H through T) ---');
+
+  console.log('TEST H: Worker missionClaim creation:');
+  const existingWorkerDb = testEnv.authenticatedContext(workerUid).firestore();
+  const missionClaimId = `${workerUid}_daily_acc_3_2026-W34`;
+  try {
+    await assertSucceeds(
+      setDoc(doc(existingWorkerDb, 'missionClaims', missionClaimId), {
+        id: missionClaimId,
+        workerId: workerUid,
+        missionId: 'daily_acc_3',
+        periodKey: '2026-W34',
+        workerName: 'Worker User',
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      }, { merge: true })
+    );
+    console.log('[PASS] Worker missionClaim creation succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker missionClaim creation failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST I: Worker attempting status "approved" in missionClaim fails:');
+  const badClaimId = `${workerUid}_bad_claim`;
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'missionClaims', badClaimId), {
+        id: badClaimId,
+        workerId: workerUid,
+        missionId: 'daily_acc_3',
+        periodKey: '2026-W34',
+        workerName: 'Worker User',
+        status: 'approved',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting status "approved" in missionClaim correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting status "approved" in missionClaim was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST J: Worker financialTransactions access fails:');
+  const finTxId = 'fin_tx_123';
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'financialTransactions', finTxId), {
+        type: 'income',
+        amount: 500000,
+        description: 'Unauthorized Income',
+        period: '2026-08',
+      })
+    );
+    await assertFails(getDoc(doc(existingWorkerDb, 'financialTransactions', finTxId)));
+    console.log('[PASS] Worker access to financialTransactions correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker access to financialTransactions was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST K: Admin financialTransactions access succeeds:');
+  const adminDb = testEnv.authenticatedContext(adminUid).firestore();
+  try {
+    await assertSucceeds(
+      setDoc(doc(adminDb, 'financialTransactions', finTxId), {
+        id: finTxId,
+        type: 'income',
+        amount: 500000,
+        description: 'Penjualan Storage Gmail',
+        period: '2026-08',
+        transactionDate: new Date(),
+        createdAt: serverTimestamp(),
+      })
+    );
+    await assertSucceeds(getDoc(doc(adminDb, 'financialTransactions', finTxId)));
+    console.log('[PASS] Admin access to financialTransactions succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin access to financialTransactions failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST L: Worker creating valid referral relationship for self succeeds:');
+  const refDocId = newWorkerUid;
+  try {
+    await assertSucceeds(
+      setDoc(doc(newWorkerDb, 'referrals', refDocId), {
+        id: refDocId,
+        referrerId: workerUid,
+        referrerName: 'Worker User',
+        referredWorkerId: newWorkerUid,
+        referredWorkerName: 'New Worker',
+        currentAccCount: 0,
+        rewardAmount: 0,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating valid referral relationship succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating valid referral relationship failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST M: Worker attempting create referral for another worker fails:');
+  try {
+    await assertFails(
+      setDoc(doc(newWorkerDb, 'referrals', otherWorkerUid), {
+        id: otherWorkerUid,
+        referrerId: workerUid,
+        referrerName: 'Worker User',
+        referredWorkerId: otherWorkerUid,
+        referredWorkerName: 'Spoofed Referred',
+        currentAccCount: 0,
+        rewardAmount: 0,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting create referral for another worker correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting create referral for another worker was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST N: Worker reading non-existent referral document for self succeeds:');
+  const nonExistentSelfRefUid = 'unregistered_ref_worker_123';
+  const nonExistentSelfDb = testEnv.authenticatedContext(nonExistentSelfRefUid).firestore();
+  try {
+    await assertSucceeds(getDoc(doc(nonExistentSelfDb, 'referrals', nonExistentSelfRefUid)));
+    console.log('[PASS] Worker reading non-existent referral document for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading non-existent referral document for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST O: Worker reading referral document of unrelated worker fails:');
+  try {
+    await assertFails(getDoc(doc(newWorkerDb, 'referrals', otherWorkerUid)));
+    console.log('[PASS] Worker reading referral document of unrelated worker correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading referral document of unrelated worker was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST P: Worker querying emailSubmissions where workerId == self succeeds:');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'emailSubmissions'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query emailSubmissions for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query emailSubmissions for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST Q: Worker querying withdrawals where workerId == self succeeds:');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'withdrawals'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query withdrawals for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query withdrawals for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST R: Worker querying referrals where referrerId == self succeeds:');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'referrals'), where('referrerId', '==', newWorkerUid))));
+    console.log('[PASS] Query referrals for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query referrals for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST S: Worker querying missionClaims where workerId == self succeeds:');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'missionClaims'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query missionClaims for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query missionClaims for self failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('TEST T: Worker querying rewardLedger where workerId == self succeeds:');
+  try {
+    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'rewardLedger'), where('workerId', '==', newWorkerUid))));
+    console.log('[PASS] Query rewardLedger for self succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Query rewardLedger for self failed:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
-  console.log('\nAll tests completed successfully!');
+  console.log('\nAll regression tests completed successfully!');
 }
 
 main().catch((err) => {
