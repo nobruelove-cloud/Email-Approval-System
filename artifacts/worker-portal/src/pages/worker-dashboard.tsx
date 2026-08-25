@@ -48,6 +48,8 @@ import {
   useWorkerData,
   useWorkerEngagementData,
   useSettings,
+  useMyReferral,
+  claimReferralCode,
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
@@ -88,12 +90,49 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
+  const myReferral = useMyReferral(profile.uid);
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
+  const [invitationCodeInput, setInvitationCodeInput] = useState("");
+  const [claimingCode, setClaimingCode] = useState(false);
+
+  const isAlreadyLinked = !!profile.referredBy || !!myReferral.data;
+  const referrerDisplayName = myReferral.data?.referrerName || (profile.referredBy ? shortId(profile.referredBy) : "");
 
   const referralCode = profile.uid;
   const referralLink = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referralCode}` : `/register?ref=${referralCode}`;
+
+  async function handleClaimInvitationCode(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanCode = invitationCodeInput.trim();
+
+    if (!cleanCode) {
+      toast.error("Kode undangan wajib diisi.");
+      return;
+    }
+
+    if (cleanCode === profile.uid) {
+      toast.error("Tidak dapat menggunakan kode undangan milik sendiri.");
+      return;
+    }
+
+    if (isAlreadyLinked) {
+      toast.error("Akun kamu sudah terhubung dengan kode undangan.");
+      return;
+    }
+
+    setClaimingCode(true);
+    try {
+      await claimReferralCode(profile, cleanCode);
+      toast.success("Berhasil mengklaim kode undangan! Akun kamu sekarang terhubung.");
+      setInvitationCodeInput("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengklaim kode undangan.");
+    } finally {
+      setClaimingCode(false);
+    }
+  }
 
   function handleCopyReferralLink() {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -654,6 +693,55 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <p className="text-lg font-bold text-amber-700 mt-0.5">{formatMoney(refStats.earnings)}</p>
                   </div>
                 </div>
+
+                {/* 🎁 KODE UNDANGAN CLAIM CARD */}
+                <Card className="bg-white border-amber-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                      🎁 Kode Undangan
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isAlreadyLinked ? (
+                      <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-xs text-green-900 space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-green-800">
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          ✓ Kode undangan sudah digunakan
+                        </p>
+                        <p className="text-[11px] text-green-700">
+                          Akun kamu sekarang terhubung dengan referral dari{" "}
+                          <strong className="font-semibold text-green-900">{referrerDisplayName || "Teman"}</strong>.
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleClaimInvitationCode} className="space-y-3">
+                        <div className="space-y-1 text-xs">
+                          <p className="font-semibold text-gray-900">Belum punya kode undangan?</p>
+                          <p className="text-gray-500">
+                            Masukkan kode undangan dari teman untuk menghubungkan akun referral kamu.
+                          </p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Input
+                            value={invitationCodeInput}
+                            onChange={(e) => setInvitationCodeInput(e.target.value)}
+                            placeholder="Masukkan kode undangan (contoh: UID teman)"
+                            className="font-mono text-xs"
+                            disabled={claimingCode}
+                          />
+                          <Button
+                            type="submit"
+                            disabled={claimingCode || !invitationCodeInput.trim()}
+                            className="bg-amber-600 hover:bg-amber-700 shrink-0 gap-1.5 text-xs"
+                          >
+                            {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                            Gunakan Kode Undangan
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </CardContent>
+                </Card>
 
                 <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
                   <p className="font-bold flex items-center gap-1">

@@ -89,6 +89,8 @@ vi.mock("../lib/firebase", async () => {
 
 import {
   usePortalAuth,
+  useMyReferral,
+  claimReferralCode,
   registerReferral,
   createPortalUser,
   createWorkerAccount,
@@ -210,6 +212,90 @@ async function reviewBatchSubmissionTx(
 
 afterEach(() => {
   cleanup();
+});
+
+describe("Post-Registration Invitation Code Claim Feature Unit Tests (claimReferralCode & useMyReferral)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. rejects empty code or whitespace-only code", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "")).rejects.toThrow("Kode undangan wajib diisi.");
+    await expect(claimReferralCode(worker, "   ")).rejects.toThrow("Kode undangan wajib diisi.");
+  });
+
+  it("2. rejects self-referral", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "worker_1")).rejects.toThrow("Tidak dapat menggunakan kode undangan milik sendiri.");
+    await expect(claimReferralCode(worker, "  worker_1  ")).rejects.toThrow("Tidak dapat menggunakan kode undangan milik sendiri.");
+  });
+
+  it("3. rejects worker who already has referredBy field", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", referredBy: "referrer_10", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "referrer_20")).rejects.toThrow("Akun kamu sudah terhubung dengan kode undangan.");
+  });
+
+  it("4. rejects claim if worker already has an existing referral record in transaction check", async () => {
+    const store = {
+      "users/worker_1": { uid: "worker_1", name: "Worker 1" },
+      "referrals/worker_1": { id: "worker_1", referrerId: "referrer_10", status: "PENDING" },
+      "users/referrer_20": { uid: "referrer_20", name: "Referrer 20" },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "referrer_20")).rejects.toThrow("Akun kamu sudah memiliki data referral/pengundang.");
+  });
+
+  it("5. rejects claim if referral code does not belong to an existing worker in Firestore", async () => {
+    const store = {
+      "users/worker_1": { uid: "worker_1", name: "Worker 1" },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "non_existent_code")).rejects.toThrow("Kode undangan tidak valid atau tidak ditemukan.");
+  });
+
+  it("6. successful claim atomically updates worker referredBy, creates referrals/currentWorkerUid with status PENDING, currentAccCount 0, rewardAmount 0, and NO immediate reward", async () => {
+    const store: Record<string, any> = {
+      "users/worker_1": { uid: "worker_1", name: "Budi Worker", balance: 1000 },
+      "users/referrer_99": { uid: "referrer_99", name: "Andi Referrer", balance: 5000 },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Budi Worker", role: "worker", status: "active", tier: 1, balance: 1000 } as any;
+
+    await claimReferralCode(worker, "  referrer_99  ");
+
+    // Check user profile update
+    expect(store["users/worker_1"].referredBy).toBe("referrer_99");
+
+    // Check referral document creation
+    const createdRef = store["referrals/worker_1"];
+    expect(createdRef).toBeDefined();
+    expect(createdRef.id).toBe("worker_1");
+    expect(createdRef.referrerId).toBe("referrer_99");
+    expect(createdRef.referrerName).toBe("Andi Referrer");
+    expect(createdRef.referredWorkerId).toBe("worker_1");
+    expect(createdRef.referredWorkerName).toBe("Budi Worker");
+    expect(createdRef.status).toBe("PENDING");
+    expect(createdRef.currentAccCount).toBe(0);
+    expect(createdRef.rewardAmount).toBe(0);
+
+    // CRITICAL REQUIREMENT: NO IMMEDIATE REWARD ISSUED
+    expect(store["users/referrer_99"].balance).toBe(5000);
+    expect(store["users/worker_1"].balance).toBe(1000);
+  });
 });
 
 describe("1. registerReferral Production Export Real Regression Unit Test", () => {
@@ -685,6 +771,11 @@ describe("3. PortalGate Production Component Real Component Tests", () => {
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (ref?.path?.startsWith("referrals/")) {
+        cb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         cb({
           docs: [],
@@ -1066,6 +1157,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (refObj?.path?.startsWith("referrals/")) {
+        successCb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         successCb({ docs: [] });
       }
@@ -1186,6 +1282,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (refObj?.path?.startsWith("referrals/")) {
+        successCb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         successCb({ docs: [] });
       }
@@ -1287,6 +1388,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
             exists: () => true,
             data: () => DEFAULT_RULES,
           });
+        } else if (refObj?.path?.startsWith("referrals/")) {
+          successCb({
+            exists: () => false,
+            data: () => undefined,
+          });
         } else {
           successCb({ docs: [] });
         }
@@ -1337,6 +1443,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           });
         } else if (refObj?.path?.startsWith("settings/")) {
           successCb({ exists: () => true, data: () => DEFAULT_RULES });
+        } else if (refObj?.path?.startsWith("referrals/")) {
+          successCb({
+            exists: () => false,
+            data: () => undefined,
+          });
         } else {
           successCb({ docs: [] });
         }
