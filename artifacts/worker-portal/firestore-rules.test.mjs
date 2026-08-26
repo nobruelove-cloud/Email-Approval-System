@@ -604,6 +604,196 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST U: Exact Referral Code Claim Scenario (Worker B claims Worker A code) ---');
+  const workerAUid = 'worker_A_111';
+  const workerBUid = 'worker_B_222';
+  const workerCUid = 'worker_C_333';
+  const workerDUid = 'worker_D_444';
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Worker A owns a valid referral code (has profile)
+    await setDoc(doc(db, 'users', workerAUid), {
+      uid: workerAUid,
+      name: 'Worker A (Inviter)',
+      email: 'workera@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Worker B has no referredBy initially
+    await setDoc(doc(db, 'users', workerBUid), {
+      uid: workerBUid,
+      name: 'Worker B (Invitee)',
+      email: 'workerb@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Worker C has empty referredBy string ("")
+    await setDoc(doc(db, 'users', workerCUid), {
+      uid: workerCUid,
+      name: 'Worker C (Empty Ref)',
+      email: 'workerc@example.com',
+      referredBy: '',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Worker D already has referredBy set to workerAUid
+    await setDoc(doc(db, 'users', workerDUid), {
+      uid: workerDUid,
+      name: 'Worker D (Already Linked)',
+      email: 'workerd@example.com',
+      referredBy: workerAUid,
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+  });
+
+  const workerBDb = testEnv.authenticatedContext(workerBUid).firestore();
+  const workerCDb = testEnv.authenticatedContext(workerCUid).firestore();
+  const workerDDb = testEnv.authenticatedContext(workerDUid).firestore();
+
+  const { runTransaction } = await import('firebase/firestore');
+
+  console.log('1. Worker B (no referredBy) claims Worker A code:');
+  try {
+    await assertSucceeds(
+      runTransaction(workerBDb, async (tx) => {
+        const currentUserRef = doc(workerBDb, 'users', workerBUid);
+        const currentUserSnap = await tx.get(currentUserRef);
+
+        const existingRefDocRef = doc(workerBDb, 'referrals', workerBUid);
+        const existingRefSnap = await tx.get(existingRefDocRef);
+
+        const referrerUserRef = doc(workerBDb, 'users', workerAUid);
+        const referrerUserSnap = await tx.get(referrerUserRef);
+
+        tx.update(currentUserRef, {
+          referredBy: workerAUid,
+          updatedAt: serverTimestamp(),
+        });
+
+        tx.set(existingRefDocRef, {
+          id: workerBUid,
+          referrerId: workerAUid,
+          referrerName: referrerUserSnap.data().name,
+          referredWorkerId: workerBUid,
+          referredWorkerName: currentUserSnap.data().name,
+          currentAccCount: 0,
+          rewardAmount: 0,
+          status: 'PENDING',
+          createdAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Worker B claiming Worker A code succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker B claiming Worker A code failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('2. Worker C (referredBy == "") claims Worker A code:');
+  try {
+    await assertSucceeds(
+      runTransaction(workerCDb, async (tx) => {
+        const currentUserRef = doc(workerCDb, 'users', workerCUid);
+        const currentUserSnap = await tx.get(currentUserRef);
+
+        const existingRefDocRef = doc(workerCDb, 'referrals', workerCUid);
+        const existingRefSnap = await tx.get(existingRefDocRef);
+
+        const referrerUserRef = doc(workerCDb, 'users', workerAUid);
+        const referrerUserSnap = await tx.get(referrerUserRef);
+
+        tx.update(currentUserRef, {
+          referredBy: workerAUid,
+          updatedAt: serverTimestamp(),
+        });
+
+        tx.set(existingRefDocRef, {
+          id: workerCUid,
+          referrerId: workerAUid,
+          referrerName: referrerUserSnap.data().name,
+          referredWorkerId: workerCUid,
+          referredWorkerName: currentUserSnap.data().name,
+          currentAccCount: 0,
+          rewardAmount: 0,
+          status: 'PENDING',
+          createdAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Worker C (empty referredBy) claiming Worker A code succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker C (empty referredBy) claiming Worker A code failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('3. Worker B attempting to claim another code afterward (referredBy immutability):');
+  try {
+    await assertFails(
+      runTransaction(workerBDb, async (tx) => {
+        const currentUserRef = doc(workerBDb, 'users', workerBUid);
+        tx.update(currentUserRef, {
+          referredBy: workerCUid,
+          updatedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Worker B attempting to change referredBy after set correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker B attempting to change referredBy after set was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4. Worker B attempting to modify Worker A profile:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerBDb, 'users', workerAUid), {
+        name: 'Hacked Worker A',
+      })
+    );
+    console.log('[PASS] Worker B attempting to modify Worker A correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker B attempting to modify Worker A was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('5. Self-referral attempt (Worker B claims Worker B code):');
+  try {
+    await assertFails(
+      runTransaction(workerBDb, async (tx) => {
+        const existingRefDocRef = doc(workerBDb, 'referrals', 'self_ref_test');
+        tx.set(existingRefDocRef, {
+          id: 'self_ref_test',
+          referrerId: workerBUid,
+          referrerName: 'Worker B',
+          referredWorkerId: workerBUid,
+          referredWorkerName: 'Worker B',
+          currentAccCount: 0,
+          rewardAmount: 0,
+          status: 'PENDING',
+          createdAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Self-referral in referrals collection correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Self-referral was not rejected:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
