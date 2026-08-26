@@ -400,7 +400,8 @@ export function usePortalAuth() {
       setIsReady(false);
       setError("");
 
-      console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+      console.log(`[Stage 3: users/{uid} GET] Registering Firestore snapshot listener for path: users/${user.uid}, ProjectID: ${projectId}`);
 
       // Set a 10-second safety fallback timeout in case Firestore listener hangs
       profileTimerRef.current = setTimeout(() => {
@@ -875,6 +876,8 @@ export function useMyReferral(uid?: string) {
     }
     let isMounted = true;
     setLoading(true);
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    console.log(`[Stage 4: secondary worker collection listener] Registering listener for path: referrals/${uid}, ProjectID: ${projectId}`);
     const refDoc = doc(db, "referrals", uid);
     const unsubscribe = onSnapshot(
       refDoc,
@@ -1182,7 +1185,8 @@ export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid"
     Object.entries(data).filter(([_, v]) => v !== undefined)
   );
 
-  console.log(`[createPortalUser] Initiating profile creation for path: users/${uid}`);
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+  console.log(`[Stage 2: users/{uid} CREATE] Initiating profile creation for path: users/${uid}, ProjectID: ${projectId}`);
 
   const maxAttempts = 3;
   let lastError: unknown = null;

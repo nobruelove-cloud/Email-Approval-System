@@ -167,10 +167,11 @@ export default function LoginPage() {
     setBusy(true);
     let createdUserCredential = null;
     try {
-      console.log(`[Auth] Registering user: ${regEmail.trim()}`);
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+      console.log(`[Stage 1: Auth Creation] Registering user: ${regEmail.trim()}, ProjectID: ${projectId}`);
       createdUserCredential = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPassword);
       const uid = createdUserCredential.user.uid;
-      console.log(`[Auth] Firebase Auth account created. UID: ${uid}, Path: users/${uid}. Creating Firestore profile...`);
+      console.log(`[Stage 1: Auth Creation] Firebase Auth account created. UID: ${uid}, Path: users/${uid}. Creating Firestore profile...`);
 
       const cleanRef = refCode.trim();
 

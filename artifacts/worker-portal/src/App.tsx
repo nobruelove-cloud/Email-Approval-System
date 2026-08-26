@@ -38,6 +38,11 @@ function FullScreenMessage({
 export function PortalGate() {
   const { firebaseUser, profile, loading, isReady, error, configured, logout } = usePortalAuth();
 
+  useEffect(() => {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    console.log(`[Stage 5: PortalGate] Auth UID: ${firebaseUser?.uid ?? 'none'}, Profile UID: ${profile?.uid ?? 'none'}, Role: ${profile?.role ?? 'none'}, Status: ${profile?.status ?? 'none'}, Loading: ${loading}, IsReady: ${isReady}, Error: ${error || 'none'}, ProjectID: ${projectId}`);
+  }, [firebaseUser, profile, loading, isReady, error]);
+
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   if (urlParams && urlParams.get("preview") === "admin") {
     const mockAdminProfile: import("@/lib/portal-types").PortalUser = {
