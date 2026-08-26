@@ -40,6 +40,7 @@ export type Referral = {
   rewardedAt?: unknown;
   rewardAmount?: number;
   reviewNote?: string;
+  claimedTiers?: Record<string, boolean>;
 };
 
 export type MissionType = "daily" | "weekly";
