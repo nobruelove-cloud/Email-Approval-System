@@ -220,10 +220,16 @@ export default function LoginPage() {
 
       let code = (err as { code?: string }).code ?? "";
       if (!code && err instanceof Error) {
-        const match = err.message.match(/auth\/[a-z0-9-]+/i);
-        if (match) code = match[0];
+        if (err.message.includes("permission-denied")) {
+          code = "permission-denied";
+        } else {
+          const match = err.message.match(/auth\/[a-z0-9-]+/i);
+          if (match) code = match[0];
+        }
       }
-      const baseMessage = friendlyAuthError(code, "register");
+      const baseMessage = code === "permission-denied"
+        ? "Gagal membuat profil pengguna (permission-denied). Silakan periksa koneksi atau hubungi admin."
+        : friendlyAuthError(code, "register");
       toast.error(code ? `${baseMessage} (${code})` : baseMessage);
     } finally {
       setBusy(false);
