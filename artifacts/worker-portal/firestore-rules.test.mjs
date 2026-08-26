@@ -794,6 +794,44 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST V: Race Condition / Partial Update Immutability Check (Update without referredBy key) ---');
+  const workerVUid = 'worker_V_555';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'users', workerVUid), {
+      uid: workerVUid,
+      name: 'Worker V',
+      email: 'workerv@example.com',
+      referredBy: 'REFERRER_AAA',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+  });
+
+  const workerVDb = testEnv.authenticatedContext(workerVUid).firestore();
+
+  try {
+    await assertSucceeds(
+      setDoc(doc(workerVDb, 'users', workerVUid), {
+        uid: workerVUid,
+        name: 'Worker V Updated Name',
+        email: 'workerv@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] TEST V: Updating user profile without referredBy key succeeded without CEL Property undefined runtime error.');
+  } catch (err) {
+    console.error('[FAIL] TEST V: Updating user profile without referredBy key failed:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
