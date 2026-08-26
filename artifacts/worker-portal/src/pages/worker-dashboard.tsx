@@ -50,6 +50,7 @@ import {
   useSettings,
   useMyReferral,
   claimReferralCode,
+  claimReferralTier,
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
@@ -65,6 +66,8 @@ import {
   getReferralTierForAccCount,
   getNextReferralTierForAccCount,
   getOperatingStatus,
+  isReferralTierClaimed,
+  isReferralTierClaimable,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -96,6 +99,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [copiedLink, setCopiedLink] = useState(false);
   const [invitationCodeInput, setInvitationCodeInput] = useState("");
   const [claimingCode, setClaimingCode] = useState(false);
+  const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
+
+  const pendingClaimsSet = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(engagement.referralClaims?.data)) {
+      engagement.referralClaims.data.forEach((c) => {
+        if (c.status === "pending") {
+          set.add(`${c.referralId}_${c.minAcc}`);
+        }
+      });
+    }
+    return set;
+  }, [engagement.referralClaims?.data]);
+
+  async function handleClaimTier(referralId: string, minAcc: number) {
+    const key = `${referralId}_${minAcc}`;
+    if (busyClaimTierKey) return;
+    setBusyClaimTierKey(key);
+    try {
+      await claimReferralTier(referralId, minAcc);
+      toast.success(`Permintaan klaim reward referral tier ${minAcc} ACC berhasil dikirim!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengklaim reward tier referral.");
+    } finally {
+      setBusyClaimTierKey(null);
+    }
+  }
 
   const isAlreadyLinked = !!profile.referredBy || !!myReferral.data;
   const referrerDisplayName = myReferral.data?.referrerName || (profile.referredBy ? shortId(profile.referredBy) : "");
@@ -627,14 +657,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* REFERRAL SYSTEM */}
           <TabsContent value="referral" className="space-y-4">
-            {/* DAFTAR REWARD REFERRAL (READ-ONLY) */}
+            {/* DAFTAR REWARD REFERRAL */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   🎁 Daftar Reward Referral
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Semakin banyak email ACC dari pekerja yang Anda undang, semakin besar bonus reward referral yang Anda dapatkan.
+                  Klaim setiap reward tier segera setelah target email ACC tercapai, tanpa perlu menunggu tier berikutnya.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -644,7 +674,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       key={idx}
                       className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-lg text-center"
                     >
-                      <p className="text-xs text-gray-600 font-medium">{t.minAcc} ACC</p>
+                      <p className="text-xs text-gray-600 font-semibold">{t.minAcc} ACC</p>
                       <p className="text-base font-extrabold text-amber-700 mt-1">
                         {formatMoney(t.reward)}
                       </p>
@@ -749,8 +779,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </p>
                   <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
                     <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
-                    <li>Pekerja yang diundang harus mencapai minimal email ACC yang disetujui admin untuk membuka tier reward.</li>
-                    <li>Hadiah referral dihitung berdasarkan tier tertinggi yang dicapai ketika admin menyetujui kualifikasi (1 kali payout per referral).</li>
+                    <li>Pekerja yang diundang harus mencapai target email ACC terverifikasi untuk membuka masing-masing tier reward.</li>
+                    <li>Reward dapat di-claim per-tier (5 ACC, 10 ACC, 20 ACC, 50 ACC) tanpa harus menunggu seluruh tier selesai.</li>
+                    <li>Setiap tier reward hanya dapat di-claim SATU KALI per pekerja referral.</li>
                   </ul>
                 </div>
 
@@ -763,59 +794,91 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       Belum ada pekerja yang mendaftar menggunakan referral Anda.
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                    <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white">
                       {engagement.referrals.data.map((ref) => {
                         const accProgress = ref.currentAccCount ?? 0;
-                        const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
-                        const isQualified = ref.status === "QUALIFIED";
-                        const isRejected = ref.status === "REJECTED";
-
-                        const currentTier = getReferralTierForAccCount(accProgress, activeReferralTiers);
-                        const nextTier = getNextReferralTierForAccCount(accProgress, activeReferralTiers);
-                        const currentReward = isPaid
-                          ? (ref.rewardAmount ?? getReferralRewardForAccCount(accProgress, activeReferralTiers))
-                          : getReferralRewardForAccCount(accProgress, activeReferralTiers);
-
-                        let statusText = "Belum Qualified";
-                        let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
-
-                        if (isPaid) {
-                          statusText = "Sudah Disetujui";
-                          statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
-                        } else if (isQualified) {
-                          statusText = "Menunggu ACC Admin";
-                          statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                        } else if (isRejected) {
-                          statusText = "Ditolak";
-                          statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
-                        }
-
-                        const targetAccDisplay = nextTier ? nextTier.minAcc : (currentTier ? currentTier.minAcc : 5);
+                        const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
 
                         return (
-                          <div key={ref.id} className="p-3 rounded-md border border-gray-200 flex items-center justify-between text-xs bg-gray-50/50">
-                            <div className="space-y-0.5">
-                              <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
-                              <p className="text-[11px] text-gray-500">
-                                ACC: <strong className="text-gray-800">{accProgress}/{targetAccDisplay}</strong>
-                              </p>
-                              {nextTier ? (
-                                <p className="text-[11px] text-gray-500">
-                                  Tier berikutnya: <strong className="text-blue-900">{nextTier.minAcc} ACC</strong>
+                          <div key={ref.id} className="p-3 rounded-lg border border-amber-100 bg-amber-50/30 space-y-3">
+                            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                              <div>
+                                <p className="font-bold text-gray-900 text-sm">
+                                  {ref.referredWorkerName || shortId(ref.referredWorkerId)}
                                 </p>
-                              ) : currentTier ? (
                                 <p className="text-[11px] text-gray-500">
-                                  Tier: <strong className="text-blue-900">{currentTier.minAcc} ACC</strong>
+                                  Total ACC Pekerja: <strong className="text-gray-900 font-bold">{accProgress} Email ACC</strong>
                                 </p>
-                              ) : null}
-                            </div>
-                            <div className="text-right space-y-1">
-                              <Badge className={`text-[11px] font-medium ${statusBadgeClass}`}>
-                                {statusText}
+                              </div>
+                              <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-200 text-xs">
+                                Total Bonus: {formatMoney(ref.rewardAmount ?? 0)}
                               </Badge>
-                              <p className="text-[11px] text-amber-800 font-bold">
-                                {isPaid ? `Bonus: ${formatMoney(currentReward)}` : isRejected ? `Bonus: ${formatMoney(0)}` : `Reward saat ini: ${formatMoney(currentReward)}`}
-                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {sortedTiers.map((t) => {
+                                const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
+                                const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
+                                const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
+                                const busyKey = `${ref.id}_${t.minAcc}`;
+                                const isBusy = busyClaimTierKey === busyKey;
+
+                                return (
+                                  <div
+                                    key={t.minAcc}
+                                    className={`p-2.5 rounded-md border text-xs flex items-center justify-between gap-2 ${
+                                      isClaimed
+                                        ? "bg-green-50/80 border-green-200"
+                                        : isPendingClaim
+                                          ? "bg-blue-50/80 border-blue-200"
+                                          : isClaimable
+                                            ? "bg-white border-amber-300 shadow-sm"
+                                            : "bg-gray-50 border-gray-200 opacity-75"
+                                    }`}
+                                  >
+                                    <div className="space-y-0.5">
+                                      <p className="font-bold text-gray-900">
+                                        {t.minAcc} ACC — <span className="text-amber-700">{formatMoney(t.reward)}</span>
+                                      </p>
+                                      <p className="text-[11px] text-gray-500">
+                                        Progress: <strong className="text-gray-800">{accProgress}/{t.minAcc}</strong>
+                                      </p>
+                                    </div>
+
+                                    <div>
+                                      {isClaimed ? (
+                                        <Badge className="bg-green-100 text-green-800 border-green-300 gap-1 text-[11px]">
+                                          <CheckCircle2 className="w-3 h-3 text-green-600" />
+                                          Sudah Diklaim
+                                        </Badge>
+                                      ) : isPendingClaim ? (
+                                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 text-[11px]">
+                                          <Clock className="w-3 h-3 text-blue-600" />
+                                          Menunggu Admin
+                                        </Badge>
+                                      ) : isClaimable ? (
+                                        <Button
+                                          size="sm"
+                                          disabled={isBusy}
+                                          onClick={() => handleClaimTier(ref.id, t.minAcc)}
+                                          className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs h-7 px-3 gap-1 shrink-0"
+                                        >
+                                          {isBusy ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                          ) : (
+                                            <CheckCircle2 className="w-3 h-3" />
+                                          )}
+                                          Claim
+                                        </Button>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200 gap-1 text-[11px]">
+                                          Belum tersedia
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

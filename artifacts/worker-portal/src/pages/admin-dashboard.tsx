@@ -1847,7 +1847,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <div className="flex flex-wrap items-center gap-3 text-gray-600 font-medium">
                                 <span>ACC: <strong className="text-gray-900">{currentAcc}</strong></span>
                                 <span>Tier: <strong className="text-blue-900">{qualTier ? `${qualTier.minAcc} ACC` : "-"}</strong></span>
-                                <span>{isPaid ? "Reward Paid" : "Reward"}: <strong className="text-amber-700">{formatMoney(rewardAmt)}</strong></span>
+                                <span>Total Reward Diklaim: <strong className="text-amber-700">{formatMoney(ref.rewardAmount ?? (isPaid ? rewardAmt : 0))}</strong></span>
                               </div>
 
                               <div className="text-[11px] text-gray-400 flex flex-wrap gap-2">

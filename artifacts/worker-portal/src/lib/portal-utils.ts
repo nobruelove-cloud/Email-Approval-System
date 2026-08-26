@@ -7,6 +7,7 @@ import {
   type TierConfig,
   type ReferralTierConfig,
   type OperatingHoursConfig,
+  type Referral,
 } from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
@@ -335,6 +336,46 @@ export function isValidTelegramUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Checks whether a specific referral tier (by minAcc) has already been claimed for a referral.
+ */
+export function isReferralTierClaimed(
+  referral?: Partial<Referral> | null,
+  minAcc?: number,
+  referralTiers?: ReferralTierConfig[]
+): boolean {
+  if (!referral || typeof minAcc !== "number") return false;
+  const key = String(minAcc);
+  if (referral.claimedTiers && typeof referral.claimedTiers[key] === "boolean") {
+    return referral.claimedTiers[key];
+  }
+  // Fallback for legacy PAID referrals created before per-tier tracking
+  if ((referral.status === "PAID" || referral.status === "REWARDED") && (!referral.claimedTiers || Object.keys(referral.claimedTiers).length === 0)) {
+    const acc = referral.currentAccCount ?? 0;
+    const tierReward = getReferralRewardForAccCount(minAcc, referralTiers);
+    const paidReward = referral.rewardAmount ?? 0;
+    if (acc >= minAcc && tierReward > 0 && paidReward >= tierReward) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks whether a specific referral tier (by minAcc) is eligible to be claimed for a referral.
+ */
+export function isReferralTierClaimable(
+  referral?: Partial<Referral> | null,
+  minAcc?: number,
+  referralTiers?: ReferralTierConfig[]
+): boolean {
+  if (!referral || typeof minAcc !== "number") return false;
+  if (referral.status === "REJECTED") return false;
+  const acc = referral.currentAccCount ?? 0;
+  if (acc < minAcc) return false;
+  return !isReferralTierClaimed(referral, minAcc, referralTiers);
 }
 
 /**
