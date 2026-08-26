@@ -147,6 +147,15 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---- referralClaims/{id} ----
+    match /referralClaims/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.referrerId == request.auth.uid);
+      allow create: if isSignedIn() &&
+        request.resource.data.referrerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
     // ---- missionClaims/{id} ----
     match /missionClaims/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);

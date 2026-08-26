@@ -43,6 +43,21 @@ export type Referral = {
   claimedTiers?: Record<string, boolean>;
 };
 
+export type ReferralClaimStatus = "pending" | "approved" | "rejected";
+
+export type ReferralClaim = {
+  id: string;
+  referralId: string;
+  referrerId: string;
+  referredWorkerId: string;
+  minAcc: number;
+  rewardAmount: number;
+  status: ReferralClaimStatus;
+  requestedAt?: unknown;
+  processedAt?: unknown;
+  note?: string;
+};
+
 export type MissionType = "daily" | "weekly";
 
 export type MissionConfig = {

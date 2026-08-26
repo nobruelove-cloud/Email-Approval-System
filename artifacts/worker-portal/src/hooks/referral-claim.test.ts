@@ -32,6 +32,7 @@ vi.mock("firebase/firestore", () => {
     collection: vi.fn((db: any, path: string) => ({ path })),
     query: vi.fn(),
     where: vi.fn(),
+    getDoc: vi.fn(),
     getDocs: vi.fn().mockResolvedValue([]),
     setDoc: vi.fn().mockResolvedValue(undefined),
     serverTimestamp: vi.fn(() => "MOCK_TIMESTAMP"),
@@ -43,6 +44,7 @@ vi.mock("firebase/firestore", () => {
 
 import {
   claimReferralTier,
+  createReferralClaimRequest,
   approveReferral,
   evaluateReferralQualification,
   registerReferral,
@@ -53,7 +55,8 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
     vi.clearAllMocks();
   });
 
-  it("1. Worker reaches 5 ACC -> Rp500 can be claimed", async () => {
+  it("1. Worker creates claim request when target 5 ACC reached", async () => {
+    const firestoreModule = await import("firebase/firestore");
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -63,50 +66,36 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    const rulesDoc = {
-      referralTiers: DEFAULT_REFERRAL_TIERS,
-    };
-
-    const referrerUserDoc: PortalUser = {
-      uid: "referrer_worker_1",
-      name: "Worker 1",
-      email: "referrer@test.com",
-      role: "worker",
-      status: "active",
-      tier: 1,
-      balance: 10000,
-    };
-
-    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
-      if (refObj.path === "referrals/ref_worker_2") {
-        return { exists: () => true, data: () => referralDoc };
+    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
+      if (docRef.path === "referrals/ref_worker_2") {
+        return { exists: () => true, data: () => referralDoc } as any;
       }
-      if (refObj.path === "settings/rules") {
-        return { exists: () => true, data: () => rulesDoc };
+      if (docRef.path === "settings/rules") {
+        return { exists: () => true, data: () => ({ referralTiers: DEFAULT_REFERRAL_TIERS }) } as any;
       }
-      if (refObj.path === "users/referrer_worker_1") {
-        return { exists: () => true, data: () => referrerUserDoc };
+      if (docRef.path === "referralClaims/ref_worker_2_tier_5") {
+        return { exists: () => false, data: () => null } as any;
       }
-      return { exists: () => false, data: () => null };
+      return { exists: () => false, data: () => null } as any;
     });
 
     await claimReferralTier("ref_worker_2", 5);
 
-    expect(mockTransactionTx.update).toHaveBeenCalledWith(
-      { path: "referrals/ref_worker_2" },
+    expect(firestoreModule.setDoc).toHaveBeenCalledWith(
+      { path: "referralClaims/ref_worker_2_tier_5" },
       expect.objectContaining({
-        claimedTiers: { "5": true },
+        id: "ref_worker_2_tier_5",
+        referralId: "ref_worker_2",
+        referrerId: "referrer_worker_1",
+        minAcc: 5,
         rewardAmount: 500,
+        status: "pending",
       })
-    );
-
-    expect(mockTransactionTx.update).toHaveBeenCalledWith(
-      { path: "users/referrer_worker_1" },
-      { balance: 10500 }
     );
   });
 
-  it("2. Worker under 5 ACC -> Rp500 cannot be claimed", async () => {
+  it("2. Worker under 5 ACC -> Rp500 claim request fails", async () => {
+    const firestoreModule = await import("firebase/firestore");
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -116,20 +105,17 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
-      if (refObj.path === "referrals/ref_worker_2") {
-        return { exists: () => true, data: () => referralDoc };
+    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
+      if (docRef.path === "referrals/ref_worker_2") {
+        return { exists: () => true, data: () => referralDoc } as any;
       }
-      if (refObj.path === "settings/rules") {
-        return { exists: () => true, data: () => ({ referralTiers: DEFAULT_REFERRAL_TIERS }) };
-      }
-      return { exists: () => false };
+      return { exists: () => false } as any;
     });
 
     await expect(claimReferralTier("ref_worker_2", 5)).rejects.toThrow("Target ACC belum tercapai");
   });
 
-  it("3. Worker reaches 10 ACC -> Rp1.000 can be claimed without waiting for 20/50 ACC", async () => {
+  it("3. Admin approves 10 ACC claim request and credits referrer balance", async () => {
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -163,7 +149,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_2", 10);
+    await approveReferral("ref_worker_2", 10);
 
     expect(mockTransactionTx.update).toHaveBeenCalledWith(
       { path: "referrals/ref_worker_2" },
@@ -179,7 +165,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
     );
   });
 
-  it("4. Worker reaches 20 ACC -> Rp2.000 can be claimed", async () => {
+  it("4. Admin approves 20 ACC claim request and credits referrer balance", async () => {
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -213,7 +199,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_2", 20);
+    await approveReferral("ref_worker_2", 20);
 
     expect(mockTransactionTx.update).toHaveBeenCalledWith(
       { path: "referrals/ref_worker_2" },
@@ -229,7 +215,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
     );
   });
 
-  it("5. Worker reaches 50 ACC -> Rp5.000 can be claimed and marks status PAID when all tiers claimed", async () => {
+  it("5. Admin approves 50 ACC claim request and marks status PAID when all tiers claimed", async () => {
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -263,7 +249,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_2", 50);
+    await approveReferral("ref_worker_2", 50);
 
     expect(mockTransactionTx.update).toHaveBeenCalledWith(
       { path: "referrals/ref_worker_2" },
@@ -280,7 +266,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
     );
   });
 
-  it("6. Rp500 already claimed cannot be claimed again", async () => {
+  it("6. Tier already claimed cannot be approved again", async () => {
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -300,7 +286,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await expect(claimReferralTier("ref_worker_2", 5)).rejects.toThrow("sudah pernah diklaim");
+    await expect(approveReferral("ref_worker_2", 5)).rejects.toThrow("sudah pernah diklaim");
   });
 
   it("7. Claiming Rp500 maintains eligibility for Rp1.000", () => {
@@ -319,6 +305,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
   });
 
   it("8. Worker cannot claim referral reward of another worker", async () => {
+    const firestoreModule = await import("firebase/firestore");
     const referralDoc: Referral = {
       id: "ref_other_worker",
       referrerId: "different_worker_uid",
@@ -328,11 +315,11 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
-      if (refObj.path === "referrals/ref_other_worker") {
-        return { exists: () => true, data: () => referralDoc };
+    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
+      if (docRef.path === "referrals/ref_other_worker") {
+        return { exists: () => true, data: () => referralDoc } as any;
       }
-      return { exists: () => false };
+      return { exists: () => false } as any;
     });
 
     await expect(claimReferralTier("ref_other_worker", 5)).rejects.toThrow("milik akun lain");
@@ -376,7 +363,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_custom", 5);
+    await approveReferral("ref_worker_custom", 5);
 
     expect(mockTransactionTx.update).toHaveBeenCalledWith(
       { path: "users/referrer_worker_1" },
@@ -407,10 +394,10 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_concurrent", 5);
+    await approveReferral("ref_worker_concurrent", 5);
     referralDocState.claimedTiers = { "5": true };
 
-    await expect(claimReferralTier("ref_worker_concurrent", 5)).rejects.toThrow("sudah pernah diklaim");
+    await expect(approveReferral("ref_worker_concurrent", 5)).rejects.toThrow("sudah pernah diklaim");
   });
 
   it("11. Existing referral registration works", async () => {

@@ -101,13 +101,25 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [claimingCode, setClaimingCode] = useState(false);
   const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
 
+  const pendingClaimsSet = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(engagement.referralClaims?.data)) {
+      engagement.referralClaims.data.forEach((c) => {
+        if (c.status === "pending") {
+          set.add(`${c.referralId}_${c.minAcc}`);
+        }
+      });
+    }
+    return set;
+  }, [engagement.referralClaims?.data]);
+
   async function handleClaimTier(referralId: string, minAcc: number) {
     const key = `${referralId}_${minAcc}`;
     if (busyClaimTierKey) return;
     setBusyClaimTierKey(key);
     try {
       await claimReferralTier(referralId, minAcc);
-      toast.success(`Berhasil mengklaim reward referral tier ${minAcc} ACC! Saldo Anda telah bertambah.`);
+      toast.success(`Permintaan klaim reward referral tier ${minAcc} ACC berhasil dikirim!`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengklaim reward tier referral.");
     } finally {
@@ -807,6 +819,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                               {sortedTiers.map((t) => {
                                 const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
                                 const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
+                                const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
                                 const busyKey = `${ref.id}_${t.minAcc}`;
                                 const isBusy = busyClaimTierKey === busyKey;
 
@@ -816,9 +829,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                     className={`p-2.5 rounded-md border text-xs flex items-center justify-between gap-2 ${
                                       isClaimed
                                         ? "bg-green-50/80 border-green-200"
-                                        : isClaimable
-                                          ? "bg-white border-amber-300 shadow-sm"
-                                          : "bg-gray-50 border-gray-200 opacity-75"
+                                        : isPendingClaim
+                                          ? "bg-blue-50/80 border-blue-200"
+                                          : isClaimable
+                                            ? "bg-white border-amber-300 shadow-sm"
+                                            : "bg-gray-50 border-gray-200 opacity-75"
                                     }`}
                                   >
                                     <div className="space-y-0.5">
@@ -835,6 +850,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                         <Badge className="bg-green-100 text-green-800 border-green-300 gap-1 text-[11px]">
                                           <CheckCircle2 className="w-3 h-3 text-green-600" />
                                           Sudah Diklaim
+                                        </Badge>
+                                      ) : isPendingClaim ? (
+                                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 text-[11px]">
+                                          <Clock className="w-3 h-3 text-blue-600" />
+                                          Menunggu Admin
                                         </Badge>
                                       ) : isClaimable ? (
                                         <Button
