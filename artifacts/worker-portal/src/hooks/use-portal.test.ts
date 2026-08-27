@@ -1761,14 +1761,14 @@ describe("Referral Tier Claim & Approval Logic Unit Tests (createReferralClaimRe
 
     mockGetDoc.mockImplementation(async (ref: any) => {
       const p = ref?.path || (typeof ref === "string" ? ref : String(ref));
-      if (p.includes("ref_worker_1")) {
+      if (p.startsWith("referralClaims") || p.includes("referralClaims")) {
+        return { exists: () => false, data: () => ({}) };
+      }
+      if (p === "referrals/ref_worker_1") {
         return { exists: () => true, data: () => referralData };
       }
-      if (p.includes("rules")) {
+      if (p === "settings/rules") {
         return { exists: () => true, data: () => rulesData };
-      }
-      if (p.includes("referralClaims")) {
-        return { exists: () => false, data: () => ({}) };
       }
       return { exists: () => false, data: () => ({}) };
     });
