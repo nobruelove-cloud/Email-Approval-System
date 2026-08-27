@@ -48,7 +48,7 @@ export function PortalGate() {
     const mockAdminProfile: import("@/lib/portal-types").PortalUser = {
       uid: "admin_demo",
       name: "Admin Demo",
-      email: "mandarawanzz@gmail.com",
+      email: "admin@example.com",
       role: "admin",
       status: "active",
       tier: 1,
