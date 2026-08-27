@@ -832,6 +832,163 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST W: Referral Claim Security Rules (referralClaims, rewardLedger, referrals, user balance) ---');
+  const claimWorkerUid = 'claim_worker_w1';
+  const claimRefId = 'referral_doc_w1';
+  const claimDocId = `${claimRefId}_tier_5`;
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'users', claimWorkerUid), {
+      uid: claimWorkerUid,
+      name: 'Claim Worker W1',
+      email: 'claimw1@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    await setDoc(doc(db, 'referrals', claimRefId), {
+      id: claimRefId,
+      referrerId: claimWorkerUid,
+      referredWorkerId: 'child_worker_1',
+      referredWorkerName: 'Child Worker 1',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
+    });
+  });
+
+  const claimWorkerDb = testEnv.authenticatedContext(claimWorkerUid).firestore();
+
+  console.log('1. Worker checking non-existent claim request (resource == null):');
+  try {
+    await assertSucceeds(getDoc(doc(claimWorkerDb, 'referralClaims', claimDocId)));
+    console.log('[PASS] Worker get non-existent referralClaim succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker get non-existent referralClaim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('2. Worker creating valid pending claim request (status == "pending"):');
+  try {
+    await assertSucceeds(
+      setDoc(doc(claimWorkerDb, 'referralClaims', claimDocId), {
+        id: claimDocId,
+        referralId: claimRefId,
+        referrerId: claimWorkerUid,
+        referredWorkerId: 'child_worker_1',
+        minAcc: 5,
+        rewardAmount: 500,
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating pending referral claim succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating pending referral claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('3. Worker attempting to create claim as "approved":');
+  try {
+    await assertFails(
+      setDoc(doc(claimWorkerDb, 'referralClaims', `${claimRefId}_tier_10`), {
+        id: `${claimRefId}_tier_10`,
+        referralId: claimRefId,
+        referrerId: claimWorkerUid,
+        referredWorkerId: 'child_worker_1',
+        minAcc: 10,
+        rewardAmount: 1000,
+        status: 'approved',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating approved referral claim correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating approved referral claim was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4. Worker attempting to update referralClaim to "approved":');
+  try {
+    await assertFails(
+      updateDoc(doc(claimWorkerDb, 'referralClaims', claimDocId), {
+        status: 'approved',
+      })
+    );
+    console.log('[PASS] Worker updating referralClaim status correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker updating referralClaim status was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('5. Worker attempting direct write to rewardLedger:');
+  try {
+    await assertFails(
+      setDoc(doc(claimWorkerDb, 'rewardLedger', 'illegal_ledger_entry'), {
+        workerId: claimWorkerUid,
+        rewardType: 'referral',
+        amount: 5000,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker writing to rewardLedger correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker writing to rewardLedger was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('6. Worker attempting direct update to referrals collection (claimedTiers/rewardAmount):');
+  try {
+    await assertFails(
+      updateDoc(doc(claimWorkerDb, 'referrals', claimRefId), {
+        claimedTiers: { '5': true },
+        rewardAmount: 500,
+      })
+    );
+    console.log('[PASS] Worker updating referrals document correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker updating referrals document was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('7. Worker attempting balance increase on users/{uid}:');
+  try {
+    await assertFails(
+      updateDoc(doc(claimWorkerDb, 'users', claimWorkerUid), {
+        balance: 500,
+      })
+    );
+    console.log('[PASS] Worker increasing balance on users/{uid} correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker increasing balance on users/{uid} was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('8. Worker attempting to claim another worker\'s referralClaim request:');
+  const fakeClaimDb = testEnv.authenticatedContext('hacker_uid').firestore();
+  try {
+    await assertFails(
+      setDoc(doc(fakeClaimDb, 'referralClaims', `${claimRefId}_tier_20`), {
+        id: `${claimRefId}_tier_20`,
+        referralId: claimRefId,
+        referrerId: claimWorkerUid, // Spoofed referrer
+        referredWorkerId: 'child_worker_1',
+        minAcc: 20,
+        rewardAmount: 2000,
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating claim request for another worker correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating claim request for another worker was not rejected:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
