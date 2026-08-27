@@ -1610,6 +1610,15 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
       const currentBalance = referrerData.balance ?? 0;
       const referrerName = referrerData.name || referral.referrerName || shortId(referral.referrerId);
 
+      // Read all referralClaims documents in the READ phase before ANY writes occur
+      const claimDocsToProcess: Array<{ claimRef: any; exists: boolean; tier: ReferralTierConfig }> = [];
+      for (const t of tiersToClaim) {
+        const claimDocId = `${referralId}_tier_${t.minAcc}`;
+        const claimRef = doc(firestore, "referralClaims", claimDocId);
+        const claimSnap = await tx.get(claimRef);
+        claimDocsToProcess.push({ claimRef, exists: claimSnap.exists(), tier: t });
+      }
+
       // 2. ALL WRITES AFTER READS
       const updatedClaimedTiers = { ...claimedTiers };
       tiersToClaim.forEach((t) => {
@@ -1630,30 +1639,36 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         balance: currentBalance + totalClaimReward,
       });
 
-      tiersToClaim.forEach((t) => {
+      claimDocsToProcess.forEach(({ claimRef, exists, tier }) => {
         const ledgerRef = doc(collection(firestore, "rewardLedger"));
         tx.set(ledgerRef, {
           workerId: referral.referrerId,
           workerName: referrerName,
           rewardType: "referral",
-          amount: t.reward,
-          sourceRefId: `${referralId}_tier_${t.minAcc}`,
-          description: `Hadiah Referral Tier ${t.minAcc} ACC (${formatMoney(t.reward)}) dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
+          amount: tier.reward,
+          sourceRefId: `${referralId}_tier_${tier.minAcc}`,
+          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
           createdAt: serverTimestamp(),
         });
 
-        // Resolve pending claim request if any
-        const claimRef = doc(firestore, "referralClaims", `${referralId}_tier_${t.minAcc}`);
-        tx.set(claimRef, {
-          id: `${referralId}_tier_${t.minAcc}`,
-          referralId,
-          referrerId: referral.referrerId,
-          referredWorkerId: referral.referredWorkerId,
-          minAcc: t.minAcc,
-          rewardAmount: t.reward,
-          status: "approved",
-          processedAt: serverTimestamp(),
-        }, { merge: true });
+        // Resolve pending claim request cleanly based on read snapshot
+        if (exists) {
+          tx.update(claimRef, {
+            status: "approved",
+            processedAt: serverTimestamp(),
+          });
+        } else {
+          tx.set(claimRef, {
+            id: `${referralId}_tier_${tier.minAcc}`,
+            referralId,
+            referrerId: referral.referrerId,
+            referredWorkerId: referral.referredWorkerId,
+            minAcc: tier.minAcc,
+            rewardAmount: tier.reward,
+            status: "approved",
+            processedAt: serverTimestamp(),
+          });
+        }
       });
     },
     "approveReferral",
