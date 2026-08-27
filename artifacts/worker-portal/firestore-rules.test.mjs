@@ -832,6 +832,31 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST Y: Safe Property Check on referrals/{id} and referralClaims/{id} ---');
+  const safeWorkerUid = 'safe_worker_999';
+  const safeWorkerDb = testEnv.authenticatedContext(safeWorkerUid).firestore();
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Doc with safeWorkerUid as referrerId but lacking other optional fields
+    await setDoc(doc(db, 'referrals', safeWorkerUid), {
+      status: 'PENDING',
+    });
+    await setDoc(doc(db, 'referralClaims', `${safeWorkerUid}_claim`), {
+      referrerId: safeWorkerUid,
+      status: 'pending',
+    });
+  });
+
+  try {
+    await assertSucceeds(getDoc(doc(safeWorkerDb, 'referrals', safeWorkerUid)));
+    await assertSucceeds(getDoc(doc(safeWorkerDb, 'referralClaims', `${safeWorkerUid}_claim`)));
+    console.log('[PASS] TEST Y: Safe property checks prevented CEL evaluation errors on minimal documents.');
+  } catch (err) {
+    console.error('[FAIL] TEST Y failed:', err);
+    process.exitCode = 1;
+  }
+
   console.log('\n--- TEST W: Referral Claim Security Rules (referralClaims, rewardLedger, referrals, user balance) ---');
   const claimWorkerUid = 'claim_worker_w1';
   const claimRefId = 'referral_doc_w1';

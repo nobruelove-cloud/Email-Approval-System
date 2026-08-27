@@ -129,13 +129,16 @@ service cloud.firestore {
       allow get: if isAdmin() || (
         isSignedIn() && (
           id == request.auth.uid ||
-          (resource != null && (resource.data.referrerId == request.auth.uid || resource.data.referredWorkerId == request.auth.uid))
+          (resource != null && (
+            ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+            ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
+          ))
         )
       );
       allow list: if isAdmin() || (
         isSignedIn() && (
-          resource.data.referrerId == request.auth.uid ||
-          resource.data.referredWorkerId == request.auth.uid
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+          ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
         )
       );
       allow create: if isSignedIn() &&
@@ -152,12 +155,12 @@ service cloud.firestore {
       allow get: if isAdmin() || (
         isSignedIn() && (
           resource == null ||
-          resource.data.referrerId == request.auth.uid
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid)
         )
       );
       allow list: if isAdmin() || (
         isSignedIn() &&
-        resource.data.referrerId == request.auth.uid
+        ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid)
       );
       allow create: if isAdmin() || (
         isSignedIn() &&
