@@ -1516,6 +1516,10 @@ export async function createReferralClaimRequest(referralId: string, minAcc: num
     if (existingData.status === "pending") {
       throw new Error(`Permintaan klaim tier ${minAcc} ACC sedang menunggu persetujuan admin.`);
     }
+    if (existingData.status === "rejected") {
+      throw new Error(`Permintaan klaim tier ${minAcc} ACC sebelumnya telah ditolak oleh admin.`);
+    }
+    throw new Error(`Permintaan klaim tier ${minAcc} ACC sudah pernah diajukan.`);
   }
 
   await setDocWithDiagnostic(
