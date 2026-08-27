@@ -989,6 +989,146 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- TEST X: End-to-End Worker Claim & Admin Approval Flow ---');
+  const e2eReferrerUid = 'e2e_referrer_user';
+  const e2eReferredUid = 'e2e_referred_user';
+  const e2eReferralId = e2eReferredUid;
+  const e2eClaimDocId = `${e2eReferralId}_tier_5`;
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Referrer profile
+    await setDoc(doc(db, 'users', e2eReferrerUid), {
+      uid: e2eReferrerUid,
+      name: 'E2E Referrer Worker',
+      email: 'e2ereferrer@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Referred worker profile
+    await setDoc(doc(db, 'users', e2eReferredUid), {
+      uid: e2eReferredUid,
+      name: 'E2E Referred Worker',
+      email: 'e2ereferred@example.com',
+      referredBy: e2eReferrerUid,
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Referral relationship doc
+    await setDoc(doc(db, 'referrals', e2eReferralId), {
+      id: e2eReferralId,
+      referrerId: e2eReferrerUid,
+      referrerName: 'E2E Referrer Worker',
+      referredWorkerId: e2eReferredUid,
+      referredWorkerName: 'E2E Referred Worker',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
+    });
+    // Rules doc
+    await setDoc(doc(db, 'settings', 'rules'), {
+      referralMinAcc: 5,
+      referralTiers: [
+        { minAcc: 5, reward: 5000 },
+        { minAcc: 10, reward: 12000 },
+      ],
+    });
+  });
+
+  const e2eReferrerDb = testEnv.authenticatedContext(e2eReferrerUid).firestore();
+  const e2eAdminDb = testEnv.authenticatedContext(adminUid).firestore();
+
+  console.log('Step 1: Referrer Worker executes Worker Claim flow...');
+  try {
+    // 1. Read referral doc
+    const refSnap = await getDoc(doc(e2eReferrerDb, 'referrals', e2eReferralId));
+    console.log(' - Read referrals doc exists:', refSnap.exists());
+
+    // 2. Read settings/rules doc
+    const rulesSnap = await getDoc(doc(e2eReferrerDb, 'settings', 'rules'));
+    console.log(' - Read settings/rules doc exists:', rulesSnap.exists());
+
+    // 3. Read referralClaims doc
+    const claimSnapBefore = await getDoc(doc(e2eReferrerDb, 'referralClaims', e2eClaimDocId));
+    console.log(' - Read referralClaims doc exists:', claimSnapBefore.exists());
+
+    // 4. Create pending referral claim
+    await setDoc(doc(e2eReferrerDb, 'referralClaims', e2eClaimDocId), {
+      id: e2eClaimDocId,
+      referralId: e2eReferralId,
+      referrerId: e2eReferrerUid,
+      referredWorkerId: e2eReferredUid,
+      minAcc: 5,
+      rewardAmount: 5000,
+      status: 'pending',
+      requestedAt: serverTimestamp(),
+    });
+    console.log('[PASS] Step 1: Referrer Worker Claim succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Step 1: Referrer Worker Claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('Step 2: Admin executes Admin Approval flow in transaction...');
+  try {
+    const { runTransaction } = await import('firebase/firestore');
+    await runTransaction(e2eAdminDb, async (tx) => {
+      const referralRef = doc(e2eAdminDb, 'referrals', e2eReferralId);
+      const referralSnap = await tx.get(referralRef);
+
+      const rulesRef = doc(e2eAdminDb, 'settings', 'rules');
+      const rulesSnap = await tx.get(rulesRef);
+
+      const referrerRef = doc(e2eAdminDb, 'users', e2eReferrerUid);
+      const referrerSnap = await tx.get(referrerRef);
+
+      tx.update(referralRef, {
+        claimedTiers: { '5': true },
+        rewardAmount: 5000,
+        status: 'QUALIFIED',
+        rewardedAt: serverTimestamp(),
+      });
+
+      tx.update(referrerRef, {
+        balance: 5000,
+      });
+
+      const ledgerRef = doc(collection(e2eAdminDb, 'rewardLedger'));
+      tx.set(ledgerRef, {
+        workerId: e2eReferrerUid,
+        workerName: 'E2E Referrer Worker',
+        rewardType: 'referral',
+        amount: 5000,
+        sourceRefId: `${e2eReferralId}_tier_5`,
+        description: 'Hadiah Referral Tier 5 ACC',
+        createdAt: serverTimestamp(),
+      });
+
+      const claimRef = doc(e2eAdminDb, 'referralClaims', e2eClaimDocId);
+      tx.set(claimRef, {
+        id: e2eClaimDocId,
+        referralId: e2eReferralId,
+        referrerId: e2eReferrerUid,
+        referredWorkerId: e2eReferredUid,
+        minAcc: 5,
+        rewardAmount: 5000,
+        status: 'approved',
+        processedAt: serverTimestamp(),
+      }, { merge: true });
+    });
+    console.log('[PASS] Step 2: Admin Approval transaction succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Step 2: Admin Approval transaction failed:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
