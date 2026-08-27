@@ -567,6 +567,36 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- Admin Referral Actions Tests ---');
+
+  console.log('Admin Reject Test: Valid admin can reject a referral document');
+  const rejectRefId = 'reject_test_referral_doc';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'referrals', rejectRefId), {
+      id: rejectRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      currentAccCount: 2,
+      rewardAmount: 0,
+      status: 'PENDING',
+      createdAt: new Date(),
+    });
+  });
+  try {
+    await assertSucceeds(
+      updateDoc(doc(regAdminDb, 'referrals', rejectRefId), {
+        status: 'REJECTED',
+        reviewNote: 'Ditolak oleh admin',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Admin Reject Test: Admin rejected referral successfully.');
+  } catch (err) {
+    console.error('[FAIL] Admin Reject Test failed:', err);
+    process.exitCode = 1;
+  }
+
   console.log('\nRequired Test 7: Valid admin with users/{adminUid}.role == "admin" can execute approval transaction successfully');
   try {
     await assertSucceeds(
