@@ -704,6 +704,79 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- Legacy Referral Missing referredWorkerId Fallback Test ---');
+  const legacyRefId = 'legacy_referral_no_referred_id';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Legacy referral document lacking referredWorkerId
+    await setDoc(doc(db, 'referrals', legacyRefId), {
+      id: legacyRefId,
+      referrerId: regWorker1,
+      referrerName: 'Regression Worker 1',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
+    });
+  });
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', legacyRefId);
+        const refSnap = await tx.get(refDocRef);
+        const refData = refSnap.data();
+        const effectiveReferredWorkerId = refData.referredWorkerId || refData.id || legacyRefId;
+
+        const referrerUserRef = doc(regAdminDb, 'users', refData.referrerId);
+        const referrerSnap = await tx.get(referrerUserRef);
+
+        const claimDocId = `${legacyRefId}_tier_5`;
+        const claimDocRef = doc(regAdminDb, 'referralClaims', claimDocId);
+        const claimSnap = await tx.get(claimDocRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: refData.referrerId,
+          workerName: 'Regression Worker 1',
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: claimDocId,
+          description: `Hadiah Referral Tier 5 ACC (Rp 500) dari pekerja ${refData.referredWorkerName || effectiveReferredWorkerId}`,
+          createdAt: serverTimestamp(),
+        });
+
+        if (claimSnap.exists()) {
+          tx.update(claimDocRef, { status: 'approved', processedAt: serverTimestamp() });
+        } else {
+          tx.set(claimDocRef, {
+            id: claimDocId,
+            referralId: legacyRefId,
+            referrerId: refData.referrerId,
+            referredWorkerId: effectiveReferredWorkerId,
+            minAcc: 5,
+            rewardAmount: 500,
+            status: 'approved',
+            processedAt: serverTimestamp(),
+          });
+        }
+      })
+    );
+    console.log('[PASS] Legacy Referral Fallback Test: Admin approval succeeded on document lacking referredWorkerId.');
+  } catch (err) {
+    console.error('[FAIL] Legacy Referral Fallback Test failed:', err);
+    process.exitCode = 1;
+  }
+
   console.log('\nRequired Test 9: Non-admin cannot perform admin approval');
   const nonAdminClaimId = 'non_admin_test_claim';
   await testEnv.withSecurityRulesDisabled(async (context) => {

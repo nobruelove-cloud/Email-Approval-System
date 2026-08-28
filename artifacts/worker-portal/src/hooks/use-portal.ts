@@ -1566,6 +1566,7 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
       }
 
       const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+      const effectiveReferredWorkerId = referral.referredWorkerId || referral.id || referralId;
 
       if (referral.status === "REJECTED") {
         throw new Error("Referral ini sudah ditolak.");
@@ -1573,6 +1574,7 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
 
       const rulesRef = doc(firestore, "settings", "rules");
       const rulesSnap = await tx.get(rulesRef);
+
       const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
       const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
 
@@ -1600,8 +1602,13 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
 
       const totalClaimReward = tiersToClaim.reduce((sum, t) => sum + t.reward, 0);
 
+      if (!referral.referrerId) {
+        throw new Error("Data pengundang (referrerId) tidak ditemukan pada dokumen referral.");
+      }
+
       const referrerRef = doc(firestore, "users", referral.referrerId);
       const referrerSnap = await tx.get(referrerRef);
+
       if (!referrerSnap.exists()) {
         throw new Error("Profil pengundang tidak ditemukan.");
       }
@@ -1611,12 +1618,12 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
       const referrerName = referrerData.name || referral.referrerName || shortId(referral.referrerId);
 
       // Read all referralClaims documents in the READ phase before ANY writes occur
-      const claimDocsToProcess: Array<{ claimRef: any; exists: boolean; tier: ReferralTierConfig }> = [];
+      const claimDocsToProcess: Array<{ claimRef: any; claimDocId: string; exists: boolean; tier: ReferralTierConfig }> = [];
       for (const t of tiersToClaim) {
         const claimDocId = `${referralId}_tier_${t.minAcc}`;
         const claimRef = doc(firestore, "referralClaims", claimDocId);
         const claimSnap = await tx.get(claimRef);
-        claimDocsToProcess.push({ claimRef, exists: claimSnap.exists(), tier: t });
+        claimDocsToProcess.push({ claimRef, claimDocId, exists: claimSnap.exists(), tier: t });
       }
 
       // 2. ALL WRITES AFTER READS
@@ -1639,15 +1646,15 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         balance: currentBalance + totalClaimReward,
       });
 
-      claimDocsToProcess.forEach(({ claimRef, exists, tier }) => {
-        const ledgerRef = doc(collection(firestore, "rewardLedger"));
-        tx.set(ledgerRef, {
+      claimDocsToProcess.forEach(({ claimRef, claimDocId, exists, tier }) => {
+        const ledgerDoc = doc(collection(firestore, "rewardLedger"));
+        tx.set(ledgerDoc, {
           workerId: referral.referrerId,
           workerName: referrerName,
           rewardType: "referral",
           amount: tier.reward,
-          sourceRefId: `${referralId}_tier_${tier.minAcc}`,
-          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
+          sourceRefId: claimDocId,
+          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${referral.referredWorkerName || shortId(effectiveReferredWorkerId)}`,
           createdAt: serverTimestamp(),
         });
 
@@ -1659,10 +1666,10 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
           });
         } else {
           tx.set(claimRef, {
-            id: `${referralId}_tier_${tier.minAcc}`,
+            id: claimDocId,
             referralId,
             referrerId: referral.referrerId,
-            referredWorkerId: referral.referredWorkerId,
+            referredWorkerId: effectiveReferredWorkerId,
             minAcc: tier.minAcc,
             rewardAmount: tier.reward,
             status: "approved",

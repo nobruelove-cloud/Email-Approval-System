@@ -38,7 +38,8 @@ export function formatMoney(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
-export function shortId(id: string) {
+export function shortId(id?: string | null) {
+  if (!id || typeof id !== "string") return id ? String(id) : "";
   return id.length > 12 ? `${id.slice(0, 5)}…${id.slice(-4)}` : id;
 }
 
