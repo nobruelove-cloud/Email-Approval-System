@@ -1639,6 +1639,9 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         balance: currentBalance + totalClaimReward,
       });
 
+      const effectiveReferredWorkerId = referral.referredWorkerId || referral.id || referralId;
+      const effectiveReferredWorkerName = referral.referredWorkerName || shortId(effectiveReferredWorkerId);
+
       claimDocsToProcess.forEach(({ claimRef, exists, tier }) => {
         const ledgerRef = doc(collection(firestore, "rewardLedger"));
         tx.set(ledgerRef, {
@@ -1647,7 +1650,7 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
           rewardType: "referral",
           amount: tier.reward,
           sourceRefId: `${referralId}_tier_${tier.minAcc}`,
-          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
+          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
           createdAt: serverTimestamp(),
         });
 
@@ -1662,7 +1665,7 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
             id: `${referralId}_tier_${tier.minAcc}`,
             referralId,
             referrerId: referral.referrerId,
-            referredWorkerId: referral.referredWorkerId,
+            referredWorkerId: effectiveReferredWorkerId,
             minAcc: tier.minAcc,
             rewardAmount: tier.reward,
             status: "approved",
