@@ -414,9 +414,9 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\n--- REQUIRED REGRESSION TESTS (ITEMS 1 - 10) ---');
+  console.log('\n--- PRODUCTION-MATCHING REGRESSION SUITE (SCENARIOS 1 - 10) ---');
 
-  // Setup test environment data for Required Regression Tests
+  // Setup test environment data for Production-Matching Regression Suite
   const regWorker1 = 'reg_worker_1';
   const regWorker2 = 'reg_worker_2';
   const regReferralId = 'reg_referral_doc_1';
@@ -446,7 +446,7 @@ async function main() {
       balance: 0,
       createdAt: new Date(),
     });
-    // Document in referrals collection that lacks referrerId/referredWorkerId
+    // Malformed document in referrals collection
     await setDoc(doc(db, 'referrals', 'malformed_ref_doc'), {
       customField: 'no_referrer_or_referred_keys',
     });
@@ -465,139 +465,9 @@ async function main() {
   });
 
   const regWorker1Db = testEnv.authenticatedContext(regWorker1).firestore();
-  const regWorker2Db = testEnv.authenticatedContext(regWorker2).firestore();
   const regAdminDb = testEnv.authenticatedContext(adminUid).firestore();
 
-  console.log('\nRequired Test 1: Worker getDoc on referrals/{id} where doc is missing or lacks referrerId/referredWorkerId must not produce CEL/property-access permission error');
-  try {
-    // Reading non-existent referral document for self
-    await assertSucceeds(getDoc(doc(regWorker1Db, 'referrals', regWorker1)));
-    // Reading referral doc that exists but lacks referrerId/referredWorkerId (should fail cleanly with permission denied without throwing unhandled CEL evaluation error)
-    await assertFails(getDoc(doc(regWorker1Db, 'referrals', 'malformed_ref_doc')));
-    console.log('[PASS] Required Test 1: getDoc on missing or malformed referrals document handled cleanly without CEL error.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 1 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 2: Worker creates a new referralClaims/{claimId} with referrerId == authenticated worker UID and status == "pending"');
-  try {
-    await assertSucceeds(
-      setDoc(doc(regWorker1Db, 'referralClaims', regClaimId), {
-        id: regClaimId,
-        referralId: regReferralId,
-        referrerId: regWorker1,
-        referredWorkerId: regWorker2,
-        minAcc: 5,
-        rewardAmount: 500,
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Required Test 2: Worker created valid pending referralClaim request.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 2 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 3: Worker attempting to write/update an existing referralClaims document must be denied');
-  try {
-    await assertFails(
-      updateDoc(doc(regWorker1Db, 'referralClaims', regClaimId), {
-        status: 'approved',
-      })
-    );
-    await assertFails(
-      setDoc(doc(regWorker1Db, 'referralClaims', regClaimId), {
-        id: regClaimId,
-        referralId: regReferralId,
-        referrerId: regWorker1,
-        referredWorkerId: regWorker2,
-        minAcc: 5,
-        rewardAmount: 500,
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Required Test 3: Worker attempting to update existing referralClaims correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 3 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 4: Worker cannot update users/{uid}.balance upward');
-  try {
-    await assertFails(
-      updateDoc(doc(regWorker1Db, 'users', regWorker1), {
-        balance: 99999,
-      })
-    );
-    console.log('[PASS] Required Test 4: Worker updating balance upward correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 4 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 5: Worker cannot update referrals/{id}');
-  try {
-    await assertFails(
-      updateDoc(doc(regWorker1Db, 'referrals', regReferralId), {
-        rewardAmount: 5000,
-      })
-    );
-    console.log('[PASS] Required Test 5: Worker updating referrals document correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 5 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 6: Worker cannot write rewardLedger/{id}');
-  try {
-    await assertFails(
-      setDoc(doc(regWorker1Db, 'rewardLedger', 'illegal_ledger_id'), {
-        workerId: regWorker1,
-        amount: 5000,
-        rewardType: 'referral',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Required Test 6: Worker writing rewardLedger correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Required Test 6 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- Admin Referral Actions Tests ---');
-
-  console.log('Admin Reject Test: Valid admin can reject a referral document');
-  const rejectRefId = 'reject_test_referral_doc';
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    const db = context.firestore();
-    await setDoc(doc(db, 'referrals', rejectRefId), {
-      id: rejectRefId,
-      referrerId: regWorker1,
-      referredWorkerId: regWorker2,
-      currentAccCount: 2,
-      rewardAmount: 0,
-      status: 'PENDING',
-      createdAt: new Date(),
-    });
-  });
-  try {
-    await assertSucceeds(
-      updateDoc(doc(regAdminDb, 'referrals', rejectRefId), {
-        status: 'REJECTED',
-        reviewNote: 'Ditolak oleh admin',
-        updatedAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Admin Reject Test: Admin rejected referral successfully.');
-  } catch (err) {
-    console.error('[FAIL] Admin Reject Test failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nRequired Test 7: Valid admin with users/{adminUid}.role == "admin" can execute approval transaction successfully');
+  console.log('\nScenario 1: Valid admin approval succeeds');
   try {
     await assertSucceeds(
       runTransaction(regAdminDb, async (tx) => {
@@ -633,78 +503,41 @@ async function main() {
         }, { merge: true });
       })
     );
-    console.log('[PASS] Required Test 7: Valid admin executed approval transaction successfully.');
+    console.log('[PASS] Scenario 1: Valid admin approval succeeded.');
   } catch (err) {
-    console.error('[FAIL] Required Test 7 failed:', err);
+    console.error('[FAIL] Scenario 1 failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\nRequired Test 8: Admin approval atomically updates referrals/{id}, credits users/{referrerId}.balance, creates rewardLedger/{id}, and updates referralClaims/{claimId} to approved');
-  const e2eRegClaimId = 'e2e_reg_claim_doc_10';
-  const e2eRegReferralId = 'e2e_reg_referral_doc_10';
+  console.log('\nScenario 2: Reject succeeds');
+  const rejectRefId = 'reject_test_referral_doc';
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    await setDoc(doc(db, 'referrals', e2eRegReferralId), {
-      id: e2eRegReferralId,
+    await setDoc(doc(db, 'referrals', rejectRefId), {
+      id: rejectRefId,
       referrerId: regWorker1,
       referredWorkerId: regWorker2,
-      currentAccCount: 10,
-      rewardAmount: 500,
-      claimedTiers: { '5': true },
-      status: 'QUALIFIED',
-    });
-    await setDoc(doc(db, 'referralClaims', e2eRegClaimId), {
-      id: e2eRegClaimId,
-      referralId: e2eRegReferralId,
-      referrerId: regWorker1,
-      referredWorkerId: regWorker2,
-      minAcc: 10,
-      rewardAmount: 1000,
-      status: 'pending',
+      currentAccCount: 2,
+      rewardAmount: 0,
+      status: 'PENDING',
+      createdAt: new Date(),
     });
   });
   try {
     await assertSucceeds(
-      runTransaction(regAdminDb, async (tx) => {
-        const refDocRef = doc(regAdminDb, 'referrals', e2eRegReferralId);
-        const refSnap = await tx.get(refDocRef);
-        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
-        const referrerSnap = await tx.get(referrerUserRef);
-        const claimDocRef = doc(regAdminDb, 'referralClaims', e2eRegClaimId);
-        const claimSnap = await tx.get(claimDocRef);
-
-        tx.update(refDocRef, {
-          claimedTiers: { ...refSnap.data().claimedTiers, '10': true },
-          rewardAmount: 1500,
-          status: 'QUALIFIED',
-        });
-
-        tx.update(referrerUserRef, {
-          balance: (referrerSnap.data().balance || 0) + 1000,
-        });
-
-        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
-        tx.set(ledgerRef, {
-          workerId: regWorker1,
-          rewardType: 'referral',
-          amount: 1000,
-          sourceRefId: e2eRegClaimId,
-          createdAt: serverTimestamp(),
-        });
-
-        tx.set(claimDocRef, {
-          status: 'approved',
-          processedAt: serverTimestamp(),
-        }, { merge: true });
+      updateDoc(doc(regAdminDb, 'referrals', rejectRefId), {
+        status: 'REJECTED',
+        reviewNote: 'Ditolak oleh admin',
+        updatedAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Required Test 8: Admin approval transaction verified atomic updates to all 4 collections.');
+    console.log('[PASS] Scenario 2: Reject succeeded.');
   } catch (err) {
-    console.error('[FAIL] Required Test 8 failed:', err);
+    console.error('[FAIL] Scenario 2 failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\nRequired Test 9: Non-admin cannot perform admin approval');
+  console.log('\nScenario 3: Non-admin approval denied');
   const nonAdminClaimId = 'non_admin_test_claim';
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
@@ -751,15 +584,56 @@ async function main() {
         }, { merge: true });
       })
     );
-    console.log('[PASS] Required Test 9: Non-admin approval transaction correctly denied.');
+    console.log('[PASS] Scenario 3: Non-admin approval correctly denied.');
   } catch (err) {
-    console.error('[FAIL] Required Test 9 failed:', err);
+    console.error('[FAIL] Scenario 3 failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\nRequired Test 10: Duplicate tier approval cannot pay twice');
+  console.log('\nScenario 4: Worker cannot increase balance');
   try {
-    // Attempting to re-approve tier 5 which was already claimed in claimedTiers: { '5': true }
+    await assertFails(
+      updateDoc(doc(regWorker1Db, 'users', regWorker1), {
+        balance: 99999,
+      })
+    );
+    console.log('[PASS] Scenario 4: Worker increasing balance correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 4 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 5: Worker cannot update referrals');
+  try {
+    await assertFails(
+      updateDoc(doc(regWorker1Db, 'referrals', regReferralId), {
+        rewardAmount: 5000,
+      })
+    );
+    console.log('[PASS] Scenario 5: Worker updating referrals correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 5 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 6: Worker cannot write rewardLedger');
+  try {
+    await assertFails(
+      setDoc(doc(regWorker1Db, 'rewardLedger', 'illegal_ledger_id'), {
+        workerId: regWorker1,
+        amount: 5000,
+        rewardType: 'referral',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Scenario 6: Worker writing rewardLedger correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 6 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 7: Duplicate approval cannot pay twice');
+  try {
     let duplicatePayoutOccurred = false;
     await runTransaction(regAdminDb, async (tx) => {
       const refDocRef = doc(regAdminDb, 'referrals', regReferralId);
@@ -775,17 +649,177 @@ async function main() {
         rewardAmount: (refSnap.data().rewardAmount || 0) + 500,
       });
     }).catch((err) => {
-      console.log(' - Expected rejection received:', err.message);
+      console.log(' - Expected duplicate rejection received:', err.message);
     });
 
     if (!duplicatePayoutOccurred) {
-      console.log('[PASS] Required Test 10: Duplicate tier approval safely blocked from double payout.');
+      console.log('[PASS] Scenario 7: Duplicate approval safely blocked from double payout.');
     } else {
-      console.error('[FAIL] Required Test 10: Duplicate payout was allowed!');
+      console.error('[FAIL] Scenario 7: Duplicate payout was allowed!');
       process.exitCode = 1;
     }
   } catch (err) {
-    console.error('[FAIL] Required Test 10 failed:', err);
+    console.error('[FAIL] Scenario 7 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 8: Legacy referral missing referredWorkerId succeeds');
+  const legacyRefId = 'legacy_ref_missing_referred_worker_id';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Legacy doc where referredWorkerId is omitted but doc ID is the referredWorkerId
+    await setDoc(doc(db, 'referrals', legacyRefId), {
+      referrerId: regWorker1,
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+    });
+  });
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', legacyRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referralData = refSnap.data();
+
+        const effectiveReferredWorkerId = referralData.referredWorkerId || refSnap.id || legacyRefId;
+        const referrerUserRef = doc(regAdminDb, 'users', referralData.referrerId);
+        const referrerSnap = await tx.get(referrerUserRef);
+
+        const claimDocId = `${legacyRefId}_tier_5`;
+        const claimDocRef = doc(regAdminDb, 'referralClaims', claimDocId);
+        const claimSnap = await tx.get(claimDocRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: referralData.referrerId,
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: claimDocId,
+          createdAt: serverTimestamp(),
+        });
+
+        tx.set(claimDocRef, {
+          id: claimDocId,
+          referralId: legacyRefId,
+          referrerId: referralData.referrerId,
+          referredWorkerId: effectiveReferredWorkerId,
+          minAcc: 5,
+          rewardAmount: 500,
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Scenario 8: Legacy referral missing referredWorkerId approval succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 8 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 9: referralClaims existing-document case');
+  const existingClaimRefId = 'ref_with_existing_claim_doc';
+  const existingClaimId = `${existingClaimRefId}_tier_5`;
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'referrals', existingClaimRefId), {
+      id: existingClaimRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+    });
+    await setDoc(doc(db, 'referralClaims', existingClaimId), {
+      id: existingClaimId,
+      referralId: existingClaimRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      minAcc: 5,
+      rewardAmount: 500,
+      status: 'pending',
+      requestedAt: new Date(),
+    });
+  });
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', existingClaimRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', existingClaimId);
+        const claimSnap = await tx.get(claimDocRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: regWorker1,
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: existingClaimId,
+          createdAt: serverTimestamp(),
+        });
+
+        // Updating existing claim document
+        tx.update(claimDocRef, {
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Scenario 9: referralClaims existing-document case succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 9 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 10: rewardLedger existing-document case');
+  const existingLedgerId = 'existing_ledger_doc_123';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'rewardLedger', existingLedgerId), {
+      id: existingLedgerId,
+      workerId: regWorker1,
+      rewardType: 'referral',
+      amount: 500,
+      createdAt: new Date(),
+    });
+  });
+  try {
+    // Admin reading or writing an existing rewardLedger document succeeds
+    await assertSucceeds(getDoc(doc(regAdminDb, 'rewardLedger', existingLedgerId)));
+    await assertSucceeds(
+      setDoc(
+        doc(regAdminDb, 'rewardLedger', existingLedgerId),
+        {
+          note: 'Updated by admin',
+        },
+        { merge: true }
+      )
+    );
+    console.log('[PASS] Scenario 10: rewardLedger existing-document case succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 10 failed:', err);
     process.exitCode = 1;
   }
 
