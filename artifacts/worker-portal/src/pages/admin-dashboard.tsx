@@ -853,8 +853,24 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     try {
       await approveReferral(refId);
       toast.success("Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyetujui referral.");
+    } catch (err: any) {
+      const status = err?.status;
+      const code = err?.code;
+      const msg = err instanceof Error ? err.message : String(err || "Gagal menyetujui referral.");
+
+      if (status === 401) {
+        toast.error("Sesi tidak valid atau telah berakhir. Silakan login kembali.");
+      } else if (status === 403) {
+        toast.error("Akses ditolak: Hanya admin yang berhak menyetujui referral.");
+      } else if (status === 404) {
+        toast.error("Data referral tidak ditemukan.");
+      } else if (status === 409 || code === "ALREADY_PAID" || code === "ALREADY_CLAIMED") {
+        toast.error("Referral / tier ini sudah pernah disetujui atau dicairkan.");
+      } else if (status === 400) {
+        toast.error(msg || "Permintaan tidak valid.");
+      } else {
+        toast.error(msg || "Gagal menyetujui referral.");
+      }
     } finally {
       setBusyId(null);
     }
