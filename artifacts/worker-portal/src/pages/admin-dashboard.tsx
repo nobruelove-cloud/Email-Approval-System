@@ -832,9 +832,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   async function handleApproveReferral(refId: string) {
     setBusyId(refId);
     try {
+      console.log(`[APPROVE] AdminDashboard.handleApproveReferral called for referralId: ${refId}`);
       await approveReferral(refId);
       toast.success("Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!");
     } catch (err) {
+      console.error(`[APPROVE] AdminDashboard.handleApproveReferral failed for referralId: ${refId}:`, err);
       toast.error(err instanceof Error ? err.message : "Gagal menyetujui referral.");
     } finally {
       setBusyId(null);
