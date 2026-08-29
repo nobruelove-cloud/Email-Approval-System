@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import {
   LogOut,
@@ -132,6 +133,24 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
+
+  useEffect(() => {
+    const currentUser = auth?.currentUser;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    const actualUid = currentUser?.uid || profile.uid;
+    console.log("[REAL AUTH IDENTITY DIAGNOSTIC]", {
+      authUid: actualUid,
+      email: currentUser?.email || profile.email,
+      projectId,
+      profilePath: `users/${actualUid}`,
+      profileExists: true,
+      role: profile.role,
+      status: profile.status,
+      tier: profile.tier,
+      balance: profile.balance,
+      isAdmin: profile.role === "admin",
+    });
+  }, [profile]);
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
