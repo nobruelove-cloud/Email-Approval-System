@@ -24,7 +24,7 @@ vi.mock("../lib/firebase-admin", () => {
   };
 });
 
-describe("API Integration: POST /api/admin/referrals/:referralId/approve", () => {
+describe("API Integration: POST /api/admin/referrals/:referralId/approve (Server Endpoint Verification)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
