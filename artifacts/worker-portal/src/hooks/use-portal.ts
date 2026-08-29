@@ -1555,22 +1555,57 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
 
-  console.log(`[approveReferral Diagnostic] Starting approval transaction for referralId: ${referralId}, targetMinAcc: ${targetMinAcc}`);
+  const currentUid = auth?.currentUser?.uid || "unauthenticated";
+  console.log(`[APPROVE] Starting approval call for referralId: ${referralId}, targetMinAcc: ${targetMinAcc}`);
+
+  let attemptCount = 0;
 
   try {
     await runTransactionWithDiagnostic(
       firestore,
       async (tx) => {
+        attemptCount++;
+        let phase: "READ" | "WRITE" | "VALIDATION" = "READ";
+        let currentOpName = "";
+        let currentPath = "";
+
+        console.log(`[APPROVE] Attempt ${attemptCount} starting (Phase: ${phase})`);
+
+        // --- AUTH METADATA READ (READ 0) ---
+        currentOpName = "READ AUTH PROFILE";
+        currentPath = `users/${currentUid}`;
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 0 BEFORE users/${currentUid}`);
+        let authProfileSnap: any = null;
+        try {
+          if (auth?.currentUser) {
+            authProfileSnap = await tx.get(doc(firestore, "users", currentUid));
+          }
+          console.log(`[APPROVE] Attempt ${attemptCount} READ 0 AFTER users/${currentUid}`);
+          console.log(`[APPROVE] AUTH METADATA:`, {
+            uid: currentUid,
+            exists: authProfileSnap ? authProfileSnap.exists() : false,
+            role: authProfileSnap && authProfileSnap.exists() ? authProfileSnap.data()?.role : null,
+            status: authProfileSnap && authProfileSnap.exists() ? authProfileSnap.data()?.status : null,
+          });
+        } catch (authErr) {
+          console.error(`[APPROVE] Attempt ${attemptCount} READ 0 FAILED users/${currentUid}:`, authErr);
+        }
+
         // --- 1. ALL READS FIRST ---
 
         // READ 1: referrals/{referralId}
-        console.log(`[approveReferral Diagnostic] READ 1: referrals/${referralId}`);
+        currentOpName = "tx.get(referral)";
+        currentPath = `referrals/${referralId}`;
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 1 BEFORE referrals/${referralId}`);
         const referralRef = doc(firestore, "referrals", referralId);
         const referralSnap = await tx.get(referralRef);
-        console.log(`[approveReferral Diagnostic] READ 1 RESULT: path=referrals/${referralId}, exists=${referralSnap.exists()}`);
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 1 AFTER referrals/${referralId}`);
 
         if (!referralSnap.exists()) {
-          throw new Error(`Data referral tidak ditemukan (referrals/${referralId}).`);
+          phase = "VALIDATION";
+          const err = new Error(`Data referral tidak ditemukan (referrals/${referralId}).`);
+          console.error(`[APPROVE] FAILED\nattempt: ${attemptCount}\nphase: ${phase}\noperation: ${currentOpName}\npath: ${currentPath}\nfirebaseErrorCode: document-not-found\nfirebaseErrorMessage: ${err.message}`);
+          throw err;
         }
 
         const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
@@ -1578,30 +1613,36 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         const effectiveReferredWorkerId = referral.referredWorkerId || referral.id || referralId;
         const effectiveReferredWorkerName = referral.referredWorkerName || shortId(effectiveReferredWorkerId);
 
-        console.log(`[approveReferral Diagnostic] 1. Metadata referrals/${referralId}:`, {
+        console.log(`[APPROVE] REFERRAL METADATA:`, {
+          referralId,
+          path: `referrals/${referralId}`,
           exists: true,
           status: referral.status,
           referrerId: effectiveReferrerId,
           referredWorkerId: effectiveReferredWorkerId,
           referredWorkerName: effectiveReferredWorkerName,
           currentAccCount: referral.currentAccCount ?? 0,
-          claimedTiers: referral.claimedTiers || {},
         });
 
         if (referral.status === "REJECTED") {
-          throw new Error("Referral ini sudah ditolak.");
+          phase = "VALIDATION";
+          const err = new Error("Referral ini sudah ditolak.");
+          console.error(`[APPROVE] FAILED\nattempt: ${attemptCount}\nphase: ${phase}\noperation: ${currentOpName}\npath: ${currentPath}\nfirebaseErrorCode: invalid-argument\nfirebaseErrorMessage: ${err.message}`);
+          throw err;
         }
 
         // READ 2: settings/rules
-        console.log(`[approveReferral Diagnostic] READ 2: settings/rules`);
+        currentOpName = "tx.get(rules)";
+        currentPath = "settings/rules";
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 2 BEFORE settings/rules`);
         const rulesRef = doc(firestore, "settings", "rules");
         const rulesSnap = await tx.get(rulesRef);
-        console.log(`[approveReferral Diagnostic] READ 2 RESULT: path=settings/rules, exists=${rulesSnap.exists()}`);
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 2 AFTER settings/rules`);
 
         const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
         const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
 
-        console.log(`[approveReferral Diagnostic] 2. Metadata settings/rules:`, {
+        console.log(`[APPROVE] SETTINGS METADATA:`, {
           exists: rulesSnap.exists(),
           tierCount: referralTiers.length,
           referralTiers,
@@ -1613,15 +1654,25 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         let tiersToClaim: ReferralTierConfig[] = [];
         if (typeof targetMinAcc === "number") {
           const found = referralTiers.find((t) => Number(t.minAcc) === Number(targetMinAcc));
-          if (!found) throw new Error(`Tier referral ${targetMinAcc} ACC tidak ditemukan.`);
-          if (currentAcc < found.minAcc) throw new Error(`Target ACC belum tercapai (${currentAcc}/${found.minAcc}).`);
-          if (claimedTiers[String(found.minAcc)]) throw new Error(`Tier ${found.minAcc} ACC sudah pernah diklaim.`);
+          if (!found) {
+            phase = "VALIDATION";
+            throw new Error(`Tier referral ${targetMinAcc} ACC tidak ditemukan.`);
+          }
+          if (currentAcc < found.minAcc) {
+            phase = "VALIDATION";
+            throw new Error(`Target ACC belum tercapai (${currentAcc}/${found.minAcc}).`);
+          }
+          if (claimedTiers[String(found.minAcc)]) {
+            phase = "VALIDATION";
+            throw new Error(`Tier ${found.minAcc} ACC sudah pernah diklaim.`);
+          }
           tiersToClaim = [found];
         } else {
           tiersToClaim = referralTiers.filter(
             (t) => currentAcc >= t.minAcc && !claimedTiers[String(t.minAcc)]
           );
           if (tiersToClaim.length === 0) {
+            phase = "VALIDATION";
             if (referral.status === "PAID" || referral.status === "REWARDED") {
               throw new Error("Referral ini sudah pernah disetujui / dibayar.");
             }
@@ -1632,24 +1683,29 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         const totalClaimReward = tiersToClaim.reduce((sum, t) => sum + t.reward, 0);
 
         // READ 3: users/{referrerId}
-        console.log(`[approveReferral Diagnostic] READ 3: users/${effectiveReferrerId}`);
+        currentOpName = "tx.get(referrer)";
+        currentPath = `users/${effectiveReferrerId}`;
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 3 BEFORE users/${effectiveReferrerId}`);
         const referrerRef = doc(firestore, "users", effectiveReferrerId);
         const referrerSnap = await tx.get(referrerRef);
-        console.log(`[approveReferral Diagnostic] READ 3 RESULT: path=users/${effectiveReferrerId}, exists=${referrerSnap.exists()}`);
+        console.log(`[APPROVE] Attempt ${attemptCount} READ 3 AFTER users/${effectiveReferrerId}`);
 
         if (!referrerSnap.exists()) {
-          throw new Error(`Profil pengundang tidak ditemukan (users/${effectiveReferrerId}).`);
+          phase = "VALIDATION";
+          const err = new Error(`Profil pengundang tidak ditemukan (users/${effectiveReferrerId}).`);
+          console.error(`[APPROVE] FAILED\nattempt: ${attemptCount}\nphase: ${phase}\noperation: ${currentOpName}\npath: ${currentPath}\nfirebaseErrorCode: document-not-found\nfirebaseErrorMessage: ${err.message}`);
+          throw err;
         }
 
         const referrerData = referrerSnap.data() as PortalUser;
         const currentBalance = referrerData.balance ?? 0;
         const referrerName = (referrerData.name && String(referrerData.name).trim()) || referral.referrerName || shortId(effectiveReferrerId);
 
-        console.log(`[approveReferral Diagnostic] 3. Metadata users/${effectiveReferrerId}:`, {
+        console.log(`[APPROVE] REFERRER METADATA:`, {
+          path: `users/${effectiveReferrerId}`,
           exists: true,
           role: referrerData.role,
           balance: currentBalance,
-          name: referrerName,
         });
 
         // READ 4+: referralClaims/{claimId} for every target tier
@@ -1657,36 +1713,57 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         let readIdx = 4;
         for (const t of tiersToClaim) {
           const claimDocId = `${referralId}_tier_${t.minAcc}`;
-          console.log(`[approveReferral Diagnostic] READ ${readIdx}: referralClaims/${claimDocId}`);
+          currentOpName = "tx.get(claimDoc)";
+          currentPath = `referralClaims/${claimDocId}`;
+          console.log(`[APPROVE] Attempt ${attemptCount} READ ${readIdx} BEFORE referralClaims/${claimDocId}`);
           const claimRef = doc(firestore, "referralClaims", claimDocId);
           const claimSnap = await tx.get(claimRef);
-          console.log(`[approveReferral Diagnostic] READ ${readIdx} RESULT: path=referralClaims/${claimDocId}, exists=${claimSnap.exists()}`);
+          console.log(`[APPROVE] Attempt ${attemptCount} READ ${readIdx} AFTER referralClaims/${claimDocId}`);
 
-          if (claimSnap.exists()) {
-            const cData = claimSnap.data();
-            console.log(`[approveReferral Diagnostic] 4. Metadata referralClaims/${claimDocId}:`, {
-              path: `referralClaims/${claimDocId}`,
-              exists: true,
-              status: cData?.status,
-              referralId: cData?.referralId,
-              referrerId: cData?.referrerId,
-              referredWorkerId: cData?.referredWorkerId,
-            });
-          } else {
-            console.log(`[approveReferral Diagnostic] 4. Metadata referralClaims/${claimDocId}:`, {
-              path: `referralClaims/${claimDocId}`,
-              exists: false,
-            });
-          }
+          const cData = claimSnap.exists() ? claimSnap.data() : null;
+          console.log(`[APPROVE] CLAIM METADATA:`, {
+            claimId: claimDocId,
+            path: `referralClaims/${claimDocId}`,
+            exists: claimSnap.exists(),
+            status: cData?.status ?? null,
+            referralId: cData?.referralId ?? referralId,
+            referrerId: cData?.referrerId ?? effectiveReferrerId,
+            referredWorkerId: cData?.referredWorkerId ?? effectiveReferredWorkerId,
+          });
 
           claimDocsToProcess.push({ claimRef, claimDocId, exists: claimSnap.exists(), tier: t });
           readIdx++;
         }
 
+        // READ 5+: rewardLedger/{ledgerId}
+        const ledgerDocsToProcess: Array<{ ledgerRef: any; ledgerId: string; exists: boolean; tier: ReferralTierConfig }> = [];
+        for (const t of tiersToClaim) {
+          const ledgerRef = doc(collection(firestore, "rewardLedger"));
+          const ledgerId = ledgerRef.id;
+          currentOpName = "tx.get(ledgerDoc)";
+          currentPath = `rewardLedger/${ledgerId}`;
+          console.log(`[APPROVE] Attempt ${attemptCount} READ ${readIdx} BEFORE rewardLedger/${ledgerId}`);
+          const ledgerSnap = await tx.get(ledgerRef);
+          console.log(`[APPROVE] Attempt ${attemptCount} READ ${readIdx} AFTER rewardLedger/${ledgerId}`);
+
+          console.log(`[APPROVE] LEDGER METADATA:`, {
+            ledgerId,
+            path: `rewardLedger/${ledgerId}`,
+            exists: ledgerSnap.exists(),
+          });
+
+          ledgerDocsToProcess.push({ ledgerRef, ledgerId, exists: ledgerSnap.exists(), tier: t });
+          readIdx++;
+        }
+
         // --- 2. ALL WRITES AFTER READS ---
+        phase = "WRITE";
+
         let writeIdx = 1;
 
         // WRITE 1: referrals/{referralId}
+        currentOpName = "tx.update(referral)";
+        currentPath = `referrals/${referralId}`;
         const updatedClaimedTiers = { ...claimedTiers };
         tiersToClaim.forEach((t) => {
           updatedClaimedTiers[String(t.minAcc)] = true;
@@ -1695,26 +1772,32 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
         const newTotalReward = (referral.rewardAmount ?? 0) + totalClaimReward;
         const allClaimed = referralTiers.every((t) => Boolean(updatedClaimedTiers[String(t.minAcc)]));
 
-        console.log(`[approveReferral Diagnostic] WRITE ${writeIdx}: referrals/${referralId} update`);
+        console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} BEFORE referrals/${referralId}`);
         tx.update(referralRef, {
           claimedTiers: updatedClaimedTiers,
           rewardAmount: newTotalReward,
           status: allClaimed ? "PAID" : "QUALIFIED",
           rewardedAt: serverTimestamp(),
         });
+        console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} AFTER referrals/${referralId}`);
         writeIdx++;
 
         // WRITE 2: users/{referrerId}
-        console.log(`[approveReferral Diagnostic] WRITE ${writeIdx}: users/${effectiveReferrerId} update balance`);
+        currentOpName = "tx.update(referrer)";
+        currentPath = `users/${effectiveReferrerId}`;
+        console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} BEFORE users/${effectiveReferrerId}`);
         tx.update(referrerRef, {
           balance: currentBalance + totalClaimReward,
         });
+        console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} AFTER users/${effectiveReferrerId}`);
         writeIdx++;
 
-        // WRITE 3+: rewardLedger & referralClaims for each tier
-        claimDocsToProcess.forEach(({ claimRef, claimDocId, exists, tier }) => {
-          const ledgerRef = doc(collection(firestore, "rewardLedger"));
-          console.log(`[approveReferral Diagnostic] WRITE ${writeIdx}: rewardLedger/${ledgerRef.id} set (exists=false)`);
+        // WRITE 3+: rewardLedger for each tier
+        for (let i = 0; i < ledgerDocsToProcess.length; i++) {
+          const { ledgerRef, ledgerId, tier } = ledgerDocsToProcess[i];
+          currentOpName = "tx.set(rewardLedger)";
+          currentPath = `rewardLedger/${ledgerId}`;
+          console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} BEFORE rewardLedger/${ledgerId}`);
           tx.set(ledgerRef, {
             workerId: effectiveReferrerId,
             workerName: referrerName,
@@ -1724,16 +1807,26 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
             description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
             createdAt: serverTimestamp(),
           });
+          console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} AFTER rewardLedger/${ledgerId}`);
           writeIdx++;
+        }
 
+        // WRITE 4+: referralClaims for each tier
+        for (let i = 0; i < claimDocsToProcess.length; i++) {
+          const { claimRef, claimDocId, exists, tier } = claimDocsToProcess[i];
           if (exists) {
-            console.log(`[approveReferral Diagnostic] WRITE ${writeIdx}: referralClaims/${claimDocId} update`);
+            currentOpName = "tx.update(referralClaims)";
+            currentPath = `referralClaims/${claimDocId}`;
+            console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} BEFORE referralClaims/${claimDocId}`);
             tx.update(claimRef, {
               status: "approved",
               processedAt: serverTimestamp(),
             });
+            console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} AFTER referralClaims/${claimDocId}`);
           } else {
-            console.log(`[approveReferral Diagnostic] WRITE ${writeIdx}: referralClaims/${claimDocId} set`);
+            currentOpName = "tx.set(referralClaims)";
+            currentPath = `referralClaims/${claimDocId}`;
+            console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} BEFORE referralClaims/${claimDocId}`);
             tx.set(claimRef, {
               id: `${referralId}_tier_${tier.minAcc}`,
               referralId,
@@ -1744,21 +1837,20 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
               status: "approved",
               processedAt: serverTimestamp(),
             });
+            console.log(`[APPROVE] Attempt ${attemptCount} WRITE ${writeIdx} AFTER referralClaims/${claimDocId}`);
           }
           writeIdx++;
-        });
+        }
       },
       "approveReferral",
       `referrals/${referralId}`
     );
+
+    console.log(`[APPROVE] Transaction completed successfully for referralId: ${referralId}`);
   } catch (err) {
     const code = (err as { code?: string })?.code ?? "unknown";
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[approveReferral Diagnostic ERROR] Transaction failed for referralId: ${referralId}:`, {
-      code,
-      message: msg,
-      path: `referrals/${referralId}`,
-    });
+    console.error(`[APPROVE] FAILED\nattempt: ${attemptCount}\nfirebaseErrorCode: ${code}\nfirebaseErrorMessage: ${msg}`);
     throw err;
   }
 }
