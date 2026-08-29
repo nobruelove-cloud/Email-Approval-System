@@ -96,6 +96,7 @@ vi.mock("../lib/firebase", async () => {
 import {
   usePortalAuth,
   useMyReferral,
+  useAdminData,
   claimReferralCode,
   registerReferral,
   createPortalUser,
@@ -1735,6 +1736,83 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
 
     // Ensure calling sendRemoteDiagnostic directly with broken network does not throw
     await expect(sendRemoteDiagnostic(payload)).resolves.toBeUndefined();
+
+    fetchSpy.mockRestore();
+  });
+});
+
+describe("AdminDashboard & useAdminData Referral Document ID Mapping Regression Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthObj.currentUser = { uid: "test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any;
+  });
+
+  it("useAdminData maps row.id === Firestore snapshot.id and internal document id property CANNOT overwrite snapshot.id", () => {
+    let referralsSuccessCb: ((snapshot: any) => void) | null = null;
+    mockOnSnapshot.mockImplementation((queryRef: any, successCb: any) => {
+      if (queryRef?.path === "referrals") {
+        referralsSuccessCb = successCb;
+      }
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useAdminData());
+
+    // Simulate Firestore snapshot where document ID is "bKCCoXaby_actual_doc_id" but data contains legacy or overwriting id
+    act(() => {
+      referralsSuccessCb?.({
+        docs: [
+          {
+            id: "bKCCoXaby_actual_doc_id",
+            data: () => ({
+              id: "overwriting_legacy_internal_id",
+              referrerId: "XYNKFUs_referrer_id",
+              referredWorkerId: "bKCCoXaby_actual_doc_id",
+              status: "QUALIFIED",
+            }),
+          },
+        ],
+      });
+    });
+
+    expect(result.current.referrals.data.length).toBe(1);
+    const row = result.current.referrals.data[0];
+
+    // PROOF: row.id MUST equal the Firestore snapshot ID (bKCCoXaby_actual_doc_id)
+    expect(row.id).toBe("bKCCoXaby_actual_doc_id");
+    // PROOF: internal data field 'id' did NOT overwrite row.id
+    expect(row.id).not.toBe("overwriting_legacy_internal_id");
+  });
+
+  it("approveReferral receives the actual referral document ID (row.id)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url: any) => {
+      expect(String(url)).toContain("/api/admin/referrals/bKCCoXaby_actual_doc_id/approve");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: "ok",
+          message: "Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!",
+          data: {
+            referralId: "bKCCoXaby_actual_doc_id",
+            totalClaimReward: 5000,
+            approvedTiers: [5],
+            status: "QUALIFIED",
+          },
+        }),
+      } as any;
+    });
+
+    const row = {
+      id: "bKCCoXaby_actual_doc_id",
+      referredWorkerId: "bKCCoXaby_actual_doc_id",
+      referrerId: "XYNKFUs_referrer_id",
+    } as any;
+
+    const res = await approveReferral(row.id);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(res.data.referralId).toBe("bKCCoXaby_actual_doc_id");
 
     fetchSpy.mockRestore();
   });
