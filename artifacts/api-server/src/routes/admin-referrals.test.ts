@@ -255,6 +255,7 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.data.approvedTiers).toEqual([5]);
   });
 
+
   it("approves legacy referral document with missing optional fields", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);

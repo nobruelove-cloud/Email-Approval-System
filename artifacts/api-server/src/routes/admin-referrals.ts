@@ -39,8 +39,15 @@ function sanitizePayload<T extends Record<string, any>>(obj: T): T {
 const router: IRouter = Router();
 
 router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Response): Promise<void> => {
-  const referralId = req.params.referralId;
+  const referralId = req.params.referralId ? String(req.params.referralId).trim() : "";
   const targetMinAcc = req.body?.targetMinAcc !== undefined ? Number(req.body.targetMinAcc) : undefined;
+
+  console.log("[ADMIN REFERRAL ID TRACE]", {
+    serverReceivedReferralId: referralId,
+    referralIdType: typeof referralId,
+    referralIdLength: referralId.length,
+    requestUrlPath: req.originalUrl || req.url,
+  });
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -109,6 +116,14 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       const referralRef = adminDb.doc(`referrals/${referralId}`);
       let referralSnap = await tx.get(referralRef);
 
+      console.log("[ADMIN REFERRAL LOOKUP]", {
+        receivedReferralId: referralId,
+        directPath: `referrals/${referralId}`,
+        directExists: referralSnap.exists,
+        directSnapshotId: referralSnap.exists ? referralSnap.id : null,
+        directSafeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
+      });
+
       logger.info(
         {
           referralId,
@@ -127,8 +142,14 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
         const workerSnap = await tx.get(queryByWorker as any);
         if (workerSnap && !workerSnap.empty && Array.isArray(workerSnap.docs) && workerSnap.docs.length > 0) {
           referralSnap = workerSnap.docs[0] as any;
+          const safeFieldNames = Object.keys(referralSnap.data() || {});
+          console.log("[ADMIN REFERRAL LOOKUP - FALLBACK MATCH]", {
+            fallbackQueryField: "referredWorkerId",
+            fallbackMatchedDocumentId: referralSnap.id,
+            fallbackMatchedSafeFieldNames: safeFieldNames,
+          });
           logger.info(
-            { referralId, matchedDocId: referralSnap.id },
+            { referralId, fallbackQueryField: "referredWorkerId", matchedDocId: referralSnap.id, safeFieldNames },
             "[ADMIN REFERRAL APPROVAL] Fallback match found by referredWorkerId"
           );
         } else {
@@ -137,8 +158,14 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
           const idSnap = await tx.get(queryById as any);
           if (idSnap && !idSnap.empty && Array.isArray(idSnap.docs) && idSnap.docs.length > 0) {
             referralSnap = idSnap.docs[0] as any;
+            const safeFieldNames = Object.keys(referralSnap.data() || {});
+            console.log("[ADMIN REFERRAL LOOKUP - FALLBACK MATCH]", {
+              fallbackQueryField: "id",
+              fallbackMatchedDocumentId: referralSnap.id,
+              fallbackMatchedSafeFieldNames: safeFieldNames,
+            });
             logger.info(
-              { referralId, matchedDocId: referralSnap.id },
+              { referralId, fallbackQueryField: "id", matchedDocId: referralSnap.id, safeFieldNames },
               "[ADMIN REFERRAL APPROVAL] Fallback match found by id field"
             );
           }

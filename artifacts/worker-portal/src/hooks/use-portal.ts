@@ -1567,8 +1567,13 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
     throw new Error("Gagal mengambil token otentikasi. Silakan masuk kembali.");
   }
 
-  console.log(`[approveReferral] Sending approval request for referralId: "${referralId}"`);
   const endpoint = `/api/admin/referrals/${encodeURIComponent(referralId)}/approve`;
+  console.log("[ADMIN REFERRAL ID TRACE]", {
+    clientReferralId: referralId,
+    requestUrlPath: endpoint,
+    referralIdType: typeof referralId,
+    referralIdLength: referralId ? referralId.length : 0,
+  });
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
