@@ -848,10 +848,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }
 
-  async function handleApproveReferral(refId: string) {
-    setBusyId(refId);
+  async function handleApproveReferral(row: import("@/lib/portal-types").Referral) {
+    console.log("[ADMIN REFERRAL ID TRACE]", {
+      referralId: row.id,
+      referralIdType: typeof row.id,
+      referralIdLength: row.id?.length,
+      referralIdFromRow: row.id,
+      referralWorkerId: row.referredWorkerId,
+      referrerId: row.referrerId,
+    });
+    setBusyId(row.id);
     try {
-      await approveReferral(refId);
+      await approveReferral(row.id);
       toast.success("Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!");
     } catch (err: any) {
       const status = err?.status;
@@ -1902,7 +1910,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   <Button
                                     size="sm"
                                     disabled={busyId === ref.id}
-                                    onClick={() => handleApproveReferral(ref.id)}
+                                    onClick={() => handleApproveReferral(ref)}
                                     className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-2.5 gap-1"
                                   >
                                     {busyId === ref.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
