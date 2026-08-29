@@ -73,6 +73,15 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
 
   const verifiedAuthUid = decodedToken.uid;
 
+  console.log("[ADMIN REFERRAL SERVER TRACE]", {
+    authUid: verifiedAuthUid,
+    projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "creat-2c127",
+    receivedReferralId: referralId,
+    receivedReferralIdType: typeof referralId,
+    receivedReferralIdLength: referralId.length,
+    requestOriginalUrl: req.originalUrl || req.url,
+  });
+
   // Verify Admin Firestore Profile
   try {
     const adminUserSnap = await adminDb.doc(`users/${verifiedAuthUid}`).get();
@@ -116,13 +125,22 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       const referralRef = adminDb.doc(`referrals/${referralId}`);
       let referralSnap = await tx.get(referralRef);
 
-      console.log("[ADMIN REFERRAL LOOKUP]", {
-        receivedReferralId: referralId,
-        directPath: `referrals/${referralId}`,
-        directExists: referralSnap.exists,
-        directSnapshotId: referralSnap.exists ? referralSnap.id : null,
-        directSafeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
+      console.log("[ADMIN REFERRAL DIRECT LOOKUP]", {
+        path: `referrals/${referralId}`,
+        exists: referralSnap.exists,
+        snapshotId: referralSnap.exists ? referralSnap.id : null,
+        safeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
       });
+
+      if (!referralSnap.exists) {
+        console.log("[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]", {
+          receivedReferralId: referralId,
+          searchedPath: `referrals/${referralId}`,
+          projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "creat-2c127",
+          authUid: verifiedAuthUid,
+          reason: "DIRECT_REFERRAL_DOCUMENT_NOT_FOUND",
+        });
+      }
 
       logger.info(
         {
