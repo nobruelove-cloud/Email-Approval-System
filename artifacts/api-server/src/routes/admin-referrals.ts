@@ -107,12 +107,50 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       currentOperation = `READ 1 referrals/${referralId}`;
       currentPath = `referrals/${referralId}`;
       const referralRef = adminDb.doc(`referrals/${referralId}`);
-      const referralSnap = await tx.get(referralRef);
+      let referralSnap = await tx.get(referralRef);
+
+      logger.info(
+        {
+          referralId,
+          searchedPath: `referrals/${referralId}`,
+          exists: referralSnap.exists,
+          actualDocId: referralSnap.exists ? referralSnap.id : null,
+          safeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
+        },
+        "[ADMIN REFERRAL APPROVAL] Referral document lookup"
+      );
+
+      // Fallback lookup during READ_PHASE if direct document ID lookup yields nothing
+      if (!referralSnap.exists) {
+        currentOperation = `READ 1 (fallback by referredWorkerId) referrals/${referralId}`;
+        const queryByWorker = adminDb.collection("referrals").where("referredWorkerId", "==", referralId);
+        const workerSnap = await tx.get(queryByWorker as any);
+        if (workerSnap && !workerSnap.empty && Array.isArray(workerSnap.docs) && workerSnap.docs.length > 0) {
+          referralSnap = workerSnap.docs[0] as any;
+          logger.info(
+            { referralId, matchedDocId: referralSnap.id },
+            "[ADMIN REFERRAL APPROVAL] Fallback match found by referredWorkerId"
+          );
+        } else {
+          currentOperation = `READ 1 (fallback by id field) referrals/${referralId}`;
+          const queryById = adminDb.collection("referrals").where("id", "==", referralId);
+          const idSnap = await tx.get(queryById as any);
+          if (idSnap && !idSnap.empty && Array.isArray(idSnap.docs) && idSnap.docs.length > 0) {
+            referralSnap = idSnap.docs[0] as any;
+            logger.info(
+              { referralId, matchedDocId: referralSnap.id },
+              "[ADMIN REFERRAL APPROVAL] Fallback match found by id field"
+            );
+          }
+        }
+      }
 
       if (!referralSnap.exists) {
+        logger.warn({ referralId, searchedPath: `referrals/${referralId}` }, "[ADMIN REFERRAL APPROVAL] Referral document not found");
         throw { code: "NOT_FOUND", status: 404, message: "Data referral tidak ditemukan." };
       }
 
+      const actualDocId = referralSnap.id;
       const referralData = referralSnap.data() || {};
       const status = referralData.status ?? "PENDING";
       if (status === "REJECTED") {
@@ -122,12 +160,12 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       const effectiveReferrerId =
         (referralData.referrerId && String(referralData.referrerId).trim()) ||
         referralData.id ||
-        referralId;
+        actualDocId;
 
       const effectiveReferredWorkerId =
         (referralData.referredWorkerId && String(referralData.referredWorkerId).trim()) ||
         referralData.id ||
-        referralId;
+        actualDocId;
 
       const effectiveReferredWorkerName =
         referralData.referredWorkerName ||
@@ -200,13 +238,13 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       }> = [];
 
       for (const t of tiersToClaim) {
-        const claimDocId = `${referralId}_tier_${t.minAcc}`;
+        const claimDocId = `${actualDocId}_tier_${t.minAcc}`;
         currentOperation = `READ 4 referralClaims/${claimDocId}`;
         currentPath = `referralClaims/${claimDocId}`;
         const claimRef = adminDb.doc(`referralClaims/${claimDocId}`);
         const claimSnap = await tx.get(claimRef);
 
-        const ledgerDocId = `${referralId}_ledger_tier_${t.minAcc}`;
+        const ledgerDocId = `${actualDocId}_ledger_tier_${t.minAcc}`;
         currentOperation = `READ 5 rewardLedger/${ledgerDocId}`;
         currentPath = `rewardLedger/${ledgerDocId}`;
         const ledgerRef = adminDb.doc(`rewardLedger/${ledgerDocId}`);
@@ -226,9 +264,9 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       // --- ALL WRITES AFTER READS ---
       currentPhase = "WRITE_PHASE";
 
-      // WRITE 1: referrals/{referralId}
-      currentOperation = `WRITE 1 referrals/${referralId}`;
-      currentPath = `referrals/${referralId}`;
+      // WRITE 1: referrals/{actualDocId}
+      currentOperation = `WRITE 1 referrals/${actualDocId}`;
+      currentPath = `referrals/${actualDocId}`;
       const updatedClaimedTiers = { ...claimedTiers };
       tiersToClaim.forEach((t) => {
         updatedClaimedTiers[String(t.minAcc)] = true;
@@ -243,7 +281,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
         status: allClaimed ? "PAID" : "QUALIFIED",
         rewardedAt: FieldValue.serverTimestamp(),
       });
-      tx.update(referralRef, referralUpdates);
+      tx.update(referralSnap.ref, referralUpdates);
 
       // WRITE 2: users/{effectiveReferrerId}
       currentOperation = `WRITE 2 users/${effectiveReferrerId}`;
@@ -263,7 +301,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
           workerName: referrerName,
           rewardType: "referral",
           amount: tier.reward,
-          sourceRefId: `${referralId}_tier_${tier.minAcc}`,
+          sourceRefId: `${actualDocId}_tier_${tier.minAcc}`,
           description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -279,7 +317,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
         currentPath = `referralClaims/${claimDocId}`;
         const claimData = sanitizePayload({
           id: claimDocId,
-          referralId,
+          referralId: actualDocId,
           referrerId: effectiveReferrerId,
           referredWorkerId: effectiveReferredWorkerId,
           minAcc: tier.minAcc,
@@ -299,7 +337,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
       }
 
       return {
-        referralId,
+        referralId: actualDocId,
         effectiveReferrerId,
         totalClaimReward,
         approvedTiers: tiersToClaim.map((t) => t.minAcc),

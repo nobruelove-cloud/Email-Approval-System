@@ -671,7 +671,7 @@ export function useCollection<T>(
       q,
       (snapshot) => {
         if (!isMounted) return;
-        let rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T);
+        let rows = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as T);
         if (sortBy) {
           const dir = sortBy.direction === "asc" ? 1 : -1;
           rows = [...rows].sort((a, b) => {
@@ -891,7 +891,7 @@ export function useMyReferral(uid?: string) {
         if (!isMounted) return;
         const exists = typeof snapshot?.exists === "function" ? snapshot.exists() : false;
         if (exists) {
-          setData({ id: snapshot.id, ...snapshot.data() } as import("@/lib/portal-types").Referral);
+          setData({ ...snapshot.data(), id: snapshot.id } as import("@/lib/portal-types").Referral);
         } else {
           setData(null);
         }
@@ -1567,6 +1567,7 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
     throw new Error("Gagal mengambil token otentikasi. Silakan masuk kembali.");
   }
 
+  console.log(`[approveReferral] Sending approval request for referralId: "${referralId}"`);
   const endpoint = `/api/admin/referrals/${encodeURIComponent(referralId)}/approve`;
   const response = await fetch(endpoint, {
     method: "POST",
