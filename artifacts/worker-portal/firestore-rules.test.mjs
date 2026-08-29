@@ -31,11 +31,11 @@ async function main() {
   // Setup initial user documents bypassing rules
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    // Admin user doc (role: admin)
+    // Actual production-shaped admin profile
     await setDoc(doc(db, 'users', adminUid), {
       uid: adminUid,
-      name: 'Admin User',
-      email: 'admin@example.com',
+      name: 'Production Admin',
+      email: 'admin@production.com',
       role: 'admin',
       status: 'active',
       tier: 1,

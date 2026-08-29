@@ -130,8 +130,23 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={variants[status] ?? variants.pending}>{labels[status] ?? status}</Badge>;
 }
 
+import { auth } from "@/lib/firebase";
+import { useEffect } from "react";
+
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
+
+  useEffect(() => {
+    const currentAuthUid = auth?.currentUser?.uid || "null";
+    const currentAuthEmail = auth?.currentUser?.email || "null";
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    console.log("[REAL AUTH IDENTITY DIAGNOSTIC]", {
+      authUid: currentAuthUid,
+      authEmail: currentAuthEmail,
+      projectId,
+      profileDoc: profile,
+    });
+  }, [profile]);
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
