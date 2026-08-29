@@ -1567,13 +1567,22 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
     throw new Error("Gagal mengambil token otentikasi. Silakan masuk kembali.");
   }
 
-  const endpoint = `/api/admin/referrals/${encodeURIComponent(referralId)}/approve`;
-  console.log("[ADMIN REFERRAL ID TRACE]", {
-    clientReferralId: referralId,
-    requestUrlPath: endpoint,
+  const requestPath = `/api/admin/referrals/${encodeURIComponent(referralId)}/approve`;
+  const requestUrl = typeof window !== "undefined" ? `${window.location.origin}${requestPath}` : requestPath;
+  const firebaseProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+
+  console.log("[ADMIN REFERRAL PRODUCTION TRACE]", {
+    authUid: auth.currentUser.uid,
+    email: auth.currentUser.email || "",
+    firebaseProjectId,
+    referralId,
     referralIdType: typeof referralId,
     referralIdLength: referralId ? referralId.length : 0,
+    requestUrl,
+    requestPath,
   });
+
+  const endpoint = requestPath;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
