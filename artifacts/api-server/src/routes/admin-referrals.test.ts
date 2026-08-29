@@ -68,6 +68,7 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.error).toContain("Akses ditolak");
   });
 
+  // 1. VALID ADMIN APPROVAL (HTTP 200)
   it("returns 200 and approves referral when valid admin calls endpoint", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
@@ -140,6 +141,7 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.data.totalClaimReward).toBe(20000);
   });
 
+  // 2. NONEXISTENT REFERRAL (HTTP 404)
   it("returns 404 when referral document does not exist and fallback queries yield nothing", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
@@ -317,6 +319,7 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.data.approvedTiers).toEqual([5]);
   });
 
+  // 3. DUPLICATE APPROVAL (HTTP 409)
   it("returns 409 when referral has already been paid/claimed", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
