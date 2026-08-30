@@ -42,12 +42,11 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
   const referralId = req.params.referralId ? String(req.params.referralId).trim() : "";
   const targetMinAcc = req.body?.targetMinAcc !== undefined ? Number(req.body.targetMinAcc) : undefined;
 
-  console.log("[ADMIN REFERRAL ID TRACE]", {
-    serverReceivedReferralId: referralId,
-    referralIdType: typeof referralId,
-    referralIdLength: referralId.length,
-    requestUrlPath: req.originalUrl || req.url,
+  console.log("[ADMIN REFERRAL RUNTIME DIAGNOSTIC]", {
+    requestOriginalUrl: req.originalUrl || req.url,
+    receivedReferralId: referralId,
     projectId: (adminDb as any).app.options.projectId,
+    authUid: (req as any).user?.uid || "unverified_yet",
   });
 
   const authHeader = req.headers.authorization;
@@ -73,6 +72,13 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
   }
 
   const verifiedAuthUid = decodedToken.uid;
+
+  console.log("[ADMIN REFERRAL RUNTIME DIAGNOSTIC AUTHENTICATED]", {
+    requestOriginalUrl: req.originalUrl || req.url,
+    receivedReferralId: referralId,
+    projectId: (adminDb as any).app.options.projectId,
+    authUid: verifiedAuthUid,
+  });
 
   // Verify Admin Firestore Profile
   try {

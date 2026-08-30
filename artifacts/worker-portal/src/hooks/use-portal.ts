@@ -1568,11 +1568,16 @@ export async function approveReferral(referralId: string, targetMinAcc?: number)
   }
 
   const endpoint = `/api/admin/referrals/${encodeURIComponent(referralId)}/approve`;
-  console.log("[ADMIN REFERRAL ID TRACE]", {
-    clientReferralId: referralId,
-    requestUrlPath: endpoint,
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+  const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${endpoint}` : endpoint;
+
+  console.log("[ADMIN REFERRAL RUNTIME DIAGNOSTIC]", {
+    requestUrl: fullUrl,
+    requestPath: endpoint,
+    referralId,
     referralIdType: typeof referralId,
     referralIdLength: referralId ? referralId.length : 0,
+    firebaseProjectId: projectId,
   });
   const response = await fetch(endpoint, {
     method: "POST",
