@@ -47,6 +47,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
     referralIdType: typeof referralId,
     referralIdLength: referralId.length,
     requestUrlPath: req.originalUrl || req.url,
+    projectId: (adminDb as any).app.options.projectId,
   });
 
   const authHeader = req.headers.authorization;
@@ -122,6 +123,7 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
         directExists: referralSnap.exists,
         directSnapshotId: referralSnap.exists ? referralSnap.id : null,
         directSafeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
+        projectId: (adminDb as any).app.options.projectId,
       });
 
       logger.info(
@@ -131,49 +133,22 @@ router.post("/admin/referrals/:referralId/approve", async (req: Request, res: Re
           exists: referralSnap.exists,
           actualDocId: referralSnap.exists ? referralSnap.id : null,
           safeFieldNames: referralSnap.exists ? Object.keys(referralSnap.data() || {}) : [],
+          projectId: (adminDb as any).app.options.projectId,
         },
         "[ADMIN REFERRAL APPROVAL] Referral document lookup"
       );
 
-      // Fallback lookup during READ_PHASE if direct document ID lookup yields nothing
       if (!referralSnap.exists) {
-        currentOperation = `READ 1 (fallback by referredWorkerId) referrals/${referralId}`;
-        const queryByWorker = adminDb.collection("referrals").where("referredWorkerId", "==", referralId);
-        const workerSnap = await tx.get(queryByWorker as any);
-        if (workerSnap && !workerSnap.empty && Array.isArray(workerSnap.docs) && workerSnap.docs.length > 0) {
-          referralSnap = workerSnap.docs[0] as any;
-          const safeFieldNames = Object.keys(referralSnap.data() || {});
-          console.log("[ADMIN REFERRAL LOOKUP - FALLBACK MATCH]", {
-            fallbackQueryField: "referredWorkerId",
-            fallbackMatchedDocumentId: referralSnap.id,
-            fallbackMatchedSafeFieldNames: safeFieldNames,
-          });
-          logger.info(
-            { referralId, fallbackQueryField: "referredWorkerId", matchedDocId: referralSnap.id, safeFieldNames },
-            "[ADMIN REFERRAL APPROVAL] Fallback match found by referredWorkerId"
-          );
-        } else {
-          currentOperation = `READ 1 (fallback by id field) referrals/${referralId}`;
-          const queryById = adminDb.collection("referrals").where("id", "==", referralId);
-          const idSnap = await tx.get(queryById as any);
-          if (idSnap && !idSnap.empty && Array.isArray(idSnap.docs) && idSnap.docs.length > 0) {
-            referralSnap = idSnap.docs[0] as any;
-            const safeFieldNames = Object.keys(referralSnap.data() || {});
-            console.log("[ADMIN REFERRAL LOOKUP - FALLBACK MATCH]", {
-              fallbackQueryField: "id",
-              fallbackMatchedDocumentId: referralSnap.id,
-              fallbackMatchedSafeFieldNames: safeFieldNames,
-            });
-            logger.info(
-              { referralId, fallbackQueryField: "id", matchedDocId: referralSnap.id, safeFieldNames },
-              "[ADMIN REFERRAL APPROVAL] Fallback match found by id field"
-            );
-          }
-        }
-      }
-
-      if (!referralSnap.exists) {
-        logger.warn({ referralId, searchedPath: `referrals/${referralId}` }, "[ADMIN REFERRAL APPROVAL] Referral document not found");
+        const searchedPath = `referrals/${referralId}`;
+        const diagnosticData = {
+          receivedReferralId: referralId,
+          searchedPath,
+          projectId: (adminDb as any).app.options.projectId,
+          authUid: verifiedAuthUid,
+          reason: "DIRECT_REFERRAL_DOCUMENT_NOT_FOUND",
+        };
+        console.log("[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]", diagnosticData);
+        logger.warn(diagnosticData, "[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]");
         throw { code: "NOT_FOUND", status: 404, message: "Data referral tidak ditemukan." };
       }
 
