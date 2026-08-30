@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import app from "../app";
 import { adminAuth, adminDb } from "../lib/firebase-admin";
+import { logger } from "../lib/logger";
 
 vi.mock("../lib/firebase-admin", () => {
   const mockVerifyIdToken = vi.fn();
@@ -14,6 +15,11 @@ vi.mock("../lib/firebase-admin", () => {
       verifyIdToken: mockVerifyIdToken,
     },
     adminDb: {
+      app: {
+        options: {
+          projectId: "test-runtime-project-id",
+        },
+      },
       doc: mockDoc,
       collection: mockCollection,
       runTransaction: mockRunTransaction,
@@ -68,8 +74,8 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.error).toContain("Akses ditolak");
   });
 
-  // 1. VALID ADMIN APPROVAL (HTTP 200)
-  it("returns 200 and approves referral when valid admin calls endpoint", async () => {
+  // 1. VALID DIRECT ADMIN APPROVAL (HTTP 200)
+  it("proves direct existing referral continues normally and returns 200", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
 
@@ -141,8 +147,8 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.data.totalClaimReward).toBe(20000);
   });
 
-  // 2. NONEXISTENT REFERRAL (HTTP 404)
-  it("returns 404 when referral document does not exist and fallback queries yield nothing", async () => {
+  // 2. NONEXISTENT REFERRAL RETURNS 404 IMMEDIATELY WITH DIAGNOSTIC
+  it("proves nonexistent referral returns HTTP 404 immediately and logs diagnostic", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
 
@@ -156,16 +162,12 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
       } as any;
     });
 
-    vi.mocked(adminDb.collection).mockReturnValue({
-      where: vi.fn().mockReturnValue({ isQuery: true }),
-    } as any);
+    const consoleLogSpy = vi.spyOn(console, "log");
+    const loggerWarnSpy = vi.spyOn(logger, "warn");
 
     vi.mocked(adminDb.runTransaction).mockImplementationOnce(async (txCallback: any) => {
       const mockTx = {
         get: vi.fn().mockImplementation(async (ref: any) => {
-          if (ref && ref.isQuery) {
-            return { empty: true, docs: [] };
-          }
           return { exists: false, data: () => ({}) };
         }),
         update: vi.fn(),
@@ -180,9 +182,30 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
 
     expect(res.status).toBe(404);
     expect(res.body.error).toContain("Data referral tidak ditemukan");
+
+    // Verify diagnostic log was emitted with exact properties
+    const diagnosticCalls = consoleLogSpy.mock.calls.filter(
+      (call) => call[0] === "[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]"
+    );
+    expect(diagnosticCalls.length).toBeGreaterThan(0);
+    const diagnosticPayload = diagnosticCalls[0][1];
+    expect(diagnosticPayload).toEqual({
+      receivedReferralId: "nonexistent_ref",
+      searchedPath: "referrals/nonexistent_ref",
+      projectId: "test-runtime-project-id",
+      authUid: adminUid,
+      reason: "DIRECT_REFERRAL_DOCUMENT_NOT_FOUND",
+    });
+
+    const warnCalls = loggerWarnSpy.mock.calls.filter(
+      (call) => call[1] === "[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]"
+    );
+    expect(warnCalls.length).toBeGreaterThan(0);
+    expect(warnCalls[0][0]).toEqual(diagnosticPayload);
   });
 
-  it("approves referral via fallback lookup when direct ID mismatch occurs", async () => {
+  // 3. FALLBACK QUERIES ARE NOT EXECUTED WHEN DIRECT DOCUMENT IS MISSING
+  it("proves fallback queries are NOT executed when direct document is missing", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
 
@@ -196,21 +219,6 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
       } as any;
     });
 
-    const mockReferralDoc = {
-      id: "actual_doc_123",
-      ref: { path: "referrals/actual_doc_123" },
-      exists: true,
-      data: () => ({
-        id: "worker_referred_999",
-        referrerId: "referrer_1",
-        referredWorkerId: "worker_referred_999",
-        currentAccCount: 5,
-        status: "QUALIFIED",
-        claimedTiers: {},
-        rewardAmount: 0,
-      }),
-    };
-
     vi.mocked(adminDb.collection).mockReturnValue({
       where: vi.fn().mockReturnValue({ isQuery: true }),
     } as any);
@@ -218,27 +226,6 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     vi.mocked(adminDb.runTransaction).mockImplementationOnce(async (txCallback: any) => {
       const mockTx = {
         get: vi.fn().mockImplementation(async (ref: any) => {
-          if (ref && ref.isQuery) {
-            return { empty: false, docs: [mockReferralDoc] };
-          }
-          const path = typeof ref === "string" ? ref : ref?.path || String(ref);
-          if (path.includes("referrals/worker_referred_999")) {
-            return { exists: false, data: () => ({}) };
-          }
-          if (path.includes("settings/rules")) {
-            return {
-              exists: true,
-              data: () => ({
-                referralTiers: [{ minAcc: 5, reward: 5000 }],
-              }),
-            };
-          }
-          if (path.includes("users/referrer_1")) {
-            return {
-              exists: true,
-              data: () => ({ name: "Referrer One", balance: 1000 }),
-            };
-          }
           return { exists: false, data: () => ({}) };
         }),
         update: vi.fn(),
@@ -248,15 +235,55 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     });
 
     const res = await request(app)
-      .post("/api/admin/referrals/worker_referred_999/approve")
+      .post("/api/admin/referrals/missing_ref_123/approve")
       .set("Authorization", "Bearer valid_admin_token");
 
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe("ok");
-    expect(res.body.data.referralId).toBe("actual_doc_123");
-    expect(res.body.data.approvedTiers).toEqual([5]);
+    expect(res.status).toBe(404);
+    // Explicitly assert adminDb.collection was NEVER called during the request
+    expect(adminDb.collection).not.toHaveBeenCalled();
   });
 
+  // 4. DIAGNOSTIC PROJECT ID COMES FROM adminDb.app.options.projectId
+  it("proves diagnostic project ID comes from adminDb.app.options.projectId", async () => {
+    const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
+    vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
+
+    vi.mocked(adminDb.doc).mockImplementation((path: string) => {
+      return {
+        path,
+        get: vi.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({ uid: adminUid, role: "admin", status: "active" }),
+        }),
+      } as any;
+    });
+
+    const consoleLogSpy = vi.spyOn(console, "log");
+
+    vi.mocked(adminDb.runTransaction).mockImplementationOnce(async (txCallback: any) => {
+      const mockTx = {
+        get: vi.fn().mockImplementation(async (ref: any) => {
+          return { exists: false, data: () => ({}) };
+        }),
+        update: vi.fn(),
+        set: vi.fn(),
+      };
+      return txCallback(mockTx);
+    });
+
+    await request(app)
+      .post("/api/admin/referrals/test_proj_id_ref/approve")
+      .set("Authorization", "Bearer valid_admin_token");
+
+    // Verify projectId reported in diagnostic matches adminDb.app.options.projectId
+    expect((adminDb as any).app.options.projectId).toBe("test-runtime-project-id");
+
+    const diagnosticCalls = consoleLogSpy.mock.calls.filter(
+      (call) => call[0] === "[ADMIN REFERRAL NOT FOUND DIAGNOSTIC]"
+    );
+    expect(diagnosticCalls[0][1].projectId).toBe("test-runtime-project-id");
+    expect(diagnosticCalls[0][1].projectId).toBe((adminDb as any).app.options.projectId);
+  });
 
   it("approves legacy referral document with missing optional fields", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
@@ -319,7 +346,7 @@ describe("API Integration: POST /api/admin/referrals/:referralId/approve", () =>
     expect(res.body.data.approvedTiers).toEqual([5]);
   });
 
-  // 3. DUPLICATE APPROVAL (HTTP 409)
+  // 5. DUPLICATE APPROVAL (HTTP 409)
   it("returns 409 when referral has already been paid/claimed", async () => {
     const adminUid = "vQfEbhhVyXMXVlhYmu4AgOvmony1";
     vi.mocked(adminAuth.verifyIdToken).mockResolvedValueOnce({ uid: adminUid } as any);
