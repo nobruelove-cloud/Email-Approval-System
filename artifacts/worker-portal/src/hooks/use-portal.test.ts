@@ -95,6 +95,7 @@ vi.mock("../lib/firebase", async () => {
 
 import {
   usePortalAuth,
+  useCollection,
   useMyReferral,
   claimReferralCode,
   registerReferral,
@@ -1735,6 +1736,78 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
 
     // Ensure calling sendRemoteDiagnostic directly with broken network does not throw
     await expect(sendRemoteDiagnostic(payload)).resolves.toBeUndefined();
+
+    fetchSpy.mockRestore();
+  });
+});
+
+describe("Referral Collection Document Mapping & Admin Approval Verification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthObj.currentUser = { uid: "admin_uid_1", getIdToken: vi.fn().mockResolvedValue("token") } as any;
+  });
+
+  it("proves row.id equals Firestore snapshot.id and internal id in document data cannot overwrite snapshot.id", () => {
+    let snapshotCallback: ((snapshot: any) => void) | null = null;
+    mockOnSnapshot.mockImplementation((queryRef: any, callback: any) => {
+      snapshotCallback = callback;
+      return () => {};
+    });
+
+    const { result } = renderHook(() => useCollection<any>("referrals"));
+
+    const mockDocSnapshot = {
+      id: "firestore_snap_id_777",
+      data: () => ({
+        id: "internal_data_id_WILL_NOT_OVERWRITE",
+        referrerId: "referrer_a",
+        referredWorkerId: "worker_b",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+      }),
+    };
+
+    act(() => {
+      snapshotCallback?.({
+        docs: [mockDocSnapshot],
+      });
+    });
+
+    expect(result.current.data).toHaveLength(1);
+    const row = result.current.data[0];
+
+    // Proves row.id equals Firestore snapshot.id
+    expect(row.id).toBe("firestore_snap_id_777");
+
+    // Proves internal id in document data CANNOT overwrite snapshot.id
+    expect(row.id).not.toBe("internal_data_id_WILL_NOT_OVERWRITE");
+  });
+
+  it("proves AdminDashboard approval passes row.id (Firestore snapshot ID) to approveReferral", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementationOnce(async (url: any) => {
+      expect(String(url)).toContain("/api/admin/referrals/firestore_snap_id_777/approve");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: "ok",
+          data: { referralId: "firestore_snap_id_777", totalClaimReward: 5000 },
+        }),
+      } as any;
+    });
+
+    const mockRow = {
+      id: "firestore_snap_id_777",
+      referrerId: "referrer_a",
+      referredWorkerId: "worker_b",
+      status: "QUALIFIED",
+    };
+
+    // Simulate AdminDashboard handleApproveReferral passing row.id
+    const res = await approveReferral(mockRow.id);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(res.data.referralId).toBe("firestore_snap_id_777");
 
     fetchSpy.mockRestore();
   });

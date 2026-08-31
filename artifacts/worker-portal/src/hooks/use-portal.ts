@@ -671,6 +671,7 @@ export function useCollection<T>(
       q,
       (snapshot) => {
         if (!isMounted) return;
+        // Ensure Firestore document ID (item.id) is assigned LAST so internal data properties cannot overwrite snapshot ID
         let rows = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as T);
         if (sortBy) {
           const dir = sortBy.direction === "asc" ? 1 : -1;
@@ -891,6 +892,7 @@ export function useMyReferral(uid?: string) {
         if (!isMounted) return;
         const exists = typeof snapshot?.exists === "function" ? snapshot.exists() : false;
         if (exists) {
+          // Ensure Firestore document ID (snapshot.id) is assigned LAST
           setData({ ...snapshot.data(), id: snapshot.id } as import("@/lib/portal-types").Referral);
         } else {
           setData(null);
