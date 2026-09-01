@@ -2,13 +2,6 @@ rules_version = '2';
 
 // Deploy this from the Firebase Console → Firestore Database → Rules tab,
 // or with `firebase deploy --only firestore:rules` if you use the CLI.
-//
-// NOTE: this is a different kind of "rules" from the admin dashboard's
-// "Aturan & Harga" tab. This file is Firestore's own security layer
-// (who is allowed to read/write which documents). The admin dashboard's
-// rules are application/business settings (price per email, min withdraw,
-// etc.) stored in the settings/rules document and read dynamically by the
-// app — both are needed, and both are now wired up.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -22,7 +15,6 @@ service cloud.firestore {
     }
 
     // Evaluates whether the authenticated user has role = "admin" in Firestore users/{uid}.
-    // Case-insensitive regex matching handles formatting variations (e.g. "Admin", "ADMIN", " admin ").
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -31,14 +23,47 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.matches('(?i)^\\s*admin\\s*$');
     }
 
+    // Helper: verifies that a referral claim document is valid for a participant
+    function isValidReferralClaim(claimId) {
+      return isSignedIn() &&
+        request.resource.data.keys().hasAll(['id', 'referralId', 'referrerId', 'referredWorkerId', 'minAcc', 'rewardAmount', 'status']) &&
+        (request.auth.uid == request.resource.data.referrerId || request.auth.uid == request.resource.data.referredWorkerId) &&
+        exists(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)) &&
+        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.referrerId == request.resource.data.referrerId &&
+        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.referredWorkerId == request.resource.data.referredWorkerId &&
+        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.currentAccCount >= request.resource.data.minAcc &&
+        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.status != 'REJECTED' &&
+        request.resource.data.rewardAmount > 0 &&
+        request.resource.data.status == 'approved';
+    }
+
+    // Helper: verifies that a balance credit on users/{uid} is backed by a valid referral claim
+    function isValidReferralRewardCredit(uid) {
+      let delta = request.resource.data.balance - resource.data.balance;
+      return delta > 0 &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.tier == resource.data.tier &&
+        (!('email' in resource.data) || request.resource.data.email == resource.data.email) &&
+        (!('name' in resource.data) || request.resource.data.name == resource.data.name) &&
+        (!('referredBy' in resource.data) || resource.data.referredBy == '' || resource.data.referredBy == null || (!('referredBy' in request.resource.data) || request.resource.data.referredBy == resource.data.referredBy)) &&
+        (
+          (exists(/databases/$(database)/documents/referrals/$(request.auth.uid)) &&
+           getAfter(/databases/$(database)/documents/referrals/$(request.auth.uid)).data.referrerId == uid &&
+           getAfter(/databases/$(database)/documents/referrals/$(request.auth.uid)).data.rewardAmount == get(/databases/$(database)/documents/referrals/$(request.auth.uid)).data.rewardAmount + delta) ||
+          (exists(/databases/$(database)/documents/referrals/$(uid)) &&
+           getAfter(/databases/$(database)/documents/referrals/$(uid)).data.referrerId == uid &&
+           getAfter(/databases/$(database)/documents/referrals/$(uid)).data.rewardAmount == get(/databases/$(database)/documents/referrals/$(uid)).data.rewardAmount + delta)
+        );
+    }
+
     // ---- users/{uid} ----
     match /users/{uid} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
 
-      // Self-registration: a signed-in user may create ONLY their own
-      // profile, and only as an unprivileged worker — they
-      // cannot grant themselves admin, custom tier, or balance.
+      // Self-registration
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll([
@@ -65,11 +90,7 @@ service cloud.firestore {
         request.resource.data.createdAt is timestamp
       );
 
-      // Admin can update anything (approvals, tier, balance adjustments).
-      // A worker may touch their own contact info and may DECREASE (never
-      // increase) their own balance — that's what the withdraw-request
-      // transaction does client-side. Role, status and tier are always
-      // admin-controlled. A worker can never self-credit their balance.
+      // Self-update (withdrawals / contact info) or referral reward balance credit
       allow update: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.uid == uid &&
@@ -79,7 +100,7 @@ service cloud.firestore {
         (!('referredBy' in resource.data) || resource.data.referredBy == '' || resource.data.referredBy == null || (!('referredBy' in request.resource.data) || request.resource.data.referredBy == resource.data.referredBy)) &&
         request.resource.data.balance >= 0 &&
         request.resource.data.balance <= resource.data.balance
-      );
+      ) || isValidReferralRewardCredit(uid);
 
       allow delete: if isAdmin();
     }
@@ -92,8 +113,6 @@ service cloud.firestore {
         request.resource.data.workerId == request.auth.uid &&
         request.resource.data.status == 'pending';
 
-      // Only an admin resolves a submission (approve/reject); this is what
-      // credits the worker's balance, done atomically in application code.
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -102,23 +121,17 @@ service cloud.firestore {
     match /withdrawals/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
 
-      // A worker may request a withdrawal for themselves only. The paired
-      // debit to users/{workerId}.balance happens in the same client
-      // transaction and is allowed by the users/update rule above (which
-      // permits a self-decrease but never a self-increase) — so a worker
-      // can request withdrawals but can never credit their own balance.
       allow create: if isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.amount is number &&
         request.resource.data.amount > 0;
 
-      // Only an admin resolves a withdrawal (process/success/reject).
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ---- settings/{name} ---- (dynamic rules, payment methods, pricing)
+    // ---- settings/{name} ----
     match /settings/{name} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -144,7 +157,28 @@ service cloud.firestore {
         request.resource.data.status == 'PENDING' &&
         request.resource.data.currentAccCount == 0 &&
         request.resource.data.rewardAmount == 0;
-      allow update, delete: if isAdmin();
+
+      // Allow referral updates during valid claim transactions by referral participants
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        resource != null &&
+        (request.auth.uid == resource.data.referrerId || request.auth.uid == resource.data.referredWorkerId || request.auth.uid == id) &&
+        request.resource.data.referrerId == resource.data.referrerId &&
+        request.resource.data.referredWorkerId == resource.data.referredWorkerId &&
+        request.resource.data.currentAccCount == resource.data.currentAccCount &&
+        request.resource.data.rewardAmount >= resource.data.rewardAmount &&
+        request.resource.data.status in ['PENDING', 'QUALIFIED', 'PAID'] &&
+        (
+          request.resource.data.rewardAmount == resource.data.rewardAmount ||
+          existsAfter(/databases/$(database)/documents/users/$(resource.data.referrerId))
+        ) &&
+        (
+          request.resource.data.rewardAmount == resource.data.rewardAmount ||
+          getAfter(/databases/$(database)/documents/users/$(resource.data.referrerId)).data.balance == get(/databases/$(database)/documents/users/$(resource.data.referrerId)).data.balance + (request.resource.data.rewardAmount - resource.data.rewardAmount)
+        )
+      );
+
+      allow delete: if isAdmin();
     }
 
     // ---- referralClaims/{id} ----
@@ -152,19 +186,18 @@ service cloud.firestore {
       allow get: if isAdmin() || (
         isSignedIn() && (
           resource == null ||
-          resource.data.referrerId == request.auth.uid
+          resource.data.referrerId == request.auth.uid ||
+          resource.data.referredWorkerId == request.auth.uid
         )
       );
       allow list: if isAdmin() || (
-        isSignedIn() &&
-        resource.data.referrerId == request.auth.uid
+        isSignedIn() && (
+          resource.data.referrerId == request.auth.uid ||
+          resource.data.referredWorkerId == request.auth.uid
+        )
       );
-      allow create: if isAdmin() || (
-        isSignedIn() &&
-        request.resource.data.referrerId == request.auth.uid &&
-        request.resource.data.status == 'pending'
-      );
-      allow update, delete: if isAdmin();
+      allow create, update: if isAdmin() || isValidReferralClaim(id);
+      allow delete: if isAdmin();
     }
 
     // ---- missionClaims/{id} ----
@@ -185,7 +218,14 @@ service cloud.firestore {
     // ---- rewardLedger/{id} ----
     match /rewardLedger/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.rewardType == 'referral' &&
+        request.resource.data.amount > 0 &&
+        existsAfter(/databases/$(database)/documents/referrals/$(request.resource.data.sourceRefId.split('_')[0])) &&
+        getAfter(/databases/$(database)/documents/referrals/$(request.resource.data.sourceRefId.split('_')[0])).data.referrerId == request.resource.data.workerId
+      );
+      allow delete: if isAdmin();
     }
 
     // ---- financialTransactions/{id} ----

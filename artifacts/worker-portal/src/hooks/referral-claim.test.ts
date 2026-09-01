@@ -44,7 +44,6 @@ vi.mock("firebase/firestore", () => {
 
 import {
   claimReferralTier,
-  createReferralClaimRequest,
   approveReferral,
   evaluateReferralQualification,
   registerReferral,
@@ -55,8 +54,7 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
     vi.clearAllMocks();
   });
 
-  it("1. Worker creates claim request when target 5 ACC reached", async () => {
-    const firestoreModule = await import("firebase/firestore");
+  it("1. Worker claims 5 ACC tier reward atomically", async () => {
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -66,36 +64,49 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
-      if (docRef.path === "referrals/ref_worker_2") {
-        return { exists: () => true, data: () => referralDoc } as any;
+    const referrerUserDoc: PortalUser = {
+      uid: "referrer_worker_1",
+      name: "Worker 1",
+      email: "referrer@test.com",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 10000,
+    };
+
+    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
+      if (refObj.path === "referrals/ref_worker_2") {
+        return { exists: () => true, data: () => referralDoc };
       }
-      if (docRef.path === "settings/rules") {
-        return { exists: () => true, data: () => ({ referralTiers: DEFAULT_REFERRAL_TIERS }) } as any;
+      if (refObj.path === "settings/rules") {
+        return { exists: () => true, data: () => ({ referralTiers: DEFAULT_REFERRAL_TIERS }) };
       }
-      if (docRef.path === "referralClaims/ref_worker_2_tier_5") {
-        return { exists: () => false, data: () => null } as any;
+      if (refObj.path === "users/referrer_worker_1") {
+        return { exists: () => true, data: () => referrerUserDoc };
       }
-      return { exists: () => false, data: () => null } as any;
+      return { exists: () => false };
     });
 
-    await claimReferralTier("ref_worker_2", 5);
+    const res = await claimReferralTier("ref_worker_2", 5);
 
-    expect(firestoreModule.setDoc).toHaveBeenCalledWith(
-      { path: "referralClaims/ref_worker_2_tier_5" },
+    expect(res.status).toBe("ok");
+    expect(res.data.totalClaimReward).toBe(500);
+
+    expect(mockTransactionTx.update).toHaveBeenCalledWith(
+      { path: "referrals/ref_worker_2" },
       expect.objectContaining({
-        id: "ref_worker_2_tier_5",
-        referralId: "ref_worker_2",
-        referrerId: "referrer_worker_1",
-        minAcc: 5,
+        claimedTiers: { "5": true },
         rewardAmount: 500,
-        status: "pending",
       })
+    );
+
+    expect(mockTransactionTx.update).toHaveBeenCalledWith(
+      { path: "users/referrer_worker_1" },
+      { balance: 10500 }
     );
   });
 
   it("2. Worker under 5 ACC -> Rp500 claim request fails", async () => {
-    const firestoreModule = await import("firebase/firestore");
     const referralDoc: Referral = {
       id: "ref_worker_2",
       referrerId: "referrer_worker_1",
@@ -105,11 +116,11 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
-      if (docRef.path === "referrals/ref_worker_2") {
-        return { exists: () => true, data: () => referralDoc } as any;
+    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
+      if (refObj.path === "referrals/ref_worker_2") {
+        return { exists: () => true, data: () => referralDoc };
       }
-      return { exists: () => false } as any;
+      return { exists: () => false };
     });
 
     await expect(claimReferralTier("ref_worker_2", 5)).rejects.toThrow("Target ACC belum tercapai");
@@ -305,7 +316,6 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
   });
 
   it("8. Worker cannot claim referral reward of another worker", async () => {
-    const firestoreModule = await import("firebase/firestore");
     const referralDoc: Referral = {
       id: "ref_other_worker",
       referrerId: "different_worker_uid",
@@ -315,11 +325,24 @@ describe("Per-Tier Referral Claim & Qualification Test Suite", () => {
       claimedTiers: {},
     };
 
-    vi.mocked(firestoreModule.getDoc).mockImplementation(async (docRef: any) => {
-      if (docRef.path === "referrals/ref_other_worker") {
-        return { exists: () => true, data: () => referralDoc } as any;
+    const callerDoc: PortalUser = {
+      uid: "referrer_worker_1",
+      name: "Worker 1",
+      email: "referrer@test.com",
+      role: "worker",
+      status: "active",
+      tier: 1,
+      balance: 0,
+    };
+
+    mockTransactionTx.get.mockImplementation(async (refObj: any) => {
+      if (refObj.path === "referrals/ref_other_worker") {
+        return { exists: () => true, data: () => referralDoc };
       }
-      return { exists: () => false } as any;
+      if (refObj.path === "users/referrer_worker_1") {
+        return { exists: () => true, data: () => callerDoc };
+      }
+      return { exists: () => false };
     });
 
     await expect(claimReferralTier("ref_other_worker", 5)).rejects.toThrow("milik akun lain");

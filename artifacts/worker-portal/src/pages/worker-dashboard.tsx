@@ -118,8 +118,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     if (busyClaimTierKey) return;
     setBusyClaimTierKey(key);
     try {
-      await claimReferralTier(referralId, minAcc);
-      toast.success(`Permintaan klaim reward referral tier ${minAcc} ACC berhasil dikirim!`);
+      const res = await claimReferralTier(referralId, minAcc);
+      const rewardAmt = res?.data?.totalClaimReward ?? 0;
+      toast.success(`🎉 Referral Tier ${minAcc} ACC berhasil! +${formatMoney(rewardAmt)}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengklaim reward tier referral.");
     } finally {
@@ -819,7 +820,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                               {sortedTiers.map((t) => {
                                 const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
                                 const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
-                                const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
                                 const busyKey = `${ref.id}_${t.minAcc}`;
                                 const isBusy = busyClaimTierKey === busyKey;
 
@@ -829,11 +829,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                     className={`p-2.5 rounded-md border text-xs flex items-center justify-between gap-2 ${
                                       isClaimed
                                         ? "bg-green-50/80 border-green-200"
-                                        : isPendingClaim
-                                          ? "bg-blue-50/80 border-blue-200"
-                                          : isClaimable
-                                            ? "bg-white border-amber-300 shadow-sm"
-                                            : "bg-gray-50 border-gray-200 opacity-75"
+                                        : isClaimable
+                                          ? "bg-white border-amber-300 shadow-sm"
+                                          : "bg-gray-50 border-gray-200 opacity-75"
                                     }`}
                                   >
                                     <div className="space-y-0.5">
@@ -851,11 +849,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                           <CheckCircle2 className="w-3 h-3 text-green-600" />
                                           Sudah Diklaim
                                         </Badge>
-                                      ) : isPendingClaim ? (
-                                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 text-[11px]">
-                                          <Clock className="w-3 h-3 text-blue-600" />
-                                          Menunggu Admin
-                                        </Badge>
                                       ) : isClaimable ? (
                                         <Button
                                           size="sm"
@@ -868,7 +861,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                           ) : (
                                             <CheckCircle2 className="w-3 h-3" />
                                           )}
-                                          Claim
+                                          🎉 Claim Reward
                                         </Button>
                                       ) : (
                                         <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200 gap-1 text-[11px]">
