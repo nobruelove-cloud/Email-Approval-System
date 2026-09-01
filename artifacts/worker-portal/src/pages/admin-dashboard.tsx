@@ -848,34 +848,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }
 
-  async function handleApproveReferral(refId: string) {
-    setBusyId(refId);
-    try {
-      await approveReferral(refId);
-      toast.success("Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!");
-    } catch (err: any) {
-      const status = err?.status;
-      const code = err?.code;
-      const msg = err instanceof Error ? err.message : String(err || "Gagal menyetujui referral.");
-
-      if (status === 401) {
-        toast.error("Sesi tidak valid atau telah berakhir. Silakan login kembali.");
-      } else if (status === 403) {
-        toast.error("Akses ditolak: Hanya admin yang berhak menyetujui referral.");
-      } else if (status === 404) {
-        toast.error("Data referral tidak ditemukan.");
-      } else if (status === 409 || code === "ALREADY_PAID" || code === "ALREADY_CLAIMED") {
-        toast.error("Referral / tier ini sudah pernah disetujui atau dicairkan.");
-      } else if (status === 400) {
-        toast.error(msg || "Permintaan tidak valid.");
-      } else {
-        toast.error(msg || "Gagal menyetujui referral.");
-      }
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   async function handleRejectReferral(refId: string) {
     setBusyId(refId);
     try {
@@ -1692,16 +1664,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
             )}
 
-            {/* REFERRAL APPROVAL & CONTROL */}
+            {/* REFERRAL STATUS & MONITORING */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="w-5 h-5 text-amber-600" /> Pengaturan & Approval Referral
+                      <Users className="w-5 h-5 text-amber-600" /> Pengaturan & Status Referral
                     </CardTitle>
                     <CardDescription>
-                      Atur tier kualifikasi referral, kelola approval referral qualified, dan cairkan hadiah ke pengundang.
+                      Atur tier kualifikasi referral dan pantau progres klaim referral otomatis oleh pekerja.
                     </CardDescription>
                   </div>
                   <Button
@@ -1823,11 +1795,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   )}
                 </div>
 
-                {/* TABLE DAFTAR REFERRAL APPROVAL */}
+                {/* TABLE DAFTAR MONITORING REFERRAL */}
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-sm font-bold text-gray-900">
-                      Daftar Hubungan & Approval Referral ({referrals.data.length})
+                      Daftar Hubungan & Monitoring Referral ({referrals.data.length})
                     </Label>
                   </div>
 
@@ -1840,13 +1812,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       {referrals.data.map((ref) => {
                         const currentAcc = ref.currentAccCount ?? 0;
                         const qualTier = getReferralTierForAccCount(currentAcc, activeReferralTiers);
-                        const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
-                        const lowestMinAcc = sortedTiers[0]?.minAcc ?? rules.data.referralMinAcc ?? 5;
 
                         const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
                         const isQualified = ref.status === "QUALIFIED";
                         const isRejected = ref.status === "REJECTED";
-                        const isCanApprove = isQualified || (ref.status === "PENDING" && currentAcc >= lowestMinAcc);
 
                         const rewardAmt = isPaid
                           ? (ref.rewardAmount ?? getReferralRewardForAccCount(currentAcc, activeReferralTiers))
@@ -1858,7 +1827,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         if (isPaid) {
                           statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
                           statusText = "PAID";
-                        } else if (isQualified || isCanApprove) {
+                        } else if (isQualified) {
                           statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
                           statusText = "QUALIFIED";
                         } else if (isRejected) {
@@ -1881,7 +1850,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                               <div className="flex flex-wrap items-center gap-3 text-gray-600 font-medium">
                                 <span>ACC: <strong className="text-gray-900">{currentAcc}</strong></span>
-                                <span>Tier: <strong className="text-blue-900">{qualTier ? `${qualTier.minAcc} ACC` : "-"}</strong></span>
+                                <span>Tier Kualifikasi: <strong className="text-blue-900">{qualTier ? `${qualTier.minAcc} ACC` : "-"}</strong></span>
                                 <span>Total Reward Diklaim: <strong className="text-amber-700">{formatMoney(ref.rewardAmount ?? (isPaid ? rewardAmt : 0))}</strong></span>
                               </div>
 
@@ -1897,28 +1866,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 {statusText}
                               </Badge>
 
-                              {isCanApprove && (
-                                <div className="flex gap-1.5 ml-2">
-                                  <Button
-                                    size="sm"
-                                    disabled={busyId === ref.id}
-                                    onClick={() => handleApproveReferral(ref.id)}
-                                    className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-2.5 gap-1"
-                                  >
-                                    {busyId === ref.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-                                    ACC
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    disabled={busyId === ref.id}
-                                    onClick={() => handleRejectReferral(ref.id)}
-                                    className="text-xs h-7 px-2.5 gap-1"
-                                  >
-                                    <XCircle className="w-3 h-3" />
-                                    Tolak
-                                  </Button>
-                                </div>
+                              {!isPaid && !isRejected && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  disabled={busyId === ref.id}
+                                  onClick={() => handleRejectReferral(ref.id)}
+                                  className="text-xs h-7 px-2.5 gap-1 ml-2"
+                                >
+                                  <XCircle className="w-3 h-3" />
+                                  Tolak
+                                </Button>
                               )}
                             </div>
                           </div>
