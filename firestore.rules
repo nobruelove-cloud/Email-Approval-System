@@ -158,10 +158,14 @@ service cloud.firestore {
         ('rewardedAt' in request.resource.data) &&
         request.resource.data.rewardedAt == request.time &&
         (
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')).data.processedAt == request.time)
+          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')) &&
+           getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')).data.processedAt == request.time) ||
+          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')) &&
+           getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')).data.processedAt == request.time) ||
+          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')) &&
+           getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')).data.processedAt == request.time) ||
+          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')) &&
+           getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')).data.processedAt == request.time)
         )
       );
       allow delete: if isAdmin();
@@ -181,6 +185,7 @@ service cloud.firestore {
       );
       allow create, update: if isAdmin() || (
         isSignedIn() &&
+        (resource == null || resource.data.status != 'approved') &&
         request.resource.data.referrerId == request.auth.uid &&
         request.resource.data.status == 'approved' &&
         ('processedAt' in request.resource.data) &&
@@ -214,7 +219,12 @@ service cloud.firestore {
 
     // ---- rewardLedger/{id} ----
     match /rewardLedger/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('workerId' in resource.data && resource.data.workerId == request.auth.uid)
+        )
+      );
       allow create, update: if isAdmin() || (
         isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&
