@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
+import { WithdrawalSection } from "@/components/withdrawal-section";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -97,6 +98,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const rules = useSettings("rules", DEFAULT_RULES);
   const myReferral = useMyReferral(profile.uid);
   const announcements = useAnnouncements();
+
+  // Active Tab State
+  const [activeTab, setActiveTab] = useState("submit");
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
@@ -346,23 +350,23 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   }
 
   // --- Withdraw ---
-  const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState(rules.data.paymentMethods[0] ?? "DANA");
-  const [account, setAccount] = useState("");
-  const [accountHolderName, setAccountHolderName] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
-  async function handleWithdraw(e: React.FormEvent) {
-    e.preventDefault();
-    if (!account.trim()) {
+  async function handleWithdrawSubmit(params: {
+    amount: number;
+    method: string;
+    account: string;
+    accountHolderName: string;
+  }) {
+    if (!params.account.trim()) {
       toast.error("Nomor rekening / e-wallet wajib diisi.");
       return;
     }
-    if (!accountHolderName.trim()) {
+    if (!params.accountHolderName.trim()) {
       toast.error("Atas Nama (nama pemilik rekening/wallet) wajib diisi.");
       return;
     }
-    const value = amount;
+    const value = params.amount;
     if (!value || value <= 0) {
       toast.error("Masukkan jumlah penarikan yang valid.");
       return;
@@ -385,16 +389,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       await createWithdrawal({
         workerId: profile.uid,
         amount: value,
-        method,
-        account: account.trim(),
-        accountHolderName: accountHolderName.trim(),
+        method: params.method,
+        account: params.account.trim(),
+        accountHolderName: params.accountHolderName.trim(),
       });
       toast.success("Permintaan penarikan berhasil dikirim!");
-      setAmount(0);
-      setAccount("");
-      setAccountHolderName("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim permintaan penarikan.");
+      throw err;
     } finally {
       setWithdrawing(false);
     }
@@ -518,7 +520,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </Card>
         )}
 
-        <Tabs defaultValue="submit">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full h-auto p-1 mb-6">
             <TabsTrigger value="submit" className="gap-1.5 text-xs py-2">
               <Send className="w-3.5 h-3.5" /> STORAN EMAIL
@@ -970,83 +972,16 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </TabsContent>
 
           {/* TARIK SALDO */}
-          <TabsContent value="withdraw" className="space-y-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="pt-6 flex items-start gap-2 text-xs text-blue-800">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
-                  {formatMoney(rules.data.minWithdraw)}, maksimal {formatMoney(rules.data.maxWithdraw)}.
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Tarik Saldo</CardTitle>
-                <CardDescription>Pilih metode pembayaran dan masukkan nomor tujuan.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleWithdraw} className="space-y-4">
-                  <div>
-                    <Label>Metode Pembayaran</Label>
-                    <Select value={method} onValueChange={setMethod}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Pilih metode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rules.data.paymentMethods.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="account">Nomor Rekening / Nomor E-Wallet</Label>
-                    <Input
-                      id="account"
-                      value={account}
-                      onChange={(e) => setAccount(e.target.value)}
-                      placeholder={`Nomor HP ${method} / Rekening`}
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="accountHolderName">Atas Nama</Label>
-                    <Input
-                      id="accountHolderName"
-                      value={accountHolderName}
-                      onChange={(e) => setAccountHolderName(e.target.value)}
-                      placeholder="Masukkan nama pemilik rekening/wallet"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      id="amount"
-                      value={amount}
-                      onChange={(val) => setAmount(val)}
-                      placeholder="Contoh: 100.000"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={withdrawing}
-                    className="w-full bg-amber-600 hover:bg-amber-700 gap-2"
-                  >
-                    {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+          <TabsContent value="withdraw" className="space-y-6">
+            <WithdrawalSection
+              balance={profile.balance}
+              minWithdraw={rules.data.minWithdraw}
+              maxWithdraw={rules.data.maxWithdraw}
+              paymentMethods={rules.data.paymentMethods}
+              onSubmitWithdrawal={handleWithdrawSubmit}
+              onNavigateToReferral={() => setActiveTab("referral")}
+              isSubmitting={withdrawing}
+            />
 
             {/* RIWAYAT TRANSAKSI / PENARIKAN */}
             <Card className="bg-white border-gray-200">
