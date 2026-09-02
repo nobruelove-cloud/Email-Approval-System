@@ -1454,96 +1454,219 @@ export async function evaluateReferralQualification(referredWorkerId: string) {
     "evaluateReferralQualification",
     `referrals/${referredWorkerId}`
   );
+
+  // Automatically claim any eligible unclaimed tiers for the referrer
+  try {
+    await autoClaimEligibleReferralRewards(referredWorkerId);
+  } catch (autoClaimErr) {
+    console.warn("[evaluateReferralQualification] autoClaim notice:", autoClaimErr);
+  }
 }
 
 // Alias for backwards compatibility if needed
 export const evaluateReferralQualificationAndReward = evaluateReferralQualification;
 
 /**
- * Worker creates a pending claim request for a specific referral tier.
- * Adheres strictly to security rules (creates pending claim document in referralClaims collection).
+ * Worker directly claims a qualified referral tier reward via an atomic Firestore transaction.
+ * STRICT ORDERING: ALL READS MUST HAPPEN BEFORE ANY WRITES.
  */
-export async function createReferralClaimRequest(referralId: string, minAcc: number) {
+export async function claimReferralReward(referralId: string, minAcc: number) {
   if (!db || !auth) throw new Error("Firebase is not configured.");
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Anda harus masuk terlebih dahulu.");
 
   const firestore = db;
-  const claimDocId = `${referralId}_tier_${minAcc}`;
-  const claimRef = doc(firestore, "referralClaims", claimDocId);
 
-  // Read referral doc to validate referrer and progress
-  const referralRef = doc(firestore, "referrals", referralId);
-  const referralSnap = await getDocWithDiagnostic(referralRef, "createReferralClaimRequest");
-  if (!referralSnap.exists()) {
-    throw new Error("Data referral tidak ditemukan.");
-  }
+  return runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // --- ALL READS FIRST ---
 
-  const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-  if (referral.referrerId !== currentUser.uid) {
-    throw new Error("Anda tidak dapat mengklaim reward referral milik akun lain.");
-  }
+      // READ 1: referrals/{referralId}
+      const referralRef = doc(firestore, "referrals", referralId);
+      const referralSnap = await tx.get(referralRef);
 
-  if (referral.status === "REJECTED") {
-    throw new Error("Referral ini telah ditolak oleh admin.");
-  }
+      if (!referralSnap.exists()) {
+        throw new Error("Data referral tidak ditemukan.");
+      }
 
-  if ((referral.currentAccCount ?? 0) < minAcc) {
-    throw new Error(`Target ACC belum tercapai (${referral.currentAccCount ?? 0}/${minAcc}).`);
-  }
+      const actualDocId = referralSnap.id;
+      const referralData = referralSnap.data() as import("@/lib/portal-types").Referral;
+      const status = referralData.status ?? "PENDING";
+      if (status === "REJECTED") {
+        throw new Error("Referral ini telah ditolak oleh admin.");
+      }
 
-  const rulesRef = doc(firestore, "settings", "rules");
-  const rulesSnap = await getDocWithDiagnostic(rulesRef, "createReferralClaimRequest");
-  const rulesData = rulesSnap.exists() ? (rulesSnap.data() as import("@/lib/portal-types").PortalRules) : null;
-  const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+      const effectiveReferrerId =
+        (referralData.referrerId && String(referralData.referrerId).trim()) ||
+        referralData.id ||
+        actualDocId;
 
-  const matchedTier = referralTiers.find((t) => Number(t.minAcc) === Number(minAcc));
-  if (!matchedTier) {
-    throw new Error(`Tier referral ${minAcc} ACC tidak ditemukan.`);
-  }
+      if (effectiveReferrerId !== currentUser.uid) {
+        throw new Error("Anda tidak dapat mengklaim reward referral milik akun lain.");
+      }
 
-  if (referral.claimedTiers?.[String(minAcc)]) {
-    throw new Error(`Hadiah tier ${minAcc} ACC sudah pernah diklaim.`);
-  }
+      const effectiveReferredWorkerId =
+        (referralData.referredWorkerId && String(referralData.referredWorkerId).trim()) ||
+        referralData.id ||
+        actualDocId;
 
-  // Check if claim request already exists
-  const existingSnap = await getDocWithDiagnostic(claimRef, "createReferralClaimRequest");
-  if (existingSnap.exists()) {
-    const existingData = existingSnap.data() as import("@/lib/portal-types").ReferralClaim;
-    if (existingData.status === "approved") {
-      throw new Error(`Klaim reward tier ${minAcc} ACC sudah pernah disetujui.`);
-    }
-    if (existingData.status === "pending") {
-      throw new Error(`Permintaan klaim tier ${minAcc} ACC sedang menunggu persetujuan admin.`);
-    }
-    if (existingData.status === "rejected") {
-      throw new Error(`Permintaan klaim tier ${minAcc} ACC sebelumnya telah ditolak oleh admin.`);
-    }
-    throw new Error(`Permintaan klaim tier ${minAcc} ACC sudah pernah diajukan.`);
-  }
+      const effectiveReferredWorkerName =
+        referralData.referredWorkerName || shortId(effectiveReferredWorkerId);
 
-  await setDocWithDiagnostic(
-    claimRef,
-    {
-      id: claimDocId,
-      referralId,
-      referrerId: currentUser.uid,
-      referredWorkerId: referral.referredWorkerId,
-      minAcc: matchedTier.minAcc,
-      rewardAmount: matchedTier.reward,
-      status: "pending",
-      requestedAt: serverTimestamp(),
+      // READ 2: settings/rules
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+      const matchedTier = referralTiers.find((t) => Number(t.minAcc) === Number(minAcc));
+      if (!matchedTier) {
+        throw new Error(`Tier referral ${minAcc} ACC tidak ditemukan.`);
+      }
+
+      const currentAcc = Number(referralData.currentAccCount ?? 0);
+      if (currentAcc < matchedTier.minAcc) {
+        throw new Error(`Target ACC belum tercapai (${currentAcc}/${matchedTier.minAcc}).`);
+      }
+
+      const claimedTiers: Record<string, boolean> = referralData.claimedTiers || {};
+      if (claimedTiers[String(matchedTier.minAcc)]) {
+        throw new Error(`Hadiah tier ${matchedTier.minAcc} ACC sudah pernah diklaim.`);
+      }
+
+      // READ 3: users/{effectiveReferrerId}
+      const referrerRef = doc(firestore, "users", effectiveReferrerId);
+      const referrerSnap = await tx.get(referrerRef);
+
+      if (!referrerSnap.exists()) {
+        throw new Error(`Profil pengundang tidak ditemukan (users/${effectiveReferrerId}).`);
+      }
+
+      const referrerData = referrerSnap.data() as PortalUser;
+      const currentBalance = Number(referrerData.balance ?? 0);
+      const referrerName =
+        (referrerData.name && String(referrerData.name).trim()) ||
+        referralData.referrerName ||
+        shortId(effectiveReferrerId);
+
+      // READ 4 & READ 5: referralClaims/{claimId} & rewardLedger/{ledgerId}
+      const claimDocId = `${actualDocId}_tier_${matchedTier.minAcc}`;
+      const claimRef = doc(firestore, "referralClaims", claimDocId);
+      const claimSnap = await tx.get(claimRef);
+
+      if (claimSnap.exists() && claimSnap.data()?.status === "approved") {
+        throw new Error(`Hadiah tier ${matchedTier.minAcc} ACC sudah pernah diklaim.`);
+      }
+
+      const ledgerDocId = `${actualDocId}_ledger_tier_${matchedTier.minAcc}`;
+      const ledgerRef = doc(firestore, "rewardLedger", ledgerDocId);
+      const ledgerSnap = await tx.get(ledgerRef);
+
+      // --- ALL WRITES AFTER READS ---
+
+      // WRITE 1: referrals/{actualDocId}
+      const updatedClaimedTiers = { ...claimedTiers, [String(matchedTier.minAcc)]: true };
+      const newTotalReward = Number(referralData.rewardAmount ?? 0) + matchedTier.reward;
+      const allClaimed = referralTiers.every((t) => Boolean(updatedClaimedTiers[String(t.minAcc)]));
+
+      tx.update(referralRef, {
+        claimedTiers: updatedClaimedTiers,
+        rewardAmount: newTotalReward,
+        status: allClaimed ? "PAID" : "QUALIFIED",
+        rewardedAt: serverTimestamp(),
+      });
+
+      // WRITE 2: users/{effectiveReferrerId}
+      tx.update(referrerRef, {
+        balance: currentBalance + matchedTier.reward,
+        lastClaimId: claimDocId,
+      });
+
+      // WRITE 3: rewardLedger/{ledgerDocId}
+      const ledgerData = {
+        id: ledgerDocId,
+        workerId: effectiveReferrerId,
+        workerName: referrerName,
+        rewardType: "referral" as const,
+        amount: matchedTier.reward,
+        sourceRefId: `${actualDocId}_tier_${matchedTier.minAcc}`,
+        description: `Hadiah Referral Tier ${matchedTier.minAcc} ACC (${formatMoney(matchedTier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
+        createdAt: serverTimestamp(),
+      };
+      if (ledgerSnap.exists()) {
+        tx.update(ledgerRef, ledgerData);
+      } else {
+        tx.set(ledgerRef, ledgerData);
+      }
+
+      // WRITE 4: referralClaims/{claimDocId}
+      const claimData = {
+        id: claimDocId,
+        referralId: actualDocId,
+        referrerId: effectiveReferrerId,
+        referredWorkerId: effectiveReferredWorkerId,
+        minAcc: matchedTier.minAcc,
+        rewardAmount: matchedTier.reward,
+        status: "approved" as const,
+        processedAt: serverTimestamp(),
+      };
+      if (claimSnap.exists()) {
+        tx.update(claimRef, claimData);
+      } else {
+        tx.set(claimRef, claimData);
+      }
+
+      return {
+        status: "ok",
+        message: `🎉 Reward referral berhasil diklaim +${formatMoney(matchedTier.reward)}`,
+        rewardAmount: matchedTier.reward,
+      };
     },
-    undefined,
-    "createReferralClaimRequest"
+    "claimReferralReward",
+    `referrals/${referralId}`
   );
 }
 
+export const claimReferralTier = claimReferralReward;
+export const createReferralClaimRequest = claimReferralReward;
+
 /**
- * Worker claims a specific referral tier reward (per-tier claim request).
+ * Automatically checks for any unclaimed eligible referral tiers for referredWorkerId
+ * and attempts to claim them for the referrer.
  */
-export async function claimReferralTier(referralId: string, minAcc: number) {
-  return createReferralClaimRequest(referralId, minAcc);
+export async function autoClaimEligibleReferralRewards(referredWorkerId: string) {
+  if (!db || !auth?.currentUser) return;
+  try {
+    const firestore = db;
+    const referralRef = doc(firestore, "referrals", referredWorkerId);
+    const referralSnap = await getDocWithDiagnostic(referralRef, "autoClaimEligibleReferralRewards");
+    if (!referralSnap.exists()) return;
+
+    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+    // Only auto-claim if current logged-in user is the referrer
+    if (referral.referrerId !== auth.currentUser.uid) return;
+
+    const currentAcc = referral.currentAccCount ?? 0;
+    const claimedTiers = referral.claimedTiers || {};
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await getDocWithDiagnostic(rulesRef, "autoClaimEligibleReferralRewards");
+    const rulesData = rulesSnap.exists() ? (rulesSnap.data() as import("@/lib/portal-types").PortalRules) : null;
+    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+    for (const tier of referralTiers) {
+      if (currentAcc >= tier.minAcc && !claimedTiers[String(tier.minAcc)]) {
+        try {
+          await claimReferralReward(referredWorkerId, tier.minAcc);
+        } catch (claimErr) {
+          console.warn(`[autoClaimEligibleReferralRewards] Tier ${tier.minAcc} claim notice:`, claimErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[autoClaimEligibleReferralRewards] Error:", err);
+  }
 }
 
 /**
