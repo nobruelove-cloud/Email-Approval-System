@@ -3,11 +3,15 @@ import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
   DEFAULT_OPERATING_HOURS,
+  DEFAULT_PAYMENT_METHOD_FEES,
   type EmailSubmission,
   type TierConfig,
   type ReferralTierConfig,
   type OperatingHoursConfig,
   type Referral,
+  type PaymentMethodFeeConfig,
+  type WithdrawalSettings,
+  type PortalRules,
 } from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
@@ -40,6 +44,74 @@ export function formatMoney(value: number) {
 
 export function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 5)}…${id.slice(-4)}` : id;
+}
+
+/**
+ * Resolves fee configuration for a specific payment method from WithdrawalSettings or fallback PortalRules.
+ */
+export function getPaymentMethodFeeConfig(
+  methodName: string,
+  withdrawalSettings?: WithdrawalSettings | null,
+  fallbackRules?: PortalRules | null
+): PaymentMethodFeeConfig {
+  const normName = (methodName || "").trim().toLowerCase();
+
+  if (withdrawalSettings?.methods && Array.isArray(withdrawalSettings.methods)) {
+    const found = withdrawalSettings.methods.find((m) => m.method.trim().toLowerCase() === normName);
+    if (found) return found;
+  }
+
+  const defaultFound = DEFAULT_PAYMENT_METHOD_FEES.find((m) => m.method.trim().toLowerCase() === normName);
+  if (defaultFound) return defaultFound;
+
+  // Fallback if legacy withdrawFeePercent is set in rules
+  const legacyPercent = fallbackRules?.withdrawFeePercent ?? 0;
+  return {
+    method: methodName || "Transfer Bank",
+    enabled: true,
+    feeType: legacyPercent > 0 ? "percentage" : "free",
+    feeValue: legacyPercent,
+  };
+}
+
+/**
+ * Calculates withdrawal fee based on provider configuration and withdrawal amount.
+ */
+export function calculateWithdrawalFee(amount: number, feeConfig?: PaymentMethodFeeConfig | null): number {
+  if (!feeConfig || feeConfig.feeType === "free" || !Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+
+  if (feeConfig.feeType === "fixed") {
+    return Math.max(0, Math.round(feeConfig.feeValue));
+  }
+
+  if (feeConfig.feeType === "percentage") {
+    const fee = (amount * Math.max(0, feeConfig.feeValue)) / 100;
+    return Math.max(0, Math.round(fee));
+  }
+
+  return 0;
+}
+
+/**
+ * Formats a fee configuration into a human-readable badge text.
+ * e.g. "Bebas Biaya", "Biaya Rp 2.500", or "Biaya 1.5%"
+ */
+export function formatFeeBadge(feeConfig?: PaymentMethodFeeConfig | null): string {
+  if (!feeConfig || feeConfig.feeType === "free" || feeConfig.feeValue <= 0) {
+    return "Bebas Biaya";
+  }
+
+  if (feeConfig.feeType === "fixed") {
+    return `Biaya ${formatMoney(feeConfig.feeValue)}`;
+  }
+
+  if (feeConfig.feeType === "percentage") {
+    return `Biaya ${feeConfig.feeValue}%`;
+  }
+
+  return "Bebas Biaya";
 }
 
 /**

@@ -56,7 +56,7 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -70,6 +70,9 @@ import {
   getOperatingStatus,
   isReferralTierClaimed,
   isReferralTierClaimable,
+  getPaymentMethodFeeConfig,
+  calculateWithdrawalFee,
+  formatFeeBadge,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -95,6 +98,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
+  const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const myReferral = useMyReferral(profile.uid);
   const announcements = useAnnouncements();
 
@@ -347,10 +351,50 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // --- Withdraw ---
   const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState(rules.data.paymentMethods[0] ?? "DANA");
+
+  // Active payment method fee configurations
+  const activeWithdrawalSettings = useMemo(() => {
+    return {
+      minWithdraw: withdrawalSettingsHook.data?.minWithdraw ?? rules.data.minWithdraw ?? 50000,
+      maxWithdraw: withdrawalSettingsHook.data?.maxWithdraw ?? rules.data.maxWithdraw ?? 5000000,
+      methods: Array.isArray(withdrawalSettingsHook.data?.methods) && withdrawalSettingsHook.data.methods.length > 0
+        ? withdrawalSettingsHook.data.methods
+        : (rules.data.paymentMethods ?? ["DANA", "OVO", "GoPay", "ShopeePay", "Bank Transfer"]).map((m) => ({
+            method: m,
+            enabled: true,
+            feeType: "free" as const,
+            feeValue: 0,
+          })),
+    };
+  }, [withdrawalSettingsHook.data, rules.data]);
+
+  const enabledMethods = useMemo(() => {
+    return activeWithdrawalSettings.methods.filter((m) => m.enabled !== false);
+  }, [activeWithdrawalSettings.methods]);
+
+  const [method, setMethod] = useState<string>(() => enabledMethods[0]?.method ?? "DANA");
+
+  // Keep selected method valid if enabled methods list updates
+  const activeMethodConfig = useMemo(() => {
+    return getPaymentMethodFeeConfig(method, activeWithdrawalSettings, rules.data);
+  }, [method, activeWithdrawalSettings, rules.data]);
+
   const [account, setAccount] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
+
+  // Dynamic fee calculation
+  const calculatedFee = useMemo(() => {
+    return calculateWithdrawalFee(amount, activeMethodConfig);
+  }, [amount, activeMethodConfig]);
+
+  const calculatedNet = useMemo(() => {
+    return Math.max(0, amount - calculatedFee);
+  }, [amount, calculatedFee]);
+
+  const currentFeeBadgeText = useMemo(() => {
+    return formatFeeBadge(activeMethodConfig);
+  }, [activeMethodConfig]);
 
   async function handleWithdraw(e: React.FormEvent) {
     e.preventDefault();
@@ -367,12 +411,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       toast.error("Masukkan jumlah penarikan yang valid.");
       return;
     }
-    if (value < rules.data.minWithdraw) {
-      toast.error(`Minimal penarikan adalah ${formatMoney(rules.data.minWithdraw)}.`);
+    if (value < activeWithdrawalSettings.minWithdraw) {
+      toast.error(`Minimal penarikan adalah ${formatMoney(activeWithdrawalSettings.minWithdraw)}.`);
       return;
     }
-    if (value > rules.data.maxWithdraw) {
-      toast.error(`Maksimal penarikan adalah ${formatMoney(rules.data.maxWithdraw)}.`);
+    if (value > activeWithdrawalSettings.maxWithdraw) {
+      toast.error(`Maksimal penarikan adalah ${formatMoney(activeWithdrawalSettings.maxWithdraw)}.`);
       return;
     }
     if (value > profile.balance) {
@@ -385,9 +429,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       await createWithdrawal({
         workerId: profile.uid,
         amount: value,
-        method,
+        method: activeMethodConfig.method,
         account: account.trim(),
         accountHolderName: accountHolderName.trim(),
+        fee: calculatedFee,
+        netAmount: calculatedNet,
       });
       toast.success("Permintaan penarikan berhasil dikirim!");
       setAmount(0);
@@ -976,28 +1022,52 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
                   Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
-                  {formatMoney(rules.data.minWithdraw)}, maksimal {formatMoney(rules.data.maxWithdraw)}.
+                  {formatMoney(activeWithdrawalSettings.minWithdraw)}, maksimal {formatMoney(activeWithdrawalSettings.maxWithdraw)}.
                 </span>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Tarik Saldo</CardTitle>
-                <CardDescription>Pilih metode pembayaran dan masukkan nomor tujuan.</CardDescription>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-lg">Tarik Saldo</CardTitle>
+                    <CardDescription>Pilih metode pembayaran dan masukkan nomor tujuan.</CardDescription>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs font-bold px-2.5 py-1 ${
+                      activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
+                        ? "bg-green-50 text-green-800 border-green-300"
+                        : "bg-amber-50 text-amber-800 border-amber-300"
+                    }`}
+                  >
+                    {currentFeeBadgeText}
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleWithdraw} className="space-y-4">
                   <div>
-                    <Label>Metode Pembayaran</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label>Metode Pembayaran</Label>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {enabledMethods.length} metode tersedia
+                      </span>
+                    </div>
                     <Select value={method} onValueChange={setMethod}>
                       <SelectTrigger className="mt-1.5">
                         <SelectValue placeholder="Pilih metode" />
                       </SelectTrigger>
                       <SelectContent>
-                        {rules.data.paymentMethods.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
+                        {enabledMethods.map((m) => (
+                          <SelectItem key={m.method} value={m.method}>
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span className="font-semibold">{m.method}</span>
+                              <span className="text-[11px] text-gray-500 font-normal">
+                                ({formatFeeBadge(m)})
+                              </span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1036,13 +1106,34 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       required
                     />
                   </div>
+
+                  {/* DYNAMIC FEE CALCULATION BREAKDOWN SUMMARY CARD */}
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2">
+                    <div className="flex justify-between items-center text-gray-600">
+                      <span>Nominal Penarikan:</span>
+                      <span className="font-semibold text-gray-900">{formatMoney(amount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-600">
+                      <span className="flex items-center gap-1">
+                        Biaya Admin / Layanan ({activeMethodConfig.method}):
+                      </span>
+                      <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-green-700"}>
+                        {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-gray-200 flex justify-between items-center font-bold text-sm">
+                      <span className="text-gray-900">Net Saldo Diterima:</span>
+                      <span className="text-green-700">{formatMoney(calculatedNet)}</span>
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
                     disabled={withdrawing}
-                    className="w-full bg-amber-600 hover:bg-amber-700 gap-2"
+                    className="w-full bg-amber-600 hover:bg-amber-700 gap-2 font-bold"
                   >
                     {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan
+                    Ajukan Penarikan ({formatMoney(calculatedNet)})
                   </Button>
                 </form>
               </CardContent>

@@ -1109,6 +1109,8 @@ export async function createWithdrawal(payload: {
   method: string;
   account: string;
   accountHolderName: string;
+  fee?: number;
+  netAmount?: number;
 }) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
@@ -1130,7 +1132,7 @@ export async function createWithdrawal(payload: {
 
       tx.update(userRef, { balance: balance - payload.amount });
       const withdrawalRef = doc(collection(firestore, "withdrawals"));
-      tx.set(withdrawalRef, {
+      const docData: Record<string, unknown> = {
         workerId: payload.workerId,
         amount: payload.amount,
         method: payload.method,
@@ -1138,7 +1140,11 @@ export async function createWithdrawal(payload: {
         accountHolderName: trimmedHolderName,
         status: "pending" as WithdrawalStatus,
         requestedAt: serverTimestamp(),
-      });
+      };
+      if (typeof payload.fee === "number") docData.fee = payload.fee;
+      if (typeof payload.netAmount === "number") docData.netAmount = payload.netAmount;
+
+      tx.set(withdrawalRef, docData);
     },
     "createWithdrawal",
     "withdrawals"
