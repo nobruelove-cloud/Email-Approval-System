@@ -1,0 +1,23 @@
+
+> @workspace/worker-portal@0.0.0 dev /app/artifacts/worker-portal
+> vite --config vite.config.ts --host 0.0.0.0
+
+=== Vercel Build-time Environment Diagnostics ===
+[Diagnostic] VITE_FIREBASE_API_KEY: Missing/Undefined
+[Diagnostic] FIREBASE_API_KEY: Missing/Undefined
+[Diagnostic] VITE_FIREBASE_AUTH_DOMAIN: Missing/Undefined
+[Diagnostic] FIREBASE_AUTH_DOMAIN: Missing/Undefined
+[Diagnostic] VITE_FIREBASE_PROJECT_ID: Missing/Undefined
+[Diagnostic] FIREBASE_PROJECT_ID: Missing/Undefined
+[Diagnostic] VITE_FIREBASE_STORAGE_BUCKET: Missing/Undefined
+[Diagnostic] FIREBASE_STORAGE_BUCKET: Missing/Undefined
+[Diagnostic] VITE_FIREBASE_MESSAGING_SENDER_ID: Missing/Undefined
+[Diagnostic] FIREBASE_MESSAGING_SENDER_ID: Missing/Undefined
+[Diagnostic] VITE_FIREBASE_APP_ID: Missing/Undefined
+[Diagnostic] FIREBASE_APP_ID: Missing/Undefined
+==================================================
+
+  VITE v7.3.6  ready in 392 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://192.168.0.2:3000/

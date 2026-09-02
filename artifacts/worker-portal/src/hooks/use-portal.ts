@@ -1106,6 +1106,8 @@ export async function updateEmailStockStatus(
 export async function createWithdrawal(payload: {
   workerId: string;
   amount: number;
+  fee?: number;
+  netAmount?: number;
   method: string;
   account: string;
   accountHolderName: string;
@@ -1130,7 +1132,7 @@ export async function createWithdrawal(payload: {
 
       tx.update(userRef, { balance: balance - payload.amount });
       const withdrawalRef = doc(collection(firestore, "withdrawals"));
-      tx.set(withdrawalRef, {
+      const withdrawalData: Record<string, unknown> = {
         workerId: payload.workerId,
         amount: payload.amount,
         method: payload.method,
@@ -1138,7 +1140,11 @@ export async function createWithdrawal(payload: {
         accountHolderName: trimmedHolderName,
         status: "pending" as WithdrawalStatus,
         requestedAt: serverTimestamp(),
-      });
+      };
+      if (typeof payload.fee === "number") withdrawalData.fee = payload.fee;
+      if (typeof payload.netAmount === "number") withdrawalData.netAmount = payload.netAmount;
+
+      tx.set(withdrawalRef, withdrawalData);
     },
     "createWithdrawal",
     "withdrawals"

@@ -56,7 +56,7 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_FEE, type EmailSubmission, type PortalUser, type WithdrawalFeeConfig } from "@/lib/portal-types";
 import {
   formatDateTime,
   formatMoney,
@@ -70,6 +70,7 @@ import {
   getOperatingStatus,
   isReferralTierClaimed,
   isReferralTierClaimable,
+  calculateWithdrawalFee,
 } from "@/lib/portal-utils";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -95,6 +96,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
+  const withdrawalFeeSettings = useSettings("withdrawal", DEFAULT_WITHDRAWAL_FEE);
+  const withdrawalFeeConfig: WithdrawalFeeConfig = withdrawalFeeSettings.data;
   const myReferral = useMyReferral(profile.uid);
   const announcements = useAnnouncements();
 
@@ -203,11 +206,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     // 1. Withdrawals
     withdrawals.data.forEach((w) => {
       const holderName = w.accountHolderName ?? w.accountName ?? "Belum tersedia";
+      let desc = `${w.method} · ${w.account} (a.n. ${holderName})`;
+      if (typeof w.fee === "number" && w.fee > 0) {
+        desc += ` · Biaya: ${formatMoney(w.fee)}`;
+      }
       list.push({
         id: `wd-${w.id}`,
         date: w.requestedAt,
         type: "Penarikan Saldo",
-        description: `${w.method} · ${w.account} (a.n. ${holderName})`,
+        description: desc,
         amount: w.amount,
         isCredit: false,
         status: w.status,
@@ -352,6 +359,23 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [accountHolderName, setAccountHolderName] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
+  const feeCalculation = useMemo(() => {
+    return calculateWithdrawalFee(amount, withdrawalFeeConfig);
+  }, [amount, withdrawalFeeConfig]);
+
+  const feeBadgeText = useMemo(() => {
+    if (withdrawalFeeConfig.feeType === "free") return "Bebas Biaya";
+    if (withdrawalFeeConfig.feeType === "fixed") return `Biaya: ${formatMoney(withdrawalFeeConfig.fixedFee || 0)}`;
+    if (withdrawalFeeConfig.feeType === "percentage") {
+      let text = `Biaya: ${withdrawalFeeConfig.percentageFee}%`;
+      if (withdrawalFeeConfig.minFee && withdrawalFeeConfig.minFee > 0) {
+        text += ` (Min. ${formatMoney(withdrawalFeeConfig.minFee)})`;
+      }
+      return text;
+    }
+    return "Bebas Biaya";
+  }, [withdrawalFeeConfig]);
+
   async function handleWithdraw(e: React.FormEvent) {
     e.preventDefault();
     if (!account.trim()) {
@@ -380,11 +404,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       return;
     }
 
+    const { fee, netAmount } = feeCalculation;
+    if (netAmount <= 0) {
+      toast.error("Nominal penarikan setelah dipotong biaya harus lebih besar dari Rp 0.");
+      return;
+    }
+
     setWithdrawing(true);
     try {
       await createWithdrawal({
         workerId: profile.uid,
         amount: value,
+        fee,
+        netAmount,
         method,
         account: account.trim(),
         accountHolderName: accountHolderName.trim(),
@@ -974,10 +1006,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="pt-6 flex items-start gap-2 text-xs text-blue-800">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
-                  {formatMoney(rules.data.minWithdraw)}, maksimal {formatMoney(rules.data.maxWithdraw)}.
-                </span>
+                <div className="space-y-1">
+                  <p>
+                    Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
+                    {formatMoney(rules.data.minWithdraw)}, maksimal {formatMoney(rules.data.maxWithdraw)}.
+                  </p>
+                  <p className="font-medium text-blue-900">
+                    Info Biaya Penarikan: <Badge variant="outline" className="bg-white text-blue-800 border-blue-300 font-bold ml-1">{feeBadgeText}</Badge>
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -989,9 +1026,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <CardContent>
                 <form onSubmit={handleWithdraw} className="space-y-4">
                   <div>
-                    <Label>Metode Pembayaran</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label>Metode Pembayaran</Label>
+                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300 font-semibold">
+                        {feeBadgeText}
+                      </Badge>
+                    </div>
                     <Select value={method} onValueChange={setMethod}>
-                      <SelectTrigger className="mt-1.5">
+                      <SelectTrigger>
                         <SelectValue placeholder="Pilih metode" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1036,13 +1078,37 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       required
                     />
                   </div>
+
+                  {/* RINCIAN PENARIKAN (FEE BREAKDOWN & NET RECEIVED) */}
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-2 text-xs">
+                    <p className="font-bold text-gray-900 border-b border-gray-200 pb-1.5 mb-2">Rincian Penarikan</p>
+                    <div className="flex items-center justify-between text-gray-600">
+                      <span>Jumlah Diajukan</span>
+                      <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-gray-600">
+                      <span>Estimasi Biaya Layanan / Admin ({feeBadgeText})</span>
+                      <span className="font-bold text-red-600">- {formatMoney(feeCalculation.fee)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm font-black pt-2 border-t border-gray-200 text-amber-900">
+                      <span>Net Saldo Diterima</span>
+                      <span className="text-amber-700">{formatMoney(feeCalculation.netAmount)}</span>
+                    </div>
+                  </div>
+
+                  {amount > 0 && feeCalculation.netAmount <= 0 && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+                      ⚠️ Nominal penarikan setelah dipotong biaya layanan harus lebih besar dari Rp 0. Silakan tingkatkan nominal penarikan.
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
-                    disabled={withdrawing}
+                    disabled={withdrawing || (amount > 0 && feeCalculation.netAmount <= 0) || amount < rules.data.minWithdraw || amount > profile.balance}
                     className="w-full bg-amber-600 hover:bg-amber-700 gap-2"
                   >
                     {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan
+                    Ajukan Penarikan ({formatMoney(feeCalculation.netAmount)})
                   </Button>
                 </form>
               </CardContent>

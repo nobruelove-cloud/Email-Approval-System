@@ -89,7 +89,7 @@ import {
   toggleAnnouncementStatus,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_FEE, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type WithdrawalFeeConfig, type FeeType } from "@/lib/portal-types";
 import {
   formatDate,
   formatDateTime,
@@ -159,6 +159,30 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }, [profile]);
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
+  const withdrawalFeeSettings = useSettings("withdrawal", DEFAULT_WITHDRAWAL_FEE);
+  const [feeDraft, setFeeDraft] = useState<WithdrawalFeeConfig | null>(null);
+  const [savingFee, setSavingFee] = useState(false);
+
+  const activeFeeConfig: WithdrawalFeeConfig = feeDraft !== null ? feeDraft : withdrawalFeeSettings.data;
+
+  async function handleSaveFeeConfig() {
+    setSavingFee(true);
+    try {
+      await saveSettings("withdrawal", {
+        feeType: activeFeeConfig.feeType,
+        fixedFee: Number(activeFeeConfig.fixedFee) || 0,
+        percentageFee: Number(activeFeeConfig.percentageFee) || 0,
+        minFee: Number(activeFeeConfig.minFee) || 0,
+      });
+      toast.success("Pengaturan biaya penarikan berhasil disimpan!");
+      setFeeDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengaturan biaya penarikan.");
+    } finally {
+      setSavingFee(false);
+    }
+  }
+
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
 
   // --- Keuangan / Financial Tracking state ---
@@ -2308,10 +2332,126 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </CardContent>
               </Card>
 
+              {/* PENGATURAN BIAYA PENARIKAN (WITHDRAWAL FEE SETTINGS) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-amber-600" />
+                    Pengaturan Biaya Penarikan
+                  </CardTitle>
+                  <CardDescription>
+                    Atur struktur biaya layanan/admin yang dikenakan setiap kali pekerja melakukan penarikan saldo.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-xs font-semibold">Tipe Biaya Penarikan</Label>
+                    <Select
+                      value={activeFeeConfig.feeType}
+                      onValueChange={(val: FeeType) =>
+                        setFeeDraft({
+                          ...activeFeeConfig,
+                          feeType: val,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="mt-1.5 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free" className="text-xs font-semibold text-green-700">
+                          Gratis / Bebas Biaya (0%)
+                        </SelectItem>
+                        <SelectItem value="fixed" className="text-xs font-semibold text-blue-700">
+                          Biaya Flat / Nominal Rp
+                        </SelectItem>
+                        <SelectItem value="percentage" className="text-xs font-semibold text-amber-700">
+                          Persentase / Potongan %
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {activeFeeConfig.feeType === "fixed" && (
+                    <div>
+                      <Label className="text-xs">Nominal Biaya Flat (Rp)</Label>
+                      <FormattedNumberInput
+                        value={activeFeeConfig.fixedFee}
+                        onChange={(val) =>
+                          setFeeDraft({
+                            ...activeFeeConfig,
+                            fixedFee: val,
+                          })
+                        }
+                        placeholder="Contoh: 1000"
+                        className="mt-1.5 text-xs font-bold"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Biaya tetap sebesar {formatMoney(activeFeeConfig.fixedFee || 0)} akan dipotong dari setiap transaksi penarikan.
+                      </p>
+                    </div>
+                  )}
+
+                  {activeFeeConfig.feeType === "percentage" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Persentase Biaya (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={activeFeeConfig.percentageFee}
+                          onChange={(e) =>
+                            setFeeDraft({
+                              ...activeFeeConfig,
+                              percentageFee: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          placeholder="Contoh: 1.5"
+                          className="mt-1.5 text-xs font-bold"
+                        />
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          Potongan {activeFeeConfig.percentageFee}% dari jumlah penarikan.
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Minimal Biaya / Threshold (Rp, opsional)</Label>
+                        <FormattedNumberInput
+                          value={activeFeeConfig.minFee ?? 0}
+                          onChange={(val) =>
+                            setFeeDraft({
+                              ...activeFeeConfig,
+                              minFee: val,
+                            })
+                          }
+                          placeholder="Contoh: 1000"
+                          className="mt-1.5 text-xs font-bold"
+                        />
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          Batas minimal potongan biaya (misal Rp {formatMoney(activeFeeConfig.minFee ?? 0)}).
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeFeeConfig.feeType === "free" && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800">
+                      <strong>Bebas Biaya:</strong> Pekerja tidak dikenakan biaya administrasi saat melakukan penarikan saldo.
+                    </div>
+                  )}
+
+                  <Button onClick={handleSaveFeeConfig} disabled={savingFee} className="bg-amber-600 hover:bg-amber-700 gap-2 text-xs">
+                    {savingFee && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Simpan Pengaturan Biaya Penarikan
+                  </Button>
+                </CardContent>
+              </Card>
+
               {/* GENERAL RULES */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Aturan & Biaya Penarikan</CardTitle>
+                  <CardTitle className="text-lg">Aturan Limi Penarikan</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
