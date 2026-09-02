@@ -493,7 +493,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <p className="font-bold text-gray-900">{profile.name}</p>
@@ -516,7 +516,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* JAM OPERASIONAL CARD */}
         <Card className="bg-white border-gray-200">
           <CardHeader className="pb-3">
@@ -1437,160 +1437,146 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* TARIK SALDO */}
           <TabsContent value="withdraw" className="space-y-6">
-            {/* SALDO HIGHLIGHT BANNER */}
-            <Card className="bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 text-white border-amber-500 shadow-md overflow-hidden relative">
-              <CardContent className="p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-amber-200 text-xs font-medium uppercase tracking-wider">
-                      <Wallet className="w-4 h-4" />
-                      Saldo Siap Ditarik
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                      {formatMoney(profile.balance)}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-amber-100/90 pt-1">
-                      <span>
-                        Min: <strong>{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Max: <strong>{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong>
-                      </span>
-                    </div>
-                  </div>
+            <form onSubmit={handleWithdraw}>
+              {/* SPLIT-SCREEN TWO-COLUMN LAYOUT */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* LEFT COLUMN: INPUTS & SELECTIONS (~60-65% width) */}
+                <div className="lg:col-span-7 space-y-6">
+                  {/* SALDO HIGHLIGHT BANNER */}
+                  <Card className="bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 text-white border-amber-500 shadow-md overflow-hidden relative">
+                    <CardContent className="p-5 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-amber-200 text-xs font-medium uppercase tracking-wider">
+                            <Wallet className="w-4 h-4" />
+                            Saldo Utama Siap Ditarik
+                          </div>
+                          <p className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            {formatMoney(profile.balance)}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-amber-100/90 pt-1">
+                            <span>
+                              Min: <strong>{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong>
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Max: <strong>{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong>
+                            </span>
+                          </div>
+                        </div>
 
-                  <Button
-                    type="button"
-                    onClick={() => setMainTab("referral")}
-                    className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold text-xs h-9 px-4 rounded-lg shadow-sm gap-1.5 shrink-0 transition-transform active:scale-95"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-900" />
-                    Bonus Saldo Referral
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                        <Button
+                          type="button"
+                          onClick={() => setMainTab("referral")}
+                          className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold text-xs h-9 px-4 rounded-lg shadow-sm gap-1.5 shrink-0 transition-transform active:scale-95"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-900" />
+                          Bonus Saldo Referral
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card className="bg-white border-gray-200 shadow-xs">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-lg font-bold text-gray-900">Formulir Penarikan Saldo</CardTitle>
-                    <CardDescription className="text-xs">
-                      Pilih penyedia layanan, nominal, dan detail akun penerima.
-                    </CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs font-bold px-2.5 py-1 ${
-                      activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
-                        ? "bg-green-50 text-green-800 border-green-300"
-                        : "bg-amber-50 text-amber-800 border-amber-300"
-                    }`}
-                  >
-                    {currentFeeBadgeText}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form onSubmit={handleWithdraw} className="space-y-6">
-                  {/* STEP 1: PAYMENT CATEGORY & PROVIDER GRID SELECTION */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">1</span>
-                        Pilih Metode & Penyedia Pembayaran
-                      </Label>
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        {enabledMethods.length} metode aktif
-                      </span>
-                    </div>
+                  {/* PAYMENT METHOD SELECTOR */}
+                  <Card className="bg-white border-gray-200 shadow-xs">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">1</span>
+                          Pilih Metode & Penyedia Pembayaran
+                        </CardTitle>
+                        <Badge variant="outline" className="text-[11px] font-semibold bg-gray-50 text-gray-600 border-gray-200">
+                          {enabledMethods.length} metode aktif
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* CATEGORY TOGGLE PILLS */}
+                      <div className="inline-flex p-1 bg-gray-100 rounded-lg gap-1 text-xs font-medium w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectCategory("ewallet")}
+                          className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                            categoryTab === "ewallet"
+                              ? "bg-white text-amber-900 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+                          E-Wallet (Instant)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectCategory("bank")}
+                          className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                            categoryTab === "bank"
+                              ? "bg-white text-amber-900 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                          Transfer Bank
+                        </button>
+                      </div>
 
-                    {/* CATEGORY TOGGLE PILLS */}
-                    <div className="inline-flex p-1 bg-gray-100 rounded-lg gap-1 text-xs font-medium w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectCategory("ewallet")}
-                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          categoryTab === "ewallet"
-                            ? "bg-white text-amber-900 shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-                        E-Wallet (Instant)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectCategory("bank")}
-                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          categoryTab === "bank"
-                            ? "bg-white text-amber-900 shadow-xs"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                        Transfer Bank
-                      </button>
-                    </div>
+                      {/* PROVIDER GRID CARDS */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                        {visibleMethods.map((m) => {
+                          const isSelected = method === m.method;
+                          const feeBadge = formatFeeBadge(m);
+                          const isEWallet = isEWalletMethod(m);
 
-                    {/* PROVIDER GRID CARDS */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                      {visibleMethods.map((m) => {
-                        const isSelected = method === m.method;
-                        const feeBadge = formatFeeBadge(m);
-                        const isEWallet = isEWalletMethod(m);
-
-                        return (
-                          <div
-                            key={m.method}
-                            onClick={() => setMethod(m.method)}
-                            className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none ${
-                              isSelected
-                                ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/30 shadow-sm"
-                                : "border-gray-200 bg-white hover:border-amber-300 hover:bg-gray-50/60"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                {isEWallet ? (
-                                  <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
-                                ) : (
-                                  <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
-                                )}
-                                <span className="font-bold text-sm text-gray-900 truncate">{m.method}</span>
-                              </div>
-                              {isSelected && (
-                                <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-                              )}
-                            </div>
-
-                            <Badge
-                              variant="secondary"
-                              className={`text-[10px] w-fit font-semibold px-2 py-0.5 ${
-                                m.feeType === "free" || m.feeValue <= 0
-                                  ? "bg-green-100 text-green-800 border-green-200"
-                                  : "bg-amber-100 text-amber-800 border-amber-200"
+                          return (
+                            <div
+                              key={m.method}
+                              onClick={() => setMethod(m.method)}
+                              className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none ${
+                                isSelected
+                                  ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/30 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-amber-300 hover:bg-gray-50/60"
                               }`}
                             >
-                              {feeBadge}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {isEWallet ? (
+                                    <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
+                                  ) : (
+                                    <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
+                                  )}
+                                  <span className="font-bold text-sm text-gray-900 truncate">{m.method}</span>
+                                </div>
+                                {isSelected && (
+                                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                                )}
+                              </div>
 
-                  {/* STEP 2: NOMINAL QUICK CHIPS & INPUT */}
-                  <div className="space-y-3 pt-2 border-t border-gray-100">
-                    <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">2</span>
-                      Nominal Penarikan
-                    </Label>
+                              <Badge
+                                variant="secondary"
+                                className={`text-[10px] w-fit font-semibold px-2 py-0.5 ${
+                                  m.feeType === "free" || m.feeValue <= 0
+                                    ? "bg-green-100 text-green-800 border-green-200"
+                                    : "bg-amber-100 text-amber-800 border-amber-200"
+                                }`}
+                              >
+                                {feeBadge}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                    <div className="space-y-2">
+                  {/* AMOUNT SELECTOR */}
+                  <Card className="bg-white border-gray-200 shadow-xs">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">2</span>
+                        Nominal Penarikan
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
                       <FormattedNumberInput
                         id="amount"
                         value={amount}
@@ -1629,75 +1615,139 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           );
                         })}
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
 
-                  {/* STEP 3: ACCOUNT DETAILS & REAL-TIME CALCULATION SUMMARY */}
-                  <div className="space-y-3 pt-2 border-t border-gray-100">
-                    <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">3</span>
-                      Detail Akun & Ringkasan Penarikan
-                    </Label>
+                  {/* ACCOUNT DETAILS INPUTS */}
+                  <Card className="bg-white border-gray-200 shadow-xs">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">3</span>
+                        Detail Akun Penerima
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="account" className="text-xs text-gray-600 font-medium">
+                            Nomor Rekening / Nomor HP {method}
+                          </Label>
+                          <Input
+                            id="account"
+                            value={account}
+                            onChange={(e) => setAccount(e.target.value)}
+                            placeholder={`Nomor HP ${method} / Rekening`}
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="accountHolderName" className="text-xs text-gray-600 font-medium">
+                            Atas Nama Pemilik (Sesuai Rekening)
+                          </Label>
+                          <Input
+                            id="accountHolderName"
+                            value={accountHolderName}
+                            onChange={(e) => setAccountHolderName(e.target.value)}
+                            placeholder="Nama pemilik rekening/wallet"
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="account" className="text-xs text-gray-600">
-                          Nomor Rekening / Nomor {method}
-                        </Label>
-                        <Input
-                          id="account"
-                          value={account}
-                          onChange={(e) => setAccount(e.target.value)}
-                          placeholder={`Nomor HP ${method} / Rekening`}
-                          className="mt-1"
-                          required
-                        />
+                {/* RIGHT COLUMN: STICKY RECEIPT CARD & PRIMARY CTA (~35-40% width) */}
+                <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
+                  <Card className="bg-white border-gray-200 shadow-md">
+                    <CardHeader className="pb-3 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-amber-600" />
+                          Rincian & Ringkasan Penarikan
+                        </CardTitle>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs font-bold px-2 py-0.5 ${
+                            activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
+                              ? "bg-green-50 text-green-800 border-green-300"
+                              : "bg-amber-50 text-amber-800 border-amber-300"
+                          }`}
+                        >
+                          {currentFeeBadgeText}
+                        </Badge>
                       </div>
-                      <div>
-                        <Label htmlFor="accountHolderName" className="text-xs text-gray-600">
-                          Atas Nama (Pemilik Rekening/Wallet)
-                        </Label>
-                        <Input
-                          id="accountHolderName"
-                          value={accountHolderName}
-                          onChange={(e) => setAccountHolderName(e.target.value)}
-                          placeholder="Masukkan nama sesuai rekening/wallet"
-                          className="mt-1"
-                          required
-                        />
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-4 text-xs">
+                      {/* SELECTED PROVIDER HEADER */}
+                      <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-lg bg-white border border-amber-200 text-amber-700 shadow-2xs">
+                            {isEWalletMethod(activeMethodConfig) ? (
+                              <Smartphone className="w-4 h-4" />
+                            ) : (
+                              <Building2 className="w-4 h-4 text-blue-600" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-gray-500 font-medium">Metode Dipilih</p>
+                            <p className="font-bold text-gray-900 text-sm">{activeMethodConfig.method}</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-900 text-[10px] font-semibold">
+                          {isEWalletMethod(activeMethodConfig) ? "E-Wallet Instant" : "Transfer Bank"}
+                        </Badge>
                       </div>
-                    </div>
 
-                    {/* DYNAMIC BREAKDOWN SUMMARY CARD */}
-                    <div className="p-4 bg-gray-50/80 rounded-xl border border-gray-200 space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center text-gray-600">
-                        <span>Jumlah Penarikan:</span>
-                        <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+                      {/* ACCOUNT SUMMARY DETAILS */}
+                      <div className="space-y-2 border-b border-gray-100 pb-3">
+                        <div className="flex justify-between items-center text-gray-600">
+                          <span>Nomor Akun/Rekening:</span>
+                          <span className="font-mono font-semibold text-gray-900">{account.trim() || "-"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-600">
+                          <span>Atas Nama Pemilik:</span>
+                          <span className="font-semibold text-gray-900">{accountHolderName.trim() || "-"}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-gray-600">
-                        <span>Biaya Admin / Layanan ({activeMethodConfig.method}):</span>
-                        <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-green-700"}>
-                          {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
-                        </span>
-                      </div>
-                      <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm">
-                        <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
-                        <span className="font-extrabold text-green-700 text-base">{formatMoney(calculatedNet)}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <Button
-                    type="submit"
-                    disabled={withdrawing}
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 gap-2 text-sm shadow-sm"
-                  >
-                    {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan ({formatMoney(calculatedNet)})
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+                      {/* BREAKDOWN CALCULATIONS */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-gray-600">
+                          <span>Nominal Penarikan:</span>
+                          <span className="font-bold text-gray-900 text-sm">{formatMoney(amount)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-600">
+                          <span>Biaya Admin / Layanan:</span>
+                          <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-green-700"}>
+                            {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
+                          </span>
+                        </div>
+                        <div className="pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
+                          <div>
+                            <p className="font-bold text-gray-900">Net Saldo Diterima</p>
+                            <p className="text-[10px] text-gray-400">Diperkirakan masuk otomatis</p>
+                          </div>
+                          <span className="font-extrabold text-green-700 text-lg">{formatMoney(calculatedNet)}</span>
+                        </div>
+                      </div>
+
+                      {/* PRIMARY CTA EMBEDDED IN RECEIPT */}
+                      <Button
+                        type="submit"
+                        disabled={withdrawing}
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 gap-2 text-sm shadow-md mt-2"
+                      >
+                        {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        Kirim Pengajuan Withdraw ({formatMoney(calculatedNet)})
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </form>
 
             {/* RIWAYAT TRANSAKSI / PENARIKAN */}
             <Card className="bg-white border-gray-200">
