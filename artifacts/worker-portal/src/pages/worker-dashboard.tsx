@@ -21,6 +21,7 @@ import {
   User,
   Mail,
   Phone,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -49,6 +50,7 @@ import {
   useWorkerEngagementData,
   useSettings,
   useMyReferral,
+  useAnnouncements,
   claimReferralCode,
   claimReferralReward,
   createSubmission,
@@ -94,6 +96,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const engagement = useWorkerEngagementData(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
   const myReferral = useMyReferral(profile.uid);
+  const announcements = useAnnouncements();
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
@@ -516,9 +519,17 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto p-1 mb-6">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full h-auto p-1 mb-6">
             <TabsTrigger value="submit" className="gap-1.5 text-xs py-2">
               <Send className="w-3.5 h-3.5" /> STORAN EMAIL
+            </TabsTrigger>
+            <TabsTrigger value="announcements" className="gap-1.5 text-xs py-2">
+              <Megaphone className="w-3.5 h-3.5" /> PENGUMUMAN
+              {announcements.data.length > 0 && (
+                <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5 font-bold">
+                  {announcements.data.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="withdraw" className="gap-1.5 text-xs py-2">
               <Wallet className="w-3.5 h-3.5" /> PENARIKAN
@@ -530,6 +541,79 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <History className="w-3.5 h-3.5" /> RIWAYAT STORAN EMAIL
             </TabsTrigger>
           </TabsList>
+
+          {/* PENGUMUMAN & INFORMASI RESMI */}
+          <TabsContent value="announcements" className="space-y-4">
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
+                  <Megaphone className="w-4 h-4 text-amber-600" />
+                  Pusat Pengumuman & Informasi Resmi
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Informasi terbaru langsung dari admin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {announcements.loading && (
+                  <p className="text-sm text-gray-400 text-center py-8">Memuat pengumuman...</p>
+                )}
+                {announcements.error && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg text-center">
+                    Gagal memuat pengumuman: {announcements.error}
+                  </div>
+                )}
+                {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
+                  <div className="p-8 border border-dashed border-gray-200 rounded-lg text-center text-xs text-gray-400">
+                    Belum ada pengumuman resmi saat ini.
+                  </div>
+                )}
+                {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
+                  <div className="space-y-3">
+                    {announcements.data.map((item) => {
+                      const badgeUpper = item.badge?.toUpperCase().trim() || "";
+                      let badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
+                      if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
+                        badgeStyle = "bg-red-100 text-red-800 hover:bg-red-100";
+                      } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
+                        badgeStyle = "bg-amber-100 text-amber-800 hover:bg-amber-100";
+                      } else if (badgeUpper === "INFO") {
+                        badgeStyle = "bg-sky-100 text-sky-800 hover:bg-sky-100";
+                      }
+
+                      return (
+                        <Card key={item.id} className="bg-white border-gray-200/80 shadow-2xs hover:border-gray-300 transition-colors">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <CardTitle className="text-base font-bold text-gray-900">{item.title}</CardTitle>
+                                  {item.badge && (
+                                    <Badge className={`text-xs font-bold ${badgeStyle}`}>
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-400">
+                                  {item.updatedAt ? "Diperbarui pada: " : "Diterbitkan pada: "}
+                                  {formatDateTime(item.updatedAt || item.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                              {item.content}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">

@@ -27,6 +27,7 @@ import {
   MinusCircle,
   Edit3,
   Calendar,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -81,7 +82,13 @@ import {
   evaluateReferralQualification,
   distributeLeaderboardReward,
   reviewMissionClaim,
+  useAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  toggleAnnouncementStatus,
 } from "@/hooks/use-portal";
+import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType } from "@/lib/portal-types";
 import {
   formatDate,
@@ -131,6 +138,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
+  const announcements = useAnnouncements({ includeInactive: true });
 
   useEffect(() => {
     const currentUser = auth?.currentUser;
@@ -154,6 +162,97 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
 
   // --- Keuangan / Financial Tracking state ---
+  // --- Announcements state ---
+  const [annModalOpen, setAnnModalOpen] = useState(false);
+  const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annContent, setAnnContent] = useState("");
+  const [annBadge, setAnnBadge] = useState("");
+  const [annIsActive, setAnnIsActive] = useState(true);
+  const [annSaving, setAnnSaving] = useState(false);
+  const [deletingAnnId, setDeletingAnnId] = useState<string | null>(null);
+
+  function openAddAnnModal() {
+    setEditingAnn(null);
+    setAnnTitle("");
+    setAnnContent("");
+    setAnnBadge("BARU");
+    setAnnIsActive(true);
+    setAnnModalOpen(true);
+  }
+
+  function openEditAnnModal(ann: Announcement) {
+    setEditingAnn(ann);
+    setAnnTitle(ann.title);
+    setAnnContent(ann.content);
+    setAnnBadge(ann.badge ?? "");
+    setAnnIsActive(ann.isActive !== false);
+    setAnnModalOpen(true);
+  }
+
+  async function handleSaveAnnouncement(e: React.FormEvent) {
+    e.preventDefault();
+    if (!annTitle.trim()) {
+      toast.error("Judul pengumuman wajib diisi.");
+      return;
+    }
+    if (!annContent.trim()) {
+      toast.error("Isi pengumuman wajib diisi.");
+      return;
+    }
+
+    setAnnSaving(true);
+    try {
+      if (editingAnn) {
+        await updateAnnouncement(editingAnn.id, {
+          title: annTitle,
+          content: annContent,
+          badge: annBadge,
+          isActive: annIsActive,
+        });
+        toast.success("Pengumuman berhasil diperbarui.");
+      } else {
+        await createAnnouncement({
+          title: annTitle,
+          content: annContent,
+          badge: annBadge,
+          isActive: annIsActive,
+        });
+        toast.success("Pengumuman baru berhasil diterbitkan!");
+      }
+      setAnnModalOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengumuman.");
+    } finally {
+      setAnnSaving(false);
+    }
+  }
+
+  async function handleToggleAnnStatus(id: string, currentStatus: boolean) {
+    setBusyId(id);
+    try {
+      await toggleAnnouncementStatus(id, currentStatus);
+      toast.success(`Status pengumuman diubah menjadi ${!currentStatus ? "Aktif" : "Nonaktif"}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengubah status pengumuman.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDeleteAnnouncement(id: string) {
+    setBusyId(id);
+    try {
+      await deleteAnnouncement(id);
+      toast.success("Pengumuman berhasil dihapus.");
+      setDeletingAnnId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pengumuman.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const [selectedPeriod, setSelectedPeriod] = useState<string>(() => getMonthlyPeriodKey(new Date()));
   const { transactions: finTransactions, summary: finSummary, loading: finLoading, error: finError } = useFinancialData(selectedPeriod);
 
@@ -864,8 +963,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue="overview">
-          <TabsList className="grid grid-cols-4 sm:grid-cols-7 w-full mb-6">
+          <TabsList className="grid grid-cols-4 sm:grid-cols-8 w-full mb-6">
             <TabsTrigger value="overview">Ringkasan</TabsTrigger>
+            <TabsTrigger value="announcements" className="gap-1 text-xs font-semibold">
+              <Megaphone className="w-3.5 h-3.5" /> Pengumuman
+            </TabsTrigger>
             <TabsTrigger value="finance" className="gap-1 text-xs font-semibold">
               <DollarSign className="w-3.5 h-3.5" /> Keuangan
             </TabsTrigger>
@@ -891,6 +993,250 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan & Tier
             </TabsTrigger>
           </TabsList>
+
+          {/* TAB KELOLA PENGUMUMAN ADMIN */}
+          <TabsContent value="announcements" className="space-y-6">
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                      <Megaphone className="w-5 h-5 text-amber-600" /> Kelola Pengumuman
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      Buat, edit, dan kelola pengumuman atau informasi resmi untuk seluruh pekerja portal.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={openAddAnnModal}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 gap-1.5 shadow-sm shrink-0"
+                  >
+                    <Plus className="w-4 h-4" /> Buat Pengumuman Baru
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {announcements.loading && <p className="text-sm text-gray-400 text-center py-8">Memuat pengumuman...</p>}
+                {announcements.error && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs text-center rounded-lg">
+                    Gagal memuat pengumuman: {announcements.error}
+                  </div>
+                )}
+                {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
+                  <div className="p-10 border border-dashed border-gray-200 text-center rounded-xl bg-gray-50/50 space-y-1">
+                    <p className="text-sm font-semibold text-gray-600">Belum ada pengumuman.</p>
+                    <p className="text-xs text-gray-400">Gunakan tombol "Buat Pengumuman Baru" di atas untuk menambah pengumuman pertama.</p>
+                  </div>
+                )}
+                {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
+                  <div className="space-y-3">
+                    {announcements.data.map((item) => {
+                      const isActive = item.isActive !== false;
+                      const badgeUpper = item.badge?.toUpperCase().trim() || "";
+                      let badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
+                      if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
+                        badgeStyle = "bg-red-100 text-red-800 hover:bg-red-100";
+                      } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
+                        badgeStyle = "bg-amber-100 text-amber-800 hover:bg-amber-100";
+                      } else if (badgeUpper === "INFO") {
+                        badgeStyle = "bg-sky-100 text-sky-800 hover:bg-sky-100";
+                      }
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-4 rounded-xl border transition-colors shadow-2xs space-y-2 ${
+                            isActive ? "bg-white border-gray-200 hover:border-gray-300" : "bg-gray-50/80 border-gray-200 opacity-75"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-base text-gray-900">{item.title}</span>
+                                {item.badge && (
+                                  <Badge className={`text-xs font-bold ${badgeStyle}`}>
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[11px] font-semibold ${
+                                    isActive
+                                      ? "bg-green-50 text-green-800 border-green-300"
+                                      : "bg-gray-100 text-gray-600 border-gray-300"
+                                  }`}
+                                >
+                                  {isActive ? "Aktif (Tampil)" : "Nonaktif"}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-gray-400">
+                                {item.updatedAt ? "Diperbarui: " : "Dibuat: "}
+                                {formatDateTime(item.updatedAt || item.createdAt)}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === item.id}
+                                onClick={() => handleToggleAnnStatus(item.id, isActive)}
+                                className={`text-xs h-8 ${
+                                  isActive
+                                    ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    : "bg-green-50 text-green-800 border-green-300 hover:bg-green-100"
+                                }`}
+                              >
+                                {isActive ? "Sembunyikan" : "Aktifkan"}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEditAnnModal(item)}
+                                className="text-xs h-8 text-amber-800 border-amber-300 hover:bg-amber-50 gap-1"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" /> Edit
+                              </Button>
+
+                              <AlertDialog
+                                open={deletingAnnId === item.id}
+                                onOpenChange={(open) => setDeletingAnnId(open ? item.id : null)}
+                              >
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-xs h-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                    title="Hapus Pengumuman"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Hapus Pengumuman?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Apakah Anda yakin ingin menghapus pengumuman "{item.title}"? Tindakan ini tidak dapat dibatalkan.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteAnnouncement(item.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Hapus
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+
+                          <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap leading-relaxed pt-1 border-t border-gray-100">
+                            {item.content}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* DIALOG BUAT / EDIT PENGUMUMAN */}
+            <Dialog open={annModalOpen} onOpenChange={setAnnModalOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingAnn ? "Edit Pengumuman" : "Buat Pengumuman Baru"}</DialogTitle>
+                  <DialogDescription>
+                    {editingAnn ? "Perbarui isi atau status pengumuman resmi." : "Terbitkan pengumuman baru yang akan langsung muncul di dashboard pekerja."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={handleSaveAnnouncement} className="space-y-4 pt-2">
+                  <div>
+                    <Label htmlFor="ann-title" className="text-xs">Judul Pengumuman *</Label>
+                    <Input
+                      id="ann-title"
+                      placeholder="Contoh: Perubahan Harga Tier & Jam Operasional"
+                      value={annTitle}
+                      onChange={(e) => setAnnTitle(e.target.value)}
+                      className="mt-1 h-9 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ann-badge" className="text-xs">Label Badge (opsional)</Label>
+                    <Input
+                      id="ann-badge"
+                      placeholder="Contoh: BARU, IMPORTANT, INFO, PENTING"
+                      value={annBadge}
+                      onChange={(e) => setAnnBadge(e.target.value)}
+                      className="mt-1 h-9 text-xs"
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Badge tampil sebagai tag warna di samping judul pengumuman.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ann-content" className="text-xs">Isi Pengumuman *</Label>
+                    <Textarea
+                      id="ann-content"
+                      rows={5}
+                      placeholder="Tuliskan isi pengumuman secara lengkap di sini..."
+                      value={annContent}
+                      onChange={(e) => setAnnContent(e.target.value)}
+                      className="mt-1 text-xs leading-relaxed"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Status Publikasi</Label>
+                    <Select
+                      value={annIsActive ? "ACTIVE" : "INACTIVE"}
+                      onValueChange={(val) => setAnnIsActive(val === "ACTIVE")}
+                    >
+                      <SelectTrigger className="mt-1 h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACTIVE" className="text-xs font-semibold text-green-700">
+                          Aktif (Langsung Tampil di Workers)
+                        </SelectItem>
+                        <SelectItem value="INACTIVE" className="text-xs font-semibold text-gray-600">
+                          Draft / Nonaktif (Disembunyikan)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setAnnModalOpen(false)}
+                      className="text-xs h-9"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={annSaving}
+                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 gap-1.5"
+                    >
+                      {annSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {editingAnn ? "Simpan Perubahan" : "Terbitkan Pengumuman"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
 
           {/* RINGKASAN */}
           <TabsContent value="overview">

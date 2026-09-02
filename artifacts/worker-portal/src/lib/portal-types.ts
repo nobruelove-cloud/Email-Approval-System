@@ -1,3 +1,14 @@
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  badge?: string; // e.g., "BARU", "IMPORTANT", "INFO"
+  createdAt: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
+  createdBy: string; // Admin UID
+  isActive: boolean;
+}
+
 export type Role = "admin" | "worker";
 export type UserStatus = "pending" | "approved" | "active" | "rejected" | "inactive";
 export type UserTier = number;

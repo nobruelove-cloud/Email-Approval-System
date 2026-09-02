@@ -230,5 +230,11 @@ service cloud.firestore {
     match /financialTransactions/{id} {
       allow read, write: if isAdmin();
     }
+
+    // ---- announcements/{id} ----
+    match /announcements/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }

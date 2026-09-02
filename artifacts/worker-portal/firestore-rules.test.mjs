@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, getDocs, query, collection, where, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, collection, where, runTransaction } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
 const rulesContent = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../firestore.rules'), 'utf8');
@@ -820,6 +820,101 @@ async function main() {
     console.log('[PASS] Scenario 10: rewardLedger existing-document case succeeded.');
   } catch (err) {
     console.error('[FAIL] Scenario 10 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- Announcements Security Rules Tests ---');
+  const annId = 'ann_test_1';
+  // Admin creates announcement
+  try {
+    await assertSucceeds(
+      setDoc(doc(regAdminDb, 'announcements', annId), {
+        title: 'Pengumuman Penting',
+        content: 'Isi pengumuman admin',
+        badge: 'BARU',
+        isActive: true,
+        createdBy: adminUid,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Admin creating announcement succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin creating announcement failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Worker reading announcement
+  try {
+    await assertSucceeds(getDoc(doc(workerDb, 'announcements', annId)));
+    console.log('[PASS] Worker reading announcement succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading announcement failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Worker creating announcement should fail
+  try {
+    await assertFails(
+      setDoc(doc(workerDb, 'announcements', 'illegal_ann_id'), {
+        title: 'Fake Announcement',
+        content: 'Worker created content',
+        isActive: true,
+        createdBy: workerUid,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker creating announcement correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker creating announcement was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Worker updating announcement should fail
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'announcements', annId), {
+        title: 'Hacked Title',
+      })
+    );
+    console.log('[PASS] Worker updating announcement correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker updating announcement was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Worker deleting announcement should fail
+  try {
+    await assertFails(
+      deleteDoc(doc(workerDb, 'announcements', annId))
+    );
+    console.log('[PASS] Worker deleting announcement correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker deleting announcement was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Admin updating announcement
+  try {
+    await assertSucceeds(
+      updateDoc(doc(regAdminDb, 'announcements', annId), {
+        title: 'Pengumuman Penting (Updated)',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Admin updating announcement succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin updating announcement failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Admin deleting announcement
+  try {
+    await assertSucceeds(
+      deleteDoc(doc(regAdminDb, 'announcements', annId))
+    );
+    console.log('[PASS] Admin deleting announcement succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin deleting announcement failed:', err);
     process.exitCode = 1;
   }
 
