@@ -89,7 +89,7 @@ import {
   toggleAnnouncementStatus,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType } from "@/lib/portal-types";
 import {
   formatDate,
   formatDateTime,
@@ -159,7 +159,101 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }, [profile]);
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
+  const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // Per-method fee state
+  const activeWithdrawalSettings = useMemo(() => {
+    return {
+      minWithdraw: withdrawalSettingsHook.data?.minWithdraw ?? rules.data.minWithdraw ?? 50000,
+      maxWithdraw: withdrawalSettingsHook.data?.maxWithdraw ?? rules.data.maxWithdraw ?? 5000000,
+      methods: Array.isArray(withdrawalSettingsHook.data?.methods) && withdrawalSettingsHook.data.methods.length > 0
+        ? withdrawalSettingsHook.data.methods
+        : DEFAULT_PAYMENT_METHOD_FEES,
+    };
+  }, [withdrawalSettingsHook.data, rules.data]);
+
+  const [methodsDraft, setMethodsDraft] = useState<PaymentMethodFeeConfig[] | null>(null);
+  const currentMethods = methodsDraft ?? activeWithdrawalSettings.methods;
+  const [savingWithdrawalSettings, setSavingWithdrawalSettings] = useState(false);
+  const [newMethodName, setNewMethodName] = useState("");
+  const [newMethodCategory, setNewMethodCategory] = useState<"bank" | "ewallet">("ewallet");
+
+  function handleToggleMethodEnabled(index: number, enabled: boolean) {
+    const updated = currentMethods.map((m, idx) => (idx === index ? { ...m, enabled } : m));
+    setMethodsDraft(updated);
+  }
+
+  function handleUpdateMethodFee(index: number, field: "feeType" | "feeValue" | "category", value: any) {
+    const updated = currentMethods.map((m, idx) => {
+      if (idx === index) {
+        if (field === "feeType") {
+          const newType = value as MethodFeeType;
+          const defaultVal = newType === "free" ? 0 : newType === "percentage" ? 1.5 : 2500;
+          return { ...m, feeType: newType, feeValue: defaultVal };
+        }
+        return { ...m, [field]: value };
+      }
+      return m;
+    });
+    setMethodsDraft(updated);
+  }
+
+  function handleAddMethod() {
+    if (!newMethodName.trim()) {
+      toast.error("Nama metode pembayaran wajib diisi.");
+      return;
+    }
+    const norm = newMethodName.trim();
+    if (currentMethods.some((m) => m.method.toLowerCase() === norm.toLowerCase())) {
+      toast.error("Metode pembayaran ini sudah ada.");
+      return;
+    }
+    const newConfig: PaymentMethodFeeConfig = {
+      method: norm,
+      category: newMethodCategory,
+      enabled: true,
+      feeType: "free",
+      feeValue: 0,
+    };
+    setMethodsDraft([...currentMethods, newConfig]);
+    setNewMethodName("");
+  }
+
+  function handleRemoveMethod(index: number) {
+    if (currentMethods.length <= 1) {
+      toast.error("Minimal harus ada 1 metode pembayaran.");
+      return;
+    }
+    const updated = currentMethods.filter((_, idx) => idx !== index);
+    setMethodsDraft(updated);
+  }
+
+  async function handleSaveWithdrawalSettings() {
+    setSavingWithdrawalSettings(true);
+    try {
+      const payload: WithdrawalSettings = {
+        minWithdraw: activeMinWithdraw,
+        maxWithdraw: activeMaxWithdraw,
+        methods: currentMethods,
+      };
+
+      await saveSettings("withdrawal", payload);
+
+      // Also sync paymentMethods string array to settings/rules for backward compatibility
+      const enabledMethodNames = currentMethods.filter((m) => m.enabled).map((m) => m.method);
+      if (enabledMethodNames.length > 0) {
+        await saveSettings("rules", { paymentMethods: enabledMethodNames });
+      }
+
+      toast.success("Pengaturan penarikan & biaya per-metode berhasil disimpan!");
+      setMethodsDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengaturan penarikan.");
+    } finally {
+      setSavingWithdrawalSettings(false);
+    }
+  }
 
   // --- Keuangan / Financial Tracking state ---
   // --- Announcements state ---
@@ -2308,15 +2402,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </CardContent>
               </Card>
 
-              {/* GENERAL RULES */}
+              {/* PER-METHOD WITHDRAWAL FEE CONFIGURATION */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Aturan & Biaya Penarikan</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <Label>Minimal Penarikan (Rp)</Label>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-amber-600" /> Pengaturan Biaya Penarikan Per-Metode Pembayaran
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Konfigurasi jenis dan nilai biaya admin/layanan secara spesifik untuk setiap Bank dan E-Wallet.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={handleSaveWithdrawalSettings}
+                      disabled={savingWithdrawalSettings}
+                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 gap-1.5 shrink-0"
+                    >
+                      {savingWithdrawalSettings && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Simpan Konfigurasi Penarikan
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+                    <div>
+                      <Label className="text-xs font-semibold">Minimal Penarikan (Rp)</Label>
                       <FormattedNumberInput
                         value={activeMinWithdraw}
                         onChange={(val) =>
@@ -2330,11 +2441,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             tiers: activeTiers,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1 h-9 text-xs bg-white"
                       />
                     </div>
                     <div>
-                      <Label>Maksimal Penarikan (Rp)</Label>
+                      <Label className="text-xs font-semibold">Maksimal Penarikan (Rp)</Label>
                       <FormattedNumberInput
                         value={activeMaxWithdraw}
                         onChange={(val) =>
@@ -2348,28 +2459,158 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             tiers: activeTiers,
                           })
                         }
-                        className="mt-1.5"
+                        className="mt-1 h-9 text-xs bg-white"
                       />
                     </div>
                   </div>
+
                   <div>
-                    <Label>Metode Pembayaran (pisahkan dengan koma)</Label>
-                    <Input
-                      value={activePaymentMethodsStr}
-                      onChange={(e) =>
-                        setRulesDraft({
-                          pricePerEmail: activePricePerEmail,
-                          withdrawFeePercent: activeWithdrawFeePercent,
-                          minWithdraw: activeMinWithdraw,
-                          maxWithdraw: activeMaxWithdraw,
-                          paymentMethodsStr: e.target.value,
-                          submissionNotesText: activeSubmissionNotesText,
-                          tiers: activeTiers,
-                        })
-                      }
-                      className="mt-1.5"
-                    />
+                    <Label className="text-sm font-bold text-gray-900 mb-2 block">
+                      Daftar Metode Pembayaran & Struktur Biaya
+                    </Label>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold">
+                          <tr>
+                            <th className="px-3 py-2.5">Status</th>
+                            <th className="px-3 py-2.5">Metode Pembayaran</th>
+                            <th className="px-3 py-2.5">Kategori</th>
+                            <th className="px-3 py-2.5">Jenis Biaya</th>
+                            <th className="px-3 py-2.5">Nilai Biaya</th>
+                            <th className="px-3 py-2.5 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {currentMethods.map((m, idx) => (
+                            <tr key={idx} className={m.enabled ? "hover:bg-gray-50/60" : "bg-gray-50/80 opacity-60"}>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleMethodEnabled(idx, !m.enabled)}
+                                  className={`text-[11px] h-7 px-2 font-bold ${
+                                    m.enabled
+                                      ? "bg-green-50 text-green-800 border-green-300 hover:bg-green-100"
+                                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                                  }`}
+                                >
+                                  {m.enabled ? "✓ Aktif" : "Nonaktif"}
+                                </Button>
+                              </td>
+                              <td className="px-3 py-2.5 font-bold text-gray-900 whitespace-nowrap">{m.method}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <Select
+                                  value={m.category ?? "bank"}
+                                  onValueChange={(val) => handleUpdateMethodFee(idx, "category", val)}
+                                >
+                                  <SelectTrigger className="h-7 text-[11px] w-28 bg-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
+                                    <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
+                                    <SelectItem value="other" className="text-xs">Lainnya</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <Select
+                                  value={m.feeType}
+                                  onValueChange={(val) => handleUpdateMethodFee(idx, "feeType", val)}
+                                >
+                                  <SelectTrigger className="h-7 text-[11px] w-32 bg-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="free" className="text-xs text-green-700 font-semibold">Bebas Biaya (Gratis)</SelectItem>
+                                    <SelectItem value="fixed" className="text-xs text-blue-700 font-semibold">Biaya Tetap (Rp)</SelectItem>
+                                    <SelectItem value="percentage" className="text-xs text-amber-700 font-semibold">Persentase (%)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                {m.feeType === "free" ? (
+                                  <span className="text-green-700 font-semibold">Rp 0 (Gratis)</span>
+                                ) : m.feeType === "fixed" ? (
+                                  <div className="w-32">
+                                    <FormattedNumberInput
+                                      value={m.feeValue}
+                                      onChange={(val) => handleUpdateMethodFee(idx, "feeValue", val)}
+                                      className="h-7 text-xs bg-white font-bold text-blue-800"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 w-28">
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={m.feeValue}
+                                      onChange={(e) => handleUpdateMethodFee(idx, "feeValue", parseFloat(e.target.value) || 0)}
+                                      className="h-7 text-xs bg-white font-bold text-amber-800"
+                                    />
+                                    <span className="font-bold text-gray-500 text-xs">%</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveMethod(idx)}
+                                  className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+
+                  {/* FORM TAMBAH METODE BARU */}
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                    <p className="text-xs font-bold text-gray-900">Tambah Metode Pembayaran Baru</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        placeholder="Nama Metode (contoh: Permata, LinkAja)"
+                        value={newMethodName}
+                        onChange={(e) => setNewMethodName(e.target.value)}
+                        className="h-8 text-xs flex-1 bg-white"
+                      />
+                      <Select
+                        value={newMethodCategory}
+                        onValueChange={(val: "bank" | "ewallet") => setNewMethodCategory(val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-full sm:w-36 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
+                          <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        onClick={handleAddMethod}
+                        className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1 shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Tambah Metode
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* GENERAL RULES & NOTES */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Aturan Setor Email & Instruksi Kata Sandi</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
                     <Label>Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
                     <Textarea

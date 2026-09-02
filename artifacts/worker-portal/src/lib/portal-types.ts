@@ -170,6 +170,40 @@ export type EmailSubmission = {
   updatedAt?: unknown;
 };
 
+export type MethodFeeType = "free" | "fixed" | "percentage";
+
+export type PaymentMethodFeeConfig = {
+  method: string;
+  category?: "bank" | "ewallet" | "other";
+  enabled: boolean;
+  feeType: MethodFeeType;
+  feeValue: number; // e.g. 0 for free, 1000 for fixed Rp 1.000, 1.5 for 1.5%
+};
+
+export type WithdrawalSettings = {
+  minWithdraw: number;
+  maxWithdraw: number;
+  methods: PaymentMethodFeeConfig[];
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_PAYMENT_METHOD_FEES: PaymentMethodFeeConfig[] = [
+  { method: "BCA", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "BRI", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "BNI", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "Mandiri", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "DANA", category: "ewallet", enabled: true, feeType: "free", feeValue: 0 },
+  { method: "OVO", category: "ewallet", enabled: true, feeType: "percentage", feeValue: 1.5 },
+  { method: "GoPay", category: "ewallet", enabled: true, feeType: "free", feeValue: 0 },
+  { method: "ShopeePay", category: "ewallet", enabled: true, feeType: "fixed", feeValue: 1000 },
+];
+
+export const DEFAULT_WITHDRAWAL_SETTINGS: WithdrawalSettings = {
+  minWithdraw: 50000,
+  maxWithdraw: 5000000,
+  methods: DEFAULT_PAYMENT_METHOD_FEES,
+};
+
 export type Withdrawal = {
   id: string;
   workerId: string;
@@ -178,6 +212,8 @@ export type Withdrawal = {
   account: string;
   accountName?: string;
   accountHolderName?: string;
+  fee?: number;
+  netAmount?: number;
   status: WithdrawalStatus;
   requestedAt?: unknown;
   processedAt?: unknown;

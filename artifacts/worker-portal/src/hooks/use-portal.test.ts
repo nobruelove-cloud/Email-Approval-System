@@ -20,6 +20,9 @@ import {
   getMonthlyPeriodKey,
   formatMonthYear,
   getPeriodOptions,
+  calculateWithdrawalFee,
+  formatFeeBadge,
+  getPaymentMethodFeeConfig,
 } from "../lib/portal-utils";
 import {
   DEFAULT_TIERS,
@@ -1072,6 +1075,49 @@ describe("Admin Monthly Financial Tracking Unit Tests", () => {
   });
 });
 
+describe("Per-Method Withdrawal Fee Calculation & Unit Tests", () => {
+  it("calculates free, fixed, and percentage fees correctly", () => {
+    const freeCfg = { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 };
+    expect(calculateWithdrawalFee(100000, freeCfg)).toBe(0);
+
+    const fixedCfg = { method: "BCA", enabled: true, feeType: "fixed" as const, feeValue: 2500 };
+    expect(calculateWithdrawalFee(100000, fixedCfg)).toBe(2500);
+
+    const percentCfg = { method: "OVO", enabled: true, feeType: "percentage" as const, feeValue: 1.5 };
+    expect(calculateWithdrawalFee(100000, percentCfg)).toBe(1500);
+  });
+
+  it("formats fee badges correctly", () => {
+    const freeCfg = { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 };
+    expect(formatFeeBadge(freeCfg)).toBe("Bebas Biaya");
+
+    const fixedCfg = { method: "ShopeePay", enabled: true, feeType: "fixed" as const, feeValue: 1000 };
+    expect(formatFeeBadge(fixedCfg)).toBe("Biaya Rp\u00a01.000");
+
+    const percentCfg = { method: "OVO", enabled: true, feeType: "percentage" as const, feeValue: 1.5 };
+    expect(formatFeeBadge(percentCfg)).toBe("Biaya 1.5%");
+  });
+
+  it("resolves payment method fee config from withdrawal settings correctly", () => {
+    const settings = {
+      minWithdraw: 50000,
+      maxWithdraw: 5000000,
+      methods: [
+        { method: "BCA", enabled: true, feeType: "fixed" as const, feeValue: 2500 },
+        { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 },
+      ],
+    };
+
+    const bcaFee = getPaymentMethodFeeConfig("BCA", settings);
+    expect(bcaFee.feeType).toBe("fixed");
+    expect(bcaFee.feeValue).toBe(2500);
+
+    const danaFee = getPaymentMethodFeeConfig("DANA", settings);
+    expect(danaFee.feeType).toBe("free");
+    expect(danaFee.feeValue).toBe(0);
+  });
+});
+
 describe("Withdrawal Atas Nama Unit Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1089,7 +1135,7 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
     ).rejects.toThrow("Nama pemilik rekening/wallet wajib diisi.");
   });
 
-  it("trims accountHolderName and passes payload to transaction correctly", async () => {
+  it("trims accountHolderName and passes fee and netAmount to transaction correctly", async () => {
     const store = {
       "users/w123": {
         uid: "w123",
@@ -1105,6 +1151,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
       method: "BCA",
       account: "1234567890",
       accountHolderName: "  Ahmad Yasin  ",
+      fee: 2500,
+      netAmount: 47500,
     };
 
     const trimmedHolderName = payload.accountHolderName.trim();
@@ -1117,6 +1165,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
       method: payload.method,
       account: payload.account,
       accountHolderName: trimmedHolderName,
+      fee: payload.fee,
+      netAmount: payload.netAmount,
       status: "pending",
     });
 
@@ -1124,6 +1174,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
     expect(store["withdrawals/wd_test_1"].accountHolderName).toBe("Ahmad Yasin");
     expect(store["withdrawals/wd_test_1"].account).toBe("1234567890");
     expect(store["withdrawals/wd_test_1"].method).toBe("BCA");
+    expect(store["withdrawals/wd_test_1"].fee).toBe(2500);
+    expect(store["withdrawals/wd_test_1"].netAmount).toBe(47500);
   });
 });
 
