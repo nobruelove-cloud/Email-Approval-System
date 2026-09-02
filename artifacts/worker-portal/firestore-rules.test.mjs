@@ -823,6 +823,191 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- SEQUENTIAL MULTI-TIER CLAIM REGRESSION SUITE (TIERS 5 -> 10 -> 20 -> 50) ---');
+
+  const seqReferrerUid = 'seq_referrer_777';
+  const seqReferredUid = 'seq_referred_888';
+  const seqRefId = seqReferredUid;
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'users', seqReferrerUid), {
+      uid: seqReferrerUid,
+      name: 'Seq Referrer',
+      email: 'seqref@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+
+    await setDoc(doc(db, 'referrals', seqRefId), {
+      id: seqRefId,
+      referrerId: seqReferrerUid,
+      referrerName: 'Seq Referrer',
+      referredWorkerId: seqReferredUid,
+      referredWorkerName: 'Seq Referred',
+      currentAccCount: 50, // Reached 50 ACC
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      claimedTiers: {},
+      createdAt: new Date(),
+    });
+  });
+
+  const seqReferrerDb = testEnv.authenticatedContext(seqReferrerUid).firestore();
+
+  // Helper for sequential claim execution in rules test
+  async function executeSeqClaim(db, referrerUid, refId, minAcc, reward, previousBalance, previousClaimedTiers = {}) {
+    await runTransaction(db, async (tx) => {
+      const refRef = doc(db, 'referrals', refId);
+      const refSnap = await tx.get(refRef);
+      const userRef = doc(db, 'users', referrerUid);
+      const userSnap = await tx.get(userRef);
+
+      const claimDocId = `${refId}_tier_${minAcc}`;
+      const claimRef = doc(db, 'referralClaims', claimDocId);
+      const claimSnap = await tx.get(claimRef);
+
+      const ledgerDocId = `${refId}_ledger_tier_${minAcc}`;
+      const ledgerRef = doc(db, 'rewardLedger', ledgerDocId);
+      const ledgerSnap = await tx.get(ledgerRef);
+
+      const updatedClaimedTiers = { ...previousClaimedTiers, [String(minAcc)]: true };
+      const newTotalReward = (refSnap.data()?.rewardAmount || 0) + reward;
+
+      tx.update(refRef, {
+        claimedTiers: updatedClaimedTiers,
+        rewardAmount: newTotalReward,
+        status: minAcc === 50 ? 'PAID' : 'QUALIFIED',
+        rewardedAt: serverTimestamp(),
+      });
+
+      tx.update(userRef, {
+        balance: previousBalance + reward,
+        lastClaimId: claimDocId,
+      });
+
+      tx.set(ledgerRef, {
+        id: ledgerDocId,
+        workerId: referrerUid,
+        workerName: 'Seq Referrer',
+        rewardType: 'referral',
+        amount: reward,
+        sourceRefId: claimDocId,
+        description: `Hadiah Referral Tier ${minAcc} ACC`,
+        createdAt: serverTimestamp(),
+      });
+
+      tx.set(claimRef, {
+        id: claimDocId,
+        referralId: refId,
+        referrerId: referrerUid,
+        referredWorkerId: seqReferredUid,
+        minAcc,
+        rewardAmount: reward,
+        status: 'approved',
+        processedAt: serverTimestamp(),
+      });
+    });
+  }
+
+  console.log('1. Sequential Claim Tier 5 (Rp500):');
+  try {
+    await assertSucceeds(
+      executeSeqClaim(seqReferrerDb, seqReferrerUid, seqRefId, 5, 500, 0, {})
+    );
+    let userBal = 0;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snap = await getDoc(doc(context.firestore(), 'users', seqReferrerUid));
+      userBal = snap.data().balance;
+    });
+    if (userBal === 500) {
+      console.log('[PASS] Tier 5 claim succeeded. Balance is Rp500.');
+    } else {
+      console.error('[FAIL] Tier 5 balance incorrect:', userBal);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error('[FAIL] Tier 5 claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('2. Sequential Claim Tier 10 (Rp1,000 in NEW transaction):');
+  try {
+    await assertSucceeds(
+      executeSeqClaim(seqReferrerDb, seqReferrerUid, seqRefId, 10, 1000, 500, { '5': true })
+    );
+    let userBal = 0;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snap = await getDoc(doc(context.firestore(), 'users', seqReferrerUid));
+      userBal = snap.data().balance;
+    });
+    if (userBal === 1500) {
+      console.log('[PASS] Tier 10 claim succeeded in new transaction. Balance is Rp1,500.');
+    } else {
+      console.error('[FAIL] Tier 10 balance incorrect:', userBal);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error('[FAIL] Tier 10 claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('3. Sequential Claim Tier 20 (Rp2,000 in NEW transaction):');
+  try {
+    await assertSucceeds(
+      executeSeqClaim(seqReferrerDb, seqReferrerUid, seqRefId, 20, 2000, 1500, { '5': true, '10': true })
+    );
+    let userBal = 0;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snap = await getDoc(doc(context.firestore(), 'users', seqReferrerUid));
+      userBal = snap.data().balance;
+    });
+    if (userBal === 3500) {
+      console.log('[PASS] Tier 20 claim succeeded in new transaction. Balance is Rp3,500.');
+    } else {
+      console.error('[FAIL] Tier 20 balance incorrect:', userBal);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error('[FAIL] Tier 20 claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4. Sequential Claim Tier 50 (Rp5,000 in NEW transaction):');
+  try {
+    await assertSucceeds(
+      executeSeqClaim(seqReferrerDb, seqReferrerUid, seqRefId, 50, 5000, 3500, { '5': true, '10': true, '20': true })
+    );
+    let userBal = 0;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snap = await getDoc(doc(context.firestore(), 'users', seqReferrerUid));
+      userBal = snap.data().balance;
+    });
+    if (userBal === 8500) {
+      console.log('[PASS] Tier 50 claim succeeded in new transaction. Balance is Rp8,500.');
+    } else {
+      console.error('[FAIL] Tier 50 balance incorrect:', userBal);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error('[FAIL] Tier 50 claim failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('5. Double claim attempt for Tier 5 rejected:');
+  try {
+    await assertFails(
+      executeSeqClaim(seqReferrerDb, seqReferrerUid, seqRefId, 5, 500, 8500, { '5': true, '10': true, '20': true, '50': true })
+    );
+    console.log('[PASS] Double claim attempt for Tier 5 correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Double claim attempt was not rejected:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
