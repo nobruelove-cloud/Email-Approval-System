@@ -20,7 +20,9 @@ import {
   getMonthlyPeriodKey,
   formatMonthYear,
   getPeriodOptions,
+  calculateWithdrawalFee,
 } from "../lib/portal-utils";
+import { DEFAULT_WITHDRAWAL_FEE, type WithdrawalFeeConfig } from "../lib/portal-types";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -1069,6 +1071,49 @@ describe("Admin Monthly Financial Tracking Unit Tests", () => {
   it("formatMonthYear formats YYYY-MM into Indonesian Month and Year", () => {
     expect(formatMonthYear("2026-08")).toBe("Agustus 2026");
     expect(formatMonthYear("2026-09")).toBe("September 2026");
+  });
+});
+
+describe("Dynamic Withdrawal Fee Calculation Unit Tests", () => {
+  it("returns fee 0 and full netAmount when feeType is 'free'", () => {
+    const config: WithdrawalFeeConfig = { feeType: "free", fixedFee: 1000, percentageFee: 1.5 };
+    const res = calculateWithdrawalFee(100000, config);
+    expect(res.fee).toBe(0);
+    expect(res.netAmount).toBe(100000);
+  });
+
+  it("calculates correct fixed fee and netAmount when feeType is 'fixed'", () => {
+    const config: WithdrawalFeeConfig = { feeType: "fixed", fixedFee: 2500, percentageFee: 0 };
+    const res = calculateWithdrawalFee(100000, config);
+    expect(res.fee).toBe(2500);
+    expect(res.netAmount).toBe(97500);
+  });
+
+  it("calculates percentage fee correctly when feeType is 'percentage'", () => {
+    const config: WithdrawalFeeConfig = { feeType: "percentage", fixedFee: 0, percentageFee: 1.5 };
+    const res = calculateWithdrawalFee(100000, config);
+    expect(res.fee).toBe(1500);
+    expect(res.netAmount).toBe(98500);
+  });
+
+  it("applies minFee threshold when calculated percentage fee is below minFee", () => {
+    const config: WithdrawalFeeConfig = { feeType: "percentage", fixedFee: 0, percentageFee: 1.0, minFee: 1000 };
+    // 1% of 10000 is 100, which is below minFee 1000 -> fee should be 1000
+    const res = calculateWithdrawalFee(10000, config);
+    expect(res.fee).toBe(1000);
+    expect(res.netAmount).toBe(9000);
+  });
+
+  it("handles zero or negative requested amounts safely", () => {
+    expect(calculateWithdrawalFee(0, DEFAULT_WITHDRAWAL_FEE)).toEqual({ fee: 0, netAmount: 0 });
+    expect(calculateWithdrawalFee(-5000, DEFAULT_WITHDRAWAL_FEE)).toEqual({ fee: 0, netAmount: 0 });
+  });
+
+  it("clamps netAmount to 0 if fee exceeds requested amount", () => {
+    const config: WithdrawalFeeConfig = { feeType: "fixed", fixedFee: 5000, percentageFee: 0 };
+    const res = calculateWithdrawalFee(2000, config);
+    expect(res.fee).toBe(5000);
+    expect(res.netAmount).toBe(0);
   });
 });
 

@@ -170,10 +170,29 @@ export type EmailSubmission = {
   updatedAt?: unknown;
 };
 
+export type FeeType = "fixed" | "percentage" | "free";
+
+export type WithdrawalFeeConfig = {
+  feeType: FeeType;
+  fixedFee: number;
+  percentageFee: number;
+  minFee?: number;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_WITHDRAWAL_FEE: WithdrawalFeeConfig = {
+  feeType: "free",
+  fixedFee: 1000,
+  percentageFee: 1.5,
+  minFee: 0,
+};
+
 export type Withdrawal = {
   id: string;
   workerId: string;
   amount: number;
+  fee?: number;
+  netAmount?: number;
   method: string;
   account: string;
   accountName?: string;

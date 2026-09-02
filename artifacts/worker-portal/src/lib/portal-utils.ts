@@ -38,6 +38,33 @@ export function formatMoney(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
+/**
+ * Calculates withdrawal fee and net amount received based on WithdrawalFeeConfig.
+ */
+export function calculateWithdrawalFee(
+  amount: number,
+  config?: import("./portal-types").WithdrawalFeeConfig | null
+): { fee: number; netAmount: number } {
+  if (!amount || amount <= 0) return { fee: 0, netAmount: 0 };
+  const feeType = config?.feeType ?? "free";
+  let fee = 0;
+
+  if (feeType === "fixed") {
+    fee = Math.max(0, config?.fixedFee ?? 0);
+  } else if (feeType === "percentage") {
+    const pct = Math.max(0, config?.percentageFee ?? 0);
+    fee = Math.round((amount * pct) / 100);
+    if (typeof config?.minFee === "number" && config.minFee > 0 && fee < config.minFee) {
+      fee = config.minFee;
+    }
+  } else if (feeType === "free") {
+    fee = 0;
+  }
+
+  const netAmount = Math.max(0, amount - fee);
+  return { fee, netAmount };
+}
+
 export function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 5)}…${id.slice(-4)}` : id;
 }
