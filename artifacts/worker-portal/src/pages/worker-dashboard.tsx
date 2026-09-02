@@ -22,6 +22,11 @@ import {
   Mail,
   Phone,
   Megaphone,
+  Building2,
+  Smartphone,
+  ArrowRight,
+  Sparkles,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -381,7 +386,32 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   const [account, setAccount] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
+  const [mainTab, setMainTab] = useState("submit");
+  const [categoryTab, setCategoryTab] = useState<"ewallet" | "bank">("ewallet");
   const [withdrawing, setWithdrawing] = useState(false);
+
+  const isEWalletMethod = (m: PaymentMethodFeeConfig) => {
+    if (m.category === "ewallet") return true;
+    if (m.category === "bank") return false;
+    const name = m.method.toUpperCase();
+    return ["DANA", "OVO", "GOPAY", "SHOPEEPAY", "LINKAJA", "QRIS", "DOKU"].some((e) => name.includes(e));
+  };
+
+  const ewalletMethods = useMemo(() => enabledMethods.filter(isEWalletMethod), [enabledMethods]);
+  const bankMethods = useMemo(() => enabledMethods.filter((m) => !isEWalletMethod(m)), [enabledMethods]);
+
+  const visibleMethods = useMemo(() => {
+    const list = categoryTab === "ewallet" ? ewalletMethods : bankMethods;
+    return list.length > 0 ? list : enabledMethods;
+  }, [categoryTab, ewalletMethods, bankMethods, enabledMethods]);
+
+  function handleSelectCategory(cat: "ewallet" | "bank") {
+    setCategoryTab(cat);
+    const targetList = cat === "ewallet" ? ewalletMethods : bankMethods;
+    if (targetList.length > 0 && !targetList.some((m) => m.method === method)) {
+      setMethod(targetList[0].method);
+    }
+  }
 
   // Dynamic fee calculation
   const calculatedFee = useMemo(() => {
@@ -564,7 +594,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </Card>
         )}
 
-        <Tabs defaultValue="submit">
+        <Tabs value={mainTab} onValueChange={setMainTab}>
           <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full h-auto p-1 mb-6">
             <TabsTrigger value="submit" className="gap-1.5 text-xs py-2">
               <Send className="w-3.5 h-3.5" /> STORAN EMAIL
@@ -1016,23 +1046,51 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </TabsContent>
 
           {/* TARIK SALDO */}
-          <TabsContent value="withdraw" className="space-y-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="pt-6 flex items-start gap-2 text-xs text-blue-800">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
-                  {formatMoney(activeWithdrawalSettings.minWithdraw)}, maksimal {formatMoney(activeWithdrawalSettings.maxWithdraw)}.
-                </span>
+          <TabsContent value="withdraw" className="space-y-6">
+            {/* SALDO HIGHLIGHT BANNER */}
+            <Card className="bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 text-white border-amber-500 shadow-md overflow-hidden relative">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-amber-200 text-xs font-medium uppercase tracking-wider">
+                      <Wallet className="w-4 h-4" />
+                      Saldo Siap Ditarik
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                      {formatMoney(profile.balance)}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-amber-100/90 pt-1">
+                      <span>
+                        Min: <strong>{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Max: <strong>{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() => setMainTab("referral")}
+                    className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold text-xs h-9 px-4 rounded-lg shadow-sm gap-1.5 shrink-0 transition-transform active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-900" />
+                    Bonus Saldo Referral
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
+            <Card className="bg-white border-gray-200 shadow-xs">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <CardTitle className="text-lg">Tarik Saldo</CardTitle>
-                    <CardDescription>Pilih metode pembayaran dan masukkan nomor tujuan.</CardDescription>
+                    <CardTitle className="text-lg font-bold text-gray-900">Formulir Penarikan Saldo</CardTitle>
+                    <CardDescription className="text-xs">
+                      Pilih penyedia layanan, nominal, dan detail akun penerima.
+                    </CardDescription>
                   </div>
                   <Badge
                     variant="outline"
@@ -1046,91 +1104,203 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleWithdraw} className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label>Metode Pembayaran</Label>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {enabledMethods.length} metode tersedia
+              <CardContent className="space-y-6">
+                <form onSubmit={handleWithdraw} className="space-y-6">
+                  {/* STEP 1: PAYMENT CATEGORY & PROVIDER GRID SELECTION */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">1</span>
+                        Pilih Metode & Penyedia Pembayaran
+                      </Label>
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        {enabledMethods.length} metode aktif
                       </span>
                     </div>
-                    <Select value={method} onValueChange={setMethod}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Pilih metode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {enabledMethods.map((m) => (
-                          <SelectItem key={m.method} value={m.method}>
-                            <div className="flex items-center justify-between w-full gap-2">
-                              <span className="font-semibold">{m.method}</span>
-                              <span className="text-[11px] text-gray-500 font-normal">
-                                ({formatFeeBadge(m)})
-                              </span>
+
+                    {/* CATEGORY TOGGLE PILLS */}
+                    <div className="inline-flex p-1 bg-gray-100 rounded-lg gap-1 text-xs font-medium w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCategory("ewallet")}
+                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          categoryTab === "ewallet"
+                            ? "bg-white text-amber-900 shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+                        E-Wallet (Instant)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCategory("bank")}
+                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          categoryTab === "bank"
+                            ? "bg-white text-amber-900 shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                        Transfer Bank
+                      </button>
+                    </div>
+
+                    {/* PROVIDER GRID CARDS */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      {visibleMethods.map((m) => {
+                        const isSelected = method === m.method;
+                        const feeBadge = formatFeeBadge(m);
+                        const isEWallet = isEWalletMethod(m);
+
+                        return (
+                          <div
+                            key={m.method}
+                            onClick={() => setMethod(m.method)}
+                            className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none ${
+                              isSelected
+                                ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/30 shadow-sm"
+                                : "border-gray-200 bg-white hover:border-amber-300 hover:bg-gray-50/60"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {isEWallet ? (
+                                  <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
+                                ) : (
+                                  <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
+                                )}
+                                <span className="font-bold text-sm text-gray-900 truncate">{m.method}</span>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                              )}
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="account">Nomor Rekening / Nomor E-Wallet</Label>
-                    <Input
-                      id="account"
-                      value={account}
-                      onChange={(e) => setAccount(e.target.value)}
-                      placeholder={`Nomor HP ${method} / Rekening`}
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="accountHolderName">Atas Nama</Label>
-                    <Input
-                      id="accountHolderName"
-                      value={accountHolderName}
-                      onChange={(e) => setAccountHolderName(e.target.value)}
-                      placeholder="Masukkan nama pemilik rekening/wallet"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      id="amount"
-                      value={amount}
-                      onChange={(val) => setAmount(val)}
-                      placeholder="Contoh: 100.000"
-                      className="mt-1.5"
-                      required
-                    />
+
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] w-fit font-semibold px-2 py-0.5 ${
+                                m.feeType === "free" || m.feeValue <= 0
+                                  ? "bg-green-100 text-green-800 border-green-200"
+                                  : "bg-amber-100 text-amber-800 border-amber-200"
+                              }`}
+                            >
+                              {feeBadge}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* DYNAMIC FEE CALCULATION BREAKDOWN SUMMARY CARD */}
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2">
-                    <div className="flex justify-between items-center text-gray-600">
-                      <span>Nominal Penarikan:</span>
-                      <span className="font-semibold text-gray-900">{formatMoney(amount)}</span>
+                  {/* STEP 2: NOMINAL QUICK CHIPS & INPUT */}
+                  <div className="space-y-3 pt-2 border-t border-gray-100">
+                    <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">2</span>
+                      Nominal Penarikan
+                    </Label>
+
+                    <div className="space-y-2">
+                      <FormattedNumberInput
+                        id="amount"
+                        value={amount}
+                        onChange={(val) => setAmount(val)}
+                        placeholder="Contoh: 100.000"
+                        className="font-mono text-base font-semibold h-11"
+                        required
+                      />
+
+                      {/* QUICK-SELECT PRESET CHIPS */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: `Maksimal (${formatMoney(profile.balance)})`, value: profile.balance },
+                          { label: "Rp 25.000", value: 25000 },
+                          { label: "Rp 50.000", value: 50000 },
+                          { label: "Rp 100.000", value: 100000 },
+                          { label: "Rp 250.000", value: 250000 },
+                          { label: "Rp 500.000", value: 500000 },
+                        ].map((chip, idx) => {
+                          const isActive = amount === chip.value;
+                          return (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAmount(chip.value)}
+                              className={`text-xs h-7 px-2.5 rounded-full transition-colors ${
+                                isActive
+                                  ? "bg-amber-100 text-amber-900 border-amber-400 font-bold"
+                                  : "bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200"
+                              }`}
+                            >
+                              {chip.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-gray-600">
-                      <span className="flex items-center gap-1">
-                        Biaya Admin / Layanan ({activeMethodConfig.method}):
-                      </span>
-                      <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-green-700"}>
-                        {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
-                      </span>
+                  </div>
+
+                  {/* STEP 3: ACCOUNT DETAILS & REAL-TIME CALCULATION SUMMARY */}
+                  <div className="space-y-3 pt-2 border-t border-gray-100">
+                    <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-bold">3</span>
+                      Detail Akun & Ringkasan Penarikan
+                    </Label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="account" className="text-xs text-gray-600">
+                          Nomor Rekening / Nomor {method}
+                        </Label>
+                        <Input
+                          id="account"
+                          value={account}
+                          onChange={(e) => setAccount(e.target.value)}
+                          placeholder={`Nomor HP ${method} / Rekening`}
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="accountHolderName" className="text-xs text-gray-600">
+                          Atas Nama (Pemilik Rekening/Wallet)
+                        </Label>
+                        <Input
+                          id="accountHolderName"
+                          value={accountHolderName}
+                          onChange={(e) => setAccountHolderName(e.target.value)}
+                          placeholder="Masukkan nama sesuai rekening/wallet"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="pt-2 border-t border-gray-200 flex justify-between items-center font-bold text-sm">
-                      <span className="text-gray-900">Net Saldo Diterima:</span>
-                      <span className="text-green-700">{formatMoney(calculatedNet)}</span>
+
+                    {/* DYNAMIC BREAKDOWN SUMMARY CARD */}
+                    <div className="p-4 bg-gray-50/80 rounded-xl border border-gray-200 space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center text-gray-600">
+                        <span>Jumlah Penarikan:</span>
+                        <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-gray-600">
+                        <span>Biaya Admin / Layanan ({activeMethodConfig.method}):</span>
+                        <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-green-700"}>
+                          {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm">
+                        <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
+                        <span className="font-extrabold text-green-700 text-base">{formatMoney(calculatedNet)}</span>
+                      </div>
                     </div>
                   </div>
 
                   <Button
                     type="submit"
                     disabled={withdrawing}
-                    className="w-full bg-amber-600 hover:bg-amber-700 gap-2 font-bold"
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 gap-2 text-sm shadow-sm"
                   >
                     {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
                     Ajukan Penarikan ({formatMoney(calculatedNet)})
