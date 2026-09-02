@@ -27,6 +27,8 @@ import {
   ArrowRight,
   Sparkles,
   CreditCard,
+  Share2,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -113,6 +115,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [claimingCode, setClaimingCode] = useState(false);
   const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
 
+  // Pasif Income Simulation state
+  const [simFriends, setSimFriends] = useState(10);
+  const [simAccPerFriend, setSimAccPerFriend] = useState(10);
+
   const pendingClaimsSet = useMemo(() => {
     const set = new Set<string>();
     if (Array.isArray(engagement.referralClaims?.data)) {
@@ -185,16 +191,35 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
+  // Active Tier configuration & active referral tiers
+  const currentTierConfig = useMemo(() => {
+    return getTierConfig(profile.tier ?? 1, rules.data.tiers);
+  }, [profile.tier, rules.data.tiers]);
+
+  const activeReferralTiers = useMemo(() => {
+    return Array.isArray(rules.data.referralTiers) && rules.data.referralTiers.length > 0
+      ? rules.data.referralTiers
+      : DEFAULT_REFERRAL_TIERS;
+  }, [rules.data.referralTiers]);
+
   // Calculate Engagement Stats
   const refStats = useMemo(() => {
     const total = engagement.referrals.data.length;
     const pending = engagement.referrals.data.filter((r) => r.status === "PENDING").length;
     const qualified = engagement.referrals.data.filter((r) => r.status === "QUALIFIED" || r.status === "REWARDED" || r.status === "PAID").length;
+    const totalTeamAcc = engagement.referrals.data.reduce((sum, r) => sum + (r.currentAccCount ?? 0), 0);
     const earnings = engagement.rewardLedger.data
       .filter((l) => l.rewardType === "referral")
       .reduce((sum, item) => sum + item.amount, 0);
-    return { total, pending, qualified, earnings };
+    return { total, pending, qualified, totalTeamAcc, earnings };
   }, [engagement.referrals.data, engagement.rewardLedger.data]);
+
+  const simulatedEarnings = useMemo(() => {
+    const rewardPerFriend = activeReferralTiers
+      .filter((t) => simAccPerFriend >= t.minAcc)
+      .reduce((s, t) => s + t.reward, 0);
+    return simFriends * rewardPerFriend;
+  }, [simFriends, simAccPerFriend, activeReferralTiers]);
 
   // Unified Transaction History derived from existing withdrawals & reward ledger
   const transactionHistory = useMemo(() => {
@@ -256,17 +281,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       return bt - at;
     });
   }, [withdrawals.data, engagement.rewardLedger.data]);
-
-  // Active Tier configuration
-  const currentTierConfig = useMemo(() => {
-    return getTierConfig(profile.tier ?? 1, rules.data.tiers);
-  }, [profile.tier, rules.data.tiers]);
-
-  const activeReferralTiers = useMemo(() => {
-    return Array.isArray(rules.data.referralTiers) && rules.data.referralTiers.length > 0
-      ? rules.data.referralTiers
-      : DEFAULT_REFERRAL_TIERS;
-  }, [rules.data.referralTiers]);
 
   const supportConfig = useMemo(() => {
     return rules.data.supportConfig ?? DEFAULT_RULES.supportConfig!;
@@ -816,231 +830,607 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           </TabsContent>
 
           {/* REFERRAL SYSTEM */}
-          <TabsContent value="referral" className="space-y-4">
-            {/* DAFTAR REWARD REFERRAL */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  🎁 Daftar Reward Referral
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Klaim setiap reward tier segera setelah target email ACC tercapai, tanpa perlu menunggu tier berikutnya.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {activeReferralTiers.map((t, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-lg text-center"
-                    >
-                      <p className="text-xs text-gray-600 font-semibold">{t.minAcc} ACC</p>
-                      <p className="text-base font-extrabold text-amber-700 mt-1">
-                        {formatMoney(t.reward)}
-                      </p>
+          <TabsContent value="referral" className="space-y-6">
+            {/* 1. HERO BANNER & STATS CARDS */}
+            <Card className="bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 text-white border-indigo-800 shadow-lg overflow-hidden relative">
+              <CardContent className="p-6 sm:p-8 space-y-6 relative z-10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-xl">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold uppercase tracking-wider">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                      Program Pasif Income Kerja
                     </div>
-                  ))}
+                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+                      Bangun Jaringan & Cetak Cuan Otomatis
+                    </h2>
+                    <p className="text-xs sm:text-sm text-indigo-200/90 leading-relaxed">
+                      Undang rekan atau pekerja baru dan dapatkan komisi bertingkat otomatis dari setiap pengerjaan akun email (ACC) yang diselesaikan tim downline Anda.
+                    </p>
+                  </div>
+
+                  {/* VISUAL / INTERACTIVE WIDGET: SIMULASI PASIF INCOME */}
+                  <div className="bg-indigo-900/60 border border-indigo-700/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 space-y-3 shrink-0 sm:min-w-[280px]">
+                    <div className="flex items-center justify-between border-b border-indigo-800/80 pb-2">
+                      <span className="text-xs font-bold text-indigo-200 flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-indigo-400" />
+                        Simulasi Pasif Income
+                      </span>
+                      <Badge className="bg-indigo-500/30 text-indigo-200 text-[10px]">
+                        Kalkulator
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <div className="flex justify-between text-indigo-200 text-[11px] mb-1">
+                          <span>Jumlah Teman Diundang:</span>
+                          <strong className="text-white">{simFriends} Orang</strong>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="50"
+                          value={simFriends}
+                          onChange={(e) => setSimFriends(Number(e.target.value))}
+                          className="w-full accent-indigo-400 h-1.5 bg-indigo-950 rounded-lg cursor-pointer"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-indigo-200 text-[11px] mb-1">
+                          <span>Estimasi Email ACC / Teman:</span>
+                          <strong className="text-white">{simAccPerFriend} ACC</strong>
+                        </div>
+                        <input
+                          type="range"
+                          min="5"
+                          max="50"
+                          step="5"
+                          value={simAccPerFriend}
+                          onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
+                          className="w-full accent-indigo-400 h-1.5 bg-indigo-950 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-indigo-800/80 flex items-center justify-between">
+                      <span className="text-[11px] text-indigo-300">Estimasi Bonus:</span>
+                      <span className="text-lg font-extrabold text-indigo-300">{formatMoney(simulatedEarnings)}</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="w-5 h-5 text-amber-600" /> Tautan & Kode Referral
+            {/* 3-COLUMN KEY METRIC CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* CARD 1: SALDO BONUS TERSEDIA */}
+              <Card className="bg-white border-indigo-100 shadow-xs hover:border-indigo-200 transition-colors">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Saldo Bonus Tersedia
+                    </p>
+                    <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-extrabold text-indigo-900 tracking-tight">
+                    {formatMoney(refStats.earnings)}
+                  </p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    Siap ditarik kapan saja
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* CARD 2: TOTAL DOWNLINE */}
+              <Card className="bg-white border-indigo-100 shadow-xs hover:border-indigo-200 transition-colors">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Total Downline
+                    </p>
+                    <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-extrabold text-purple-950 tracking-tight">
+                    {refStats.total} <span className="text-xs font-normal text-gray-500">Pekerja</span>
+                  </p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-indigo-500" />
+                    {refStats.qualified} Pekerja Qualified
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* CARD 3: TOTAL AKUN SUKSES TIM */}
+              <Card className="bg-white border-indigo-100 shadow-xs hover:border-indigo-200 transition-colors">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Total Akun Sukses Tim
+                    </p>
+                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                    {refStats.totalTeamAcc} <span className="text-xs font-normal text-gray-500">Email ACC</span>
+                  </p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Disetujui oleh admin
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 2. REFERRAL LINK SHARE WIDGET */}
+            <Card className="bg-white border-indigo-100 shadow-xs">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-indigo-600" />
+                  Bagikan Tautan Referral Anda
                 </CardTitle>
-                <CardDescription>
-                  Bagikan tautan ini ke teman atau pekerja lain. Dapatkan bonus saldo untuk setiap referral qualified.
+                <CardDescription className="text-xs">
+                  Gunakan link unik Anda untuk merekrut tim baru. Bonus otomatis masuk ke saldo ketika downline mencetak email ACC.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-xs text-gray-600">Tautan Referral Anda</Label>
-                  <div className="flex gap-2 mt-1.5">
-                    <Input readOnly value={referralLink} className="font-mono text-xs bg-white" />
-                    <Button onClick={handleCopyReferralLink} className="bg-amber-600 hover:bg-amber-700 shrink-0 gap-1.5">
-                      {copiedLink ? <Check className="w-4 h-4 text-green-200" /> : <Copy className="w-4 h-4" />}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-600 font-semibold">Tautan Referral Resmi Anda</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={referralLink} className="font-mono text-xs bg-indigo-50/40 border-indigo-200 text-indigo-950 focus-visible:ring-indigo-500" />
+                    <Button onClick={handleCopyReferralLink} className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 gap-1.5 font-bold text-xs h-10 px-4">
+                      {copiedLink ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4" />}
                       {copiedLink ? "Tersalin!" : "Salin Link"}
                     </Button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Total Referral</p>
-                    <p className="text-lg font-bold text-gray-900 mt-0.5">{refStats.total}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Menunggu (Pending)</p>
-                    <p className="text-lg font-bold text-amber-700 mt-0.5">{refStats.pending}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Qualified (ACC)</p>
-                    <p className="text-lg font-bold text-green-700 mt-0.5">{refStats.qualified}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Total Bonus Didapat</p>
-                    <p className="text-lg font-bold text-amber-700 mt-0.5">{formatMoney(refStats.earnings)}</p>
+                {/* DAFTAR TIER REWARD REFERRAL PREVIEW */}
+                <div className="pt-2">
+                  <Label className="text-xs text-gray-600 font-semibold mb-2 block">
+                    🎁 Skema Multi-Tier Reward Per Downline:
+                  </Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {activeReferralTiers.map((t, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-lg text-center space-y-0.5"
+                      >
+                        <p className="text-[11px] text-gray-500 font-semibold">{t.minAcc} Email ACC</p>
+                        <p className="text-sm font-extrabold text-indigo-700">
+                          {formatMoney(t.reward)}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* 🎁 KODE UNDANGAN CLAIM CARD */}
-                <Card className="bg-white border-amber-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                      🎁 Kode Undangan
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isAlreadyLinked ? (
-                      <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-xs text-green-900 space-y-1">
-                        <p className="font-bold flex items-center gap-1.5 text-green-800">
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          ✓ Kode undangan sudah digunakan
-                        </p>
-                        <p className="text-[11px] text-green-700">
-                          Akun kamu sekarang terhubung dengan referral dari{" "}
-                          <strong className="font-semibold text-green-900">{referrerDisplayName || "Teman"}</strong>.
-                        </p>
-                      </div>
-                    ) : (
-                      <form onSubmit={handleClaimInvitationCode} className="space-y-3">
-                        <div className="space-y-1 text-xs">
-                          <p className="font-semibold text-gray-900">Belum punya kode undangan?</p>
-                          <p className="text-gray-500">
-                            Masukkan kode undangan dari teman untuk menghubungkan akun referral kamu.
-                          </p>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            value={invitationCodeInput}
-                            onChange={(e) => setInvitationCodeInput(e.target.value)}
-                            placeholder="Masukkan kode undangan (contoh: UID teman)"
-                            className="font-mono text-xs"
-                            disabled={claimingCode}
-                          />
-                          <Button
-                            type="submit"
-                            disabled={claimingCode || !invitationCodeInput.trim()}
-                            className="bg-amber-600 hover:bg-amber-700 shrink-0 gap-1.5 text-xs"
-                          >
-                            {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                            Gunakan Kode Undangan
-                          </Button>
-                        </div>
-                      </form>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <p className="font-bold flex items-center gap-1">
-                    <ShieldAlert className="w-3.5 h-3.5" /> Ketentuan Kualifikasi Referral:
+                <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
+                  <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    Klaim Kode Undangan Pengundang
                   </p>
-                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
-                    <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
-                    <li>Pekerja yang diundang harus mencapai target email ACC terverifikasi untuk membuka masing-masing tier reward.</li>
-                    <li>Reward dapat di-claim per-tier (5 ACC, 10 ACC, 20 ACC, 50 ACC) tanpa harus menunggu seluruh tier selesai.</li>
-                    <li>Setiap tier reward hanya dapat di-claim SATU KALI per pekerja referral.</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <Label className="text-xs text-gray-600 mb-2 block font-semibold">
-                    Daftar Referral Saya ({engagement.referrals.data.length})
-                  </Label>
-                  {engagement.referrals.data.length === 0 ? (
-                    <div className="p-4 bg-white rounded-lg border border-gray-200 text-center text-xs text-gray-500">
-                      Belum ada pekerja yang mendaftar menggunakan referral Anda.
+                  {isAlreadyLinked ? (
+                    <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-0.5">
+                      <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        ✓ Kode undangan sudah terhubung
+                      </p>
+                      <p className="text-[11px] text-emerald-700">
+                        Akun Anda terhubung dengan pengundang:{" "}
+                        <strong className="font-semibold text-emerald-950">{referrerDisplayName || "Rekan"}</strong>.
+                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white">
-                      {engagement.referrals.data.map((ref) => {
-                        const accProgress = ref.currentAccCount ?? 0;
-                        const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
+                    <form onSubmit={handleClaimInvitationCode} className="space-y-2.5">
+                      <p className="text-[11px] text-gray-500">
+                        Jika Anda mendaftar tanpa link referral, masukkan kode undangan pengundang Anda di sini:
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          value={invitationCodeInput}
+                          onChange={(e) => setInvitationCodeInput(e.target.value)}
+                          placeholder="Masukkan kode / UID pengundang"
+                          className="font-mono text-xs bg-white"
+                          disabled={claimingCode}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={claimingCode || !invitationCodeInput.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 gap-1.5 text-xs font-bold"
+                        >
+                          {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                          Gunakan Kode
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-lg text-xs text-indigo-950 space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-indigo-900">
+                    <ShieldAlert className="w-3.5 h-3.5 text-indigo-600" /> Aturan Kualifikasi Referral:
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-indigo-900/80">
+                    <li>Pendaftaran akun baru saja TIDAK langsung mencairkan bonus.</li>
+                    <li>Bonus terbuka saat downline mencapai target email ACC terverifikasi (5, 10, 20, 50 ACC).</li>
+                    <li>Reward dapat diklaim bertahap per-tier secara instant tanpa perlu menunggu tier akhir.</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. DYNAMIC REFERRAL WITHDRAWAL FORM */}
+            <Card className="bg-white border-indigo-100 shadow-xs">
+              <CardHeader className="pb-4 border-b border-indigo-50">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Wallet className="w-5 h-5 text-indigo-600" />
+                      Tarik Saldo Bonus Referral
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Cairkan saldo hasil komisi tim referral langsung ke E-Wallet atau Rekening Bank Anda.
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs font-bold px-2.5 py-1 ${
+                      activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                        : "bg-indigo-50 text-indigo-800 border-indigo-300"
+                    }`}
+                  >
+                    {currentFeeBadgeText}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                {/* REFERRAL BALANCE HIGHLIGHT CARD */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div>
+                    <p className="text-xs text-indigo-200 font-medium uppercase tracking-wider">Saldo Siap Ditarik</p>
+                    <p className="text-2xl font-extrabold text-white tracking-tight">{formatMoney(profile.balance)}</p>
+                  </div>
+                  <div className="text-xs text-indigo-200 space-y-0.5 sm:text-right">
+                    <p>Minimal: <strong className="text-white">{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong></p>
+                    <p>Maksimal: <strong className="text-white">{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong></p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleWithdraw} className="space-y-6">
+                  {/* STEP 1: PAYMENT CATEGORY & PROVIDER GRID SELECTION */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] flex items-center justify-center font-bold">1</span>
+                        Pilih Metode & Penyedia Pembayaran
+                      </Label>
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        {enabledMethods.length} metode aktif
+                      </span>
+                    </div>
+
+                    {/* CATEGORY TOGGLE PILLS */}
+                    <div className="inline-flex p-1 bg-gray-100 rounded-lg gap-1 text-xs font-medium w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCategory("ewallet")}
+                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          categoryTab === "ewallet"
+                            ? "bg-white text-indigo-950 shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+                        E-Wallet (Instant)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCategory("bank")}
+                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          categoryTab === "bank"
+                            ? "bg-white text-indigo-950 shadow-xs"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                        Transfer Bank
+                      </button>
+                    </div>
+
+                    {/* PROVIDER GRID CARDS */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      {visibleMethods.map((m) => {
+                        const isSelected = method === m.method;
+                        const feeBadge = formatFeeBadge(m);
+                        const isEWallet = isEWalletMethod(m);
 
                         return (
-                          <div key={ref.id} className="p-3 rounded-lg border border-amber-100 bg-amber-50/30 space-y-3">
-                            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
-                              <div>
-                                <p className="font-bold text-gray-900 text-sm">
-                                  {ref.referredWorkerName || shortId(ref.referredWorkerId)}
-                                </p>
-                                <p className="text-[11px] text-gray-500">
-                                  Total ACC Pekerja: <strong className="text-gray-900 font-bold">{accProgress} Email ACC</strong>
-                                </p>
+                          <div
+                            key={m.method}
+                            onClick={() => setMethod(m.method)}
+                            className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/30 shadow-sm"
+                                : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-gray-50/60"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {isEWallet ? (
+                                  <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? "text-indigo-600" : "text-gray-500"}`} />
+                                ) : (
+                                  <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-purple-600" : "text-gray-500"}`} />
+                                )}
+                                <span className="font-bold text-sm text-gray-900 truncate">{m.method}</span>
                               </div>
-                              <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-200 text-xs">
-                                Total Bonus: {formatMoney(ref.rewardAmount ?? 0)}
-                              </Badge>
+                              {isSelected && (
+                                <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                              )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {sortedTiers.map((t) => {
-                                const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
-                                const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
-                                const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
-                                const busyKey = `${ref.id}_${t.minAcc}`;
-                                const isBusy = busyClaimTierKey === busyKey;
-
-                                return (
-                                  <div
-                                    key={t.minAcc}
-                                    className={`p-2.5 rounded-md border text-xs flex items-center justify-between gap-2 ${
-                                      isClaimed
-                                        ? "bg-green-50/80 border-green-200"
-                                        : isPendingClaim
-                                          ? "bg-blue-50/80 border-blue-200"
-                                          : isClaimable
-                                            ? "bg-white border-amber-300 shadow-sm"
-                                            : "bg-gray-50 border-gray-200 opacity-75"
-                                    }`}
-                                  >
-                                    <div className="space-y-0.5">
-                                      <p className="font-bold text-gray-900">
-                                        {t.minAcc} ACC — <span className="text-amber-700">{formatMoney(t.reward)}</span>
-                                      </p>
-                                      <p className="text-[11px] text-gray-500">
-                                        Progress: <strong className="text-gray-800">{accProgress}/{t.minAcc}</strong>
-                                      </p>
-                                    </div>
-
-                                    <div>
-                                      {isClaimed ? (
-                                        <Badge className="bg-green-100 text-green-800 border-green-300 gap-1 text-[11px]">
-                                          <CheckCircle2 className="w-3 h-3 text-green-600" />
-                                          Sudah Diklaim
-                                        </Badge>
-                                      ) : isClaimable ? (
-                                        <Button
-                                          size="sm"
-                                          disabled={isBusy}
-                                          onClick={() => handleClaimTier(ref.id, t.minAcc)}
-                                          className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs h-7 px-3 gap-1 shrink-0"
-                                        >
-                                          {isBusy ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                          ) : (
-                                            <CheckCircle2 className="w-3 h-3" />
-                                          )}
-                                          Claim
-                                        </Button>
-                                      ) : (
-                                        <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200 gap-1 text-[11px]">
-                                          Belum tersedia
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] w-fit font-semibold px-2 py-0.5 ${
+                                m.feeType === "free" || m.feeValue <= 0
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : "bg-indigo-100 text-indigo-800 border-indigo-200"
+                              }`}
+                            >
+                              {feeBadge}
+                            </Badge>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
+
+                  {/* STEP 2: NOMINAL QUICK CHIPS & INPUT */}
+                  <div className="space-y-3 pt-2 border-t border-gray-100">
+                    <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] flex items-center justify-center font-bold">2</span>
+                      Nominal Penarikan
+                    </Label>
+
+                    <div className="space-y-2">
+                      <FormattedNumberInput
+                        id="amount"
+                        value={amount}
+                        onChange={(val) => setAmount(val)}
+                        placeholder="Contoh: 100.000"
+                        className="font-mono text-base font-semibold h-11 focus-visible:ring-indigo-500"
+                        required
+                      />
+
+                      {/* QUICK-SELECT PRESET CHIPS */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: `Maksimal (${formatMoney(profile.balance)})`, value: profile.balance },
+                          { label: "Rp 25.000", value: 25000 },
+                          { label: "Rp 50.000", value: 50000 },
+                          { label: "Rp 100.000", value: 100000 },
+                          { label: "Rp 250.000", value: 250000 },
+                          { label: "Rp 500.000", value: 500000 },
+                        ].map((chip, idx) => {
+                          const isActive = amount === chip.value;
+                          return (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAmount(chip.value)}
+                              className={`text-xs h-7 px-2.5 rounded-full transition-colors ${
+                                isActive
+                                  ? "bg-indigo-100 text-indigo-900 border-indigo-400 font-bold"
+                                  : "bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200"
+                              }`}
+                            >
+                              {chip.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* STEP 3: ACCOUNT DETAILS & REAL-TIME CALCULATION SUMMARY */}
+                  <div className="space-y-3 pt-2 border-t border-gray-100">
+                    <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] flex items-center justify-center font-bold">3</span>
+                      Detail Akun & Ringkasan Penarikan
+                    </Label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="account" className="text-xs text-gray-600">
+                          Nomor Rekening / Nomor {method}
+                        </Label>
+                        <Input
+                          id="account"
+                          value={account}
+                          onChange={(e) => setAccount(e.target.value)}
+                          placeholder={`Nomor HP ${method} / Rekening`}
+                          className="mt-1 focus-visible:ring-indigo-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="accountHolderName" className="text-xs text-gray-600">
+                          Atas Nama (Pemilik Rekening/Wallet)
+                        </Label>
+                        <Input
+                          id="accountHolderName"
+                          value={accountHolderName}
+                          onChange={(e) => setAccountHolderName(e.target.value)}
+                          placeholder="Masukkan nama sesuai rekening/wallet"
+                          className="mt-1 focus-visible:ring-indigo-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* DYNAMIC BREAKDOWN SUMMARY CARD */}
+                    <div className="p-4 bg-indigo-50/30 rounded-xl border border-indigo-100 space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center text-gray-600">
+                        <span>Jumlah Penarikan:</span>
+                        <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-gray-600">
+                        <span>Biaya Admin / Layanan ({activeMethodConfig.method}):</span>
+                        <span className={calculatedFee > 0 ? "font-bold text-indigo-700" : "font-bold text-emerald-700"}>
+                          {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-indigo-100 flex justify-between items-center text-sm">
+                        <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
+                        <span className="font-extrabold text-emerald-700 text-base">{formatMoney(calculatedNet)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={withdrawing}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 gap-2 text-sm shadow-sm"
+                  >
+                    {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+                    Request Withdraw Bonus ({formatMoney(calculatedNet)})
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* 4. DOWNLINE LIST & ACTIVITY TABLE */}
+            <Card className="bg-white border-indigo-100 shadow-xs">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  Riwayat Downline Saya ({engagement.referrals.data.length})
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Daftar seluruh pekerja yang mendaftar melalui tautan referral Anda beserta progress email ACC dan klaim komisi.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {engagement.referrals.loading && (
+                  <p className="text-sm text-gray-400 text-center py-8">Memuat data downline...</p>
+                )}
+                {!engagement.referrals.loading && engagement.referrals.data.length === 0 && (
+                  <div className="p-8 border border-dashed border-indigo-200 rounded-xl text-center space-y-2 bg-indigo-50/20">
+                    <Users className="w-8 h-8 text-indigo-300 mx-auto" />
+                    <p className="text-sm font-semibold text-gray-800">Belum Ada Downline</p>
+                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                      Bagikan tautan referral Anda ke rekan kerja untuk mulai mencetak komisi pasif income otomatis.
+                    </p>
+                    <Button onClick={handleCopyReferralLink} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold text-xs mt-2">
+                      <Copy className="w-3.5 h-3.5" />
+                      Salin Tautan Referral
+                    </Button>
+                  </div>
+                )}
+                {!engagement.referrals.loading && engagement.referrals.data.length > 0 && (
+                  <div className="space-y-4">
+                    {engagement.referrals.data.map((ref) => {
+                      const accProgress = ref.currentAccCount ?? 0;
+                      const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
+
+                      return (
+                        <div key={ref.id} className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/20 hover:bg-indigo-50/40 transition-colors space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100/80 pb-3">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-gray-900 text-sm">
+                                  {ref.referredWorkerName || shortId(ref.referredWorkerId)}
+                                </p>
+                                <Badge className="bg-indigo-100 text-indigo-900 border-indigo-200 text-[10px] font-mono">
+                                  ID: {shortId(ref.referredWorkerId)}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-gray-500">
+                                Bergabung: <strong className="text-gray-700">{formatDateTime(ref.createdAt)}</strong> · Total ACC: <strong className="text-indigo-900 font-bold">{accProgress} Email ACC</strong>
+                              </p>
+                            </div>
+
+                            <Badge variant="outline" className="bg-white text-indigo-950 border-indigo-200 text-xs font-bold w-fit">
+                              Komisi Earned: {formatMoney(ref.rewardAmount ?? 0)}
+                            </Badge>
+                          </div>
+
+                          {/* TIER CLAIM GRID */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {sortedTiers.map((t) => {
+                              const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
+                              const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
+                              const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
+                              const busyKey = `${ref.id}_${t.minAcc}`;
+                              const isBusy = busyClaimTierKey === busyKey;
+
+                              return (
+                                <div
+                                  key={t.minAcc}
+                                  className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                                    isClaimed
+                                      ? "bg-emerald-50/80 border-emerald-200"
+                                      : isPendingClaim
+                                        ? "bg-blue-50/80 border-blue-200"
+                                        : isClaimable
+                                          ? "bg-white border-indigo-300 shadow-2xs"
+                                          : "bg-gray-50/80 border-gray-200 opacity-75"
+                                  }`}
+                                >
+                                  <div className="space-y-0.5">
+                                    <p className="font-bold text-gray-900">
+                                      Target {t.minAcc} ACC — <span className="text-indigo-700 font-extrabold">{formatMoney(t.reward)}</span>
+                                    </p>
+                                    <p className="text-[11px] text-gray-500">
+                                      Progress: <strong className="text-gray-800">{accProgress}/{t.minAcc} ACC</strong>
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    {isClaimed ? (
+                                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 text-[11px] font-semibold">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        Sudah Diklaim
+                                      </Badge>
+                                    ) : isClaimable ? (
+                                      <Button
+                                        size="sm"
+                                        disabled={isBusy}
+                                        onClick={() => handleClaimTier(ref.id, t.minAcc)}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-7 px-3 gap-1 shrink-0 shadow-2xs"
+                                      >
+                                        {isBusy ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Sparkles className="w-3 h-3 text-amber-300" />
+                                        )}
+                                        🎉 Claim
+                                      </Button>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200 gap-1 text-[11px]">
+                                        🔒 Belum Tersedia
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
