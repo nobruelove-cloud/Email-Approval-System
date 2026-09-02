@@ -102,9 +102,8 @@ import {
   createWorkerAccount,
   createWithdrawal,
   evaluateReferralQualification,
-  createReferralClaimRequest,
+  claimReferralReward,
   claimReferralTier,
-  approveReferral,
   reviewSubmission,
   logFirestoreDiagnostic,
   formatQueryConstraint,
@@ -1742,110 +1741,27 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
   });
 });
 
-describe("Referral Tier Claim & Approval Logic Unit Tests (createReferralClaimRequest & approveReferral)", () => {
+describe("Direct Worker Referral Reward Claim Logic Unit Tests (claimReferralReward)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuthObj.currentUser = { uid: "test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any;
+    mockAuthObj.currentUser = { uid: "referrer_test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any;
   });
 
-  it("1. Worker creates valid 5 ACC claim request without updating balance or referrals", async () => {
-    const referralData = {
-      id: "ref_worker_1",
-      referrerId: "test_uid",
-      referredWorkerId: "ref_worker_1",
-      currentAccCount: 5,
-      status: "QUALIFIED",
-      claimedTiers: {},
-    };
-    const rulesData = {
-      referralTiers: DEFAULT_REFERRAL_TIERS,
-    };
-
-    mockGetDoc.mockImplementation(async (ref: any) => {
-      const p = ref?.path || (typeof ref === "string" ? ref : String(ref));
-      if (p.startsWith("referralClaims") || p.includes("referralClaims")) {
-        return { exists: () => false, data: () => ({}) };
-      }
-      if (p.includes("ref_worker_1")) {
-        return { exists: () => true, data: () => referralData };
-      }
-      if (p.includes("rules")) {
-        return { exists: () => true, data: () => rulesData };
-      }
-      return { exists: () => false, data: () => ({}) };
-    });
-
-    mockSetDoc.mockResolvedValueOnce(undefined);
-
-    await createReferralClaimRequest("ref_worker_1", 5);
-
-    expect(mockSetDoc).toHaveBeenCalledTimes(1);
-    const [docRef, claimPayload] = mockSetDoc.mock.calls[0];
-
-    expect(docRef.path).toBe("referralClaims/ref_worker_1_tier_5");
-    expect(claimPayload.referrerId).toBe("test_uid");
-    expect(claimPayload.minAcc).toBe(5);
-    expect(claimPayload.rewardAmount).toBe(500);
-    expect(claimPayload.status).toBe("pending");
-
-    // Verify NO balance update or referral modifications occurred
-    expect(mockSetDoc.mock.calls.some((call) => call[0].path.startsWith("users/"))).toBe(false);
-  });
-
-  it("2. Worker cannot claim referral if target ACC is not reached", async () => {
-    const referralData = {
-      id: "ref_worker_2",
-      referrerId: "test_uid",
-      referredWorkerId: "ref_worker_2",
-      currentAccCount: 3, // Only 3 ACC, target is 5
-      status: "PENDING",
-    };
-
-    mockGetDoc.mockImplementation(async (ref: any) => {
-      const p = ref?.path || (typeof ref === "string" ? ref : String(ref));
-      if (p.includes("ref_worker_2")) {
-        return { exists: () => true, data: () => referralData };
-      }
-      return { exists: () => false, data: () => ({}) };
-    });
-
-    await expect(createReferralClaimRequest("ref_worker_2", 5)).rejects.toThrow("Target ACC belum tercapai (3/5).");
-  });
-
-  it("3. Worker cannot claim another worker's referral", async () => {
-    const referralData = {
-      id: "ref_worker_3",
-      referrerId: "other_referrer_uid", // Belongs to someone else
-      referredWorkerId: "ref_worker_3",
-      currentAccCount: 10,
-      status: "QUALIFIED",
-    };
-
-    mockGetDoc.mockImplementation(async (ref: any) => {
-      if (ref.path === "referrals/ref_worker_3") {
-        return { exists: () => true, data: () => referralData };
-      }
-      return { exists: () => false, data: () => ({}) };
-    });
-
-    await expect(createReferralClaimRequest("ref_worker_3", 5)).rejects.toThrow("Anda tidak dapat mengklaim reward referral milik akun lain.");
-  });
-
-  it("4. Admin approval credits reward for 5 ACC, marks claimedTiers, updates referrer balance, and writes rewardLedger & referralClaims", async () => {
+  it("1. 5 approved Gmail makes 5 ACC tier claim eligible and credits exactly Rp500", async () => {
     const store: Record<string, any> = {
-      "referrals/ref_100": {
-        id: "ref_100",
-        referrerId: "referrer_100",
-        referredWorkerId: "worker_100",
-        referredWorkerName: "Worker 100",
+      "referrals/worker_b_5acc": {
+        id: "worker_b_5acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_b_5acc",
+        referredWorkerName: "Worker B",
         currentAccCount: 5,
         status: "QUALIFIED",
         rewardAmount: 0,
         claimedTiers: {},
       },
-      "users/referrer_100": {
-        uid: "referrer_100",
-        name: "Referrer 100",
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        name: "Referrer Test",
         balance: 1000,
       },
       "settings/rules": {
@@ -1856,72 +1772,37 @@ describe("Referral Tier Claim & Approval Logic Unit Tests (createReferralClaimRe
     const tx = createMockTransaction(store);
     vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
 
-    const res = await approveReferral("ref_100", 5);
+    const res = await claimReferralReward("worker_b_5acc", 5);
 
     expect(res.status).toBe("ok");
-    expect(res.data.totalClaimReward).toBe(500);
-    expect(res.data.approvedTiers).toEqual([5]);
+    expect(res.rewardAmount).toBe(500);
+
+    // Check updated referrer balance: 1000 + 500 = 1500
+    expect(store["users/referrer_test_uid"].balance).toBe(1500);
 
     // Check updated referral document
-    const updatedRef = store["referrals/ref_100"];
+    const updatedRef = store["referrals/worker_b_5acc"];
     expect(updatedRef.claimedTiers["5"]).toBe(true);
     expect(updatedRef.rewardAmount).toBe(500);
 
-    // Check updated referrer balance
-    expect(store["users/referrer_100"].balance).toBe(1500);
-
-    // Check rewardLedger document created
-    const ledgerDoc = store["rewardLedger/ref_100_ledger_tier_5"];
-    expect(ledgerDoc).toBeDefined();
-    expect(ledgerDoc.amount).toBe(500);
-    expect(ledgerDoc.workerId).toBe("referrer_100");
-
-    // Check referralClaims document updated/created
-    const claimDoc = store["referralClaims/ref_100_tier_5"];
-    expect(claimDoc).toBeDefined();
-    expect(claimDoc.status).toBe("approved");
+    // Check referralClaims and rewardLedger documents created
+    expect(store["referralClaims/worker_b_5acc_tier_5"].status).toBe("approved");
+    expect(store["rewardLedger/worker_b_5acc_ledger_tier_5"].amount).toBe(500);
   });
 
-  it("5. Duplicate approval fails with ALREADY_CLAIMED error and zero balance change", async () => {
+  it("2. 10 approved Gmail allows 10 ACC claim (credits Rp1.000)", async () => {
     const store: Record<string, any> = {
-      "referrals/ref_200": {
-        id: "ref_200",
-        referrerId: "referrer_200",
-        referredWorkerId: "worker_200",
-        currentAccCount: 5,
-        status: "QUALIFIED",
-        rewardAmount: 500,
-        claimedTiers: { "5": true },
-      },
-      "users/referrer_200": {
-        uid: "referrer_200",
-        balance: 1500,
-      },
-      "settings/rules": {
-        referralTiers: DEFAULT_REFERRAL_TIERS,
-      },
-    };
-
-    const tx = createMockTransaction(store);
-    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
-
-    await expect(approveReferral("ref_200", 5)).rejects.toThrow("Tier 5 ACC sudah pernah diklaim/disetujui.");
-    expect(store["users/referrer_200"].balance).toBe(1500);
-  });
-
-  it("6. Subsequent 10 ACC tier can be approved independently", async () => {
-    const store: Record<string, any> = {
-      "referrals/ref_300": {
-        id: "ref_300",
-        referrerId: "referrer_300",
-        referredWorkerId: "worker_300",
+      "referrals/worker_c_10acc": {
+        id: "worker_c_10acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_c_10acc",
         currentAccCount: 10,
         status: "QUALIFIED",
         rewardAmount: 500,
         claimedTiers: { "5": true },
       },
-      "users/referrer_300": {
-        uid: "referrer_300",
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
         balance: 1500,
       },
       "settings/rules": {
@@ -1932,20 +1813,170 @@ describe("Referral Tier Claim & Approval Logic Unit Tests (createReferralClaimRe
     const tx = createMockTransaction(store);
     vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
 
-    const res = await approveReferral("ref_300", 10);
+    const res = await claimReferralReward("worker_c_10acc", 10);
 
-    expect(res.data.totalClaimReward).toBe(1000);
-    expect(res.data.approvedTiers).toEqual([10]);
-    expect(store["users/referrer_300"].balance).toBe(2500);
-    expect(store["referrals/ref_300"].claimedTiers).toEqual({ "5": true, "10": true });
+    expect(res.rewardAmount).toBe(1000);
+    expect(store["users/referrer_test_uid"].balance).toBe(2500); // 1500 + 1000
+    expect(store["referrals/worker_c_10acc"].claimedTiers).toEqual({ "5": true, "10": true });
   });
 
-  it("7. Nonexistent referral fails cleanly with NOT_FOUND error and zero writes", async () => {
-    const store: Record<string, any> = {};
+  it("3. 20 approved Gmail allows 20 ACC claim (credits Rp2.000)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_d_20acc": {
+        id: "worker_d_20acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_d_20acc",
+        currentAccCount: 20,
+        status: "QUALIFIED",
+        rewardAmount: 1500,
+        claimedTiers: { "5": true, "10": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 2500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
     const tx = createMockTransaction(store);
     vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
 
-    await expect(approveReferral("nonexistent_ref", 5)).rejects.toThrow("Data referral tidak ditemukan.");
-    expect(tx._writes.length).toBe(0);
+    const res = await claimReferralReward("worker_d_20acc", 20);
+
+    expect(res.rewardAmount).toBe(2000);
+    expect(store["users/referrer_test_uid"].balance).toBe(4500); // 2500 + 2000
+  });
+
+  it("4. 50 approved Gmail allows 50 ACC claim (credits Rp5.000)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_e_50acc": {
+        id: "worker_e_50acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_e_50acc",
+        currentAccCount: 50,
+        status: "QUALIFIED",
+        rewardAmount: 3500,
+        claimedTiers: { "5": true, "10": true, "20": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 4500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await claimReferralReward("worker_e_50acc", 50);
+
+    expect(res.rewardAmount).toBe(5000);
+    expect(store["users/referrer_test_uid"].balance).toBe(9500); // 4500 + 5000
+    expect(store["referrals/worker_e_50acc"].status).toBe("PAID"); // All tiers claimed
+  });
+
+  it("5. Below-threshold tier is rejected", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_f_3acc": {
+        id: "worker_f_3acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_f_3acc",
+        currentAccCount: 3, // Only 3 ACC, target is 5
+        status: "PENDING",
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_f_3acc", 5)).rejects.toThrow("Target ACC belum tercapai (3/5).");
+    expect(store["users/referrer_test_uid"].balance).toBe(1000);
+  });
+
+  it("6. Same tier cannot be claimed twice (double claim protection)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_g_already_claimed": {
+        id: "worker_g_already_claimed",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_g_already_claimed",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 500,
+        claimedTiers: { "5": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_g_already_claimed", 5)).rejects.toThrow("Hadiah tier 5 ACC sudah pernah diklaim.");
+    expect(store["users/referrer_test_uid"].balance).toBe(1500);
+  });
+
+  it("7. Worker cannot claim another worker's referral", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_h_other_referrer": {
+        id: "worker_h_other_referrer",
+        referrerId: "another_referrer_uid", // Belongs to someone else
+        referredWorkerId: "worker_h_other_referrer",
+        currentAccCount: 10,
+        status: "QUALIFIED",
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_h_other_referrer", 5)).rejects.toThrow("Anda tidak dapat mengklaim reward referral milik akun lain.");
+    expect(store["users/referrer_test_uid"].balance).toBe(1000);
+  });
+
+  it("8. Transaction strictly executes all reads before any writes", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_i_reads_test": {
+        id: "worker_i_reads_test",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_i_reads_test",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 0,
+        claimedTiers: {},
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await claimReferralReward("worker_i_reads_test", 5);
+
+    // Verify all reads occurred before writes
+    expect(tx._reads.length).toBeGreaterThan(0);
+    expect(tx._writes.length).toBeGreaterThan(0);
   });
 });

@@ -50,7 +50,7 @@ import {
   useSettings,
   useMyReferral,
   claimReferralCode,
-  claimReferralTier,
+  claimReferralReward,
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
@@ -118,8 +118,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     if (busyClaimTierKey) return;
     setBusyClaimTierKey(key);
     try {
-      await claimReferralTier(referralId, minAcc);
-      toast.success(`Permintaan klaim reward referral tier ${minAcc} ACC berhasil dikirim!`);
+      const res = await claimReferralReward(referralId, minAcc);
+      toast.success(res.message || `🎉 Reward referral berhasil diklaim +${formatMoney(res.rewardAmount || 0)}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengklaim reward tier referral.");
     } finally {
@@ -850,11 +850,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                         <Badge className="bg-green-100 text-green-800 border-green-300 gap-1 text-[11px]">
                                           <CheckCircle2 className="w-3 h-3 text-green-600" />
                                           Sudah Diklaim
-                                        </Badge>
-                                      ) : isPendingClaim ? (
-                                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1 text-[11px]">
-                                          <Clock className="w-3 h-3 text-blue-600" />
-                                          Menunggu Admin
                                         </Badge>
                                       ) : isClaimable ? (
                                         <Button
