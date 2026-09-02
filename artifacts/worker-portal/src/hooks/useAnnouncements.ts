@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   collection,
   doc,
   serverTimestamp,
-  addDoc,
 } from "firebase/firestore";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { Announcement } from "@/lib/types";
 import {
@@ -12,15 +12,24 @@ import {
   setDocWithDiagnostic,
   updateDocWithDiagnostic,
   deleteDocWithDiagnostic,
-  logFirestoreDiagnostic,
 } from "./use-portal";
 
 export function useAnnouncements(options?: { includeInactive?: boolean }) {
   const includeInactive = options?.includeInactive ?? false;
+  const [currentUser, setCurrentUser] = useState<User | null>(() => auth?.currentUser ?? null);
+
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const { data, loading, error } = useCollection<Announcement>(
     "announcements",
     [],
-    true,
+    !!currentUser,
     { field: "createdAt", direction: "desc" }
   );
 
@@ -31,7 +40,7 @@ export function useAnnouncements(options?: { includeInactive?: boolean }) {
     return data.filter((a) => a.isActive !== false);
   }, [data, includeInactive]);
 
-  return { data: announcements, allData: data, loading, error };
+  return { data: announcements, allData: data, loading: loading || (!currentUser && !!auth), error };
 }
 
 export async function createAnnouncement(payload: {
@@ -41,6 +50,9 @@ export async function createAnnouncement(payload: {
   isActive?: boolean;
 }) {
   if (!db) throw new Error("Firebase is not configured.");
+  const currentUser = auth?.currentUser;
+  if (!currentUser) throw new Error("Pengguna belum terautentikasi.");
+
   const title = payload.title?.trim();
   const content = payload.content?.trim();
   if (!title) throw new Error("Judul pengumuman wajib diisi.");
@@ -53,7 +65,7 @@ export async function createAnnouncement(payload: {
     content,
     badge: payload.badge?.trim() || null,
     isActive: payload.isActive ?? true,
-    createdBy: auth?.currentUser?.uid ?? "admin",
+    createdBy: currentUser.uid,
     createdAt: serverTimestamp(),
   };
 
@@ -71,6 +83,7 @@ export async function updateAnnouncement(
   }>
 ) {
   if (!db) throw new Error("Firebase is not configured.");
+  if (!auth?.currentUser) throw new Error("Pengguna belum terautentikasi.");
   if (!id) throw new Error("ID pengumuman tidak valid.");
 
   const updates: Record<string, unknown> = {
@@ -100,6 +113,7 @@ export async function updateAnnouncement(
 
 export async function deleteAnnouncement(id: string) {
   if (!db) throw new Error("Firebase is not configured.");
+  if (!auth?.currentUser) throw new Error("Pengguna belum terautentikasi.");
   if (!id) throw new Error("ID pengumuman tidak valid.");
   return deleteDocWithDiagnostic(doc(db, "announcements", id), "deleteAnnouncement");
 }
