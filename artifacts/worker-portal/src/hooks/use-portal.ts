@@ -2276,6 +2276,14 @@ export async function deleteFinancialTransaction(id: string) {
   );
 }
 
+export {
+  useAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  toggleAnnouncementStatus,
+} from "./useAnnouncements";
+
 export function useFinancialData(selectedPeriod?: string) {
   const constraints: QueryConstraint[] = selectedPeriod
     ? [where("period", "==", selectedPeriod)]
