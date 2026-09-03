@@ -32,7 +32,9 @@ import {
   Wrench,
   Sparkles as SparklesIcon,
   RefreshCw,
+  Trophy,
 } from "lucide-react";
+import { Leaderboard } from "@/components/Leaderboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -312,7 +314,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           ? "Bonus Referral"
           : r.rewardType === "mission"
           ? "Bonus Misi"
-          : "Bonus Klasemen";
+          : "Bonus Reward Leaderboard";
       list.push({
         id: `rw-${r.id}`,
         date: r.createdAt,
@@ -677,12 +679,18 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs value={mainTab} onValueChange={setMainTab}>
-          <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-6 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
             <TabsTrigger
               value="submit"
               className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
             >
-              <Send className="w-3.5 h-3.5" /> STORAN EMAIL
+              <Send className="w-3.5 h-3.5" /> STORAN
+            </TabsTrigger>
+            <TabsTrigger
+              value="leaderboard"
+              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
+            >
+              <Trophy className="w-3.5 h-3.5" /> KLASEMEN
             </TabsTrigger>
             <TabsTrigger
               value="announcements"
@@ -714,6 +722,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <History className="w-3.5 h-3.5" /> RIWAYAT
             </TabsTrigger>
           </TabsList>
+
+          {/* KLASEMEN / LEADERBOARD */}
+          <TabsContent value="leaderboard" className="space-y-4">
+            <Leaderboard
+              submissions={submissions.data}
+              currentUserId={profile.uid}
+              rewards={rules.data.leaderboardRewards}
+            />
+          </TabsContent>
 
           {/* PENGUMUMAN & INFORMASI RESMI */}
           <TabsContent value="announcements" className="space-y-4">

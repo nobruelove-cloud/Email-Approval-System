@@ -47,6 +47,19 @@ export function shortId(id: string) {
 }
 
 /**
+ * Masks worker usernames for privacy (e.g., "Ahmad Fauzi" -> "Ahm***", "User" -> "Use***").
+ */
+export function maskWorkerName(name?: string | null): string {
+  if (!name || typeof name !== "string") return "User***";
+  const trimmed = name.trim();
+  if (!trimmed) return "User***";
+  if (trimmed.length <= 2) {
+    return `${trimmed.charAt(0)}***`;
+  }
+  return `${trimmed.slice(0, 3)}***`;
+}
+
+/**
  * Formats a list of email submission items into a line-separated email string for bulk copying.
  */
 export function formatBatchEmailsOnly(items: { email: string; password?: string }[]): string {
@@ -655,6 +668,103 @@ export function getWorkerAccInPeriod(
  * Validates a submitted password against password format rules found in submission notes.
  * Returns an error string in Indonesian if validation fails, or null if valid.
  */
+export interface LeaderboardEntry {
+  workerId: string;
+  workerName: string;
+  maskedName: string;
+  validAccCount: number;
+  rank: number;
+  rewardAmount?: number;
+}
+
+/**
+ * Calculates real-time leaderboard standings based ONLY on APPROVED email submissions within a timeframe.
+ */
+export function calculateLeaderboardStandings(
+  submissions: EmailSubmission[],
+  users: Array<{ uid: string; name?: string; role?: string }>,
+  startDate: Date,
+  endDate: Date,
+  rewardConfigs?: { rank: number; rewardAmount: number }[]
+): LeaderboardEntry[] {
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+
+  const userMap = new Map<string, string>();
+  if (Array.isArray(users)) {
+    users.forEach((u) => {
+      if (u.role === "worker" || !u.role) {
+        userMap.set(u.uid, u.name || "Worker");
+      }
+    });
+  }
+
+  const accMap = new Map<string, { name: string; count: number }>();
+
+  if (Array.isArray(submissions)) {
+    submissions.forEach((sub) => {
+      const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+      if (!isFinalized) return;
+
+      let subDate: Date | null = null;
+      if (sub.submittedAt) {
+        if (typeof sub.submittedAt === "object" && sub.submittedAt !== null && "toMillis" in (sub.submittedAt as any)) {
+          subDate = new Date((sub.submittedAt as any).toMillis());
+        } else {
+          subDate = new Date(sub.submittedAt as string | number);
+        }
+      }
+      if (!subDate || isNaN(subDate.getTime())) return;
+
+      const t = subDate.getTime();
+      if (t < startMs || t > endMs) return;
+
+      let approvedCount = 0;
+      if (typeof sub.approvedItemCount === "number") {
+        approvedCount = sub.approvedItemCount;
+      } else if (Array.isArray(sub.items) && sub.items.length > 0) {
+        approvedCount = sub.items.filter((i) => i.status === "approved").length;
+      } else if (sub.email) {
+        approvedCount = 1;
+      }
+
+      if (approvedCount <= 0) return;
+
+      const wId = sub.workerId;
+      const name = sub.workerName || userMap.get(wId) || "Worker";
+      const existing = accMap.get(wId);
+      if (existing) {
+        existing.count += approvedCount;
+      } else {
+        accMap.set(wId, { name, count: approvedCount });
+      }
+    });
+  }
+
+  const sorted = Array.from(accMap.entries())
+    .map(([workerId, data]) => ({
+      workerId,
+      workerName: data.name,
+      maskedName: maskWorkerName(data.name),
+      validAccCount: data.count,
+    }))
+    .sort((a, b) => b.validAccCount - a.validAccCount);
+
+  const rewardMap = new Map<number, number>();
+  if (Array.isArray(rewardConfigs)) {
+    rewardConfigs.forEach((r) => rewardMap.set(r.rank, r.rewardAmount));
+  }
+
+  return sorted.map((entry, idx) => {
+    const rank = idx + 1;
+    return {
+      ...entry,
+      rank,
+      rewardAmount: rewardMap.get(rank) ?? 0,
+    };
+  });
+}
+
 export function validatePasswordAgainstRules(password: string, submissionNotes: string[] = []): string | null {
   if (!password || password.trim().length === 0) {
     return "Kata sandi akun tidak boleh kosong.";

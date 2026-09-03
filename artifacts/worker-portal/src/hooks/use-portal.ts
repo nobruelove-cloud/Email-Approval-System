@@ -816,7 +816,11 @@ export function useAdminData() {
     field: "createdAt",
     direction: "desc",
   });
-  return { users, submissions, withdrawals, referrals, rewardLedger };
+  const leaderboardPayouts = useCollection<import("@/lib/portal-types").LeaderboardPayout>("leaderboardPayouts", [], true, {
+    field: "paidAt",
+    direction: "desc",
+  });
+  return { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts };
 }
 
 export function useWorkerEngagementData(uid?: string) {
@@ -2117,7 +2121,7 @@ export async function distributeLeaderboardReward(
         rewardType: "leaderboard",
         amount: rewardAmount,
         sourceRefId: payoutId,
-        description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
+        description: `Bonus Reward Leaderboard - Juara ${rank} (${periodKey})`,
         createdAt: serverTimestamp(),
       });
     },

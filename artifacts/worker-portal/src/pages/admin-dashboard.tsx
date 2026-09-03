@@ -128,6 +128,8 @@ import {
   getPeriodOptions,
   formatBatchEmailsOnly,
   formatBatchEmailsWithPasswords,
+  calculateLeaderboardStandings,
+  maskWorkerName,
 } from "@/lib/portal-utils";
 
 function copyToClipboard(text: string): Promise<boolean> {
@@ -182,7 +184,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
-  const { users, submissions, withdrawals, referrals, rewardLedger } = useAdminData();
+  const { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts } = useAdminData();
   const announcements = useAnnouncements({ includeInactive: true });
 
   useEffect(() => {
@@ -774,6 +776,96 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Leaderboard Management State
+  const [leaderboardPeriodType, setLeaderboardPeriodType] = useState<"weekly" | "monthly">("weekly");
+  const [distributingLeaderboard, setDistributingLeaderboard] = useState(false);
+
+  const currentLeaderboardTimeframe = useMemo(() => {
+    const now = new Date();
+    if (leaderboardPeriodType === "weekly") {
+      const { start, end } = getStartAndEndOfWeek(now);
+      const key = getWeeklyPeriodKey(now);
+      return { key, label: `Mingguan (${key})`, start, end };
+    } else {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      const key = getMonthlyPeriodKey(now);
+      return { key, label: `Bulanan (${formatMonthYear(key)})`, start, end };
+    }
+  }, [leaderboardPeriodType]);
+
+  const leaderboardRewardsConfig = useMemo(() => {
+    return Array.isArray(rules.data.leaderboardRewards) && rules.data.leaderboardRewards.length > 0
+      ? rules.data.leaderboardRewards
+      : [
+          { rank: 1, rewardAmount: 50000 },
+          { rank: 2, rewardAmount: 30000 },
+          { rank: 3, rewardAmount: 15000 },
+        ];
+  }, [rules.data.leaderboardRewards]);
+
+  const currentLeaderboardStandings = useMemo(() => {
+    return calculateLeaderboardStandings(
+      submissions.data,
+      users.data,
+      currentLeaderboardTimeframe.start,
+      currentLeaderboardTimeframe.end,
+      leaderboardRewardsConfig
+    );
+  }, [submissions.data, users.data, currentLeaderboardTimeframe.start, currentLeaderboardTimeframe.end, leaderboardRewardsConfig]);
+
+  async function handleDistributeLeaderboardRewards() {
+    if (currentLeaderboardStandings.length === 0) {
+      toast.error("Tidak ada pengerjaan email ACC pada periode ini.");
+      return;
+    }
+
+    const winnersToReward = currentLeaderboardStandings.slice(0, 3).filter((s) => s.validAccCount > 0);
+    if (winnersToReward.length === 0) {
+      toast.error("Tidak ada pemenang dengan pengerjaan ACC > 0.");
+      return;
+    }
+
+    setDistributingLeaderboard(true);
+    let successCount = 0;
+    let alreadyPaidCount = 0;
+    const errors: string[] = [];
+
+    for (const winner of winnersToReward) {
+      const rewardAmt = winner.rewardAmount || (winner.rank === 1 ? 50000 : winner.rank === 2 ? 30000 : 15000);
+      try {
+        await distributeLeaderboardReward(
+          winner.workerId,
+          currentLeaderboardTimeframe.key,
+          winner.rank,
+          winner.validAccCount,
+          rewardAmt,
+          winner.workerName
+        );
+        successCount++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("sudah pernah dicairkan") || msg.includes("already")) {
+          alreadyPaidCount++;
+        } else {
+          errors.push(`${winner.workerName}: ${msg}`);
+        }
+      }
+    }
+
+    setDistributingLeaderboard(false);
+
+    if (successCount > 0) {
+      toast.success(`Berhasil mencairkan bonus leaderboard untuk ${successCount} juara! Saldo telah ditambahkan.`);
+    } else if (alreadyPaidCount > 0) {
+      toast.info(`Hadiah leaderboard untuk periode ${currentLeaderboardTimeframe.key} sudah pernah dicairkan sebelumnya.`);
+    }
+
+    if (errors.length > 0) {
+      toast.error(`Gagal memproses beberapa juara: ${errors.join(", ")}`);
+    }
+  }
 
   // Detail submission modal & per-item status state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
@@ -2405,6 +2497,168 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* PENGATURAN HADIAH & ENGAGEMENT FEATURES */}
           <TabsContent value="rewards" className="space-y-6">
+            {/* LEADERBOARD MANAGEMENT SECTION */}
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50/30 to-orange-50/20 shadow-xs">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                      <Trophy className="w-5 h-5 text-amber-600" />
+                      Manajemen Leaderboard & Otomatisasi Payout Reward
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      Hitung real-time top pekerja berdasarkan email ACC terverifikasi dan cairkan bonus Juara 1, 2, 3 langsung ke Wallet Balance pekerja.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Select
+                      value={leaderboardPeriodType}
+                      onValueChange={(val: "weekly" | "monthly") => setLeaderboardPeriodType(val)}
+                    >
+                      <SelectTrigger className="w-32 text-xs font-bold bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly" className="text-xs">Mingguan</SelectItem>
+                        <SelectItem value="monthly" className="text-xs">Bulanan</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          disabled={distributingLeaderboard || currentLeaderboardStandings.length === 0}
+                          className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold text-xs h-9 gap-1.5 shadow-sm"
+                        >
+                          {distributingLeaderboard ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Gift className="w-4 h-4" />
+                          )}
+                          End Period & Distribute Reward
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Akhiri Periode & Cairkan Hadiah Leaderboard?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tindakan ini akan mentransfer bonus secara otomatis langsung ke Wallet Balance pemenang Top 3 untuk periode{" "}
+                            <strong>{currentLeaderboardTimeframe.label}</strong> dan mencatat transaksi "Bonus Reward Leaderboard".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-2 space-y-2 text-xs border-y border-gray-100 my-2">
+                          <p className="font-bold text-gray-900">Calon Penerima Hadiah:</p>
+                          {currentLeaderboardStandings.slice(0, 3).map((w) => (
+                            <div key={w.workerId} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                              <span>Juara #{w.rank}: <strong>{w.workerName}</strong> ({w.validAccCount} ACC)</span>
+                              <strong className="text-amber-700">{formatMoney(w.rewardAmount || 0)}</strong>
+                            </div>
+                          ))}
+                        </div>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDistributeLeaderboardRewards}
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                          >
+                            Cairkan Saldo Sekarang
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* STANDINGS PREVIEW GRID */}
+                <div>
+                  <Label className="text-xs font-bold text-gray-900 mb-2 block">
+                    Klasemen Sementara ({currentLeaderboardTimeframe.label}):
+                  </Label>
+                  {currentLeaderboardStandings.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-6 text-center border border-dashed rounded-xl bg-white">
+                      Belum ada email ACC terverifikasi pada periode ini.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {currentLeaderboardStandings.slice(0, 3).map((item) => (
+                        <div
+                          key={item.workerId}
+                          className={`p-3.5 rounded-xl border text-left bg-white shadow-2xs space-y-1.5 ${
+                            item.rank === 1 ? "border-amber-400 ring-1 ring-amber-300" : "border-gray-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <Badge
+                              className={`text-[10px] font-extrabold ${
+                                item.rank === 1
+                                  ? "bg-amber-500 text-white"
+                                  : item.rank === 2
+                                    ? "bg-slate-600 text-white"
+                                    : "bg-amber-800 text-white"
+                              }`}
+                            >
+                              Juara #{item.rank}
+                            </Badge>
+                            <span className="text-[11px] font-mono text-gray-400">{item.maskedName}</span>
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900 text-sm">{item.workerName}</p>
+                            <p className="text-xs text-amber-700 font-bold">{item.validAccCount} Email ACC Valid</p>
+                          </div>
+                          <div className="pt-1 border-t border-gray-100 flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Reward:</span>
+                            <span className="font-black text-amber-800">{formatMoney(item.rewardAmount || 0)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* RIWAYAT PAYOUT LEADERBOARD HISTORICAL TABLE */}
+                <div className="pt-2 border-t border-gray-200">
+                  <Label className="text-xs font-bold text-gray-900 mb-2 block">
+                    Riwayat Pencairan Hadiah Leaderboard ({leaderboardPayouts?.data?.length || 0})
+                  </Label>
+                  {(!leaderboardPayouts?.data || leaderboardPayouts.data.length === 0) ? (
+                    <p className="text-xs text-gray-400 py-4 text-center border border-dashed rounded-lg">
+                      Belum ada pencairan hadiah leaderboard sebelumnya.
+                    </p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white max-h-60 overflow-y-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold">
+                          <tr>
+                            <th className="px-3 py-2">Waktu Cair</th>
+                            <th className="px-3 py-2">Periode</th>
+                            <th className="px-3 py-2">Juara</th>
+                            <th className="px-3 py-2">Pekerja</th>
+                            <th className="px-3 py-2 text-right">Hadiah</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {leaderboardPayouts.data.map((payout) => (
+                            <tr key={payout.id} className="hover:bg-gray-50/50">
+                              <td className="px-3 py-2 font-mono text-gray-500">{formatDateTime(payout.paidAt)}</td>
+                              <td className="px-3 py-2 font-bold text-gray-800">{payout.periodKey}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px]">
+                                  Juara #{payout.rank}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2 font-semibold text-gray-900">{payout.workerName || workerName(payout.workerId)}</td>
+                              <td className="px-3 py-2 font-black text-amber-700 text-right">{formatMoney(payout.rewardAmount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
             {/* PENDING MISSION CLAIMS REVIEW */}
             {pendingMissionClaims.length > 0 && (
               <Card className="border-amber-300 bg-amber-50/50">
