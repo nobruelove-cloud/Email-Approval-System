@@ -17,7 +17,7 @@ export async function clearAppCachesAndUnregisterSW(): Promise<void> {
     }
   }
 
-  // 2. Clear CacheStorage if supported
+  // 2. Clear CacheStorage (window.caches) if supported
   if (typeof window !== "undefined" && "caches" in window) {
     try {
       const cacheNames = await caches.keys();
@@ -58,8 +58,25 @@ export function useAutoUpdate() {
         CURRENT_BUILD_ID !== "dev" &&
         String(serverVersion).trim() !== String(CURRENT_BUILD_ID).trim()
       ) {
-        console.log(`[AutoUpdate] New version detected: ${serverVersion} (current: ${CURRENT_BUILD_ID})`);
+        console.log(`[AutoUpdate] New version detected: ${serverVersion} (current: ${CURRENT_BUILD_ID}). Executing auto cache bust & hard reload.`);
         setHasUpdate(true);
+
+        const lastReloadedVersion = typeof window !== "undefined" ? sessionStorage.getItem("auto_reloaded_version") : null;
+        if (lastReloadedVersion !== String(serverVersion).trim()) {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("auto_reloaded_version", String(serverVersion).trim());
+          }
+          setUpdating(true);
+          await clearAppCachesAndUnregisterSW();
+          // Execute hard reload bypassing mobile browser cache
+          if (typeof window !== "undefined") {
+            if (typeof (window.location as any).reload === "function") {
+              (window.location as any).reload(true);
+            } else {
+              window.location.replace(window.location.href);
+            }
+          }
+        }
       }
     } catch (err) {
       // Ignore network errors during version check
@@ -113,7 +130,13 @@ export function useAutoUpdate() {
     setUpdating(true);
     await clearAppCachesAndUnregisterSW();
     // Force reload bypassing HTTP cache
-    window.location.reload();
+    if (typeof window !== "undefined") {
+      if (typeof (window.location as any).reload === "function") {
+        (window.location as any).reload(true);
+      } else {
+        window.location.replace(window.location.href);
+      }
+    }
   };
 
   return {
