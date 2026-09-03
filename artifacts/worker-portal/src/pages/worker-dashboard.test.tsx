@@ -19,11 +19,22 @@ vi.mock("@/hooks/use-portal", () => ({
   createWithdrawal: vi.fn(),
 }));
 
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+
 describe("WorkerDashboard Maintenance Mode", () => {
   it("renders maintenance screen when maintenance.enabled is true and role is worker", () => {
     const profile: any = { uid: "w1", name: "Worker", role: "worker", balance: 0 };
     const { getByText } = render(<WorkerDashboard profile={profile} onLogout={() => {}} />);
-    expect(getByText("Sistem Sedang Dalam Perbaikan / Maintenance")).toBeTruthy();
+    expect(getByText("Sistem Sedang Dalam Perbaikan")).toBeTruthy();
     expect(getByText("Maintenance test")).toBeTruthy();
+  });
+
+  it("handles missing or invalid targetEndTime gracefully without breaking UI", () => {
+    const { getByText } = render(
+      <MaintenanceScreen maintenance={{ enabled: true, message: "Server Upgrade", targetEndTime: "invalid-date" }} />
+    );
+    expect(getByText("Sistem Sedang Dalam Perbaikan")).toBeTruthy();
+    expect(getByText("Server Upgrade")).toBeTruthy();
+    expect(getByText("Dalam Perbaikan")).toBeTruthy();
   });
 });
