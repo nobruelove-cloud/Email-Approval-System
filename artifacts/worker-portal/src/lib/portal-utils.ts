@@ -47,6 +47,25 @@ export function shortId(id: string) {
 }
 
 /**
+ * Formats a list of email submission items into a line-separated email string for bulk copying.
+ */
+export function formatBatchEmailsOnly(items: { email: string; password?: string }[]): string {
+  if (!Array.isArray(items)) return "";
+  return items.map((it) => it.email).filter(Boolean).join("\n");
+}
+
+/**
+ * Formats a list of email submission items into email|password line-separated strings for bulk copying.
+ */
+export function formatBatchEmailsWithPasswords(items: { email: string; password?: string }[]): string {
+  if (!Array.isArray(items)) return "";
+  return items
+    .map((it) => `${it.email || ""}|${it.password || ""}`)
+    .filter((line) => line !== "|")
+    .join("\n");
+}
+
+/**
  * Resolves fee configuration for a specific payment method from WithdrawalSettings or fallback PortalRules.
  */
 export function getPaymentMethodFeeConfig(
