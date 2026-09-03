@@ -23,6 +23,8 @@ import {
   calculateWithdrawalFee,
   formatFeeBadge,
   getPaymentMethodFeeConfig,
+  formatBatchEmailsOnly,
+  formatBatchEmailsWithPasswords,
 } from "../lib/portal-utils";
 import {
   DEFAULT_TIERS,
@@ -1057,6 +1059,36 @@ describe("Mandatory Tiered Referral Flow & Security Unit Tests (TEST 1 - TEST 7)
   it("TEST 7 — 51+ ACC: reward is Rp5.000", () => {
     expect(getReferralRewardForAccCount(51, DEFAULT_REFERRAL_TIERS)).toBe(5000);
     expect(getReferralRewardForAccCount(100, DEFAULT_REFERRAL_TIERS)).toBe(5000);
+  });
+});
+
+describe("Quick-Copy Email Formatting Utilities Unit Tests", () => {
+  it("formatBatchEmailsOnly extracts email addresses as a line-separated list", () => {
+    const items = [
+      { email: "user1@gmail.com", password: "pass1" },
+      { email: "user2@yahoo.com", password: "pass2" },
+      { email: "user3@outlook.com" },
+    ];
+    expect(formatBatchEmailsOnly(items)).toBe("user1@gmail.com\nuser2@yahoo.com\nuser3@outlook.com");
+  });
+
+  it("formatBatchEmailsOnly handles empty or invalid inputs gracefully", () => {
+    expect(formatBatchEmailsOnly([])).toBe("");
+    expect(formatBatchEmailsOnly(null as any)).toBe("");
+  });
+
+  it("formatBatchEmailsWithPasswords extracts email|password formatted cleanly on each line", () => {
+    const items = [
+      { email: "user1@gmail.com", password: "pass1" },
+      { email: "user2@yahoo.com", password: "pass2" },
+      { email: "user3@outlook.com" },
+    ];
+    expect(formatBatchEmailsWithPasswords(items)).toBe("user1@gmail.com|pass1\nuser2@yahoo.com|pass2\nuser3@outlook.com|");
+  });
+
+  it("formatBatchEmailsWithPasswords handles empty or invalid inputs gracefully", () => {
+    expect(formatBatchEmailsWithPasswords([])).toBe("");
+    expect(formatBatchEmailsWithPasswords(null as any)).toBe("");
   });
 });
 

@@ -28,6 +28,8 @@ import {
   Edit3,
   Calendar,
   Megaphone,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -110,7 +112,36 @@ import {
   getDailyPeriodKey,
   formatMonthYear,
   getPeriodOptions,
+  formatBatchEmailsOnly,
+  formatBatchEmailsWithPasswords,
 } from "@/lib/portal-utils";
+
+function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text)
+      .then(() => true)
+      .catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text: string): boolean {
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    return false;
+  }
+}
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
@@ -640,6 +671,43 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   // Detail submission modal & per-item status state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
   const [itemStatuses, setItemStatuses] = useState<Record<string, "pending" | "approved" | "rejected">>({});
+  const [copiedSingleIndex, setCopiedSingleIndex] = useState<number | null>(null);
+  const [copiedBulkType, setCopiedBulkType] = useState<"emails" | "passwords" | null>(null);
+
+  function handleCopyAllEmails(baseItems: { email: string; password?: string }[]) {
+    const text = formatBatchEmailsOnly(baseItems);
+    if (!text) {
+      toast.error("Tidak ada email untuk disalin.");
+      return;
+    }
+    copyToClipboard(text).then(() => {
+      toast.success("Daftar email berhasil disalin!");
+      setCopiedBulkType("emails");
+      setTimeout(() => setCopiedBulkType(null), 2000);
+    });
+  }
+
+  function handleCopyEmailsWithPasswords(baseItems: { email: string; password?: string }[]) {
+    const text = formatBatchEmailsWithPasswords(baseItems);
+    if (!text) {
+      toast.error("Tidak ada email & sandi untuk disalin.");
+      return;
+    }
+    copyToClipboard(text).then(() => {
+      toast.success("Daftar email & sandi berhasil disalin!");
+      setCopiedBulkType("passwords");
+      setTimeout(() => setCopiedBulkType(null), 2000);
+    });
+  }
+
+  function handleCopySingleEmail(email: string, idx: number) {
+    if (!email) return;
+    copyToClipboard(email).then(() => {
+      toast.success(`Email ${email} berhasil disalin!`);
+      setCopiedSingleIndex(idx);
+      setTimeout(() => setCopiedSingleIndex(null), 2000);
+    });
+  }
 
   // Filter states
   const [submissionSearch, setSubmissionSearch] = useState("");
@@ -2874,6 +2942,44 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
                   </div>
 
+                  {/* BULK COPY TOOLBAR */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-blue-50/70 rounded-lg border border-blue-200/80 text-xs">
+                    <span className="text-blue-900 font-semibold flex items-center gap-1.5">
+                      <Copy className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                      Salin Rekap Email:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCopyAllEmails(baseItems)}
+                        className="h-7 text-xs bg-white text-blue-800 border-blue-300 hover:bg-blue-100 gap-1 font-medium shadow-2xs"
+                      >
+                        {copiedBulkType === "emails" ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        )}
+                        Salin Semua Email
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCopyEmailsWithPasswords(baseItems)}
+                        className="h-7 text-xs bg-white text-blue-800 border-blue-300 hover:bg-blue-100 gap-1 font-medium shadow-2xs"
+                      >
+                        {copiedBulkType === "passwords" ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        )}
+                        Salin Email | Sandi
+                      </Button>
+                    </div>
+                  </div>
+
                   {!isReadOnly && (
                     <div className="flex items-center justify-between gap-2 bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-xs">
                       <span className="text-amber-900 font-medium">Setujui/Tolak Semua:</span>
@@ -2915,6 +3021,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
                       {baseItems.map((it, idx) => {
                         const currentSt = itemStatuses[idx] ?? "pending";
+                        const isCopied = copiedSingleIndex === idx;
                         return (
                           <div
                             key={idx}
@@ -2927,9 +3034,23 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             }`}
                           >
                             <div className="min-w-0 flex-1 font-mono">
-                              <p className="font-semibold text-gray-900 truncate">
-                                {idx + 1}. {it.email}
-                              </p>
+                              <div className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                <span className="truncate">{idx + 1}. {it.email}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-gray-400 hover:text-amber-700 hover:bg-amber-50 shrink-0"
+                                  title="Salin Email"
+                                  onClick={() => handleCopySingleEmail(it.email, idx)}
+                                >
+                                  {isCopied ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                              </div>
                               {it.password && <p className="text-[11px] text-gray-500">Sandi: {it.password}</p>}
                             </div>
 
