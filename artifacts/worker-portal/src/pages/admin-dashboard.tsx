@@ -30,7 +30,21 @@ import {
   Megaphone,
   Copy,
   Check,
+  Wrench,
+  ShieldAlert,
+  BarChart3,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -91,7 +105,7 @@ import {
   toggleAnnouncementStatus,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig } from "@/lib/portal-types";
 import {
   formatDate,
   formatDateTime,
@@ -191,7 +205,100 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
+  const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // Global Maintenance Mode state
+  const activeMaintenance = useMemo(() => {
+    return maintenanceHook.data ?? DEFAULT_MAINTENANCE;
+  }, [maintenanceHook.data]);
+
+  const [maintEnabled, setMaintEnabled] = useState<boolean | null>(null);
+  const [maintMessage, setMaintNoteMessage] = useState<string | null>(null);
+  const [maintTargetTime, setMaintTargetTime] = useState<string | null>(null);
+  const [savingMaint, setSavingMaint] = useState(false);
+
+  const currentMaintEnabled = maintEnabled ?? activeMaintenance.enabled;
+  const currentMaintMessage = maintMessage ?? activeMaintenance.message;
+  const currentMaintTargetTime = maintTargetTime ?? activeMaintenance.targetEndTime;
+
+  function handleQuickSetDuration(minutes: number) {
+    const target = new Date(Date.now() + minutes * 60 * 1000);
+    // Format YYYY-MM-THH:mm for datetime-local input
+    const isoLocal = new Date(target.getTime() - target.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+    setMaintTargetTime(isoLocal);
+  }
+
+  async function handleSaveMaintenance() {
+    setSavingMaint(true);
+    try {
+      const payload: MaintenanceConfig = {
+        enabled: currentMaintEnabled,
+        targetEndTime: currentMaintTargetTime,
+        message: currentMaintMessage.trim() || DEFAULT_MAINTENANCE.message,
+      };
+      await saveSettings("maintenance", payload);
+      toast.success(
+        currentMaintEnabled
+          ? "Mode Maintenance System BERHASIL DIAKTIFKAN!"
+          : "Mode Maintenance System BERHASIL DINONAKTIFKAN."
+      );
+      setMaintEnabled(null);
+      setMaintNoteMessage(null);
+      setMaintTargetTime(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan mode maintenance.");
+    } finally {
+      setSavingMaint(false);
+    }
+  }
+
+  // Daily Trend Analytics calculation over last 14 days
+  const dailySubmissionTrends = useMemo(() => {
+    const daysMap = new Map<string, { dateStr: string; label: string; totalSubmitted: number; gmailAcc: number }>();
+
+    // Generate array for last 14 days up to today
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = getDailyPeriodKey(d); // "YYYY-MM-DD"
+      const label = `${d.getDate()}/${d.getMonth() + 1}`;
+      daysMap.set(key, { dateStr: key, label, totalSubmitted: 0, gmailAcc: 0 });
+    }
+
+    submissions.data.forEach((sub) => {
+      if (!sub.submittedAt) return;
+      const subDate = new Date(
+        typeof sub.submittedAt === "object" && "toMillis" in (sub.submittedAt as any)
+          ? (sub.submittedAt as any).toMillis()
+          : Number(sub.submittedAt) || Date.now()
+      );
+      const key = getDailyPeriodKey(subDate);
+
+      if (daysMap.has(key)) {
+        const item = daysMap.get(key)!;
+        const totalCount = getItemCountOfSubmission(sub);
+        item.totalSubmitted += totalCount;
+
+        const isApprovedOrAvailable =
+          sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+
+        if (isApprovedOrAvailable) {
+          const accCount =
+            typeof sub.approvedItemCount === "number"
+              ? sub.approvedItemCount
+              : Array.isArray(sub.items) && sub.items.length > 0
+              ? sub.items.filter((it) => it.status === "approved").length
+              : totalCount;
+          item.gmailAcc += accCount;
+        }
+      }
+    });
+
+    return Array.from(daysMap.values());
+  }, [submissions.data]);
 
   // Per-method fee state
   const activeWithdrawalSettings = useMemo(() => {
@@ -1401,7 +1508,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           </TabsContent>
 
           {/* RINGKASAN */}
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: "Total Pekerja", value: stats.totalWorkers },
@@ -1423,6 +1530,189 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </Card>
               ))}
             </div>
+
+            {/* VISUAL ANALYTICS & TREND CHART CARD */}
+            <Card className="bg-slate-900 text-white border-slate-800 shadow-md">
+              <CardHeader className="pb-3 border-b border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2 text-white">
+                      <BarChart3 className="w-5 h-5 text-amber-500" />
+                      Grafik Tren Setoran & Verifikasi Gmail ACC (14 Hari Terakhir)
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-400 mt-0.5">
+                      Membandingkan jumlah email yang disetor vs email terverifikasi ACC per hari.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-mono shrink-0">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-md font-bold">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      Gmail ACC Valid
+                    </span>
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded-md font-bold">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                      Total Disetor
+                    </span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 pb-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={dailySubmissionTrends}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#64748b" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#64748b" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                      <XAxis
+                        dataKey="label"
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        tickLine={false}
+                      />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#0f172a",
+                          borderColor: "#334155",
+                          borderRadius: "0.75rem",
+                          color: "#f8fafc",
+                          fontSize: "12px",
+                          boxShadow: "0 10px 15px -3px rgba(0,0,0,0.5)",
+                        }}
+                        itemStyle={{ padding: "2px 0" }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="totalSubmitted"
+                        name="Total Email Disetor"
+                        stroke="#94a3b8"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorTotal)"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="gmailAcc"
+                        name="Gmail ACC Valid"
+                        stroke="#f59e0b"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorAcc)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* GLOBAL MAINTENANCE MODE CONTROL CARD */}
+            <Card className={`border transition-all ${currentMaintEnabled ? "bg-amber-950/20 border-amber-500/80 ring-2 ring-amber-500/20" : "bg-white border-gray-200"}`}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-2 rounded-xl text-white ${currentMaintEnabled ? "bg-amber-600 animate-pulse" : "bg-gray-700"}`}>
+                        <Wrench className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                          Mode Maintenance / Perbaikan Sistem Global
+                          <Badge className={currentMaintEnabled ? "bg-amber-600 text-white font-bold" : "bg-gray-200 text-gray-700"}>
+                            {currentMaintEnabled ? "BERJALAN (AKTIF)" : "NONAKTIF"}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="text-xs text-gray-500">
+                          Aktifkan untuk memblokir sementara dashboard pekerja dengan halaman maintenance resmi dan countdown timer real-time.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={currentMaintEnabled ? "destructive" : "default"}
+                      onClick={() => setMaintEnabled(!currentMaintEnabled)}
+                      className={currentMaintEnabled ? "bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs" : "bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"}
+                    >
+                      {currentMaintEnabled ? "Matikan Mode Maintenance" : "Aktifkan Mode Maintenance"}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* ESTIMATED COMPLETION TIMESTAMP INPUT & QUICK PRESETS */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" /> Estimasi Waktu Selesai (Target Completion)
+                    </Label>
+                    <Input
+                      type="datetime-local"
+                      value={currentMaintTargetTime}
+                      onChange={(e) => setMaintTargetTime(e.target.value)}
+                      className="text-xs h-9 font-mono bg-white border-gray-300"
+                    />
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-[11px] text-gray-500 font-semibold self-center mr-1">Quick Select:</span>
+                      {[
+                        { label: "+15 Menit", mins: 15 },
+                        { label: "+30 Menit", mins: 30 },
+                        { label: "+1 Jam", mins: 60 },
+                        { label: "+2 Jam", mins: 120 },
+                      ].map((preset, idx) => (
+                        <Button
+                          key={idx}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleQuickSetDuration(preset.mins)}
+                          className="text-[11px] h-7 px-2.5 bg-gray-50 hover:bg-amber-50 hover:text-amber-900 border-gray-200"
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CUSTOM MAINTENANCE MESSAGE */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-gray-800">
+                      Pesan Pengumuman Maintenance (Tampil untuk Worker)
+                    </Label>
+                    <Textarea
+                      rows={3}
+                      value={currentMaintMessage}
+                      onChange={(e) => setMaintNoteMessage(e.target.value)}
+                      placeholder="Contoh: Pembaruan sistem & server rilis versi baru..."
+                      className="text-xs bg-white border-gray-300 leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <Button
+                    onClick={handleSaveMaintenance}
+                    disabled={savingMaint}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 gap-1.5"
+                  >
+                    {savingMaint && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Simpan Mode Maintenance
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* TAB KEUANGAN ADMIN */}

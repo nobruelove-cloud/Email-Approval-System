@@ -225,6 +225,19 @@ export type ReferralTierConfig = {
   reward: number;
 };
 
+export type MaintenanceConfig = {
+  enabled: boolean;
+  targetEndTime: string; // ISO date string e.g., "2026-03-30T12:00" or empty
+  message: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_MAINTENANCE: MaintenanceConfig = {
+  enabled: false,
+  targetEndTime: "",
+  message: "Sistem sedang dalam perbaikan & pembaruan server. Silakan cek kembali beberapa saat lagi.",
+};
+
 export type SupportConfig = {
   enabled: boolean;
   title: string;
