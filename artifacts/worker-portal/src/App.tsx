@@ -4,7 +4,9 @@ import { Loader2, Clock, ShieldOff, ShieldAlert } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { usePortalAuth } from "@/hooks/use-portal";
+import { usePortalAuth, useSettings } from "@/hooks/use-portal";
+import { DEFAULT_MAINTENANCE } from "@/lib/portal-types";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import LoginPage from "@/pages/login";
 import WorkerDashboard from "@/pages/worker-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -37,6 +39,8 @@ function FullScreenMessage({
 
 export function PortalGate() {
   const { firebaseUser, profile, loading, isReady, error, configured, logout } = usePortalAuth();
+  const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
+  const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
 
   useEffect(() => {
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
@@ -128,6 +132,12 @@ export function PortalGate() {
 
   const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
   const userStatus = typeof profile.status === "string" ? profile.status.trim().toLowerCase() : profile.status;
+
+  // ROOT-LEVEL MAINTENANCE GUARD:
+  // Intercept any non-admin user when maintenance mode is active before rendering worker dashboard
+  if (maintenance?.enabled && userRole !== "admin") {
+    return <MaintenanceScreen maintenance={maintenance} onLogout={() => logout()} />;
+  }
 
   if (userStatus === "pending") {
     if (userRole === "worker") {

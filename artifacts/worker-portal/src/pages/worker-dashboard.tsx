@@ -67,6 +67,7 @@ import {
   createWithdrawal,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import {
   formatDateTime,
   formatMoney,
@@ -161,86 +162,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // Render Maintenance Mode Screen if maintenance is enabled and user is not Admin
   if (isMaintenanceActive) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden select-none">
-        {/* Ambient background glow */}
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-md w-full text-center space-y-6 relative z-10">
-          {/* Glowing Animated Indicator */}
-          <div className="relative inline-flex items-center justify-center">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 opacity-40 blur-lg animate-pulse" />
-            <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center shadow-2xl backdrop-blur-md relative">
-              <Wrench className="w-12 h-12 text-amber-400 animate-spin" style={{ animationDuration: "8s" }} />
-            </div>
-            <span className="absolute -bottom-2 px-3 py-1 bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg border border-amber-300">
-              Maintenance System
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-              Sistem Sedang Dalam Perbaikan / Maintenance
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
-              {maintenance.message || "Sistem sedang dalam perbaikan & pembaruan server. Silakan cek kembali beberapa saat lagi."}
-            </p>
-          </div>
-
-          {/* Real-Time Countdown Timer Display */}
-          {maintenance.targetEndTime ? (
-            <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-3xl shadow-xl space-y-3 backdrop-blur-sm">
-              <p className="text-[11px] uppercase tracking-wider font-extrabold text-amber-400 flex items-center justify-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                Estimasi Waktu Selesai (Countdown)
-              </p>
-              <div className="grid grid-cols-3 gap-2 font-mono">
-                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800/80 text-center">
-                  <span className="text-2xl sm:text-3xl font-black text-amber-400 block">{pad(timeLeft.hours)}</span>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Jam</span>
-                </div>
-                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800/80 text-center">
-                  <span className="text-2xl sm:text-3xl font-black text-amber-400 block">{pad(timeLeft.minutes)}</span>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Menit</span>
-                </div>
-                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800/80 text-center">
-                  <span className="text-2xl sm:text-3xl font-black text-amber-400 block">{pad(timeLeft.seconds)}</span>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Detik</span>
-                </div>
-              </div>
-              {timeLeft.totalMs <= 0 && (
-                <p className="text-xs font-semibold text-emerald-400 animate-pulse pt-1">
-                  ✓ Waktu estimasi telah selesai. Klik Cek Status / Refresh jika dashboard belum otomatis terbuka.
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.reload()}
-              className="bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800 text-xs h-9 px-4 gap-1.5 rounded-xl"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" /> Cek Status / Refresh
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onLogout}
-              className="text-slate-400 hover:text-white hover:bg-slate-900 text-xs h-9 px-4 rounded-xl"
-            >
-              Keluar / Logout
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <MaintenanceScreen maintenance={maintenance} onLogout={onLogout} />;
   }
 
   // Engagement UI States
