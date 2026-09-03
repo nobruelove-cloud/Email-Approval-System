@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { usePortalAuth, useSettings } from "@/hooks/use-portal";
 import { DEFAULT_MAINTENANCE } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { AutoUpdateBanner } from "@/components/AutoUpdateBanner";
 import LoginPage from "@/pages/login";
 import WorkerDashboard from "@/pages/worker-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -202,6 +203,7 @@ export function PortalGate() {
 export default function App() {
   return (
     <>
+      <AutoUpdateBanner />
       <Switch>
         <Route path="/" component={PortalGate} />
         <Route path="/register" component={PortalGate} />

@@ -1,9 +1,27 @@
 import path from 'path';
+import fs from 'fs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+
+function generateVersionJsonPlugin(buildId: string): Plugin {
+  return {
+    name: 'generate-version-json',
+    writeBundle(options) {
+      const outDir = options.dir || path.resolve(import.meta.dirname, 'dist/public');
+      const versionFilePath = path.join(outDir, 'version.json');
+      const content = JSON.stringify({
+        version: buildId,
+        builtAt: new Date().toISOString(),
+      }, null, 2);
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(versionFilePath, content, 'utf-8');
+      console.log(`[VersionPlugin] Generated version.json with buildId: ${buildId} at ${versionFilePath}`);
+    },
+  };
+}
 
 export default defineConfig(async ({ mode }) => {
   // Load environment variables from .env files
@@ -49,9 +67,12 @@ export default defineConfig(async ({ mode }) => {
 
   const basePath = mergedEnv.BASE_PATH || '/';
 
+  const buildId = String(Date.now());
+
   return {
     base: basePath,
     define: {
+      'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(buildId),
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(
         mergedEnv.VITE_FIREBASE_API_KEY || mergedEnv.FIREBASE_API_KEY || '',
       ),
@@ -87,6 +108,7 @@ export default defineConfig(async ({ mode }) => {
       react(),
       tailwindcss(),
       runtimeErrorOverlay(),
+      generateVersionJsonPlugin(buildId),
       ...(mergedEnv.NODE_ENV !== 'production' &&
       mergedEnv.REPL_ID !== undefined
         ? [
