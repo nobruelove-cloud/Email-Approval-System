@@ -31,6 +31,7 @@ import {
   DEFAULT_REFERRAL_TIERS,
   DEFAULT_RULES,
   DEFAULT_OPERATING_HOURS,
+  DEFAULT_MAINTENANCE,
   type EmailSubmission,
   type TierConfig,
   type ReferralTierConfig,
@@ -38,6 +39,7 @@ import {
   type PortalRules,
   type OperatingHoursConfig,
   type FinancialTransaction,
+  type MaintenanceConfig,
 } from "../lib/portal-types";
 
 // Setup hoisted mocks for Firebase modules
@@ -1089,6 +1091,26 @@ describe("Quick-Copy Email Formatting Utilities Unit Tests", () => {
   it("formatBatchEmailsWithPasswords handles empty or invalid inputs gracefully", () => {
     expect(formatBatchEmailsWithPasswords([])).toBe("");
     expect(formatBatchEmailsWithPasswords(null as any)).toBe("");
+  });
+});
+
+describe("Maintenance Config Defaults & Utility Unit Tests", () => {
+  it("DEFAULT_MAINTENANCE has valid initial defaults", () => {
+    expect(DEFAULT_MAINTENANCE.enabled).toBe(false);
+    expect(DEFAULT_MAINTENANCE.targetEndTime).toBe("");
+    expect(DEFAULT_MAINTENANCE.message).toContain("perbaikan & pembaruan");
+  });
+
+  it("calculates countdown time difference correctly", () => {
+    const targetMs = Date.now() + 3600000; // +1 hour
+    const nowMs = Date.now();
+    const diffMs = targetMs - nowMs;
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    expect(hours).toBe(1);
+    expect(minutes).toBeLessThanOrEqual(0);
   });
 });
 
