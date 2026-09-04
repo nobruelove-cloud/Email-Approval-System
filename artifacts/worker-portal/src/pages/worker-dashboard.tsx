@@ -71,6 +71,7 @@ import {
 import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { SubmissionHistory } from "@/components/SubmissionHistory";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import {
   formatDateTime,
   formatMoney,
@@ -1563,63 +1564,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </Card>
 
             {/* RIWAYAT TRANSAKSI / PENARIKAN */}
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold flex items-center gap-2 text-gray-900">
-                  <span>💰</span> Riwayat Transaksi
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Riwayat penarikan saldo dan penerimaan bonus reward Anda.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(withdrawals.loading || engagement.rewardLedger.loading) && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat transaksi.</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-amber-100 text-amber-950 bg-amber-50/50">
-                          <th className="py-2.5 px-3 font-bold">Tanggal</th>
-                          <th className="py-2.5 px-3 font-bold">Jenis Transaksi</th>
-                          <th className="py-2.5 px-3 font-bold">Keterangan</th>
-                          <th className="py-2.5 px-3 font-bold">Nominal</th>
-                          <th className="py-2.5 px-3 font-bold text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-amber-100/60">
-                        {transactionHistory.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-amber-50/40 transition-colors">
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-gray-500 font-medium">
-                              {formatDateTime(tx.date)}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-bold text-gray-900">
-                              {tx.type}
-                            </td>
-                            <td className="py-3 px-3 align-top">
-                              <p className="text-gray-800 font-medium">{tx.description}</p>
-                              {tx.note && <p className="text-[11px] text-gray-400 italic mt-0.5">Catatan: {tx.note}</p>}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-black">
-                              <span className={tx.isCredit ? "text-emerald-600" : "text-rose-600"}>
-                                {tx.isCredit ? "+" : "-"} {formatMoney(tx.amount)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                              <StatusBadge status={tx.status} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <TransactionHistory
+              transactions={transactionHistory}
+              loading={withdrawals.loading || engagement.rewardLedger.loading}
+            />
           </TabsContent>
 
           {/* RIWAYAT STORAN EMAIL */}
