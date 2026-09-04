@@ -88,8 +88,10 @@ export function SubmissionHistory({
       const tierNum = item.appliedTier ?? item.currentTier ?? userTier;
       const tierCfg = getTierConfig(tierNum, rules.tiers);
       const pricePerItem =
-        item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-      const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
+        item.appliedPricePerItem ?? item.currentPricePerItem ?? item.pricePerEmail ?? tierCfg.pricePerItem;
+      const isPending = item.status === "pending" || (item.status as string) === "processing";
+      const earnedAmount =
+        item.totalAmount ?? (isPending ? count * pricePerItem : approvedCount * pricePerItem);
 
       // Grouped status category
       const isApprovedCategory =

@@ -953,6 +953,47 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
 }
 
 /**
+ * Manually override a pending submission batch's tier and rate.
+ * Dynamically updates tierId, currentTier, currentPricePerItem, pricePerEmail, and totalAmount in Firestore.
+ */
+export async function updateSubmissionTier(
+  submissionId: string,
+  newTierConfig: TierConfig,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+      const submissionSnap = await tx.get(submissionRef);
+      if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
+      const submission = submissionSnap.data() as EmailSubmission;
+
+      if (submission.status !== "pending") {
+        throw new Error("Hanya setoran berstatus pending yang dapat diubah tier-nya.");
+      }
+
+      const count = getItemCountOfSubmission(submission);
+      const newPrice = newTierConfig.pricePerItem;
+      const newTotal = count * newPrice;
+
+      tx.update(submissionRef, {
+        tierId: String(newTierConfig.tier),
+        currentTier: newTierConfig.tier,
+        currentPricePerItem: newPrice,
+        pricePerEmail: newPrice,
+        totalAmount: newTotal,
+        updatedAt: serverTimestamp(),
+      });
+    },
+    "updateSubmissionTier",
+    `emailSubmissions/${submissionId}`,
+  );
+}
+
+/**
  * Approving a submission (single or batch) sets status to "available" (stock) and credits the worker's balance
  * by (itemCount * applicablePricePerItem) in a single atomic transaction.
  * Permanently snapshots appliedTier, appliedPricePerItem, itemCount, and totalAmount.
@@ -1012,10 +1053,13 @@ export async function reviewSubmission(
     const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
     const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
 
-    // Dynamically calculate Tier and Price per item based ONLY on final ACC/valid email count
+    // Calculate Tier and Price per item - prioritize manually overridden batch rates over dynamic defaults
     const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
-    const appliedPricePerItem = overridePricePerItem ?? resultingTierCfg.pricePerItem;
-    const appliedTier = overrideTierNum ?? resultingTierCfg.tier;
+    const basePrice = submission.currentPricePerItem ?? submission.pricePerEmail ?? resultingTierCfg.pricePerItem;
+    const baseTier = submission.currentTier ?? resultingTierCfg.tier;
+
+    const appliedPricePerItem = overridePricePerItem ?? basePrice;
+    const appliedTier = overrideTierNum ?? baseTier;
     const creditAmount = approvedCount * appliedPricePerItem;
 
     const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
