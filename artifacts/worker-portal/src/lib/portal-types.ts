@@ -155,8 +155,10 @@ export type EmailSubmission = {
   approvedItemCount?: number;
   rejectedItemCount?: number;
   // Snapshot/info at submission time
+  tierId?: string;
   currentTier?: number;
   currentPricePerItem?: number;
+  pricePerEmail?: number;
   // Snapshot saved upon approval
   appliedTier?: number;
   appliedPricePerItem?: number;

@@ -88,6 +88,7 @@ import {
   addFinancialTransaction,
   updateFinancialTransaction,
   deleteFinancialTransaction,
+  updateSubmissionTier,
   reviewSubmission,
   updateEmailStockStatus,
   reviewWithdrawal,
@@ -989,6 +990,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     };
   }, [users.data, submissions.data, withdrawals.data]);
 
+  async function handleBatchTierChange(submissionId: string, newTierStr: string) {
+    const selectedTierNum = Number(newTierStr);
+    const selectedTierCfg = activeTiersList.find((t) => Number(t.tier) === selectedTierNum) || getTierConfig(selectedTierNum, activeTiersList);
+
+    setBusyId(submissionId);
+    try {
+      await updateSubmissionTier(submissionId, selectedTierCfg);
+      toast.success(`Tier batch berhasil diubah ke ${selectedTierCfg.name} (${formatMoney(selectedTierCfg.pricePerItem)}/item).`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengubah tier batch.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleFinalizeBatchReview(sub: EmailSubmission) {
     setBusyId(sub.id);
     try {
@@ -1006,9 +1022,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       const approvedCount = updatedItems.filter((it) => it.status === "approved").length;
       const rejectedCount = updatedItems.filter((it) => it.status === "rejected").length;
 
-      // Determine resulting Tier and price per item based ONLY on final ACC/valid count
-      const recTierCfg = getRecommendedTier(approvedCount, activeTiersList);
-      const pricePerItem = recTierCfg.pricePerItem;
+      // Determine resulting Tier and price per item - prioritize manually overridden batch tier/rate if present
+      const activeTierNum = sub.currentTier;
+      const fallbackTierCfg = getRecommendedTier(approvedCount, activeTiersList);
+      const activeTierCfg = activeTierNum ? getTierConfig(activeTierNum, activeTiersList) : fallbackTierCfg;
+
+      const pricePerItem = sub.currentPricePerItem ?? sub.pricePerEmail ?? activeTierCfg.pricePerItem;
+      const tierNum = sub.currentTier ?? activeTierCfg.tier;
       const totalCredit = approvedCount * pricePerItem;
 
       const decision = approvedCount > 0 ? "approved" : "rejected";
@@ -1018,7 +1038,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         decision,
         notes[sub.id] ?? "",
         pricePerItem,
-        recTierCfg.tier,
+        tierNum,
         updatedItems,
       );
 
@@ -1030,7 +1050,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       }
 
       toast.success(
-        `Finalisasi batch berhasil! ${approvedCount} ACC (${recTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
+        `Finalisasi batch berhasil! ${approvedCount} ACC (${activeTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
       );
       setDetailSubmission(null);
     } catch (err) {
@@ -2146,11 +2166,33 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-base text-gray-900">{displayWorkerName}</p>
-                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
-                            {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                          </Badge>
+                          {!isFinalized ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-gray-500 font-medium">Tier Batch:</span>
+                              <Select
+                                disabled={busyId === item.id}
+                                value={String(tierNum)}
+                                onValueChange={(val) => handleBatchTierChange(item.id, val)}
+                              >
+                                <SelectTrigger className="h-7 text-xs bg-amber-50/80 border-amber-300 text-amber-900 font-bold min-w-[130px]">
+                                  <SelectValue placeholder="Pilih Tier" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {activeTiersList.map((t) => (
+                                    <SelectItem key={t.tier} value={String(t.tier)} className="text-xs font-medium">
+                                      {t.name} ({formatMoney(t.pricePerItem)}/item)
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
+                              {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                            </Badge>
+                          )}
                         </div>
                         {isFinalized ? (
                           <div className="text-xs text-gray-600 font-medium flex flex-wrap items-center gap-2">
@@ -2162,7 +2204,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </div>
                         ) : (
                           <p className="text-xs text-gray-600 font-medium">
-                            <strong>{count} email disetorkan</strong> · Estimasi Awal: <span className="text-amber-700 font-bold">{formatMoney(count * pricePerItem)}</span>
+                            <strong>{count} email disetorkan</strong> · Estimasi Awal: <span className="text-amber-700 font-bold">{formatMoney(item.totalAmount ?? (count * pricePerItem))}</span>
                           </p>
                         )}
                         <p className="text-xs text-gray-400">
@@ -3448,14 +3490,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 ? 0
                 : baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "pending").length;
 
-              // Resolved tier and price based on final ACC count (if pending, preview dynamic recommendation)
+              // Resolved tier and price based on submission override or dynamic default
+              const currentBatchTierNum = detailSubmission.appliedTier ?? detailSubmission.currentTier;
               const recTierCfg = isReadOnly
-                ? getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? 1, activeTiersList)
-                : getRecommendedTier(approvedCount, activeTiersList);
+                ? getTierConfig(currentBatchTierNum ?? 1, activeTiersList)
+                : (currentBatchTierNum ? getTierConfig(currentBatchTierNum, activeTiersList) : getRecommendedTier(approvedCount, activeTiersList));
 
               const pricePerItem = isReadOnly
                 ? (detailSubmission.appliedPricePerItem ?? recTierCfg.pricePerItem)
-                : recTierCfg.pricePerItem;
+                : (detailSubmission.currentPricePerItem ?? detailSubmission.pricePerEmail ?? recTierCfg.pricePerItem);
 
               const calcTotal = isReadOnly
                 ? (detailSubmission.totalAmount ?? (approvedCount * pricePerItem))

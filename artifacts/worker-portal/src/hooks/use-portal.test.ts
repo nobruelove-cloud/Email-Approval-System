@@ -111,6 +111,7 @@ import {
   evaluateReferralQualification,
   claimReferralReward,
   claimReferralTier,
+  updateSubmissionTier,
   reviewSubmission,
   logFirestoreDiagnostic,
   formatQueryConstraint,
@@ -2084,5 +2085,97 @@ describe("Direct Worker Referral Reward Claim Logic Unit Tests (claimReferralRew
     // Verify all reads occurred before writes
     expect(tx._reads.length).toBeGreaterThan(0);
     expect(tx._writes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Admin Batch Tier Override & Recalculation System Unit Tests", () => {
+  it("updateSubmissionTier correctly updates tierId, currentPricePerItem, pricePerEmail, and totalAmount", async () => {
+    const store: Record<string, any> = {
+      "emailSubmissions/sub_tier_override_1": {
+        id: "sub_tier_override_1",
+        workerId: "worker_123",
+        status: "pending",
+        items: [
+          { email: "a@gmail.com", password: "pass" },
+          { email: "b@gmail.com", password: "pass" },
+          { email: "c@gmail.com", password: "pass" },
+        ],
+        itemCount: 3,
+        currentTier: 3,
+        currentPricePerItem: 3000,
+        totalAmount: 9000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const newTierConfig: TierConfig = {
+      tier: 1,
+      name: "Tier 1",
+      minQty: 1,
+      maxQty: 3,
+      pricePerItem: 2800,
+    };
+
+    await updateSubmissionTier("sub_tier_override_1", newTierConfig);
+
+    const updateCall = tx._writes.find((w: any) => w.type === "update" && w.ref === "emailSubmissions/sub_tier_override_1");
+    expect(updateCall).toBeDefined();
+    expect(updateCall.updates.tierId).toBe("1");
+    expect(updateCall.updates.currentTier).toBe(1);
+    expect(updateCall.updates.currentPricePerItem).toBe(2800);
+    expect(updateCall.updates.pricePerEmail).toBe(2800);
+    expect(updateCall.updates.totalAmount).toBe(3 * 2800); // 8400
+  });
+
+  it("reviewSubmission credits worker wallet using overridden Tier rate", async () => {
+    const store: Record<string, any> = {
+      "emailSubmissions/sub_overridden_approve": {
+        id: "sub_overridden_approve",
+        workerId: "worker_overridden_456",
+        status: "pending",
+        items: [
+          { email: "acc1@gmail.com", password: "pass" },
+          { email: "acc2@gmail.com", password: "pass" },
+        ],
+        itemCount: 2,
+        currentTier: 1,
+        currentPricePerItem: 2800,
+        pricePerEmail: 2800,
+        totalAmount: 5600,
+      },
+      "settings/rules": {
+        tiers: DEFAULT_TIERS,
+      },
+      "users/worker_overridden_456": {
+        uid: "worker_overridden_456",
+        balance: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await reviewSubmission(
+      "sub_overridden_approve",
+      "approved",
+      "Batch verified",
+      2800,
+      1,
+      [
+        { email: "acc1@gmail.com", password: "pass", status: "approved" },
+        { email: "acc2@gmail.com", password: "pass", status: "approved" },
+      ]
+    );
+
+    const subUpdate = tx._writes.find((w: any) => w.type === "update" && w.ref === "emailSubmissions/sub_overridden_approve");
+    expect(subUpdate.updates.appliedTier).toBe(1);
+    expect(subUpdate.updates.appliedPricePerItem).toBe(2800);
+    expect(subUpdate.updates.totalAmount).toBe(2 * 2800); // 5600
+
+    const userUpdate = tx._writes.find((w: any) => w.type === "update" && w.ref === "users/worker_overridden_456");
+    expect(userUpdate.updates.balance).toBe(10000 + 5600); // 15600
+    expect(userUpdate.updates.tier).toBe(1);
   });
 });
