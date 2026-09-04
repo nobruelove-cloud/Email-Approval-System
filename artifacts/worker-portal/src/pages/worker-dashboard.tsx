@@ -199,7 +199,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       const res = await claimReferralReward(referralId, minAcc);
       toast.success(res.message || `🎉 Reward referral berhasil diklaim +${formatMoney(res.rewardAmount || 0)}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengklaim reward tier referral.");
+      console.error("REFERRAL_CLAIM_ERROR_DETAIL:", err);
+      const errMsg = err instanceof Error ? err.message : String(err || "Gagal mengklaim reward tier referral.");
+      const errCode = (err as { code?: string })?.code ? ` [${(err as { code?: string }).code}]` : "";
+      toast.error(`${errMsg}${errCode}`);
     } finally {
       setBusyClaimTierKey(null);
     }
