@@ -32,7 +32,7 @@ import {
   type FinancialTransaction,
   type FinancialTransactionType,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers } from "@/lib/portal-utils";
 import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
 
 import { useRef } from "react";
@@ -1301,6 +1301,34 @@ export async function createWorkerAccount(data: {
 export async function deletePortalUser(uid: string) {
   if (!db) throw new Error("Firebase is not configured.");
   return deleteDocWithDiagnostic(doc(db, "users", uid), "deletePortalUser");
+}
+
+/**
+ * Updates an existing referral tier at index with new minAcc and rewardAmount values.
+ * Validates the updated tiers array before persisting to Firestore settings/rules.
+ */
+export async function updateReferralTier(index: number, updatedTier: ReferralTierConfig) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  const rulesRef = doc(firestore, "settings", "rules");
+  const rulesSnap = await getDocWithDiagnostic(rulesRef, "updateReferralTier");
+  const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+  const currentTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+  if (index < 0 || index >= currentTiers.length) {
+    throw new Error("Index tier referral tidak valid.");
+  }
+
+  const updatedList = currentTiers.map((t, idx) => (idx === index ? updatedTier : t));
+  const sorted = [...updatedList].sort((a, b) => a.minAcc - b.minAcc);
+
+  const valError = validateReferralTiers(sorted);
+  if (valError) {
+    throw new Error(valError);
+  }
+
+  return saveSettings("rules", { referralTiers: sorted });
 }
 
 export async function saveSettings(name: string, data: Record<string, unknown>) {

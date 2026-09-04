@@ -95,6 +95,7 @@ import {
   updatePortalUser,
   deletePortalUser,
   createWorkerAccount,
+  updateReferralTier,
   saveSettings,
   evaluateReferralQualification,
   distributeLeaderboardReward,
@@ -619,6 +620,49 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [newRefMinAcc, setNewRefMinAcc] = useState<number | "">("");
   const [newRefReward, setNewRefReward] = useState<number | "">("");
   const [savingRefTiers, setSavingRefTiers] = useState(false);
+
+  // Edit referral tier state
+  const [isEditingRefTierOpen, setIsEditingRefTierOpen] = useState(false);
+  const [editingRefTierIndex, setEditingRefTierIndex] = useState<number | null>(null);
+  const [editingRefMinAcc, setEditingRefMinAcc] = useState<number | "">("");
+  const [editingRefReward, setEditingRefReward] = useState<number | "">("");
+  const [savingEditRefTier, setSavingEditRefTier] = useState(false);
+
+  function openEditRefTierModal(index: number, tier: ReferralTierConfig) {
+    setEditingRefTierIndex(index);
+    setEditingRefMinAcc(tier.minAcc);
+    setEditingRefReward(tier.reward);
+    setIsEditingRefTierOpen(true);
+  }
+
+  async function handleEditReferralTierSubmit() {
+    if (editingRefTierIndex === null) return;
+    if (editingRefMinAcc === "" || typeof editingRefMinAcc !== "number" || editingRefMinAcc <= 0) {
+      toast.error("Minimal ACC harus berupa bilangan bulat positif.");
+      return;
+    }
+    if (editingRefReward === "" || typeof editingRefReward !== "number" || editingRefReward < 0) {
+      toast.error("Reward harus berupa angka non-negatif.");
+      return;
+    }
+
+    setSavingEditRefTier(true);
+    try {
+      await updateReferralTier(editingRefTierIndex, {
+        minAcc: editingRefMinAcc,
+        reward: editingRefReward,
+      });
+      toast.success("Tier referral berhasil diperbarui!");
+      setIsEditingRefTierOpen(false);
+      setEditingRefTierIndex(null);
+      setEditingRefMinAcc("");
+      setEditingRefReward("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal memperbarui tier referral.");
+    } finally {
+      setSavingEditRefTier(false);
+    }
+  }
 
   function handleRemoveReferralTier(index: number) {
     if (activeReferralTiers.length <= 1) {
@@ -2820,15 +2864,26 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             <td className="px-3 py-2.5 font-bold text-slate-100">{t.minAcc} ACC</td>
                             <td className="px-3 py-2.5 font-bold text-emerald-400">{formatMoney(t.reward)}</td>
                             <td className="px-3 py-2.5 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveReferralTier(idx)}
-                                className="h-7 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditRefTierModal(idx, t)}
+                                  className="h-7 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5 mr-1" /> Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveReferralTier(idx)}
+                                  className="h-7 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -2968,6 +3023,64 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </CardContent>
             </Card>
 
+
+            {/* DIALOG EDIT TIER REFERRAL */}
+            <Dialog open={isEditingRefTierOpen} onOpenChange={setIsEditingRefTierOpen}>
+              <DialogContent className="max-w-md bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-slate-100">Edit Tier Referral</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Perbarui syarat minimal ACC dan nominal reward untuk tier referral ini.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={(e) => { e.preventDefault(); handleEditReferralTierSubmit(); }} className="space-y-4 pt-2">
+                  <div>
+                    <Label htmlFor="edit-ref-minacc" className="text-xs text-slate-300">Minimal ACC *</Label>
+                    <Input
+                      id="edit-ref-minacc"
+                      type="number"
+                      placeholder="Contoh: 10"
+                      value={editingRefMinAcc}
+                      onChange={(e) => setEditingRefMinAcc(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-ref-reward" className="text-xs text-slate-300">Reward Amount (Rp) *</Label>
+                    <FormattedNumberInput
+                      id="edit-ref-reward"
+                      value={editingRefReward === "" ? 0 : editingRefReward}
+                      onChange={(val) => setEditingRefReward(val)}
+                      placeholder="Contoh: 5000"
+                      className="mt-1 h-9 text-xs font-bold bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      required
+                    />
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditingRefTierOpen(false)}
+                      className="text-xs h-9 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={savingEditRefTier}
+                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
+                    >
+                      {savingEditRefTier && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Simpan Perubahan
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             {/* AUDIT LEDGER HADIAH */}
             <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
