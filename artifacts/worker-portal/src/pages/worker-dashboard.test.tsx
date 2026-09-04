@@ -1,6 +1,7 @@
-import { render } from "@testing-library/react";
+// @vitest-environment happy-dom
+import { render, cleanup } from "@testing-library/react";
 import WorkerDashboard from "./worker-dashboard";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
 vi.mock("@/hooks/use-portal", () => ({
   useWorkerData: () => ({ submissions: { data: [], loading: false }, withdrawals: { data: [], loading: false } }),
@@ -22,6 +23,10 @@ vi.mock("@/hooks/use-portal", () => ({
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 
 describe("WorkerDashboard Maintenance Mode", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders maintenance screen when maintenance.enabled is true and role is worker", () => {
     const profile: any = { uid: "w1", name: "Worker", role: "worker", balance: 0 };
     const { getByText } = render(<WorkerDashboard profile={profile} onLogout={() => {}} />);
@@ -30,10 +35,10 @@ describe("WorkerDashboard Maintenance Mode", () => {
   });
 
   it("handles missing or invalid targetEndTime gracefully without breaking UI", () => {
-    const { getByText } = render(
+    const { getAllByText, getByText } = render(
       <MaintenanceScreen maintenance={{ enabled: true, message: "Server Upgrade", targetEndTime: "invalid-date" }} />
     );
-    expect(getByText("Sistem Sedang Dalam Perbaikan")).toBeTruthy();
+    expect(getAllByText("Sistem Sedang Dalam Perbaikan")[0]).toBeTruthy();
     expect(getByText("Server Upgrade")).toBeTruthy();
     expect(getByText("Dalam Perbaikan")).toBeTruthy();
   });
