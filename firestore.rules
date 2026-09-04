@@ -214,7 +214,12 @@ service cloud.firestore {
 
     // ---- rewardLedger/{id} ----
     match /rewardLedger/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('workerId' in resource.data && resource.data.workerId == request.auth.uid)
+        )
+      );
       allow create, update: if isAdmin() || (
         isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&

@@ -1313,7 +1313,7 @@ export async function updateReferralTier(index: number, updatedTier: ReferralTie
 
   const rulesRef = doc(firestore, "settings", "rules");
   const rulesSnap = await getDocWithDiagnostic(rulesRef, "updateReferralTier");
-  const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+  const rulesData = rulesSnap.exists() ? (rulesSnap.data() as import("@/lib/portal-types").PortalRules) : null;
   const currentTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
 
   if (index < 0 || index >= currentTiers.length) {
