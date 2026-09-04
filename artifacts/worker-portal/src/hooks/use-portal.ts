@@ -1617,12 +1617,12 @@ export async function claimReferralReward(referralId: string, minAcc: number) {
         throw new Error(`Hadiah tier ${matchedTier.minAcc} ACC sudah pernah diklaim.`);
       }
 
-      // READ 3: users/{effectiveReferrerId}
-      const referrerRef = doc(firestore, "users", effectiveReferrerId);
+      // READ 3: users/{currentUser.uid}
+      const referrerRef = doc(firestore, "users", currentUser.uid);
       const referrerSnap = await tx.get(referrerRef);
 
       if (!referrerSnap.exists()) {
-        throw new Error(`Profil pengundang tidak ditemukan (users/${effectiveReferrerId}).`);
+        throw new Error(`Profil pengundang tidak ditemukan (users/${currentUser.uid}).`);
       }
 
       const referrerData = referrerSnap.data() as PortalUser;
@@ -1630,7 +1630,7 @@ export async function claimReferralReward(referralId: string, minAcc: number) {
       const referrerName =
         (referrerData.name && String(referrerData.name).trim()) ||
         referralData.referrerName ||
-        shortId(effectiveReferrerId);
+        shortId(currentUser.uid);
 
       // READ 4 & READ 5: referralClaims/{claimId} & rewardLedger/{ledgerId}
       const claimDocId = `${actualDocId}_tier_${matchedTier.minAcc}`;
@@ -1659,7 +1659,7 @@ export async function claimReferralReward(referralId: string, minAcc: number) {
         rewardedAt: serverTimestamp(),
       });
 
-      // WRITE 2: users/{effectiveReferrerId}
+      // WRITE 2: users/{currentUser.uid}
       tx.update(referrerRef, {
         balance: currentBalance + matchedTier.reward,
         lastClaimId: claimDocId,
@@ -1668,7 +1668,7 @@ export async function claimReferralReward(referralId: string, minAcc: number) {
       // WRITE 3: rewardLedger/{ledgerDocId}
       const ledgerData = {
         id: ledgerDocId,
-        workerId: effectiveReferrerId,
+        workerId: currentUser.uid,
         workerName: referrerName,
         rewardType: "referral" as const,
         amount: matchedTier.reward,
@@ -1686,7 +1686,7 @@ export async function claimReferralReward(referralId: string, minAcc: number) {
       const claimData = {
         id: claimDocId,
         referralId: actualDocId,
-        referrerId: effectiveReferrerId,
+        referrerId: currentUser.uid,
         referredWorkerId: effectiveReferredWorkerId,
         minAcc: matchedTier.minAcc,
         rewardAmount: matchedTier.reward,

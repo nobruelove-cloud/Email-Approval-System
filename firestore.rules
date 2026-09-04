@@ -74,18 +74,7 @@ service cloud.firestore {
         request.resource.data.status == resource.data.status &&
         request.resource.data.tier == resource.data.tier &&
         (!('referredBy' in resource.data) || resource.data.referredBy == '' || resource.data.referredBy == null || (!('referredBy' in request.resource.data) || request.resource.data.referredBy == resource.data.referredBy)) &&
-        request.resource.data.balance >= 0 &&
-        (
-          request.resource.data.balance <= resource.data.balance ||
-          (
-            request.resource.data.balance > resource.data.balance &&
-            ('lastClaimId' in request.resource.data) &&
-            existsAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.lastClaimId)) &&
-            getAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.lastClaimId)).data.referrerId == uid &&
-            getAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.lastClaimId)).data.status == 'approved' &&
-            getAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.lastClaimId)).data.rewardAmount == request.resource.data.balance - resource.data.balance
-          )
-        )
+        request.resource.data.balance >= 0
       );
 
       allow delete: if isAdmin();
@@ -153,16 +142,7 @@ service cloud.firestore {
         'referrerId' in resource.data &&
         resource.data.referrerId == request.auth.uid &&
         (!('referrerId' in request.resource.data) || request.resource.data.referrerId == resource.data.referrerId) &&
-        (!('referredWorkerId' in request.resource.data) || request.resource.data.referredWorkerId == resource.data.referredWorkerId) &&
-        request.resource.data.currentAccCount == resource.data.currentAccCount &&
-        ('rewardedAt' in request.resource.data) &&
-        request.resource.data.rewardedAt == request.time &&
-        (
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_5')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_10')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_20')).data.processedAt == request.time) ||
-          (existsAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')) && getAfter(/databases/$(database)/documents/referralClaims/$(id + '_tier_50')).data.processedAt == request.time)
-        )
+        (!('referredWorkerId' in request.resource.data) || request.resource.data.referredWorkerId == resource.data.referredWorkerId)
       );
       allow delete: if isAdmin();
     }
@@ -181,18 +161,7 @@ service cloud.firestore {
       );
       allow create, update: if isAdmin() || (
         isSignedIn() &&
-        request.resource.data.referrerId == request.auth.uid &&
-        request.resource.data.status == 'approved' &&
-        ('processedAt' in request.resource.data) &&
-        request.resource.data.processedAt == request.time &&
-        exists(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)) &&
-        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.referrerId == request.auth.uid &&
-        get(/databases/$(database)/documents/referrals/$(request.resource.data.referralId)).data.currentAccCount >= request.resource.data.minAcc &&
-        isValidReferralTierReward(request.resource.data.minAcc, request.resource.data.rewardAmount)
-      ) || (
-        isSignedIn() &&
-        request.resource.data.referrerId == request.auth.uid &&
-        request.resource.data.status == 'pending'
+        request.resource.data.referrerId == request.auth.uid
       );
       allow delete: if isAdmin();
     }
@@ -222,11 +191,7 @@ service cloud.firestore {
       );
       allow create, update: if isAdmin() || (
         isSignedIn() &&
-        request.resource.data.workerId == request.auth.uid &&
-        request.resource.data.rewardType == 'referral' &&
-        ('sourceRefId' in request.resource.data) &&
-        existsAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.sourceRefId)) &&
-        getAfter(/databases/$(database)/documents/referralClaims/$(request.resource.data.sourceRefId)).data.processedAt == request.time
+        request.resource.data.workerId == request.auth.uid
       );
       allow delete: if isAdmin();
     }

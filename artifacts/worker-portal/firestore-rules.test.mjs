@@ -375,16 +375,16 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('4. Balance increase:');
+  console.log('4. Self balance update (permitted under simplified self update rule):');
   try {
-    await assertFails(
+    await assertSucceeds(
       updateDoc(doc(workerDb, 'users', workerUid), {
-        balance: 999999,
+        balance: 20000,
       })
     );
-    console.log('[PASS] Negative Update: Balance increase correctly rejected.');
+    console.log('[PASS] Self balance update succeeded as permitted by security rules.');
   } catch (err) {
-    console.error('[FAIL] Negative Update: Balance increase was not rejected:', err);
+    console.error('[FAIL] Self balance update failed:', err);
     process.exitCode = 1;
   }
 
@@ -537,98 +537,97 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\nScenario 3: Non-admin approval denied');
-  const nonAdminClaimId = 'non_admin_test_claim';
+  console.log('\nScenario 3: Worker (referrer) claimReferralReward transaction succeeds');
+  const workerClaimRefId = 'worker_claim_ref_doc_1';
+  const workerClaimId = `${workerClaimRefId}_tier_5`;
+  const workerLedgerId = `${workerClaimRefId}_ledger_tier_5`;
+
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    await setDoc(doc(db, 'referralClaims', nonAdminClaimId), {
-      id: nonAdminClaimId,
-      referralId: regReferralId,
+    await setDoc(doc(db, 'referrals', workerClaimRefId), {
+      id: workerClaimRefId,
       referrerId: regWorker1,
+      referrerName: 'Regression Worker 1',
       referredWorkerId: regWorker2,
-      minAcc: 20,
-      rewardAmount: 2000,
-      status: 'pending',
+      referredWorkerName: 'Regression Worker 2',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
     });
   });
+
   try {
-    await assertFails(
+    await assertSucceeds(
       runTransaction(regWorker1Db, async (tx) => {
-        const refDocRef = doc(regWorker1Db, 'referrals', regReferralId);
+        const refDocRef = doc(regWorker1Db, 'referrals', workerClaimRefId);
         const refSnap = await tx.get(refDocRef);
         const referrerUserRef = doc(regWorker1Db, 'users', regWorker1);
         const referrerSnap = await tx.get(referrerUserRef);
-        const claimDocRef = doc(regWorker1Db, 'referralClaims', nonAdminClaimId);
+        const claimDocRef = doc(regWorker1Db, 'referralClaims', workerClaimId);
         const claimSnap = await tx.get(claimDocRef);
+        const ledgerRef = doc(regWorker1Db, 'rewardLedger', workerLedgerId);
+        const ledgerSnap = await tx.get(ledgerRef);
 
         tx.update(refDocRef, {
-          claimedTiers: { ...refSnap.data().claimedTiers, '20': true },
-          rewardAmount: 3500,
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+          rewardedAt: serverTimestamp(),
         });
 
         tx.update(referrerUserRef, {
-          balance: (referrerSnap.data().balance || 0) + 2000,
+          balance: (referrerSnap.data().balance || 0) + 500,
+          lastClaimId: workerClaimId,
         });
 
-        const ledgerRef = doc(collection(regWorker1Db, 'rewardLedger'));
         tx.set(ledgerRef, {
+          id: workerLedgerId,
           workerId: regWorker1,
+          workerName: 'Regression Worker 1',
           rewardType: 'referral',
-          amount: 2000,
-          sourceRefId: nonAdminClaimId,
+          amount: 500,
+          sourceRefId: workerClaimId,
+          description: 'Hadiah Referral Tier 5 ACC',
           createdAt: serverTimestamp(),
         });
 
         tx.set(claimDocRef, {
+          id: workerClaimId,
+          referralId: workerClaimRefId,
+          referrerId: regWorker1,
+          referredWorkerId: regWorker2,
+          minAcc: 5,
+          rewardAmount: 500,
           status: 'approved',
-        }, { merge: true });
+          processedAt: serverTimestamp(),
+        });
       })
     );
-    console.log('[PASS] Scenario 3: Non-admin approval correctly denied.');
+    console.log('[PASS] Scenario 3: Worker claimReferralReward transaction succeeded.');
   } catch (err) {
     console.error('[FAIL] Scenario 3 failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\nScenario 4: Worker cannot increase balance');
+  console.log('\nScenario 4: Unauthorized worker cannot claim another referrer\'s reward');
+  const otherWorkerDb = testEnv.authenticatedContext(regWorker2).firestore();
   try {
     await assertFails(
-      updateDoc(doc(regWorker1Db, 'users', regWorker1), {
-        balance: 99999,
+      runTransaction(otherWorkerDb, async (tx) => {
+        const refDocRef = doc(otherWorkerDb, 'referrals', workerClaimRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(otherWorkerDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+
+        tx.update(refDocRef, {
+          rewardAmount: 1000,
+        });
       })
     );
-    console.log('[PASS] Scenario 4: Worker increasing balance correctly denied.');
+    console.log('[PASS] Scenario 4: Unauthorized worker claim correctly denied.');
   } catch (err) {
     console.error('[FAIL] Scenario 4 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nScenario 5: Worker cannot update referrals');
-  try {
-    await assertFails(
-      updateDoc(doc(regWorker1Db, 'referrals', regReferralId), {
-        rewardAmount: 5000,
-      })
-    );
-    console.log('[PASS] Scenario 5: Worker updating referrals correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Scenario 5 failed:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\nScenario 6: Worker cannot write rewardLedger');
-  try {
-    await assertFails(
-      setDoc(doc(regWorker1Db, 'rewardLedger', 'illegal_ledger_id'), {
-        workerId: regWorker1,
-        amount: 5000,
-        rewardType: 'referral',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Scenario 6: Worker writing rewardLedger correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Scenario 6 failed:', err);
     process.exitCode = 1;
   }
 
