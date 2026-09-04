@@ -70,6 +70,7 @@ import {
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { SubmissionHistory } from "@/components/SubmissionHistory";
 import {
   formatDateTime,
   formatMoney,
@@ -1621,124 +1622,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </Card>
           </TabsContent>
 
-          {/* RIWAYAT STORAN EMAIL (TAB BARU) */}
+          {/* RIWAYAT STORAN EMAIL */}
           <TabsContent value="history" className="space-y-4">
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold flex items-center gap-2 text-gray-900">
-                  <span>📧</span> Riwayat Storan Email
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Daftar batch email yang telah Anda kirim beserta status persetujuannya.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {submissions.loading && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!submissions.loading && submissions.data.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
-                )}
-                {!submissions.loading && submissions.data.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-amber-100 text-amber-950 bg-amber-50/50">
-                          <th className="py-2.5 px-3 font-bold">Tanggal & ID</th>
-                          <th className="py-2.5 px-3 font-bold">Jumlah Email</th>
-                          <th className="py-2.5 px-3 font-bold">Tier & Harga</th>
-                          <th className="py-2.5 px-3 font-bold">Rincian Status</th>
-                          <th className="py-2.5 px-3 font-bold">Total Saldo</th>
-                          <th className="py-2.5 px-3 font-bold">Status</th>
-                          <th className="py-2.5 px-3 font-bold text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-amber-100/60">
-                        {submissions.data.map((item) => {
-                          const baseItems =
-                            Array.isArray(item.items) && item.items.length > 0
-                              ? item.items
-                              : item.email
-                              ? [
-                                  {
-                                    email: item.email,
-                                    password: item.password,
-                                    status:
-                                      item.status === "available" || item.status === "approved"
-                                        ? "approved"
-                                        : item.status === "rejected"
-                                        ? "rejected"
-                                        : "pending",
-                                  },
-                                ]
-                              : [];
-
-                          const count = baseItems.length || getItemCountOfSubmission(item);
-                          const approvedCount =
-                            item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-                          const rejectedCount =
-                            item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-                          const pendingCount = count - approvedCount - rejectedCount;
-
-                          const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
-                          const tierCfg = getTierConfig(tierNum, rules.data.tiers);
-                          const pricePerItem =
-                            item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-                          const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
-
-                          return (
-                            <tr key={item.id} className="hover:bg-amber-50/40 transition-colors">
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-bold text-gray-900">#{shortId(item.id)}</p>
-                                <p className="text-[11px] text-gray-400">{formatDateTime(item.submittedAt)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap font-bold text-gray-900">
-                                {count} Email
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-900 border-amber-300 font-bold">
-                                  {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <div className="space-y-0.5 text-[11px]">
-                                  <p className="text-emerald-600 font-bold">ACC: {approvedCount}</p>
-                                  <p className="text-rose-600 font-bold">Ditolak: {rejectedCount}</p>
-                                  {pendingCount > 0 && (
-                                    <p className="text-amber-600 font-bold">Menunggu: {pendingCount}</p>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-black text-amber-700">{formatMoney(earnedAmount)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <StatusBadge status={item.status} />
-                                {item.reviewNote && (
-                                  <p className="text-[11px] text-gray-500 italic mt-1 max-w-[150px] truncate" title={item.reviewNote}>
-                                    Catatan: {item.reviewNote}
-                                  </p>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDetailSubmission(item)}
-                                  className="text-xs h-7 gap-1 border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-950 font-bold rounded-lg"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-amber-600" /> Lihat Email
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <SubmissionHistory
+              submissions={submissions.data}
+              loading={submissions.loading}
+              rules={rules.data}
+              userTier={profile.tier}
+              onViewDetail={setDetailSubmission}
+            />
           </TabsContent>
         </Tabs>
 
