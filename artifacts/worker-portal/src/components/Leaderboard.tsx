@@ -26,7 +26,7 @@ interface LeaderboardProps {
 
 export function Leaderboard({
   submissions: propSubmissions,
-  users = [],
+  users: propUsers = [],
   currentUserId,
   rewards = [
     { rank: 1, rewardAmount: 50000 },
@@ -35,7 +35,10 @@ export function Leaderboard({
   ],
   className = "",
 }: LeaderboardProps) {
-  // Real-time synchronization of all global submissions for global leaderboard view
+  // Real-time synchronization of all global submissions & users for global leaderboard view
+  const globalUsersCollection = useCollection<PortalUser>("users");
+  const users = propUsers && propUsers.length > 0 ? propUsers : globalUsersCollection.data;
+
   const globalSubmissions = useCollection<EmailSubmission>("emailSubmissions");
   const activeSubmissions = propSubmissions && propSubmissions.length > 0 ? propSubmissions : globalSubmissions.data;
 
@@ -245,7 +248,7 @@ export function Leaderboard({
               </div>
               <p className="text-[11px] text-amber-200/90 font-medium">
                 {userProgressInfo.remaining > 0
-                  ? `Kurang ${userProgressInfo.remaining} ACC lagi untuk Klaim Bonus ${userProgressInfo.targetTitle}`
+                  ? `Belum Mencapai Target Minimum ${userProgressInfo.targetTitle} (${userProgressInfo.acc}/${userProgressInfo.nextTarget} ACC)`
                   : "🎉 Selamat! Anda telah mencapai target kualifikasi bonus!"}
               </p>
             </div>
