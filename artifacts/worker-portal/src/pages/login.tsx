@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -36,6 +37,7 @@ import {
   Percent,
   Activity,
   Layers,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,27 +74,24 @@ function friendlyAuthError(code: string, context: "login" | "register" | "reset"
 }
 
 export default function LoginPage() {
+  const [location, setLocation] = useLocation();
+
+  const isDedicatedAuthRoute = location === "/login" || location === "/register" || location.startsWith("/register");
+
   const [mode, setMode] = useState<"login" | "register">(() => {
-    if (typeof window !== "undefined") {
-      const pathname = window.location.pathname;
-      const params = new URLSearchParams(window.location.search);
-      if (pathname.startsWith("/register") || params.has("ref")) {
-        return "register";
-      }
+    if (location === "/register" || location.startsWith("/register")) {
+      return "register";
     }
     return "login";
   });
 
-  const [showAuthForm, setShowAuthForm] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const pathname = window.location.pathname;
-      const params = new URLSearchParams(window.location.search);
-      if (pathname.startsWith("/register") || params.has("ref")) {
-        return true;
-      }
+  useEffect(() => {
+    if (location === "/register" || location.startsWith("/register")) {
+      setMode("register");
+    } else if (location === "/login") {
+      setMode("login");
     }
-    return false;
-  });
+  }, [location]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -130,17 +129,18 @@ export default function LoginPage() {
     return "";
   });
 
-  const authSectionRef = useRef<HTMLDivElement>(null);
-
-  const scrollToAuth = (targetMode: "login" | "register") => {
+  const goToAuth = (targetMode: "login" | "register") => {
     setMode(targetMode);
-    setShowAuthForm(true);
     setMobileMenuOpen(false);
-    setTimeout(() => {
-      if (authSectionRef.current) {
-        authSectionRef.current.scrollIntoView({ behavior: "smooth" });
+    if (targetMode === "register") {
+      if (refCode) {
+        setLocation(`/register?ref=${encodeURIComponent(refCode)}`);
+      } else {
+        setLocation("/register");
       }
-    }, 50);
+    } else {
+      setLocation("/login");
+    }
   };
 
   async function handleLogin(e: React.FormEvent) {
@@ -281,6 +281,326 @@ export default function LoginPage() {
   const estimatedDailyEarnings = estDailyAcc * pricePerItem;
   const estimatedMonthlyEarnings = estimatedDailyEarnings * 30;
 
+  if (isDedicatedAuthRoute) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/20 selection:text-amber-300 flex flex-col justify-between relative overflow-hidden">
+        {/* Glow backdrop decorative elements */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-amber-500/20 via-orange-500/15 to-transparent blur-[140px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/3 left-10 w-72 h-72 bg-amber-500/10 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none" />
+
+        {/* Top Header */}
+        <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
+          <button
+            onClick={() => setLocation("/")}
+            className="flex items-center gap-2.5 group focus:outline-none"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 fill-slate-950" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
+              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
+            </div>
+          </button>
+
+          <Button
+            variant="ghost"
+            onClick={() => setLocation("/")}
+            className="text-slate-400 hover:text-amber-400 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span>Kembali ke Beranda</span>
+          </Button>
+        </header>
+
+        {/* Dedicated Centered Auth Layout */}
+        <main className="w-full max-w-md mx-auto px-4 py-8 relative z-10 my-auto">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3 shadow-lg backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>Akses Portal Terenkripsi</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              {mode === "login" ? "Selamat Datang Kembali" : "Buat Akun Worker Baru"}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1.5">
+              {mode === "login"
+                ? "Masuk untuk mengelola penyetoran email & pencairan saldo."
+                : "Daftar untuk mulai menyetor pekerjaan & dapatkan penghasilan."}
+            </p>
+          </div>
+
+          {!firebaseConfigured && (
+            <Card className="mb-4 border-amber-500/40 bg-amber-500/10 text-amber-200 backdrop-blur-md">
+              <CardContent className="pt-6 flex gap-3 text-sm">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-amber-400" />
+                <div>
+                  <p className="font-semibold text-amber-300">Firebase belum dikonfigurasi</p>
+                  <p className="text-amber-200/80 mt-1 text-xs">
+                    Firebase belum dikonfigurasi. Pastikan environment variables Firebase tersedia pada deployment environment.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Obsidian Command Center Glassmorphism Auth Card */}
+          <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-slate-100 relative overflow-hidden rounded-2xl">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500" />
+
+            <CardHeader className="pb-4">
+              <Tabs
+                value={mode}
+                onValueChange={(v) => {
+                  const target = v as "login" | "register";
+                  setMode(target);
+                  if (target === "register") {
+                    setLocation(refCode ? `/register?ref=${encodeURIComponent(refCode)}` : "/register");
+                  } else {
+                    setLocation("/login");
+                  }
+                }}
+              >
+                <TabsList className="grid grid-cols-2 w-full bg-slate-950/90 border border-slate-800/80 rounded-xl p-1">
+                  <TabsTrigger
+                    value="login"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-slate-950 font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all"
+                  >
+                    Masuk
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="register"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-slate-950 font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all"
+                  >
+                    Daftar
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardHeader>
+
+            <CardContent>
+              {mode === "login" ? (
+                <>
+                  <CardTitle className="text-lg font-bold mb-1 text-white flex items-center gap-2">
+                    <LogIn className="w-5 h-5 text-amber-400" />
+                    <span>Masuk ke Akun Worker</span>
+                  </CardTitle>
+                  <CardDescription className="mb-4 text-slate-400 text-xs">
+                    Gunakan email dan kata sandi terdaftar untuk mengakses dashboard Anda.
+                  </CardDescription>
+
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <Label htmlFor="login-email-ded" className="text-slate-300 text-xs font-medium">Email</Label>
+                      <div className="relative mt-1.5">
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="login-email-ded"
+                          type="email"
+                          required
+                          disabled={!firebaseConfigured}
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          placeholder="nama@email.com"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="login-password-ded" className="text-slate-300 text-xs font-medium">Kata Sandi</Label>
+                      <div className="relative mt-1.5">
+                        <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="login-password-ded"
+                          type={showLoginPassword ? "text" : "password"}
+                          required
+                          disabled={!firebaseConfigured}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="pl-9 pr-10 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none"
+                          aria-label="Toggle login password visibility"
+                        >
+                          {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={resetBusy || busy || !firebaseConfigured}
+                        onClick={handleForgotPassword}
+                        className="text-xs text-amber-400 hover:text-amber-300 hover:underline disabled:opacity-50 font-medium transition-colors"
+                      >
+                        {resetBusy ? "Mengirim tautan reset..." : "Lupa kata sandi?"}
+                      </button>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={busy || !firebaseConfigured}
+                      className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl"
+                    >
+                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-slate-950" /> : <LogIn className="w-4 h-4 mr-2 text-slate-950" />}
+                      Masuk ke Dashboard
+                    </Button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <CardTitle className="text-lg font-bold mb-1 text-white flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-amber-400" />
+                    <span>Pendaftaran Akun Baru</span>
+                  </CardTitle>
+                  <CardDescription className="mb-4 text-slate-400 text-xs">
+                    Daftar akun worker baru untuk langsung menyetor email & kumpulkan saldo.
+                  </CardDescription>
+
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div>
+                      <Label htmlFor="reg-name-ded" className="text-slate-300 text-xs font-medium">Nama Lengkap</Label>
+                      <div className="relative mt-1.5">
+                        <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="reg-name-ded"
+                          required
+                          disabled={!firebaseConfigured}
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Nama Lengkap Anda"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="reg-phone-ded" className="text-slate-300 text-xs font-medium">Nomor HP (opsional)</Label>
+                      <div className="relative mt-1.5">
+                        <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="reg-phone-ded"
+                          disabled={!firebaseConfigured}
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="08xxxxxxxxxx"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="reg-ref-ded" className="text-slate-300 text-xs font-medium">Kode Referral (opsional)</Label>
+                      <div className="relative mt-1.5">
+                        <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="reg-ref-ded"
+                          disabled={!firebaseConfigured}
+                          value={refCode}
+                          onChange={(e) => setRefCode(e.target.value)}
+                          placeholder="Contoh: WORKER123"
+                          className="pl-9 font-mono text-xs bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="reg-email-ded" className="text-slate-300 text-xs font-medium">Email</Label>
+                      <div className="relative mt-1.5">
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <Input
+                          id="reg-email-ded"
+                          type="email"
+                          required
+                          disabled={!firebaseConfigured}
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          placeholder="nama@email.com"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="reg-password-ded" className="text-slate-300 text-xs font-medium">Kata Sandi</Label>
+                        <div className="relative mt-1.5">
+                          <Input
+                            id="reg-password-ded"
+                            type={showRegPassword ? "text" : "password"}
+                            required
+                            disabled={!firebaseConfigured}
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            placeholder="Min. 6 karakter"
+                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegPassword(!showRegPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none"
+                            aria-label="Toggle register password visibility"
+                          >
+                            {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="reg-confirm-ded" className="text-slate-300 text-xs font-medium">Ulangi Sandi</Label>
+                        <div className="relative mt-1.5">
+                          <Input
+                            id="reg-confirm-ded"
+                            type={showRegConfirmPassword ? "text" : "password"}
+                            required
+                            disabled={!firebaseConfigured}
+                            value={regConfirm}
+                            onChange={(e) => setRegConfirm(e.target.value)}
+                            placeholder="Ulangi kata sandi"
+                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none"
+                            aria-label="Toggle register confirm password visibility"
+                          >
+                            {showRegConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={busy || !firebaseConfigured}
+                      className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl"
+                    >
+                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-slate-950" /> : <UserPlus className="w-4 h-4 mr-2 text-slate-950" />}
+                      Daftar Akun Worker
+                    </Button>
+                  </form>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+
+        {/* Footer */}
+        <footer className="w-full py-6 bg-slate-950 border-t border-slate-800/80 text-center text-xs text-slate-500 relative z-10">
+          <p>© {new Date().getFullYear()} Email Approval System. All rights reserved.</p>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/20 selection:text-amber-300">
       {/* 1. Header Navigation Bar */}
@@ -311,7 +631,7 @@ export default function LoginPage() {
           <div className="hidden md:flex items-center gap-3">
             <Button
               variant="ghost"
-              onClick={() => scrollToAuth("login")}
+              onClick={() => goToAuth("login")}
               className="text-slate-300 hover:text-amber-400 hover:bg-slate-900 border border-transparent hover:border-slate-800"
             >
               Masuk
@@ -319,7 +639,7 @@ export default function LoginPage() {
             <div className="relative group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl blur-sm opacity-60 group-hover:opacity-100 transition duration-300" />
               <Button
-                onClick={() => scrollToAuth("register")}
+                onClick={() => goToAuth("register")}
                 className="relative bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md px-5"
               >
                 Daftar Sekarang
@@ -331,7 +651,7 @@ export default function LoginPage() {
           <div className="flex md:hidden items-center gap-2">
             <Button
               size="sm"
-              onClick={() => scrollToAuth("register")}
+              onClick={() => goToAuth("register")}
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3 h-8 shadow-sm"
             >
               Daftar
@@ -394,13 +714,13 @@ export default function LoginPage() {
             <div className="pt-3 border-t border-slate-800/80 flex flex-col gap-2">
               <Button
                 variant="outline"
-                onClick={() => scrollToAuth("login")}
+                onClick={() => goToAuth("login")}
                 className="w-full justify-center border-slate-800 bg-slate-900 text-slate-200 hover:text-amber-400 font-semibold"
               >
                 Masuk ke Akun
               </Button>
               <Button
-                onClick={() => scrollToAuth("register")}
+                onClick={() => goToAuth("register")}
                 className="w-full justify-center bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold shadow-md"
               >
                 Daftar Akun Baru
@@ -441,7 +761,7 @@ export default function LoginPage() {
                 <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-300 group-hover:blur-lg" />
                 <Button
                   size="lg"
-                  onClick={() => scrollToAuth("register")}
+                  onClick={() => goToAuth("register")}
                   className="relative w-full sm:w-auto bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-8 h-13 text-base rounded-xl transition-all duration-200 flex items-center justify-center gap-2.5"
                 >
                   <UserPlus className="w-5 h-5 text-slate-950" />
@@ -453,7 +773,7 @@ export default function LoginPage() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => scrollToAuth("login")}
+                onClick={() => goToAuth("login")}
                 className="w-full sm:w-auto border-slate-800 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 px-7 h-13 text-base rounded-xl transition-all flex items-center justify-center gap-2 backdrop-blur-md"
               >
                 <LogIn className="w-5 h-5 text-amber-400" />
@@ -587,7 +907,7 @@ export default function LoginPage() {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => scrollToAuth("register")}
+                        onClick={() => goToAuth("register")}
                         className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
                       >
                         Mulai Coba Sekarang
@@ -924,7 +1244,7 @@ export default function LoginPage() {
                 </div>
 
                 <Button
-                  onClick={() => scrollToAuth("register")}
+                  onClick={() => goToAuth("register")}
                   className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold h-12 rounded-xl shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200"
                 >
                   Mulai Kumpulkan Saldo Sekarang
@@ -950,7 +1270,7 @@ export default function LoginPage() {
               </p>
               <div className="pt-2">
                 <Button
-                  onClick={() => scrollToAuth("register")}
+                  onClick={() => goToAuth("register")}
                   className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 h-11 rounded-xl"
                 >
                   Dapatkan Link Referral Anda
@@ -1054,11 +1374,10 @@ export default function LoginPage() {
       </section>
 
       {/* 8. Modern Glassmorphism Redesigned Auth Section */}
-      <section id="auth-section" ref={authSectionRef} className="py-20 bg-slate-950 scroll-mt-20 border-t border-slate-800/80 relative">
+      <section id="auth-section" className="py-20 bg-slate-950 scroll-mt-20 border-t border-slate-800/80 relative">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(245,158,11,0.15),rgba(255,255,255,0))]" />
 
         <div className="max-w-md mx-auto px-4 relative z-10">
-          {showAuthForm ? (
             <>
               <div className="text-center mb-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-2">
@@ -1312,21 +1631,20 @@ export default function LoginPage() {
               <p className="text-xs text-slate-400 mt-1">Pilih opsi di bawah untuk langsung mengakses portal.</p>
               <div className="mt-5 flex items-center justify-center gap-3">
                 <Button
-                  onClick={() => scrollToAuth("login")}
+                  onClick={() => goToAuth("login")}
                   variant="outline"
                   className="border-slate-700 bg-slate-800 text-slate-200 hover:text-amber-400 hover:bg-slate-700 font-semibold text-xs h-10 px-5 rounded-xl"
                 >
                   <LogIn className="w-3.5 h-3.5 mr-1.5 text-amber-400" /> Masuk
                 </Button>
                 <Button
-                  onClick={() => scrollToAuth("register")}
+                  onClick={() => goToAuth("register")}
                   className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-xs h-10 px-5 rounded-xl shadow-md"
                 >
                   <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Daftar Akun
                 </Button>
               </div>
             </div>
-          )}
         </div>
       </section>
 
