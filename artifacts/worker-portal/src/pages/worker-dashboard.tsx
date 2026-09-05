@@ -90,6 +90,14 @@ import {
   formatFeeBadge,
 } from "@/lib/portal-utils";
 
+function TelegramIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.96 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  );
+}
+
 export function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string; icon: React.JSX.Element }> = {
     pending: { label: "Menunggu", className: "bg-amber-100 text-amber-800 hover:bg-amber-100", icon: <Clock className="w-3 h-3" /> },
@@ -673,9 +681,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     href={supportConfig.telegramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="flex items-center gap-2"
                   >
-                    <MessageCircle className="w-4 h-4 text-amber-100" />
-                    Hubungi CS Telegram
+                    <TelegramIcon className="w-4 h-4 text-white shrink-0" />
+                    <span>Hubungi CS Telegram</span>
                   </a>
                 </Button>
               </CardContent>
@@ -1011,12 +1020,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
             {/* 3-COLUMN KEY METRIC CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* CARD 1: SALDO BONUS TERSEDIA */}
+              {/* CARD 1: TOTAL BONUS REFERRAL DIDAPAT */}
               <Card className="bg-white border-amber-100 shadow-xs hover:border-amber-300 transition-colors">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Saldo Bonus Tersedia
+                      Total Bonus Referral Didapat
                     </p>
                     <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60">
                       <Wallet className="w-4 h-4" />
@@ -1027,7 +1036,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </p>
                   <p className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    Siap ditarik kapan saja
+                    Otomatis masuk Saldo Utama (Saldo: {formatMoney(profile.balance)})
                   </p>
                 </CardContent>
               </Card>
