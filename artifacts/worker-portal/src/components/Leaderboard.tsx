@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Trophy, Medal, Award, Flame, Crown, Sparkles, CheckCircle2, User, Info, Target, HelpCircle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCollection } from "@/hooks/use-portal";
@@ -11,8 +10,6 @@ import {
   calculateLeaderboardStandings,
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
-  getMonthlyPeriodKey,
-  formatMonthYear,
   formatMoney,
 } from "@/lib/portal-utils";
 
@@ -47,32 +44,19 @@ export function Leaderboard({
       : [];
 
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [periodType, setPeriodType] = useState<"weekly" | "monthly">("weekly");
 
-  // Calculate timeframe
+  // Calculate timeframe (strictly Weekly)
   const timeFrame = useMemo(() => {
     const now = new Date();
-    if (periodType === "weekly") {
-      const { start, end } = getStartAndEndOfWeek(now);
-      const key = getWeeklyPeriodKey(now);
-      return {
-        key,
-        label: `Minggu Ini (${key})`,
-        start,
-        end,
-      };
-    } else {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-      const key = getMonthlyPeriodKey(now);
-      return {
-        key,
-        label: formatMonthYear(key),
-        start,
-        end,
-      };
-    }
-  }, [periodType]);
+    const { start, end } = getStartAndEndOfWeek(now);
+    const key = getWeeklyPeriodKey(now);
+    return {
+      key,
+      label: `Minggu Ini (${key})`,
+      start,
+      end,
+    };
+  }, []);
 
   // Calculate real-time standings
   const standings = useMemo(() => {
@@ -160,28 +144,12 @@ export function Leaderboard({
               </p>
             </div>
 
-            {/* TAB TOGGLE: MINGGUAN vs BULANAN */}
-            <div className="shrink-0 bg-amber-900/80 p-1.5 rounded-2xl border border-amber-700/80 backdrop-blur-md">
-              <Tabs
-                value={periodType}
-                onValueChange={(val) => setPeriodType(val as "weekly" | "monthly")}
-                className="w-full"
-              >
-                <TabsList className="bg-transparent border-0 p-0 gap-1 h-auto">
-                  <TabsTrigger
-                    value="weekly"
-                    className="text-xs font-bold px-4 py-2 rounded-xl transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md text-amber-200 hover:text-white"
-                  >
-                    Mingguan
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="monthly"
-                    className="text-xs font-bold px-4 py-2 rounded-xl transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md text-amber-200 hover:text-white"
-                  >
-                    Bulanan
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+            {/* WEEKLY LEADERBOARD BADGE */}
+            <div className="shrink-0 bg-amber-900/80 px-4 py-2 rounded-2xl border border-amber-700/80 backdrop-blur-md">
+              <span className="text-xs font-bold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                Mingguan
+              </span>
             </div>
           </div>
 
