@@ -34,6 +34,12 @@ import {
   Sparkles as SparklesIcon,
   RefreshCw,
   Trophy,
+  Home,
+  PlusCircle,
+  Menu,
+  ChevronRight,
+  X,
+  BookOpen,
 } from "lucide-react";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Button } from "@/components/ui/button";
@@ -389,6 +395,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Detail Dialog state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
 
+  // Mobile menu drawer state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const emailList = useMemo(
     () =>
       emailsText
@@ -613,7 +622,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 md:pb-6 space-y-6">
         {/* JAM OPERASIONAL CARD */}
         <Card className="bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-100/30 border-amber-200/80 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-300/20 to-transparent rounded-bl-full pointer-events-none" />
@@ -714,7 +723,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs value={mainTab} onValueChange={setMainTab}>
-          <TabsList className="grid grid-cols-2 sm:grid-cols-6 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
+          <TabsList className="hidden md:grid grid-cols-6 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
             <TabsTrigger
               value="submit"
               className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
@@ -1625,6 +1634,283 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             />
           </TabsContent>
         </Tabs>
+
+        {/* MOBILE BOTTOM NAVIGATION BAR (STYLE #1) */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-200 shadow-2xl px-2 py-1.5 flex items-center justify-around">
+          {/* 1. DASHBOARD */}
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab("submit");
+              setIsMobileMenuOpen(false);
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              mainTab === "submit" && !isMobileMenuOpen
+                ? "text-amber-400 font-bold scale-105"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {mainTab === "submit" && !isMobileMenuOpen && (
+              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            )}
+            <Home className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">Dashboard</span>
+          </button>
+
+          {/* 2. SUBMIT / STORAN */}
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab("submit");
+              setIsMobileMenuOpen(false);
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              mainTab === "submit" && !isMobileMenuOpen
+                ? "text-amber-400 font-bold scale-105"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <div className="p-1.5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 shadow-md shadow-amber-500/20 mb-0.5">
+              <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <span className="text-[10px] tracking-tight font-semibold">Submit</span>
+          </button>
+
+          {/* 3. RIWAYAT */}
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab("history");
+              setIsMobileMenuOpen(false);
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              mainTab === "history" && !isMobileMenuOpen
+                ? "text-amber-400 font-bold scale-105"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {mainTab === "history" && !isMobileMenuOpen && (
+              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            )}
+            <History className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">Riwayat</span>
+          </button>
+
+          {/* 4. WITHDRAW */}
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab("withdraw");
+              setIsMobileMenuOpen(false);
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              mainTab === "withdraw" && !isMobileMenuOpen
+                ? "text-amber-400 font-bold scale-105"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {mainTab === "withdraw" && !isMobileMenuOpen && (
+              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            )}
+            <Wallet className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">Withdraw</span>
+          </button>
+
+          {/* 5. PROFIL / MENU */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              isMobileMenuOpen || mainTab === "referral" || mainTab === "leaderboard" || mainTab === "announcements"
+                ? "text-amber-400 font-bold scale-105"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {(isMobileMenuOpen || mainTab === "referral" || mainTab === "leaderboard" || mainTab === "announcements") && (
+              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            )}
+            <User className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">Profil/Menu</span>
+          </button>
+        </nav>
+
+        {/* MOBILE PROFIL / MENU SHEET */}
+        <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <DialogContent className="max-w-md w-full bg-slate-900/95 backdrop-blur-xl border-slate-800 text-slate-100 p-0 overflow-hidden rounded-t-3xl sm:rounded-2xl border shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 font-extrabold flex items-center justify-center text-base shadow-lg shadow-amber-500/20 ring-2 ring-amber-400/30">
+                  {profile.name?.charAt(0).toUpperCase() || "W"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-white text-sm">{profile.name}</p>
+                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold">
+                      {currentTierConfig.name}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span className="font-mono">
+                      {isEmailVisible ? displayEmail : "*".repeat(displayEmail.length || 10)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEmailVisible(!isEmailVisible)}
+                      className="text-slate-400 hover:text-amber-400 p-0.5 rounded"
+                    >
+                      {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 uppercase font-semibold">Saldo</p>
+                <p className="font-black text-amber-400 text-sm">{formatMoney(profile.balance)}</p>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2">Menu & Fitur Portal</p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("referral");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
+                  mainTab === "referral"
+                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold">Referral & Pasif Income</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Undang teman & klaim bonus komisi</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("leaderboard");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
+                  mainTab === "leaderboard"
+                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400">
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold">Klasemen / Top Worker</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Peringkat mingguan & reward bonus</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("announcements");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
+                  mainTab === "announcements"
+                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 relative">
+                    <Megaphone className="w-4 h-4" />
+                    {announcements.data.length > 0 && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold flex items-center gap-1.5">
+                      Pengumuman Resmi
+                      {announcements.data.length > 0 && (
+                        <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.2 rounded-full font-bold">
+                          {announcements.data.length}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-normal">Informasi terbaru dari admin</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
+
+              {isSupportEnabled && supportConfig.telegramUrl && (
+                <a
+                  href={supportConfig.telegramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                      <TelegramIcon className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold">Pusat Bantuan CS Telegram</p>
+                      <p className="text-[10px] text-slate-400 font-normal">Hubungi CS jika ada kendala</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500" />
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("submit");
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold">Cara Kerja & Aturan Setor</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Panduan pengerjaan & tier harga</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 bg-slate-950/80">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onLogout();
+                }}
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 font-bold gap-2 text-xs h-10 rounded-xl"
+              >
+                <LogOut className="w-4 h-4" />
+                Keluar dari Akun (Logout)
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* DIALOG LIHAT DETAIL BATCH (WORKER PER-ITEM VIEW) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
