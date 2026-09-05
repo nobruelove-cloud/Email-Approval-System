@@ -77,7 +77,7 @@ service cloud.firestore {
 
     // ---- emailSubmissions/{id} ----
     match /emailSubmissions/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&
