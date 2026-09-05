@@ -103,6 +103,7 @@ export default function LoginPage() {
 
   // Earning Estimator State
   const [estDailyAcc, setEstDailyAcc] = useState<number>(30);
+  const [selectedRate, setSelectedRate] = useState<number>(2800);
 
   // Password visibility states
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -278,8 +279,7 @@ export default function LoginPage() {
   }
 
   const referralTiers = (rules.data?.referralTiers ?? DEFAULT_RULES.referralTiers) as ReferralTierConfig[];
-  const pricePerItem = rules.data?.tiers?.[0]?.pricePerItem ?? 3500;
-  const estimatedDailyEarnings = estDailyAcc * pricePerItem;
+  const estimatedDailyEarnings = estDailyAcc * selectedRate;
   const estimatedMonthlyEarnings = estimatedDailyEarnings * 30;
 
   if (isDedicatedAuthRoute) {
@@ -862,7 +862,7 @@ export default function LoginPage() {
                           Rp 385.000
                         </p>
                         <p className="text-xs text-amber-400/90 mt-2 flex items-center gap-1 font-medium">
-                          <TrendingUp className="w-3.5 h-3.5" /> +Rp 105.000 hari ini dari 30 Email ACC
+                          <TrendingUp className="w-3.5 h-3.5" /> +Rp 90.000 hari ini dari 30 Email ACC
                         </p>
                       </div>
 
@@ -890,7 +890,7 @@ export default function LoginPage() {
                           <span className="text-xs text-slate-400 font-medium">Level Tier Worker</span>
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">TIER 2</span>
                         </div>
-                        <p className="text-lg font-bold text-white">Rp 3.500 / Email ACC</p>
+                        <p className="text-lg font-bold text-white">Rp 3.000 / Email ACC</p>
                         <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
                           <div className="bg-gradient-to-r from-amber-500 to-orange-500 h-full w-[75%]" />
                         </div>
@@ -1201,7 +1201,36 @@ export default function LoginPage() {
 
                 {/* Range Slider / Controls */}
                 <div className="space-y-4 bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
-                  <div className="flex justify-between items-center">
+                  {/* Tier Selector Toggle */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-300">Pilih Tier Worker:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRate(2800)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                          selectedRate === 2800
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
+                        }`}
+                      >
+                        Tier 1: Rp 2.800 / Email ACC
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRate(3000)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                          selectedRate === 3000
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
+                        }`}
+                      >
+                        Tier 2: Rp 3.000 / Email ACC
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/80">
                     <label htmlFor="daily-acc-slider" className="text-xs font-medium text-slate-300">Target Email ACC / Hari:</label>
                     <span className="text-lg font-black text-amber-400 font-mono">{estDailyAcc} ACC</span>
                   </div>
@@ -1223,7 +1252,7 @@ export default function LoginPage() {
 
                   <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800/80">
                     <span className="text-slate-400">Rate Tier Aktif:</span>
-                    <span className="text-amber-300 font-semibold">{formatMoney(pricePerItem)} / email ACC</span>
+                    <span className="text-amber-300 font-semibold">{formatMoney(selectedRate)} / email ACC</span>
                   </div>
                 </div>
               </div>
