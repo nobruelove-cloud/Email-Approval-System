@@ -40,7 +40,11 @@ export function Leaderboard({
   const users = propUsers && propUsers.length > 0 ? propUsers : globalUsersCollection.data;
 
   const globalSubmissions = useCollection<EmailSubmission>("emailSubmissions");
-  const activeSubmissions = propSubmissions && propSubmissions.length > 0 ? propSubmissions : globalSubmissions.data;
+  const activeSubmissions = globalSubmissions.data.length > 0
+    ? globalSubmissions.data
+    : propSubmissions && propSubmissions.length > 0
+      ? propSubmissions
+      : [];
 
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [periodType, setPeriodType] = useState<"weekly" | "monthly">("weekly");
