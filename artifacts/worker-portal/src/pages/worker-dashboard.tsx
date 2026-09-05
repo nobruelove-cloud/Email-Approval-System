@@ -12,6 +12,7 @@ import {
   XCircle,
   Loader2,
   Eye,
+  EyeOff,
   Award,
   Users,
   Copy,
@@ -177,6 +178,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     return <MaintenanceScreen maintenance={maintenance} onLogout={onLogout} />;
   }
 
+  // Email sensor state
+  const [isEmailVisible, setIsEmailVisible] = useState(false);
+
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
   const [invitationCodeInput, setInvitationCodeInput] = useState("");
@@ -284,6 +288,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       .reduce((sum, item) => sum + item.amount, 0);
     return { total, pending, qualified, totalTeamAcc, earnings };
   }, [engagement.referrals.data, engagement.rewardLedger.data]);
+
+  const maxRefAcc = useMemo(() => {
+    if (!activeReferralTiers.length) return 200;
+    return Math.max(200, ...activeReferralTiers.map((t) => t.minAcc));
+  }, [activeReferralTiers]);
 
   const simulatedEarnings = useMemo(() => {
     const rewardPerFriend = activeReferralTiers
@@ -577,7 +586,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   {currentTierConfig.name} ({formatMoney(currentTierConfig.pricePerItem)}/item)
                 </Badge>
               </div>
-              <p className="text-[11px] text-gray-500">{profile.email}</p>
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span className="font-mono">
+                  {isEmailVisible ? displayEmail : "*".repeat(displayEmail.length || 10)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailVisible(!isEmailVisible)}
+                  className="text-gray-400 hover:text-amber-600 transition-colors p-0.5 rounded focus:outline-none"
+                  title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
+                >
+                  {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -1000,7 +1021,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         <input
                           type="range"
                           min="5"
-                          max="50"
+                          max={maxRefAcc}
                           step="5"
                           value={simAccPerFriend}
                           onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
@@ -1009,9 +1030,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-amber-800/80 flex items-center justify-between">
-                      <span className="text-[11px] text-amber-300">Estimasi Bonus:</span>
-                      <span className="text-lg font-black text-amber-300">{formatMoney(simulatedEarnings)}</span>
+                    <div className="pt-2 border-t border-amber-800/80 space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-amber-200/90">
+                        <span>Total Akun Tim:</span>
+                        <span className="font-semibold text-white">{simFriends * simAccPerFriend} ACC</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-amber-200/90">
+                        <span>Rate Email ACC Aktif:</span>
+                        <span className="font-semibold text-amber-300">{formatMoney(currentTierConfig.pricePerItem)}/email</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-amber-800/60">
+                        <span className="text-[11px] text-amber-300 font-bold">Estimasi Bonus Referral:</span>
+                        <span className="text-lg font-black text-amber-300">{formatMoney(simulatedEarnings)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1176,7 +1207,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </p>
                   <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-900/90">
                     <li>Pendaftaran akun baru saja TIDAK langsung mencairkan bonus.</li>
-                    <li>Bonus terbuka saat downline mencapai target email ACC terverifikasi (5, 10, 20, 50 ACC).</li>
+                    <li>
+                      Bonus terbuka saat downline mencapai target email ACC terverifikasi ({activeReferralTiers.map((t) => t.minAcc).join(", ")} ACC).
+                    </li>
                     <li>Reward dapat diklaim bertahap per-tier secara instant tanpa perlu menunggu tier akhir.</li>
                   </ul>
                 </div>

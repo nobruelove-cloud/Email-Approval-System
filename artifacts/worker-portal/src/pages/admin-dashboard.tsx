@@ -14,6 +14,7 @@ import {
   UserPlus,
   Clock,
   Eye,
+  EyeOff,
   Award,
   Sparkles,
   Plus,
@@ -211,6 +212,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // Email sensor toggle state
+  const [isEmailVisible, setIsEmailVisible] = useState(false);
 
   // Global Maintenance Mode state
   const activeMaintenance = useMemo(() => {
@@ -1534,7 +1538,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   ADMIN
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">{profile.email}</p>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
+                <span>
+                  {isEmailVisible
+                    ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
+                    : "*".repeat((profile.email && profile.email.trim() ? profile.email.trim() : "-").length)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailVisible(!isEmailVisible)}
+                  className="text-slate-400 hover:text-emerald-400 transition-colors p-0.5 rounded focus:outline-none"
+                  title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
+                >
+                  {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
           </div>
           <Button
