@@ -495,7 +495,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const [selectedPeriod, setSelectedPeriod] = useState<string>(() => getMonthlyPeriodKey(new Date()));
   const [finSearch, setFinSearch] = useState("");
-  const [vendorSalePrice, setVendorSalePrice] = useState<number>(4000);
+  const [vendorSalePrice, setVendorSalePrice] = useState<number>(4500);
+  const [simVendorRate, setSimVendorRate] = useState<number>(4500);
+  const [simWorkerRate, setSimWorkerRate] = useState<number>(3000);
+  const [simDailyAccVolume, setSimDailyAccVolume] = useState<number>(100);
+
+  function handleSimVendorRateChange(val: number) {
+    const rate = val > 0 ? val : 4000;
+    setSimVendorRate(rate);
+    setVendorSalePrice(rate);
+  }
+
   const { transactions: finTransactions, loading: finLoading, error: finError } = useFinancialData(selectedPeriod);
 
   // Period options for dropdown including transactions, submissions, withdrawals, and ledger dates
@@ -578,7 +588,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       }
     });
 
-    const totalExpense = periodWorkerCommissions + periodWithdrawalsExpense + periodRewardsExpense + manualExpense;
+    // Exclude periodWithdrawalsExpense from totalExpense to avoid double counting with periodWorkerCommissions
+    const totalExpense = periodWorkerCommissions + periodRewardsExpense + manualExpense;
     const netBalance = totalIncome - totalExpense;
 
     return {
@@ -2097,11 +2108,199 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <span className="text-slate-400 font-bold">Rp</span>
                     <FormattedNumberInput
                       value={vendorSalePrice}
-                      onChange={(val) => setVendorSalePrice(val > 0 ? val : 4000)}
+                      onChange={(val) => handleSimVendorRateChange(val)}
                       className="w-28 h-8 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
                     />
                   </div>
                 </div>
+
+                {/* VENDOR PROFIT & PROJECTION SIMULATOR CARD */}
+                <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl border-emerald-500/20">
+                  <CardHeader className="pb-3 border-b border-slate-800/80">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-100">
+                          <Sparkles className="w-5 h-5 text-emerald-400" />
+                          Simulator Keuntungan & Proyeksi Profit Vendor
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-400 mt-0.5">
+                          Hitung estimasi pemasukan vendor, komisi pekerja, dan net profit admin berdasarkan rate dan volume harian.
+                        </CardDescription>
+                      </div>
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold self-start sm:self-center">
+                        Simulasi Real-time
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-5 pt-4">
+                    {/* INPUT CONTROL CONTROLS GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-950/80 border border-slate-800 rounded-xl">
+                      {/* VENDOR RATE INPUT */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-200">
+                          Vendor Rate per Email (Rp)
+                        </Label>
+                        <FormattedNumberInput
+                          value={simVendorRate}
+                          onChange={handleSimVendorRateChange}
+                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
+                        />
+                        <div className="flex gap-1 pt-0.5">
+                          <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
+                          {[4000, 4500, 5000].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => handleSimVendorRateChange(preset)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                                simVendorRate === preset
+                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
+                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                              }`}
+                            >
+                              Rp {preset.toLocaleString("id-ID")}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* WORKER RATE INPUT */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-200">
+                          Worker Rate Share per Email (Rp)
+                        </Label>
+                        <FormattedNumberInput
+                          value={simWorkerRate}
+                          onChange={(val) => setSimWorkerRate(val >= 0 ? val : 2800)}
+                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-teal-300 focus:border-emerald-500"
+                        />
+                        <div className="flex gap-1 pt-0.5">
+                          <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
+                          {[2800, 3000, 3500].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setSimWorkerRate(preset)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                                simWorkerRate === preset
+                                  ? "bg-teal-500/20 text-teal-300 border-teal-500/40 font-bold"
+                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                              }`}
+                            >
+                              Rp {preset.toLocaleString("id-ID")}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* DAILY VOLUME ACC INPUT */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-200">
+                          Volume Setoran ACC / Hari (Email)
+                        </Label>
+                        <FormattedNumberInput
+                          value={simDailyAccVolume}
+                          onChange={(val) => setSimDailyAccVolume(val >= 0 ? val : 100)}
+                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        />
+                        <div className="flex gap-1 pt-0.5">
+                          <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
+                          {[50, 100, 250, 500, 1000].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setSimDailyAccVolume(preset)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                                simDailyAccVolume === preset
+                                  ? "bg-slate-800 text-slate-100 border-slate-700 font-bold"
+                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                              }`}
+                            >
+                              {preset} ACC
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BREAKDOWN PER EMAIL ACC SUMMARY BANNER */}
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <DollarSign className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-200">Rincian Profit Margin Per Email ACC</span>
+                          <p className="text-[11px] text-slate-400">Rate Vendor ({formatMoney(simVendorRate)}) - Komisi Worker ({formatMoney(simWorkerRate)})</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-medium">Worker Share</span>
+                          <strong className="text-teal-300 font-extrabold">{formatMoney(simWorkerRate)}</strong>
+                        </div>
+                        <span className="text-slate-600 font-mono text-sm">+</span>
+                        <div className="text-center px-3 py-1 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                          <span className="text-[10px] text-emerald-400 block font-medium">Admin Profit Share</span>
+                          <strong className="text-emerald-400 font-extrabold">{formatMoney(simVendorRate - simWorkerRate)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* TIMEFRAME PROJECTION CARDS GRID (1 HARI, 7 HARI, 30 HARI, 365 HARI) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "Estimasi Harian", period: "1 Hari", days: 1 },
+                        { label: "Estimasi Mingguan", period: "7 Hari", days: 7 },
+                        { label: "Estimasi Bulanan", period: "30 Hari", days: 30 },
+                        { label: "Estimasi Tahunan", period: "365 Hari", days: 365 },
+                      ].map((tf) => {
+                        const accVolume = simDailyAccVolume * tf.days;
+                        const vendorIncome = accVolume * simVendorRate;
+                        const workerPayout = accVolume * simWorkerRate;
+                        const netProfit = accVolume * (simVendorRate - simWorkerRate);
+
+                        return (
+                          <div
+                            key={tf.period}
+                            className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/90 hover:border-slate-700 transition-all space-y-3"
+                          >
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                              <div>
+                                <span className="font-bold text-xs text-slate-200">{tf.label}</span>
+                                <span className="text-[11px] text-slate-500 block font-mono">({tf.period})</span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] bg-slate-900 text-slate-300 border-slate-800 font-mono">
+                                {accVolume.toLocaleString("id-ID")} ACC
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400 text-[11px]">Pemasukan Vendor:</span>
+                                <span className="font-semibold text-slate-200">{formatMoney(vendorIncome)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400 text-[11px]">Payout Worker:</span>
+                                <span className="font-semibold text-rose-300">{formatMoney(workerPayout)}</span>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-800/80">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block mb-0.5">
+                                Admin Net Profit
+                              </span>
+                              <span className="text-lg font-black text-emerald-400">
+                                {formatMoney(netProfit)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* RINGKASAN AUTOMATED FINANCIAL LEDGER CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2139,10 +2338,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
                       </div>
                       <div className="flex justify-between">
-                        <span>Penarikan Worker:</span>
-                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWithdrawalsExpense)}</strong>
-                      </div>
-                      <div className="flex justify-between">
                         <span>Hadiah & Bonus (Leaderboard/Referral):</span>
                         <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
                       </div>
@@ -2152,6 +2347,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           <strong className="text-rose-300">{formatMoney(automatedFinSummary.manualExpense)}</strong>
                         </div>
                       )}
+                      <div className="flex justify-between pt-1 border-t border-rose-500/10 text-slate-500">
+                        <span>Penarikan Worker (Informasional):</span>
+                        <span className="font-mono">{formatMoney(automatedFinSummary.periodWithdrawalsExpense)}</span>
+                      </div>
                     </div>
                   </div>
 
