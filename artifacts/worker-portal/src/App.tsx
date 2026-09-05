@@ -206,6 +206,7 @@ export default function App() {
       <AutoUpdateBanner />
       <Switch>
         <Route path="/" component={PortalGate} />
+        <Route path="/login" component={PortalGate} />
         <Route path="/register" component={PortalGate} />
         <Route path="/dashboard" component={PortalGate} />
         <Route path="/admin" component={PortalGate} />
