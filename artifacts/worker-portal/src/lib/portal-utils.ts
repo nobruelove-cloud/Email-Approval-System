@@ -721,7 +721,8 @@ export function calculateLeaderboardStandings(
 
   if (Array.isArray(submissions)) {
     submissions.forEach((sub) => {
-      const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+      const statusNorm = typeof sub.status === "string" ? sub.status.trim().toLowerCase() : "";
+      const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold";
       if (!isFinalized) return;
 
       let subDate: Date | null = null;
@@ -748,7 +749,7 @@ export function calculateLeaderboardStandings(
 
       if (approvedCount <= 0) return;
 
-      const wId = sub.workerId;
+      const wId = sub.workerId || (sub as any).userId || (sub as any).userEmail;
       if (!wId) return;
 
       const resolvedName = userMap.get(wId) || sub.workerName || "Worker";

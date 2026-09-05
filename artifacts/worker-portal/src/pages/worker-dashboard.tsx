@@ -731,7 +731,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* KLASEMEN / LEADERBOARD */}
           <TabsContent value="leaderboard" className="space-y-4">
             <Leaderboard
-              submissions={submissions.data}
               currentUserId={profile.uid}
               rewards={rules.data.leaderboardRewards}
             />
