@@ -749,12 +749,17 @@ export function calculateLeaderboardStandings(
       if (approvedCount <= 0) return;
 
       const wId = sub.workerId;
-      const name = sub.workerName || userMap.get(wId) || "Worker";
+      if (!wId) return;
+
+      const resolvedName = userMap.get(wId) || sub.workerName || "Worker";
       const existing = accMap.get(wId);
       if (existing) {
         existing.count += approvedCount;
+        if ((existing.name === "Worker" || !existing.name) && resolvedName !== "Worker") {
+          existing.name = resolvedName;
+        }
       } else {
-        accMap.set(wId, { name, count: approvedCount });
+        accMap.set(wId, { name: resolvedName, count: approvedCount });
       }
     });
   }

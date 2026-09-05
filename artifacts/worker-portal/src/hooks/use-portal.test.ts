@@ -1095,6 +1095,68 @@ describe("Quick-Copy Email Formatting Utilities Unit Tests", () => {
   });
 });
 
+describe("Leaderboard Global Standings & Target Threshold Calculations Unit Tests", () => {
+  it("calculates standings globally across workers and applies bonus thresholds strictly", async () => {
+    const { calculateLeaderboardStandings } = await import("../lib/portal-utils");
+
+    const now = new Date();
+    const startDate = new Date(now.getTime() - 86400000);
+    const endDate = new Date(now.getTime() + 86400000);
+
+    const submissions: EmailSubmission[] = [
+      {
+        id: "sub_1",
+        workerId: "worker_a",
+        workerName: "Worker A",
+        approvedItemCount: 200,
+        status: "approved",
+        submittedAt: now,
+      },
+      {
+        id: "sub_2",
+        workerId: "sena_uid",
+        workerName: "Sena",
+        approvedItemCount: 21,
+        status: "approved",
+        submittedAt: now,
+      },
+    ];
+
+    const users = [
+      { uid: "worker_a", name: "Worker A", role: "worker" },
+      { uid: "sena_uid", name: "Sena", role: "worker" },
+    ];
+
+    const rewards = [
+      { rank: 1, rewardAmount: 50000 },
+      { rank: 2, rewardAmount: 25000 },
+      { rank: 3, rewardAmount: 15000 },
+    ];
+
+    const standings = calculateLeaderboardStandings(
+      submissions,
+      users,
+      startDate,
+      endDate,
+      rewards
+    );
+
+    expect(standings.length).toBe(2);
+
+    // Rank #1: Worker A with 200 ACC (Eligible for Rp 50.000)
+    expect(standings[0].workerId).toBe("worker_a");
+    expect(standings[0].rank).toBe(1);
+    expect(standings[0].validAccCount).toBe(200);
+    expect(standings[0].rewardAmount).toBe(50000);
+
+    // Rank #2: Sena with 21 ACC (Ineligible for Juara 2 since 21 < 100 ACC, reward = 0)
+    expect(standings[1].workerId).toBe("sena_uid");
+    expect(standings[1].rank).toBe(2);
+    expect(standings[1].validAccCount).toBe(21);
+    expect(standings[1].rewardAmount).toBe(0);
+  });
+});
+
 describe("Maintenance Config Defaults & Utility Unit Tests", () => {
   it("DEFAULT_MAINTENANCE has valid initial defaults", () => {
     expect(DEFAULT_MAINTENANCE.enabled).toBe(false);
