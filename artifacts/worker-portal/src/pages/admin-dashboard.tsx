@@ -490,11 +490,117 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }
 
   const [selectedPeriod, setSelectedPeriod] = useState<string>(() => getMonthlyPeriodKey(new Date()));
-  const { transactions: finTransactions, summary: finSummary, loading: finLoading, error: finError } = useFinancialData(selectedPeriod);
+  const [finSearch, setFinSearch] = useState("");
+  const [vendorSalePrice, setVendorSalePrice] = useState<number>(4000);
+  const { transactions: finTransactions, loading: finLoading, error: finError } = useFinancialData(selectedPeriod);
 
+  // Period options for dropdown including transactions, submissions, withdrawals, and ledger dates
   const periodOptions = useMemo(() => {
-    return getPeriodOptions(finTransactions, selectedPeriod);
-  }, [finTransactions, selectedPeriod]);
+    const combinedTx: { period: string }[] = [...finTransactions];
+    submissions.data.forEach((s) => {
+      if (s.submittedAt) combinedTx.push({ period: getMonthlyPeriodKey(s.submittedAt) });
+    });
+    withdrawals.data.forEach((w) => {
+      if (w.requestedAt) combinedTx.push({ period: getMonthlyPeriodKey(w.requestedAt) });
+    });
+    rewardLedger.data.forEach((r) => {
+      if (r.createdAt) combinedTx.push({ period: getMonthlyPeriodKey(r.createdAt) });
+    });
+    return getPeriodOptions(combinedTx, selectedPeriod);
+  }, [finTransactions, submissions.data, withdrawals.data, rewardLedger.data, selectedPeriod]);
+
+  // Auto-calculated Automated Financial Ledger Stats for selectedPeriod
+  const automatedFinSummary = useMemo(() => {
+    // 1. Email ACC Income calculation
+    let periodApprovedAccs = 0;
+    let periodWorkerCommissions = 0;
+
+    submissions.data.forEach((sub) => {
+      const subPeriod = getMonthlyPeriodKey(sub.submittedAt || sub.reviewedAt);
+      if (subPeriod === selectedPeriod) {
+        const isApprovedOrAvailable =
+          sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+        if (isApprovedOrAvailable) {
+          const accCount =
+            typeof sub.approvedItemCount === "number"
+              ? sub.approvedItemCount
+              : Array.isArray(sub.items) && sub.items.length > 0
+              ? sub.items.filter((it) => it.status === "approved").length
+              : getItemCountOfSubmission(sub);
+
+          periodApprovedAccs += accCount;
+
+          const pricePerItem = sub.appliedPricePerItem ?? sub.currentPricePerItem ?? sub.pricePerEmail ?? 2000;
+          const comm = sub.totalAmount ?? (accCount * pricePerItem);
+          periodWorkerCommissions += comm;
+        }
+      }
+    });
+
+    const vendorEmailIncome = periodApprovedAccs * vendorSalePrice;
+
+    // 2. Manual Income
+    let manualIncome = 0;
+    let manualExpense = 0;
+
+    finTransactions.forEach((tx) => {
+      const amt = Number(tx.amount) || 0;
+      if (tx.type === "income") {
+        manualIncome += amt;
+      } else if (tx.type === "expense") {
+        manualExpense += amt;
+      }
+    });
+
+    const totalIncome = vendorEmailIncome + manualIncome;
+
+    // 3. Withdrawals Expense in selectedPeriod
+    let periodWithdrawalsExpense = 0;
+    withdrawals.data.forEach((w) => {
+      if (w.status === "success") {
+        const wPeriod = getMonthlyPeriodKey(w.processedAt || w.requestedAt);
+        if (wPeriod === selectedPeriod) {
+          periodWithdrawalsExpense += w.amount;
+        }
+      }
+    });
+
+    // 4. Rewards Expense in selectedPeriod (Leaderboard, Referral, Missions)
+    let periodRewardsExpense = 0;
+    rewardLedger.data.forEach((r) => {
+      const rPeriod = getMonthlyPeriodKey(r.createdAt);
+      if (rPeriod === selectedPeriod) {
+        periodRewardsExpense += r.amount;
+      }
+    });
+
+    const totalExpense = periodWorkerCommissions + periodWithdrawalsExpense + periodRewardsExpense + manualExpense;
+    const netBalance = totalIncome - totalExpense;
+
+    return {
+      periodApprovedAccs,
+      vendorEmailIncome,
+      manualIncome,
+      totalIncome,
+      periodWorkerCommissions,
+      periodWithdrawalsExpense,
+      periodRewardsExpense,
+      manualExpense,
+      totalExpense,
+      netBalance,
+    };
+  }, [submissions.data, withdrawals.data, rewardLedger.data, finTransactions, selectedPeriod, vendorSalePrice]);
+
+  // Search filtered transactions
+  const filteredFinTransactions = useMemo(() => {
+    const q = finSearch.toLowerCase().trim();
+    if (!q) return finTransactions;
+    return finTransactions.filter(
+      (tx) =>
+        tx.description.toLowerCase().includes(q) ||
+        (tx.note && tx.note.toLowerCase().includes(q))
+    );
+  }, [finTransactions, finSearch]);
 
   const [finModalOpen, setFinModalOpen] = useState(false);
   const [editingFinTx, setEditingFinTx] = useState<FinancialTransaction | null>(null);
@@ -823,22 +929,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [busyId, setBusyId] = useState<string | null>(null);
 
   // Leaderboard Management State
-  const [leaderboardPeriodType, setLeaderboardPeriodType] = useState<"weekly" | "monthly">("weekly");
   const [distributingLeaderboard, setDistributingLeaderboard] = useState(false);
 
   const currentLeaderboardTimeframe = useMemo(() => {
     const now = new Date();
-    if (leaderboardPeriodType === "weekly") {
-      const { start, end } = getStartAndEndOfWeek(now);
-      const key = getWeeklyPeriodKey(now);
-      return { key, label: `Mingguan (${key})`, start, end };
-    } else {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-      const key = getMonthlyPeriodKey(now);
-      return { key, label: `Bulanan (${formatMonthYear(key)})`, start, end };
-    }
-  }, [leaderboardPeriodType]);
+    const { start, end } = getStartAndEndOfWeek(now);
+    const key = getWeeklyPeriodKey(now);
+    return { key, label: `Mingguan (${key})`, start, end };
+  }, []);
 
   const leaderboardRewardsConfig = useMemo(() => {
     return Array.isArray(rules.data.leaderboardRewards) && rules.data.leaderboardRewards.length > 0
@@ -860,24 +958,79 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     );
   }, [submissions.data, users.data, currentLeaderboardTimeframe.start, currentLeaderboardTimeframe.end, leaderboardRewardsConfig]);
 
+  // Set of paid payout IDs for fast lookup
+  const paidLeaderboardSet = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(leaderboardPayouts?.data)) {
+      leaderboardPayouts.data.forEach((p) => {
+        set.add(`${p.periodKey}_rank${p.rank}_${p.workerId}`);
+      });
+    }
+    return set;
+  }, [leaderboardPayouts?.data]);
+
+  const [payingIndividualWorkerId, setPayingIndividualWorkerId] = useState<string | null>(null);
+
+  async function handleCairkanIndividualReward(winner: {
+    workerId: string;
+    rank: number;
+    validAccCount: number;
+    rewardAmount?: number;
+    workerName: string;
+  }) {
+    const payoutId = `${currentLeaderboardTimeframe.key}_rank${winner.rank}_${winner.workerId}`;
+    if (paidLeaderboardSet.has(payoutId)) {
+      toast.info(`Hadiah Juara #${winner.rank} (${winner.workerName}) sudah pernah dicairkan untuk periode ini.`);
+      return;
+    }
+
+    const rewardAmt = winner.rewardAmount || (winner.rank === 1 ? 50000 : winner.rank === 2 ? 30000 : 15000);
+    setPayingIndividualWorkerId(winner.workerId);
+    try {
+      await distributeLeaderboardReward(
+        winner.workerId,
+        currentLeaderboardTimeframe.key,
+        winner.rank,
+        winner.validAccCount,
+        rewardAmt,
+        winner.workerName
+      );
+      toast.success(`Berhasil mencairkan bonus Juara #${winner.rank} (${formatMoney(rewardAmt)}) ke saldo ${winner.workerName}!`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Gagal mencairkan reward: ${msg}`);
+    } finally {
+      setPayingIndividualWorkerId(null);
+    }
+  }
+
   async function handleDistributeLeaderboardRewards() {
     if (currentLeaderboardStandings.length === 0) {
       toast.error("Tidak ada pengerjaan email ACC pada periode ini.");
       return;
     }
 
-    const winnersToReward = currentLeaderboardStandings.slice(0, 3).filter((s) => s.validAccCount > 0);
-    if (winnersToReward.length === 0) {
+    const topWinners = currentLeaderboardStandings.slice(0, 3).filter((s) => s.validAccCount > 0);
+    if (topWinners.length === 0) {
       toast.error("Tidak ada pemenang dengan pengerjaan ACC > 0.");
+      return;
+    }
+
+    // Filter out workers who have already been paid for this period
+    const unpaidWinners = topWinners.filter(
+      (w) => !paidLeaderboardSet.has(`${currentLeaderboardTimeframe.key}_rank${w.rank}_${w.workerId}`)
+    );
+
+    if (unpaidWinners.length === 0) {
+      toast.info(`Seluruh pemenang untuk periode ${currentLeaderboardTimeframe.key} sudah dicairkan.`);
       return;
     }
 
     setDistributingLeaderboard(true);
     let successCount = 0;
-    let alreadyPaidCount = 0;
     const errors: string[] = [];
 
-    for (const winner of winnersToReward) {
+    for (const winner of unpaidWinners) {
       const rewardAmt = winner.rewardAmount || (winner.rank === 1 ? 50000 : winner.rank === 2 ? 30000 : 15000);
       try {
         await distributeLeaderboardReward(
@@ -891,11 +1044,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         successCount++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("sudah pernah dicairkan") || msg.includes("already")) {
-          alreadyPaidCount++;
-        } else {
-          errors.push(`${winner.workerName}: ${msg}`);
-        }
+        errors.push(`${winner.workerName}: ${msg}`);
       }
     }
 
@@ -903,8 +1052,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
     if (successCount > 0) {
       toast.success(`Berhasil mencairkan bonus leaderboard untuk ${successCount} juara! Saldo telah ditambahkan.`);
-    } else if (alreadyPaidCount > 0) {
-      toast.info(`Hadiah leaderboard untuk periode ${currentLeaderboardTimeframe.key} sudah pernah dicairkan sebelumnya.`);
     }
 
     if (errors.length > 0) {
@@ -1922,44 +2069,103 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-4">
-                {/* RINGKASAN SUMMARY CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-emerald-400">Pemasukan</span>
-                      <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <p className="text-xl font-black text-emerald-400">{formatMoney(finSummary.totalIncome)}</p>
-                    <p className="text-[11px] text-emerald-500/70">Periode {formatMonthYear(selectedPeriod)}</p>
+                {/* VENDOR SALE PRICE CONTROL */}
+                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-200">Harga Jual Vendor Per Email ACC:</span>
+                    <p className="text-slate-400 text-[11px]">Digunakan untuk menghitung otomatis total estimasi Pemasukan kotor dari vendor.</p>
                   </div>
-
-                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-rose-400">Pengeluaran</span>
-                      <TrendingDown className="w-4 h-4 text-rose-400" />
-                    </div>
-                    <p className="text-xl font-black text-rose-400">{formatMoney(finSummary.totalExpense)}</p>
-                    <p className="text-[11px] text-rose-500/70">Periode {formatMonthYear(selectedPeriod)}</p>
-                  </div>
-
-                  <div className={`p-4 rounded-xl border space-y-1 ${finSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-teal-300" : "bg-rose-950/40 border-rose-500/40 text-rose-300"}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold">Saldo Bersih</span>
-                      <Wallet className="w-4 h-4 text-teal-400" />
-                    </div>
-                    <p className={`text-xl font-black ${finSummary.netBalance >= 0 ? "text-teal-300" : "text-rose-400"}`}>
-                      {formatMoney(finSummary.netBalance)}
-                    </p>
-                    <p className="text-[11px] text-slate-400">Pemasukan - Pengeluaran</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-slate-400 font-bold">Rp</span>
+                    <FormattedNumberInput
+                      value={vendorSalePrice}
+                      onChange={(val) => setVendorSalePrice(val > 0 ? val : 4000)}
+                      className="w-28 h-8 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
+                    />
                   </div>
                 </div>
 
-                {/* ACTION BUTTONS: CATAT PEMASUKAN & PENGELUARAN */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
-                  <div className="text-sm font-bold text-slate-100">
-                    Riwayat Keuangan — {formatMonthYear(selectedPeriod)}
+                {/* RINGKASAN AUTOMATED FINANCIAL LEDGER CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* PEMASUKAN CARD */}
+                  <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-400">Total Pemasukan (Income)</span>
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <p className="text-2xl font-black text-emerald-400">{formatMoney(automatedFinSummary.totalIncome)}</p>
+                    <div className="text-[11px] text-slate-400 space-y-0.5 pt-1 border-t border-emerald-500/20">
+                      <div className="flex justify-between">
+                        <span>Vendor Email ({automatedFinSummary.periodApprovedAccs} ACC @ {formatMoney(vendorSalePrice)}):</span>
+                        <strong className="text-emerald-300">{formatMoney(automatedFinSummary.vendorEmailIncome)}</strong>
+                      </div>
+                      {automatedFinSummary.manualIncome > 0 && (
+                        <div className="flex justify-between">
+                          <span>Pemasukan Manual:</span>
+                          <strong className="text-emerald-300">{formatMoney(automatedFinSummary.manualIncome)}</strong>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+
+                  {/* PENGELUARAN CARD */}
+                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-rose-400">Total Pengeluaran (Expense)</span>
+                      <TrendingDown className="w-4 h-4 text-rose-400" />
+                    </div>
+                    <p className="text-2xl font-black text-rose-400">{formatMoney(automatedFinSummary.totalExpense)}</p>
+                    <div className="text-[11px] text-slate-400 space-y-0.5 pt-1 border-t border-rose-500/20">
+                      <div className="flex justify-between">
+                        <span>Komisi Worker ACC:</span>
+                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Penarikan Worker:</span>
+                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWithdrawalsExpense)}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Hadiah & Bonus (Leaderboard/Referral):</span>
+                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
+                      </div>
+                      {automatedFinSummary.manualExpense > 0 && (
+                        <div className="flex justify-between">
+                          <span>Pengeluaran Manual:</span>
+                          <strong className="text-rose-300">{formatMoney(automatedFinSummary.manualExpense)}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SALDO BERSIH CARD */}
+                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-teal-300" : "bg-rose-950/40 border-rose-500/40 text-rose-300"}`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold">Saldo Bersih (Net Balance)</span>
+                        <Wallet className="w-4 h-4 text-teal-400" />
+                      </div>
+                      <p className={`text-2xl font-black ${automatedFinSummary.netBalance >= 0 ? "text-teal-300" : "text-rose-400"}`}>
+                        {formatMoney(automatedFinSummary.netBalance)}
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+                      Auto-calculated: Pemasukan - Pengeluaran ({formatMonthYear(selectedPeriod)})
+                    </p>
+                  </div>
+                </div>
+
+                {/* SEARCH FILTER & ACTION BUTTONS: CATAT PEMASUKAN & PENGELUARAN */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-800">
+                  <div className="flex items-center gap-2 flex-1 max-w-md">
+                    <Input
+                      placeholder="Cari transaksi manual..."
+                      value={finSearch}
+                      onChange={(e) => setFinSearch(e.target.value)}
+                      className="h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 shrink-0">
                     <Button
                       onClick={() => openAddFinModal("income")}
                       className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
@@ -1975,22 +2181,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
                 </div>
 
-                {/* DAFTAR TRANSAKSI KEUANGAN */}
+                {/* DAFTAR TRANSAKSI KEUANGAN MANUAL */}
                 {finLoading && <p className="text-sm text-slate-400 text-center py-8">Memuat laporan keuangan...</p>}
                 {finError && (
                   <div className="p-6 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center rounded-lg">
                     Gagal memuat laporan keuangan. Silakan coba lagi.
                   </div>
                 )}
-                {!finLoading && !finError && finTransactions.length === 0 && (
+                {!finLoading && !finError && filteredFinTransactions.length === 0 && (
                   <div className="p-10 border border-dashed border-slate-800 text-center rounded-xl bg-slate-950/40 space-y-1">
-                    <p className="text-sm font-semibold text-slate-300">Belum ada transaksi pada periode ini.</p>
-                    <p className="text-xs text-slate-500">Gunakan tombol di atas untuk mencatat pemasukan atau pengeluaran manual.</p>
+                    <p className="text-sm font-semibold text-slate-300">Belum ada transaksi manual pada periode ini.</p>
+                    <p className="text-xs text-slate-500">Gunakan tombol di atas untuk mencatat penyesuaian pemasukan atau pengeluaran manual.</p>
                   </div>
                 )}
-                {!finLoading && !finError && finTransactions.length > 0 && (
+                {!finLoading && !finError && filteredFinTransactions.length > 0 && (
                   <div className="space-y-3">
-                    {finTransactions.map((tx) => {
+                    {filteredFinTransactions.map((tx) => {
                       const isIncome = tx.type === "income";
                       return (
                         <div
@@ -2614,18 +2820,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <Select
-                      value={leaderboardPeriodType}
-                      onValueChange={(val: "weekly" | "monthly") => setLeaderboardPeriodType(val)}
-                    >
-                      <SelectTrigger className="w-32 text-xs font-bold bg-slate-950 border-slate-800 text-slate-100">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="weekly" className="text-xs">Mingguan</SelectItem>
-                        <SelectItem value="monthly" className="text-xs">Bulanan</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5" />
+                      Mingguan
+                    </div>
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -2684,37 +2882,74 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {currentLeaderboardStandings.slice(0, 3).map((item) => (
-                        <div
-                          key={item.workerId}
-                          className={`p-3.5 rounded-xl border text-left bg-slate-950/60 shadow-sm space-y-1.5 ${
-                            item.rank === 1 ? "border-emerald-500/50 ring-1 ring-emerald-500/20 bg-emerald-500/5" : "border-slate-800"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <Badge
-                              className={`text-[10px] font-extrabold ${
-                                item.rank === 1
-                                  ? "bg-emerald-500 text-slate-950"
-                                  : item.rank === 2
-                                    ? "bg-slate-700 text-slate-200"
-                                    : "bg-slate-800 text-slate-300"
-                              }`}
-                            >
-                              Juara #{item.rank}
-                            </Badge>
-                            <span className="text-[11px] font-mono text-slate-500">{item.maskedName}</span>
+                      {currentLeaderboardStandings.slice(0, 3).map((item) => {
+                        const payoutKey = `${currentLeaderboardTimeframe.key}_rank${item.rank}_${item.workerId}`;
+                        const isPaid = paidLeaderboardSet.has(payoutKey);
+                        const isPaying = payingIndividualWorkerId === item.workerId;
+                        const rewardAmt = item.rewardAmount || (item.rank === 1 ? 50000 : item.rank === 2 ? 30000 : 15000);
+
+                        return (
+                          <div
+                            key={item.workerId}
+                            className={`p-3.5 rounded-xl border text-left bg-slate-950/60 shadow-sm space-y-2 flex flex-col justify-between ${
+                              item.rank === 1 ? "border-emerald-500/50 ring-1 ring-emerald-500/20 bg-emerald-500/5" : "border-slate-800"
+                            }`}
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Badge
+                                  className={`text-[10px] font-extrabold ${
+                                    item.rank === 1
+                                      ? "bg-emerald-500 text-slate-950"
+                                      : item.rank === 2
+                                        ? "bg-slate-700 text-slate-200"
+                                        : "bg-slate-800 text-slate-300"
+                                  }`}
+                                >
+                                  Juara #{item.rank}
+                                </Badge>
+                                <span className="text-[11px] font-mono text-slate-500">{item.maskedName}</span>
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
+                                <p className="text-xs text-emerald-400 font-bold">{item.validAccCount} Email ACC Valid</p>
+                              </div>
+                              <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
+                                <span className="text-slate-400">Reward:</span>
+                                <span className="font-black text-emerald-400">{formatMoney(rewardAmt)}</span>
+                              </div>
+                            </div>
+
+                            <div className="pt-1">
+                              {isPaid ? (
+                                <Button
+                                  disabled
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full text-xs h-8 bg-slate-900 border-slate-800 text-emerald-400 font-bold gap-1 opacity-80 cursor-not-allowed"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Sudah Dicairkan
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  disabled={isPaying || item.validAccCount <= 0}
+                                  onClick={() => handleCairkanIndividualReward(item)}
+                                  className="w-full text-xs h-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold hover:from-emerald-400 hover:to-teal-500 shadow-md shadow-emerald-500/10 gap-1"
+                                >
+                                  {isPaying ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Gift className="w-3.5 h-3.5" />
+                                  )}
+                                  Cairkan Reward
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
-                            <p className="text-xs text-emerald-400 font-bold">{item.validAccCount} Email ACC Valid</p>
-                          </div>
-                          <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                            <span className="text-slate-400">Reward:</span>
-                            <span className="font-black text-emerald-400">{formatMoney(item.rewardAmount || 0)}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
