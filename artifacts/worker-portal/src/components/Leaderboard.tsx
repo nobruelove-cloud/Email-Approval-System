@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
-import { Trophy, Medal, Award, Flame, Crown, Sparkles, CheckCircle2, User } from "lucide-react";
+import { Trophy, Medal, Award, Flame, Crown, Sparkles, CheckCircle2, User, Info, Target, HelpCircle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useCollection } from "@/hooks/use-portal";
 import { type EmailSubmission, type PortalUser, type LeaderboardRewardConfig } from "@/lib/portal-types";
 import {
   calculateLeaderboardStandings,
@@ -14,7 +17,7 @@ import {
 } from "@/lib/portal-utils";
 
 interface LeaderboardProps {
-  submissions: EmailSubmission[];
+  submissions?: EmailSubmission[];
   users?: PortalUser[];
   currentUserId?: string;
   rewards?: LeaderboardRewardConfig[];
@@ -22,16 +25,21 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({
-  submissions = [],
+  submissions: propSubmissions,
   users = [],
   currentUserId,
   rewards = [
     { rank: 1, rewardAmount: 50000 },
-    { rank: 2, rewardAmount: 30000 },
+    { rank: 2, rewardAmount: 25000 },
     { rank: 3, rewardAmount: 15000 },
   ],
   className = "",
 }: LeaderboardProps) {
+  // Real-time synchronization of all global submissions for global leaderboard view
+  const globalSubmissions = useCollection<EmailSubmission>("emailSubmissions");
+  const activeSubmissions = propSubmissions && propSubmissions.length > 0 ? propSubmissions : globalSubmissions.data;
+
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [periodType, setPeriodType] = useState<"weekly" | "monthly">("weekly");
 
   // Calculate timeframe
@@ -62,22 +70,57 @@ export function Leaderboard({
   // Calculate real-time standings
   const standings = useMemo(() => {
     return calculateLeaderboardStandings(
-      submissions,
+      activeSubmissions,
       users,
       timeFrame.start,
       timeFrame.end,
       rewards
     );
-  }, [submissions, users, timeFrame.start, timeFrame.end, rewards]);
+  }, [activeSubmissions, users, timeFrame.start, timeFrame.end, rewards]);
 
   const topThree = useMemo(() => standings.slice(0, 3), [standings]);
-  const restList = useMemo(() => standings.slice(3), [standings]);
 
   // Find current user position if present
   const myPosition = useMemo(() => {
     if (!currentUserId) return null;
     return standings.find((s) => s.workerId === currentUserId) || null;
   }, [standings, currentUserId]);
+
+  // Target requirement calculation for logged-in user
+  const userProgressInfo = useMemo(() => {
+    const acc = myPosition ? myPosition.validAccCount : 0;
+    const rank = myPosition ? myPosition.rank : standings.length + 1;
+
+    // Minimum targets
+    // Juara 1: 200 ACC (Rp 50.000)
+    // Juara 2: 100 ACC (Rp 25.000)
+    // Juara 3: 50 ACC  (Rp 15.000)
+    let nextTarget = 50;
+    let targetTitle = "Juara 3 (Bonus Rp 15.000)";
+
+    if (acc >= 200) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000) — Target Tercapai! 🎉";
+    } else if (acc >= 100) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else if (acc >= 50) {
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 25.000)";
+    }
+
+    const remaining = Math.max(0, nextTarget - acc);
+    const progressPercent = Math.min(100, Math.round((acc / nextTarget) * 100));
+
+    return {
+      acc,
+      rank,
+      nextTarget,
+      targetTitle,
+      remaining,
+      progressPercent,
+    };
+  }, [myPosition, standings.length]);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -87,15 +130,26 @@ export function Leaderboard({
         <CardContent className="p-6 sm:p-8 space-y-6 relative z-10">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5 max-w-xl">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-bold uppercase tracking-wider">
-                <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                Klasemen Top Pekerja
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-bold uppercase tracking-wider">
+                  <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                  Klasemen Global Real-Time
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRulesModal(true)}
+                  className="bg-white/10 hover:bg-white/20 text-amber-100 border-amber-400/30 text-[11px] font-bold h-7 px-2.5 rounded-full gap-1"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-300" />
+                  Aturan & S&K
+                </Button>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
                 Pahlawan Email ACC Terbanyak
               </h2>
               <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
-                Peringkat real-time dihitung murni berdasarkan jumlah akun email disetujui (ACC). Capai Top 3 dan menangkan bonus tunai otomatis!
+                Peringkat global tersinkronisasi real-time murni berdasarkan email ACC. Dapatkan bonus tunai mingguan dengan memenuhi target minimal ACC!
               </p>
             </div>
 
@@ -137,21 +191,77 @@ export function Leaderboard({
                 <span>Posisi Anda: <strong className="text-white">Peringkat #{myPosition.rank}</strong> ({myPosition.validAccCount} Email ACC)</span>
               </div>
             ) : (
-              <span className="text-amber-300/80 italic">Setor email ACC sekarang untuk masuk ke papan klasemen!</span>
+              <span className="text-amber-300/80 italic">Setor email ACC sekarang untuk masuk ke papan klasemen global!</span>
             )}
           </div>
         </CardContent>
       </Card>
 
+      {/* STICKY "PERINGKAT ANDA" CARD */}
+      {currentUserId && (
+        <Card className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 border-amber-500/40 shadow-md text-white sticky top-20 z-10 backdrop-blur-xl">
+          <CardContent className="p-4 sm:p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm ring-2 ring-amber-400/30">
+                  <Crown className="w-5 h-5 text-amber-100" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Peringkat Anda saat ini</span>
+                    <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/30 text-[10px] font-bold">
+                      Global Rank
+                    </Badge>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    {myPosition ? `Peringkat #${userProgressInfo.rank}` : "Belum Masuk Peringkat"}
+                    <span className="text-xs text-amber-200/80 font-normal ml-2">
+                      ({userProgressInfo.acc} Email ACC Terverifikasi)
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <span className="text-[11px] text-amber-300 font-medium block">Target Berikutnya</span>
+                <span className="text-sm font-bold text-white">{userProgressInfo.targetTitle}</span>
+              </div>
+            </div>
+
+            {/* PROGRESS BAR */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-amber-200 font-semibold flex items-center gap-1">
+                  <Target className="w-3.5 h-3.5 text-amber-400" />
+                  Target: {userProgressInfo.acc}/{userProgressInfo.nextTarget} ACC
+                </span>
+                <span className="text-amber-300 font-bold">{userProgressInfo.progressPercent}%</span>
+              </div>
+              <div className="w-full bg-slate-800/90 h-3 rounded-full overflow-hidden border border-amber-500/30 p-0.5">
+                <div
+                  className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 h-full rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(245,158,11,0.6)]"
+                  style={{ width: `${userProgressInfo.progressPercent}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-amber-200/90 font-medium">
+                {userProgressInfo.remaining > 0
+                  ? `Kurang ${userProgressInfo.remaining} ACC lagi untuk Klaim Bonus ${userProgressInfo.targetTitle}`
+                  : "🎉 Selamat! Anda telah mencapai target kualifikasi bonus!"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* REWARD PRIZE BANNER */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { rank: 1, title: "Juara 1 (Gold)", bg: "from-amber-500 to-amber-600", border: "border-amber-400", text: "text-amber-950", icon: <Crown className="w-5 h-5 text-amber-200" /> },
-          { rank: 2, title: "Juara 2 (Silver)", bg: "from-slate-400 to-slate-500", border: "border-slate-300", text: "text-slate-950", icon: <Medal className="w-5 h-5 text-slate-100" /> },
-          { rank: 3, title: "Juara 3 (Bronze)", bg: "from-amber-700 to-orange-800", border: "border-amber-600", text: "text-amber-100", icon: <Award className="w-5 h-5 text-amber-300" /> },
+          { rank: 1, title: "🥇 Juara 1 (Gold)", req: "Min. 200 ACC / minggu", bg: "from-amber-500 to-amber-600", border: "border-amber-400", text: "text-amber-950", icon: <Crown className="w-5 h-5 text-amber-200" /> },
+          { rank: 2, title: "🥈 Juara 2 (Silver)", req: "Min. 100 ACC / minggu", bg: "from-slate-400 to-slate-500", border: "border-slate-300", text: "text-slate-950", icon: <Medal className="w-5 h-5 text-slate-100" /> },
+          { rank: 3, title: "🥉 Juara 3 (Bronze)", req: "Min. 50 ACC / minggu", bg: "from-amber-700 to-orange-800", border: "border-amber-600", text: "text-amber-100", icon: <Award className="w-5 h-5 text-amber-300" /> },
         ].map((prize) => {
           const rCfg = rewards.find((r) => r.rank === prize.rank);
-          const rewardAmt = rCfg ? rCfg.rewardAmount : prize.rank === 1 ? 50000 : prize.rank === 2 ? 30000 : 15000;
+          const rewardAmt = rCfg ? rCfg.rewardAmount : prize.rank === 1 ? 50000 : prize.rank === 2 ? 25000 : 15000;
 
           return (
             <div
@@ -165,6 +275,7 @@ export function Leaderboard({
                 <div>
                   <p className="text-xs font-bold text-white/90">{prize.title}</p>
                   <p className="text-lg font-black tracking-tight">{formatMoney(rewardAmt)}</p>
+                  <p className="text-[10px] text-white/80 font-semibold">{prize.req}</p>
                 </div>
               </div>
               <Badge className="bg-white/20 text-white border-0 text-[10px] font-extrabold uppercase">
@@ -314,15 +425,15 @@ export function Leaderboard({
                         <td className="py-3 px-3 align-middle text-center font-black">
                           {item.rank === 1 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-white shadow-2xs font-extrabold text-xs">
-                              1
+                              🥇
                             </span>
                           ) : item.rank === 2 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-500 text-white font-extrabold text-xs">
-                              2
+                              🥈
                             </span>
                           ) : item.rank === 3 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-800 text-white font-extrabold text-xs">
-                              3
+                              🥉
                             </span>
                           ) : (
                             <span className="text-gray-500 font-mono text-sm">#{item.rank}</span>
@@ -360,6 +471,60 @@ export function Leaderboard({
           )}
         </CardContent>
       </Card>
+
+      {/* RULES & TERMS DIALOG MODAL */}
+      <Dialog open={showRulesModal} onOpenChange={setShowRulesModal}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-gray-900 font-bold text-base">
+              <ShieldCheck className="w-5 h-5 text-amber-600" />
+              Syarat & Ketentuan Klasemen Global
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Ketentuan perhitungan peringkat dan klaim bonus pahlawan email ACC.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 text-xs text-gray-700 pt-2">
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 space-y-1">
+              <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-orange-500" /> Timer Reset Peringkat Mingguan:
+              </p>
+              <p className="text-[11px] text-amber-900 leading-relaxed">
+                Papan klasemen mingguan dihitung ulang setiap minggunya (dimulai Senin jam 00:00 WIB hingga Minggu jam 23:59 WIB).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-bold text-gray-900">Ketentuan Minimal Target ACC untuk Bonus Admin Profit Safety:</p>
+              <ul className="space-y-1.5 text-[11px] list-disc list-inside bg-slate-50 p-3 rounded-xl border border-gray-200">
+                <li>
+                  <strong>Top 1 (Juara 1):</strong> Bonus Rp 50.000 (Syarat Minimal: <span className="text-amber-700 font-bold">200 Email ACC / minggu</span>)
+                </li>
+                <li>
+                  <strong>Top 2 (Juara 2):</strong> Bonus Rp 25.000 (Syarat Minimal: <span className="text-amber-700 font-bold">100 Email ACC / minggu</span>)
+                </li>
+                <li>
+                  <strong>Top 3 (Juara 3):</strong> Bonus Rp 15.000 (Syarat Minimal: <span className="text-amber-700 font-bold">50 Email ACC / minggu</span>)
+                </li>
+              </ul>
+            </div>
+
+            <p className="text-[11px] text-gray-500 italic">
+              * Seluruh data email ACC disinkronkan secara langsung dari database Firestore utama platform. Peringkat bersifat adil & transparan.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <Button
+              onClick={() => setShowRulesModal(false)}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-9 rounded-xl text-xs"
+            >
+              Saya Mengerti
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

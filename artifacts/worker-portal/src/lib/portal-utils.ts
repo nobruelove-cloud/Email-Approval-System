@@ -53,6 +53,24 @@ export function maskWorkerName(name?: string | null): string {
   if (!name || typeof name !== "string") return "User***";
   const trimmed = name.trim();
   if (!trimmed) return "User***";
+
+  // Handle email addresses (e.g., edward@gmail.com -> ed***@gmail.com)
+  if (trimmed.includes("@") && !trimmed.startsWith("@")) {
+    const parts = trimmed.split("@");
+    const local = parts[0];
+    const domain = parts.slice(1).join("@");
+    const maskedLocal = local.length <= 2 ? `${local.charAt(0)}***` : `${local.slice(0, 2)}***`;
+    return `${maskedLocal}@${domain}`;
+  }
+
+  // Handle handles starting with @ (e.g., @edi_kurniawan -> @ed***)
+  if (trimmed.startsWith("@")) {
+    const handle = trimmed.slice(1);
+    const maskedHandle = handle.length <= 2 ? `${handle.charAt(0)}***` : `${handle.slice(0, 2)}***`;
+    return `@${maskedHandle}`;
+  }
+
+  // Handle standard names (e.g., Ahmad Fauzi -> Ahm***)
   if (trimmed.length <= 2) {
     return `${trimmed.charAt(0)}***`;
   }
@@ -755,12 +773,27 @@ export function calculateLeaderboardStandings(
     rewardConfigs.forEach((r) => rewardMap.set(r.rank, r.rewardAmount));
   }
 
+  const WEEKLY_MIN_ACC_THRESHOLDS: Record<number, number> = {
+    1: 200, // Juara 1: Min 200 ACC
+    2: 100, // Juara 2: Min 100 ACC
+    3: 50,  // Juara 3: Min 50 ACC
+  };
+
   return sorted.map((entry, idx) => {
     const rank = idx + 1;
+    const baseReward = rewardMap.get(rank) ?? 0;
+    const minAccRequired = WEEKLY_MIN_ACC_THRESHOLDS[rank];
+
+    // Enforce minimum ACC threshold check for reward eligibility
+    let eligibleReward = baseReward;
+    if (minAccRequired !== undefined && entry.validAccCount < minAccRequired) {
+      eligibleReward = 0;
+    }
+
     return {
       ...entry,
       rank,
-      rewardAmount: rewardMap.get(rank) ?? 0,
+      rewardAmount: eligibleReward,
     };
   });
 }
