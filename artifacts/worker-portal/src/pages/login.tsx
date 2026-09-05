@@ -54,6 +54,7 @@ import { auth, firebaseConfigured } from "@/lib/firebase";
 import { createPortalUser, registerReferral, useSettings } from "@/hooks/use-portal";
 import { DEFAULT_RULES, type ReferralTierConfig } from "@/lib/portal-types";
 import { formatMoney } from "@/lib/portal-utils";
+import { LiveWithdrawalTicker } from "@/components/LiveWithdrawalTicker";
 
 function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
@@ -730,6 +731,9 @@ export default function LoginPage() {
         )}
       </header>
 
+      {/* Live Withdrawal Ticker Bar */}
+      <LiveWithdrawalTicker />
+
       {/* 2. Hero Section & Dashboard Mockup Preview */}
       <section id="hero" className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden">
         {/* Glow backdrop decorative elements */}
@@ -1026,8 +1030,8 @@ export default function LoginPage() {
                   <Users className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-white tracking-tight">1,850+</p>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Worker Aktif Terdaftar</p>
+              <p className="text-2xl font-black text-white tracking-tight">350+</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Worker Aktif</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
@@ -1036,8 +1040,8 @@ export default function LoginPage() {
                   <Clock className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-amber-400 tracking-tight">&lt; 24 Jam</p>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Proses Pencairan Cepat</p>
+              <p className="text-2xl font-black text-amber-400 tracking-tight">&lt; 12 Jam</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Process Pencairan</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
@@ -1046,7 +1050,7 @@ export default function LoginPage() {
                   <Wallet className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-white tracking-tight">Rp 480.000.000+</p>
+              <p className="text-2xl font-black text-white tracking-tight">Rp 15.000.000+</p>
               <p className="text-xs text-slate-400 mt-1 font-medium">Total Komisi Terbayar</p>
             </div>
           </div>
