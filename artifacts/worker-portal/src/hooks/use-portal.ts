@@ -2270,6 +2270,7 @@ export async function distributeLeaderboardReward(
         rank,
         validAccCount,
         rewardAmount,
+        isPaid: true,
         paidAt: serverTimestamp(),
       });
 

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Trophy, Medal, Award, Flame, Crown, Sparkles, CheckCircle2, User, Info, Target, HelpCircle, ShieldCheck } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { Trophy, Medal, Award, Flame, Crown, Sparkles, CheckCircle2, User, Info, Target, HelpCircle, ShieldCheck, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -27,7 +27,7 @@ export function Leaderboard({
   currentUserId,
   rewards = [
     { rank: 1, rewardAmount: 50000 },
-    { rank: 2, rewardAmount: 25000 },
+    { rank: 2, rewardAmount: 30000 },
     { rank: 3, rewardAmount: 15000 },
   ],
   className = "",
@@ -45,7 +45,7 @@ export function Leaderboard({
 
   const [showRulesModal, setShowRulesModal] = useState(false);
 
-  // Calculate timeframe (strictly Weekly)
+  // Calculate timeframe (strictly Weekly: Senin 00:00 WIB s/d Minggu 23:59 WIB)
   const timeFrame = useMemo(() => {
     const now = new Date();
     const { start, end } = getStartAndEndOfWeek(now);
@@ -57,6 +57,36 @@ export function Leaderboard({
       end,
     };
   }, []);
+
+  // Real-time weekly countdown timer state to Sunday 23:59 WIB
+  const [weeklyCountdown, setWeeklyCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  useEffect(() => {
+    function calcCountdown() {
+      const nowMs = Date.now();
+      const endMs = timeFrame.end.getTime();
+      const diffMs = Math.max(0, endMs - nowMs);
+
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+      return { days, hours, minutes, seconds };
+    }
+
+    setWeeklyCountdown(calcCountdown());
+    const interval = setInterval(() => {
+      setWeeklyCountdown(calcCountdown());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeFrame.end]);
 
   // Calculate real-time standings
   const standings = useMemo(() => {
@@ -77,27 +107,36 @@ export function Leaderboard({
     return standings.find((s) => s.workerId === currentUserId) || null;
   }, [standings, currentUserId]);
 
-  // Target requirement calculation for logged-in user
+  // Target requirement calculation for logged-in user based on actual rank
   const userProgressInfo = useMemo(() => {
     const acc = myPosition ? myPosition.validAccCount : 0;
-    const rank = myPosition ? myPosition.rank : standings.length + 1;
+    const rank = myPosition ? myPosition.rank : (standings.length > 0 ? standings.length + 1 : 99);
 
-    // Minimum targets
-    // Juara 1: 200 ACC (Rp 50.000)
-    // Juara 2: 100 ACC (Rp 25.000)
-    // Juara 3: 50 ACC  (Rp 15.000)
+    // Synchronize target requirement strictly with current rank position:
+    // Rank #1: Juara 1 (min 200 ACC, Rp 50.000)
+    // Rank #2: Juara 2 (min 100 ACC, Rp 30.000)
+    // Rank #3: Juara 3 (min 50 ACC, Rp 15.000)
+    // Rank #4+ or unranked: Menembus Juara 3 (min 50 ACC, Rp 15.000)
     let nextTarget = 50;
-    let targetTitle = "Juara 3 (Bonus Rp 15.000)";
+    let targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
 
-    if (acc >= 200) {
-      nextTarget = 200;
-      targetTitle = "Juara 1 (Bonus Rp 50.000) — Target Tercapai! 🎉";
-    } else if (acc >= 100) {
-      nextTarget = 200;
-      targetTitle = "Juara 1 (Bonus Rp 50.000)";
-    } else if (acc >= 50) {
-      nextTarget = 100;
-      targetTitle = "Juara 2 (Bonus Rp 25.000)";
+    if (myPosition) {
+      if (rank === 1) {
+        nextTarget = 200;
+        targetTitle = "Juara 1 (Bonus Rp 50.000)";
+      } else if (rank === 2) {
+        nextTarget = 100;
+        targetTitle = "Juara 2 (Bonus Rp 30.000)";
+      } else if (rank === 3) {
+        nextTarget = 50;
+        targetTitle = "Juara 3 (Bonus Rp 15.000)";
+      } else {
+        nextTarget = 50;
+        targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
+      }
+    } else {
+      nextTarget = 50;
+      targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
     }
 
     const remaining = Math.max(0, nextTarget - acc);
@@ -144,12 +183,15 @@ export function Leaderboard({
               </p>
             </div>
 
-            {/* WEEKLY LEADERBOARD BADGE */}
-            <div className="shrink-0 bg-amber-900/80 px-4 py-2 rounded-2xl border border-amber-700/80 backdrop-blur-md">
-              <span className="text-xs font-bold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                Mingguan
+            {/* COUNTDOWN TIMER BADGE */}
+            <div className="shrink-0 bg-[#2D1B00] px-4 py-3 rounded-2xl border border-amber-700/80 backdrop-blur-md space-y-1 text-center sm:text-right">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center justify-center sm:justify-end gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                Sisa Waktu Kompetisi
               </span>
+              <p className="font-mono text-sm sm:text-base font-black text-[#FFB74D] tracking-tight">
+                {weeklyCountdown.days}h {weeklyCountdown.hours}j {weeklyCountdown.minutes}m {weeklyCountdown.seconds}d
+              </p>
             </div>
           </div>
 
@@ -319,7 +361,7 @@ export function Leaderboard({
                         <p className="font-extrabold text-gray-900 text-base flex items-center justify-center gap-1.5">
                           <span>{item.maskedName}</span>
                           {isMe && (
-                            <Badge className="bg-emerald-500 text-white text-[10px] py-0 px-1 font-bold">
+                            <Badge className="bg-amber-600 text-white text-[10px] py-0 px-1 font-bold">
                               Anda
                             </Badge>
                           )}
@@ -419,7 +461,7 @@ export function Leaderboard({
                           <div className="flex items-center gap-2">
                             <span>{item.maskedName}</span>
                             {isMe && (
-                              <Badge className="bg-emerald-600 text-white text-[10px] py-0 px-1 font-bold">
+                              <Badge className="bg-amber-600 text-white text-[10px] py-0 px-1 font-bold">
                                 (Anda)
                               </Badge>
                             )}
@@ -477,7 +519,7 @@ export function Leaderboard({
                   <strong>Top 1 (Juara 1):</strong> Bonus Rp 50.000 (Syarat Minimal: <span className="text-amber-700 font-bold">200 Email ACC / minggu</span>)
                 </li>
                 <li>
-                  <strong>Top 2 (Juara 2):</strong> Bonus Rp 25.000 (Syarat Minimal: <span className="text-amber-700 font-bold">100 Email ACC / minggu</span>)
+                  <strong>Top 2 (Juara 2):</strong> Bonus Rp 30.000 (Syarat Minimal: <span className="text-amber-700 font-bold">100 Email ACC / minggu</span>)
                 </li>
                 <li>
                   <strong>Top 3 (Juara 3):</strong> Bonus Rp 15.000 (Syarat Minimal: <span className="text-amber-700 font-bold">50 Email ACC / minggu</span>)
