@@ -723,6 +723,124 @@ export interface LeaderboardEntry {
   rewardAmount?: number;
 }
 
+export interface LeaderboardUserProgress {
+  acc: number;
+  arrayRank: number | null;
+  positionText: string;
+  nextTarget: number;
+  targetTitle: string;
+  remaining: number;
+  progressPercent: number;
+  descriptionText: string;
+}
+
+/**
+ * Calculates user qualification status, rank title, next target, and progress bar for Leaderboard UI.
+ */
+export function getLeaderboardUserProgress(
+  acc: number,
+  arrayRank: number | null
+): LeaderboardUserProgress {
+  const validAcc = Math.max(0, acc || 0);
+
+  // 1. Unqualified if ACC < 50 (Minimum threshold for Juara 3)
+  if (validAcc < 50) {
+    const nextTarget = 50;
+    const targetTitle = "Juara 3 (Bonus Rp 15.000)";
+    const remaining = nextTarget - validAcc;
+    const progressPercent = Math.min(100, Math.round((validAcc / nextTarget) * 100));
+    const positionText = arrayRank !== null && arrayRank <= 3 ? "Belum Terkualifikasi" : "Di Luar Top 3";
+    const descriptionText = `Butuh ${remaining} email ACC lagi untuk masuk kualifikasi Juara 3`;
+
+    return {
+      acc: validAcc,
+      arrayRank,
+      positionText,
+      nextTarget,
+      targetTitle,
+      remaining,
+      progressPercent,
+      descriptionText,
+    };
+  }
+
+  // 2. Qualified (ACC >= 50)
+  let officialRankLabel = "Di Luar Top 3";
+  let nextTarget = 50;
+  let targetTitle = "Juara 3 (Bonus Rp 15.000)";
+
+  if (arrayRank === 1) {
+    if (validAcc >= 200) {
+      officialRankLabel = "Peringkat #1";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else if (validAcc >= 100) {
+      officialRankLabel = "Peringkat #2";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      officialRankLabel = "Peringkat #3";
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else if (arrayRank === 2) {
+    if (validAcc >= 100) {
+      officialRankLabel = "Peringkat #2";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      officialRankLabel = "Peringkat #3";
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else if (arrayRank === 3) {
+    officialRankLabel = "Peringkat #3";
+    if (validAcc >= 100) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else {
+    // arrayRank > 3 or null
+    officialRankLabel = "Di Luar Top 3";
+    if (validAcc >= 100) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  }
+
+  const remaining = Math.max(0, nextTarget - validAcc);
+  const progressPercent = Math.min(100, Math.round((validAcc / nextTarget) * 100));
+
+  let descriptionText = "";
+  if (remaining > 0) {
+    const targetName = targetTitle.startsWith("Juara 1")
+      ? "Juara 1"
+      : targetTitle.startsWith("Juara 2")
+      ? "Juara 2"
+      : "Juara 3";
+    descriptionText = `Butuh ${remaining} email ACC lagi untuk masuk kualifikasi ${targetName}`;
+  } else {
+    descriptionText = "🎉 Selamat! Anda telah mencapai target kualifikasi bonus!";
+  }
+
+  return {
+    acc: validAcc,
+    arrayRank,
+    positionText: officialRankLabel,
+    nextTarget,
+    targetTitle,
+    remaining,
+    progressPercent,
+    descriptionText,
+  };
+}
+
 /**
  * Calculates real-time leaderboard standings based ONLY on APPROVED email submissions within a timeframe.
  */
