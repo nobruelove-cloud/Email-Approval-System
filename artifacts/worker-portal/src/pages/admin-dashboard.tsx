@@ -130,6 +130,7 @@ import {
   formatBatchEmailsWithPasswords,
   calculateLeaderboardStandings,
   maskWorkerName,
+  getWeeklyPeriodOptions,
 } from "@/lib/portal-utils";
 
 function copyToClipboard(text: string): Promise<boolean> {
@@ -946,12 +947,24 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   // Leaderboard Management State
   const [distributingLeaderboard, setDistributingLeaderboard] = useState(false);
 
-  const currentLeaderboardTimeframe = useMemo(() => {
+  const weeklyPeriodOptions = useMemo(() => getWeeklyPeriodOptions(10), []);
+  const [selectedWeeklyPeriod, setSelectedWeeklyPeriod] = useState<string>(() => weeklyPeriodOptions[0]?.value || getWeeklyPeriodKey(new Date()));
+
+  const selectedWeeklyTimeframe = useMemo(() => {
+    const found = weeklyPeriodOptions.find((w) => w.value === selectedWeeklyPeriod);
+    if (found) return found;
+
     const now = new Date();
     const { start, end } = getStartAndEndOfWeek(now);
     const key = getWeeklyPeriodKey(now);
-    return { key, label: `Mingguan (${key})`, start, end };
-  }, []);
+    return { value: key, label: `Minggu Ini (${key})`, start, end, isCurrent: true };
+  }, [weeklyPeriodOptions, selectedWeeklyPeriod]);
+
+  // Check if selected weekly period is currently active (Senin-Minggu running)
+  const isCurrentWeeklyPeriodActive = useMemo(() => {
+    const nowMs = Date.now();
+    return nowMs >= selectedWeeklyTimeframe.start.getTime() && nowMs <= selectedWeeklyTimeframe.end.getTime();
+  }, [selectedWeeklyTimeframe]);
 
   const leaderboardRewardsConfig = useMemo(() => {
     return Array.isArray(rules.data.leaderboardRewards) && rules.data.leaderboardRewards.length > 0
@@ -967,11 +980,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     return calculateLeaderboardStandings(
       submissions.data,
       users.data,
-      currentLeaderboardTimeframe.start,
-      currentLeaderboardTimeframe.end,
+      selectedWeeklyTimeframe.start,
+      selectedWeeklyTimeframe.end,
       leaderboardRewardsConfig
     );
-  }, [submissions.data, users.data, currentLeaderboardTimeframe.start, currentLeaderboardTimeframe.end, leaderboardRewardsConfig]);
+  }, [submissions.data, users.data, selectedWeeklyTimeframe.start, selectedWeeklyTimeframe.end, leaderboardRewardsConfig]);
 
   // Set of paid payout IDs for fast lookup
   const paidLeaderboardSet = useMemo(() => {
@@ -993,7 +1006,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     rewardAmount?: number;
     workerName: string;
   }) {
-    const payoutId = `${currentLeaderboardTimeframe.key}_rank${winner.rank}_${winner.workerId}`;
+    if (isCurrentWeeklyPeriodActive) {
+      toast.error("Pencairan reward belum dapat dilakukan. Periode minggu ini masih berjalan (Senin-Minggu).");
+      return;
+    }
+
+    const minReq = winner.rank === 1 ? 200 : winner.rank === 2 ? 100 : 50;
+    if (winner.validAccCount < minReq) {
+      toast.error(`Worker Juara #${winner.rank} (${winner.workerName}) tidak memenuhi syarat minimal ACC (${winner.validAccCount}/${minReq} ACC).`);
+      return;
+    }
+
+    const payoutId = `${selectedWeeklyTimeframe.value}_rank${winner.rank}_${winner.workerId}`;
     if (paidLeaderboardSet.has(payoutId)) {
       toast.info(`Hadiah Juara #${winner.rank} (${winner.workerName}) sudah pernah dicairkan untuk periode ini.`);
       return;
@@ -1004,7 +1028,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     try {
       await distributeLeaderboardReward(
         winner.workerId,
-        currentLeaderboardTimeframe.key,
+        selectedWeeklyTimeframe.value,
         winner.rank,
         winner.validAccCount,
         rewardAmt,
@@ -1020,24 +1044,34 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }
 
   async function handleDistributeLeaderboardRewards() {
+    if (isCurrentWeeklyPeriodActive) {
+      toast.error("Pencairan reward belum dapat dilakukan. Periode minggu ini masih berjalan (Senin-Minggu).");
+      return;
+    }
+
     if (currentLeaderboardStandings.length === 0) {
       toast.error("Tidak ada pengerjaan email ACC pada periode ini.");
       return;
     }
 
-    const topWinners = currentLeaderboardStandings.slice(0, 3).filter((s) => s.validAccCount > 0);
-    if (topWinners.length === 0) {
-      toast.error("Tidak ada pemenang dengan pengerjaan ACC > 0.");
+    // Filter qualified top 3 winners matching min ACC thresholds (Juara 1: 200, Juara 2: 100, Juara 3: 50)
+    const qualifiedWinners = currentLeaderboardStandings.slice(0, 3).filter((s) => {
+      const minReq = s.rank === 1 ? 200 : s.rank === 2 ? 100 : 50;
+      return s.validAccCount >= minReq && (s.rewardAmount ?? 0) > 0;
+    });
+
+    if (qualifiedWinners.length === 0) {
+      toast.error("Tidak ada pemenang Top 3 yang memenuhi syarat minimal ACC (Juara 1: 200, Juara 2: 100, Juara 3: 50).");
       return;
     }
 
     // Filter out workers who have already been paid for this period
-    const unpaidWinners = topWinners.filter(
-      (w) => !paidLeaderboardSet.has(`${currentLeaderboardTimeframe.key}_rank${w.rank}_${w.workerId}`)
+    const unpaidWinners = qualifiedWinners.filter(
+      (w) => !paidLeaderboardSet.has(`${selectedWeeklyTimeframe.value}_rank${w.rank}_${w.workerId}`)
     );
 
     if (unpaidWinners.length === 0) {
-      toast.info(`Seluruh pemenang untuk periode ${currentLeaderboardTimeframe.key} sudah dicairkan.`);
+      toast.info(`Seluruh pemenang qualified untuk periode ${selectedWeeklyTimeframe.value} sudah dicairkan.`);
       return;
     }
 
@@ -1050,7 +1084,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       try {
         await distributeLeaderboardReward(
           winner.workerId,
-          currentLeaderboardTimeframe.key,
+          selectedWeeklyTimeframe.value,
           winner.rank,
           winner.validAccCount,
           rewardAmt,
@@ -3122,48 +3156,101 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </CardDescription>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Trophy className="w-3.5 h-3.5" />
-                      Mingguan
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
+                    {/* WEEKLY PERIOD SELECTOR */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                      <Select value={selectedWeeklyPeriod} onValueChange={setSelectedWeeklyPeriod}>
+                        <SelectTrigger className="h-7 border-0 bg-transparent text-xs font-bold text-amber-300 focus:ring-0 w-44">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                          {weeklyPeriodOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
+                    {/* CAIRCAN REWARD KLASEMEN MINGGUAN BUTTON */}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
-                          disabled={distributingLeaderboard || currentLeaderboardStandings.length === 0}
-                          className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
+                          disabled={
+                            isCurrentWeeklyPeriodActive ||
+                            distributingLeaderboard ||
+                            currentLeaderboardStandings.length === 0 ||
+                            currentLeaderboardStandings.slice(0, 3).every((w) => {
+                              const minReq = w.rank === 1 ? 200 : w.rank === 2 ? 100 : 50;
+                              return w.validAccCount < minReq || paidLeaderboardSet.has(`${selectedWeeklyTimeframe.value}_rank${w.rank}_${w.workerId}`);
+                            })
+                          }
+                          className={
+                            isCurrentWeeklyPeriodActive
+                              ? "bg-slate-800 text-slate-500 border border-slate-700 font-bold text-xs h-9 gap-1.5 cursor-not-allowed opacity-60"
+                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-amber-500/20"
+                          }
                         >
                           {distributingLeaderboard ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <Gift className="w-4 h-4" />
                           )}
-                          End Period & Distribute Reward
+                          {isCurrentWeeklyPeriodActive
+                            ? "Periode Berjalan (Disabled)"
+                            : "Cairkan Reward Klasemen Mingguan"}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-slate-900/95 border-slate-800 text-slate-100">
                         <AlertDialogHeader>
-                          <AlertDialogTitle className="text-slate-100">Akhiri Periode & Cairkan Hadiah Leaderboard?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-slate-400">
-                            Tindakan ini akan mentransfer bonus secara otomatis langsung ke Wallet Balance pemenang Top 3 untuk periode{" "}
-                            <strong className="text-emerald-400">{currentLeaderboardTimeframe.label}</strong> dan mencatat transaksi "Bonus Reward Leaderboard".
+                          <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
+                            <Trophy className="w-5 h-5 text-amber-500" />
+                            Cairkan Reward Klasemen Mingguan ({selectedWeeklyTimeframe.value})?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-slate-300 text-xs leading-relaxed">
+                            Tindakan ini akan memverifikasi pengerjaan Top 3, mentransfer bonus secara otomatis ke Saldo Utama (balance) pemenang yang memenuhi syarat minimal ACC (Juara 1: 200, Juara 2: 100, Juara 3: 50 ACC), dan menandai status <strong className="text-amber-300">isPaid: true</strong>.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="py-2 space-y-2 text-xs border-y border-slate-800 my-2">
-                          <p className="font-bold text-slate-200">Calon Penerima Hadiah:</p>
-                          {currentLeaderboardStandings.slice(0, 3).map((w) => (
-                            <div key={w.workerId} className="flex justify-between items-center bg-slate-950/80 p-2 rounded-md border border-slate-800">
-                              <span>Juara #{w.rank}: <strong className="text-slate-100">{w.workerName}</strong> ({w.validAccCount} ACC)</span>
-                              <strong className="text-emerald-400">{formatMoney(w.rewardAmount || 0)}</strong>
-                            </div>
-                          ))}
+                          <p className="font-bold text-slate-200">Daftar Calon Penerima Reward Qualified:</p>
+                          {currentLeaderboardStandings.slice(0, 3).map((w) => {
+                            const minReq = w.rank === 1 ? 200 : w.rank === 2 ? 100 : 50;
+                            const isQualified = w.validAccCount >= minReq;
+                            const isAlreadyPaid = paidLeaderboardSet.has(`${selectedWeeklyTimeframe.value}_rank${w.rank}_${w.workerId}`);
+                            const rewardAmt = w.rewardAmount || (w.rank === 1 ? 50000 : w.rank === 2 ? 30000 : 15000);
+
+                            return (
+                              <div key={w.workerId} className="flex justify-between items-center bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                                <div>
+                                  <p className="font-bold text-slate-100">Juara #{w.rank}: {w.workerName}</p>
+                                  <p className="text-[11px] text-slate-400">Pengerjaan: {w.validAccCount} / {minReq} ACC</p>
+                                </div>
+                                <div className="text-right">
+                                  {isAlreadyPaid ? (
+                                    <Badge className="bg-slate-800 text-slate-400 border-slate-700 text-[10px]">
+                                      Sudah Dicairkan
+                                    </Badge>
+                                  ) : isQualified ? (
+                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold">
+                                      Lulus (+{formatMoney(rewardAmt)})
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-[10px]">
+                                      Tidak Lulus Target ({w.validAccCount}/{minReq} ACC)
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                         <AlertDialogFooter>
                           <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Batal</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={handleDistributeLeaderboardRewards}
-                            className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold hover:from-emerald-400 hover:to-teal-500"
+                            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-extrabold"
                           >
                             Cairkan Saldo Sekarang
                           </AlertDialogAction>
@@ -3176,9 +3263,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               <CardContent className="space-y-6 pt-4">
                 {/* STANDINGS PREVIEW GRID */}
                 <div>
-                  <Label className="text-xs font-bold text-slate-200 mb-2 block">
-                    Klasemen Sementara ({currentLeaderboardTimeframe.label}):
-                  </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs font-bold text-slate-200 block">
+                      Klasemen Pemenang ({selectedWeeklyTimeframe.label}):
+                    </Label>
+                    {isCurrentWeeklyPeriodActive && (
+                      <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                        Periode Sedang Berjalan
+                      </Badge>
+                    )}
+                  </div>
                   {currentLeaderboardStandings.length === 0 ? (
                     <p className="text-xs text-slate-500 py-6 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/40">
                       Belum ada email ACC terverifikasi pada periode ini.
@@ -3186,16 +3280,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {currentLeaderboardStandings.slice(0, 3).map((item) => {
-                        const payoutKey = `${currentLeaderboardTimeframe.key}_rank${item.rank}_${item.workerId}`;
+                        const payoutKey = `${selectedWeeklyTimeframe.value}_rank${item.rank}_${item.workerId}`;
                         const isPaid = paidLeaderboardSet.has(payoutKey);
                         const isPaying = payingIndividualWorkerId === item.workerId;
+                        const minReq = item.rank === 1 ? 200 : item.rank === 2 ? 100 : 50;
+                        const isQualified = item.validAccCount >= minReq;
                         const rewardAmt = item.rewardAmount || (item.rank === 1 ? 50000 : item.rank === 2 ? 30000 : 15000);
 
                         return (
                           <div
                             key={item.workerId}
                             className={`p-3.5 rounded-xl border text-left bg-slate-950/60 shadow-sm space-y-2 flex flex-col justify-between ${
-                              item.rank === 1 ? "border-emerald-500/50 ring-1 ring-emerald-500/20 bg-emerald-500/5" : "border-slate-800"
+                              item.rank === 1 ? "border-amber-500/50 ring-1 ring-amber-500/20 bg-amber-500/5" : "border-slate-800"
                             }`}
                           >
                             <div className="space-y-1.5">
@@ -3203,10 +3299,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 <Badge
                                   className={`text-[10px] font-extrabold ${
                                     item.rank === 1
-                                      ? "bg-emerald-500 text-slate-950"
+                                      ? "bg-amber-500 text-slate-950"
                                       : item.rank === 2
                                         ? "bg-slate-700 text-slate-200"
-                                        : "bg-slate-800 text-slate-300"
+                                        : "bg-amber-900 text-amber-200"
                                   }`}
                                 >
                                   Juara #{item.rank}
@@ -3215,11 +3311,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </div>
                               <div>
                                 <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
-                                <p className="text-xs text-emerald-400 font-bold">{item.validAccCount} Email ACC Valid</p>
+                                <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {minReq} ACC Valid</p>
                               </div>
                               <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                                <span className="text-slate-400">Reward:</span>
-                                <span className="font-black text-emerald-400">{formatMoney(rewardAmt)}</span>
+                                <span className="text-slate-400">Bonus Hadiah:</span>
+                                <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-500"}>
+                                  {isQualified ? formatMoney(rewardAmt) : "Tidak Lulus Target"}
+                                </span>
                               </div>
                             </div>
 
@@ -3229,7 +3327,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   disabled
                                   size="sm"
                                   variant="outline"
-                                  className="w-full text-xs h-8 bg-slate-900 border-slate-800 text-emerald-400 font-bold gap-1 opacity-80 cursor-not-allowed"
+                                  className="w-full text-xs h-8 bg-slate-900 border-slate-800 text-amber-300 font-bold gap-1 opacity-80 cursor-not-allowed"
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                   Sudah Dicairkan
@@ -3237,16 +3335,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               ) : (
                                 <Button
                                   size="sm"
-                                  disabled={isPaying || item.validAccCount <= 0}
+                                  disabled={isCurrentWeeklyPeriodActive || isPaying || !isQualified}
                                   onClick={() => handleCairkanIndividualReward(item)}
-                                  className="w-full text-xs h-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold hover:from-emerald-400 hover:to-teal-500 shadow-md shadow-emerald-500/10 gap-1"
+                                  className="w-full text-xs h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold shadow-md shadow-amber-500/10 gap-1"
                                 >
                                   {isPaying ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                   ) : (
                                     <Gift className="w-3.5 h-3.5" />
                                   )}
-                                  Cairkan Reward
+                                  {isCurrentWeeklyPeriodActive ? "Periode Berjalan" : "Cairkan Reward"}
                                 </Button>
                               )}
                             </div>

@@ -643,6 +643,34 @@ export function getStartAndEndOfWeek(inputDate?: Date): { start: Date; end: Date
 }
 
 /**
+ * Returns weekly period options for admin dropdown selection (e.g. past N weeks).
+ */
+export function getWeeklyPeriodOptions(weeksCount = 8): { value: string; label: string; start: Date; end: Date; isCurrent: boolean }[] {
+  const options: { value: string; label: string; start: Date; end: Date; isCurrent: boolean }[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < weeksCount; i++) {
+    const refDate = new Date(now.getTime() - i * 7 * 24 * 3600 * 1000);
+    const { start, end } = getStartAndEndOfWeek(refDate);
+    const key = getWeeklyPeriodKey(refDate);
+
+    // Avoid duplicate keys if week boundary aligns
+    if (!options.some((o) => o.value === key)) {
+      const isCurrent = i === 0;
+      const label = isCurrent
+        ? `Minggu Ini (${key})`
+        : i === 1
+          ? `Minggu Lalu (${key})`
+          : `Periode ${key}`;
+
+      options.push({ value: key, label, start, end, isCurrent });
+    }
+  }
+
+  return options;
+}
+
+/**
  * Calculates valid ACC (approved) email count for a worker within a time window.
  */
 export function getWorkerAccInPeriod(
