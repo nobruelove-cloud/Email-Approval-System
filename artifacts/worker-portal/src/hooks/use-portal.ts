@@ -635,6 +635,27 @@ export function usePortalAuth() {
     }
   };
 
+  useEffect(() => {
+    if (!db || !firebaseUser?.uid) return;
+    const uid = firebaseUser.uid;
+    const firestore = db;
+
+    const sendHeartbeat = () => {
+      updateDocWithDiagnostic(
+        doc(firestore, "users", uid),
+        { lastActiveAt: serverTimestamp() },
+        "heartbeat"
+      ).catch((err) => {
+        console.warn("[Heartbeat] Failed to update lastActiveAt:", err);
+      });
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [firebaseUser?.uid]);
+
   return {
     firebaseUser,
     profile,

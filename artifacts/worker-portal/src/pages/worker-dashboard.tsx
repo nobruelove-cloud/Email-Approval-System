@@ -997,6 +997,113 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardContent>
             </Card>
 
+            {/* WIDGET SIMULASI PASIF INCOME */}
+            <Card className="bg-gradient-to-br from-[#211300] via-[#321D00] to-[#211300] text-[#FFE0B2] border-amber-900/60 shadow-xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+              <CardHeader className="pb-3 border-b border-amber-900/50 relative z-10">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-base sm:text-lg font-black text-[#FFB74D] flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    Kalkulator Simulasi Pasif Income
+                  </CardTitle>
+                  <Badge variant="outline" className="bg-amber-500/10 text-[#FFB74D] border-amber-500/30 font-bold text-xs">
+                    Komisi: {formatMoney(rules.data.referralCommissionPerAcc || 200)} / Email ACC
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs text-[#FFE0B2]/80 mt-1">
+                  Geser slider untuk mensimulasikan estimasi komisi harian dan bulanan yang bisa Anda dapatkan dari downline Anda.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="p-5 sm:p-6 space-y-6 relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* SLIDER 1: JUMLAH TEMAN / DOWNLINE (1 - 50) */}
+                  <div className="space-y-3 p-4 bg-[#2D1B00]/80 rounded-2xl border border-amber-900/40">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-[#FFE0B2] uppercase tracking-wider">
+                        Jumlah Teman / Downline
+                      </Label>
+                      <span className="text-sm font-black text-[#FFB74D] bg-amber-950 px-2.5 py-1 rounded-lg border border-amber-800/60">
+                        {simFriends} Orang
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={50}
+                      value={simFriends}
+                      onChange={(e) => setSimFriends(Number(e.target.value))}
+                      className="w-full h-2 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                    />
+                    <div className="flex justify-between text-[10px] text-amber-300/60 font-mono">
+                      <span>1 Orang</span>
+                      <span>25 Orang</span>
+                      <span>50 Orang</span>
+                    </div>
+                  </div>
+
+                  {/* SLIDER 2: RATA-RATA EMAIL ACC PER TEMAN / HARI (1 - 50) */}
+                  <div className="space-y-3 p-4 bg-[#2D1B00]/80 rounded-2xl border border-amber-900/40">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-[#FFE0B2] uppercase tracking-wider">
+                        Rata-rata Email ACC / Teman / Hari
+                      </Label>
+                      <span className="text-sm font-black text-[#FFB74D] bg-amber-950 px-2.5 py-1 rounded-lg border border-amber-800/60">
+                        {simAccPerFriend} Email
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={50}
+                      value={simAccPerFriend}
+                      onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
+                      className="w-full h-2 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                    />
+                    <div className="flex justify-between text-[10px] text-amber-300/60 font-mono">
+                      <span>1 Email</span>
+                      <span>25 Email</span>
+                      <span>50 Email</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* REAL-TIME CALCULATION SUMMARY */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#1A0E00] border border-amber-800/50 space-y-4">
+                  <div className="text-xs text-amber-200/80 flex items-center justify-between border-b border-amber-900/60 pb-3">
+                    <span>Total Volume Email ACC Tim / Hari:</span>
+                    <strong className="text-[#FFB74D] font-mono text-sm">{simFriends * simAccPerFriend} Email ACC</strong>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    {/* HARIAN */}
+                    <div className="p-3.5 rounded-xl bg-[#281500] border border-amber-900/60 space-y-1">
+                      <p className="text-[11px] font-bold text-amber-300/80 uppercase tracking-wider">
+                        Estimasi Komisi Harian
+                      </p>
+                      <p className="text-2xl font-black text-[#FFB74D] tracking-tight">
+                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 200))}
+                        <span className="text-xs font-medium text-amber-200/70 ml-1">/ Hari</span>
+                      </p>
+                    </div>
+
+                    {/* BULANAN */}
+                    <div className="p-3.5 rounded-xl bg-[#281500] border border-amber-900/60 space-y-1">
+                      <p className="text-[11px] font-bold text-amber-300/80 uppercase tracking-wider">
+                        Estimasi Komisi Bulanan (30 Hari)
+                      </p>
+                      <p className="text-2xl font-black text-[#FFB74D] tracking-tight">
+                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 200) * 30)}
+                        <span className="text-xs font-medium text-amber-200/70 ml-1">/ Bulan</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* 2. 3 STATS CARDS: Warm Krem (#FFF8F0), Border Emas (#FFE0B2), Highlight Text Oranye/Amber (#E65100) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* CARD 1: TOTAL BONUS DIDAPAT */}

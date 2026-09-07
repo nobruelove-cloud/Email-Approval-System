@@ -37,6 +37,7 @@ export type PortalUser = {
   teamAccCount?: number;
   accCount?: number;
   createdAt?: unknown;
+  lastActiveAt?: unknown;
 };
 
 export type ReferralTransaction = {
