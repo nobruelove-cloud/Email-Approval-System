@@ -129,6 +129,7 @@ import {
   formatBatchEmailsOnly,
   formatBatchEmailsWithPasswords,
   calculateLeaderboardStandings,
+  getLeaderboardUserProgress,
   maskWorkerName,
   getWeeklyPeriodOptions,
 } from "@/lib/portal-utils";
@@ -3287,6 +3288,35 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         const isQualified = item.validAccCount >= minReq;
                         const rewardAmt = item.rewardAmount || (item.rank === 1 ? 50000 : item.rank === 2 ? 30000 : 15000);
 
+                        const userProgress = getLeaderboardUserProgress(item.validAccCount, item.rank);
+
+                        let badgeLabel = "Target Juara #3";
+                        let badgeStyle = "bg-slate-800 text-slate-300 border border-slate-700";
+                        let targetAcc = userProgress.nextTarget;
+
+                        if (item.validAccCount >= 200) {
+                          badgeLabel = "Juara #1";
+                          badgeStyle = "bg-amber-500 text-slate-950";
+                          targetAcc = 200;
+                        } else if (item.validAccCount >= 100) {
+                          badgeLabel = "Juara #2";
+                          badgeStyle = "bg-slate-700 text-slate-200";
+                          targetAcc = 100;
+                        } else if (item.validAccCount >= 50) {
+                          badgeLabel = "Juara #3";
+                          badgeStyle = "bg-amber-900 text-amber-200";
+                          targetAcc = 50;
+                        }
+
+                        let bonusText = "";
+                        if (isQualified) {
+                          bonusText = formatMoney(rewardAmt);
+                        } else if (item.validAccCount < 50) {
+                          bonusText = "Belum Lulus Target Juara 3 (Min 50 ACC)";
+                        } else {
+                          bonusText = `Belum Lulus Target (Min ${minReq} ACC)`;
+                        }
+
                         return (
                           <div
                             key={item.workerId}
@@ -3297,22 +3327,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between">
                                 <Badge
-                                  className={`text-[10px] font-extrabold ${
-                                    item.rank === 1
-                                      ? "bg-amber-500 text-slate-950"
-                                      : item.rank === 2
-                                        ? "bg-slate-700 text-slate-200"
-                                        : "bg-amber-900 text-amber-200"
-                                  }`}
+                                  className={`text-[10px] font-extrabold ${badgeStyle}`}
                                 >
-                                  Juara #{item.rank}
+                                  {badgeLabel}
                                 </Badge>
                                 <span className="text-[11px] font-mono text-slate-500">{item.maskedName}</span>
                               </div>
                               <div>
                                 <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {minReq} ACC Valid</p>
+                                  <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
                                   <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-amber-950/60 text-amber-400/80 border-amber-800/60 text-[10px]"}>
                                     {isQualified ? "Terkualifikasi" : "Belum Terkualifikasi"}
                                   </Badge>
@@ -3321,7 +3345,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
                                 <span className="text-slate-400">Bonus Hadiah:</span>
                                 <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-400 text-[11px]"}>
-                                  {isQualified ? formatMoney(rewardAmt) : `Belum Lulus Target (Min ${minReq} ACC)`}
+                                  {bonusText}
                                 </span>
                               </div>
                             </div>
