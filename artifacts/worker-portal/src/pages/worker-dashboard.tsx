@@ -70,6 +70,8 @@ import {
   useSettings,
   useMyReferral,
   useAnnouncements,
+  useReferralTransactions,
+  useDownlineWorkers,
   claimReferralCode,
   claimReferralReward,
   createSubmission,
@@ -127,6 +129,8 @@ export function StatusBadge({ status }: { status: string }) {
 export default function WorkerDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
+  const referralTxs = useReferralTransactions(profile.uid);
+  const downlines = useDownlineWorkers(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
@@ -976,375 +980,289 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* REFERRAL SYSTEM */}
           <TabsContent value="referral" className="space-y-6">
-            {/* 1. HERO BANNER & STATS CARDS */}
-            <Card className="bg-gradient-to-br from-amber-950 via-orange-950 to-amber-900 text-white border-amber-800/80 shadow-lg overflow-hidden relative">
+            {/* 1. BANNER REFERRAL: DARK BRONZE GRADIENT (#2D1B00 ke #5C3A00) */}
+            <Card className="bg-gradient-to-r from-[#2D1B00] via-[#4A2800] to-[#5C3A00] text-white border-amber-900/80 shadow-lg overflow-hidden relative">
               <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-              <CardContent className="p-6 sm:p-8 space-y-6 relative z-10">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="space-y-2 max-w-xl">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-bold uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      Program Pasif Income Kerja
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
-                      Bangun Jaringan & Cetak Cuan Otomatis
-                    </h2>
-                    <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed">
-                      Undang rekan atau pekerja baru dan dapatkan komisi bertingkat otomatis dari setiap pengerjaan akun email (ACC) yang diselesaikan tim downline Anda.
-                    </p>
-                  </div>
-
-                  {/* VISUAL / INTERACTIVE WIDGET: SIMULASI PASIF INCOME */}
-                  <div className="bg-amber-900/60 border border-amber-700/60 backdrop-blur-md rounded-2xl p-4 sm:p-5 space-y-3 shrink-0 sm:min-w-[280px]">
-                    <div className="flex items-center justify-between border-b border-amber-800/80 pb-2">
-                      <span className="text-xs font-bold text-amber-200 flex items-center gap-1.5">
-                        <Coins className="w-4 h-4 text-amber-400" />
-                        Simulasi Pasif Income
-                      </span>
-                      <Badge className="bg-amber-500/30 text-amber-200 text-[10px] font-bold">
-                        Kalkulator
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div>
-                        <div className="flex justify-between text-amber-200 text-[11px] mb-1">
-                          <span>Jumlah Teman Diundang:</span>
-                          <strong className="text-white">{simFriends} Orang</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="50"
-                          value={simFriends}
-                          onChange={(e) => setSimFriends(Number(e.target.value))}
-                          className="w-full accent-amber-400 h-1.5 bg-amber-950 rounded-lg cursor-pointer"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-amber-200 text-[11px] mb-1">
-                          <span>Estimasi Email ACC / Teman:</span>
-                          <strong className="text-white">{simAccPerFriend} ACC</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min="5"
-                          max={maxRefAcc}
-                          step="5"
-                          value={simAccPerFriend}
-                          onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
-                          className="w-full accent-amber-400 h-1.5 bg-amber-950 rounded-lg cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-amber-800/80 space-y-1">
-                      <div className="flex items-center justify-between text-[11px] text-amber-200/90">
-                        <span>Total Akun Tim:</span>
-                        <span className="font-semibold text-white">{simFriends * simAccPerFriend} ACC</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-amber-200/90">
-                        <span>Rate Email ACC Aktif:</span>
-                        <span className="font-semibold text-amber-300">{formatMoney(currentTierConfig.pricePerItem)}/email</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-1 border-t border-amber-800/60">
-                        <span className="text-[11px] text-amber-300 font-bold">Estimasi Bonus Referral:</span>
-                        <span className="text-lg font-black text-amber-300">{formatMoney(simulatedEarnings)}</span>
-                      </div>
-                    </div>
-                  </div>
+              <CardContent className="p-6 sm:p-8 space-y-3 relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  Program Pasif Income Kerja
                 </div>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
+                  Pasif Income Tanpa Batas
+                </h2>
+                <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed max-w-2xl">
+                  Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC) oleh admin, komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda tanpa perlu penarikan terpisah!
+                </p>
               </CardContent>
             </Card>
 
-            {/* 3-COLUMN KEY METRIC CARDS */}
+            {/* 2. 3 STATS CARDS: Warm Krem (#FFF8F0), Border Emas (#FFE0B2), Highlight Text Oranye/Amber (#E65100) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* CARD 1: TOTAL BONUS REFERRAL DIDAPAT */}
-              <Card className="bg-white border-amber-100 shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-4 space-y-2">
+              {/* CARD 1: TOTAL BONUS DIDAPAT */}
+              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
+                <CardContent className="p-5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Total Bonus Referral Didapat
+                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
+                      TOTAL BONUS DIDAPAT
                     </p>
-                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60">
+                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
                       <Wallet className="w-4 h-4" />
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-amber-900 tracking-tight">
-                    {formatMoney(refStats.earnings)}
+                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
+                    {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
                   </p>
-                  <p className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    Otomatis masuk Saldo Utama (Saldo: {formatMoney(profile.balance)})
+                  <p className="text-[11px] text-amber-900/80 font-medium">
+                    * Otomatis masuk ke Saldo Utama
                   </p>
                 </CardContent>
               </Card>
 
               {/* CARD 2: TOTAL DOWNLINE */}
-              <Card className="bg-white border-amber-100 shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-4 space-y-2">
+              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
+                <CardContent className="p-5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Total Downline
+                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
+                      TOTAL DOWNLINE
                     </p>
-                    <div className="p-2 rounded-xl bg-orange-50 text-orange-600 border border-orange-200/60">
+                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
                       <Users className="w-4 h-4" />
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-amber-950 tracking-tight">
-                    {refStats.total} <span className="text-xs font-medium text-gray-500">Pekerja</span>
+                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
+                    {downlines.data.length || refStats.total} <span className="text-xs font-medium text-amber-900/70">Worker</span>
                   </p>
-                  <p className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
-                    <Award className="w-3.5 h-3.5 text-amber-500" />
-                    {refStats.qualified} Pekerja Qualified
+                  <p className="text-[11px] text-amber-900/80 font-medium">
+                    Terdaftar dengan tautan Anda
                   </p>
                 </CardContent>
               </Card>
 
-              {/* CARD 3: TOTAL AKUN SUKSES TIM */}
-              <Card className="bg-white border-amber-100 shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-4 space-y-2">
+              {/* CARD 3: TOTAL EMAIL ACC TIM */}
+              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
+                <CardContent className="p-4 sm:p-5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Total Akun Sukses Tim
+                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
+                      TOTAL EMAIL ACC TIM
                     </p>
-                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60">
-                      <CheckCircle2 className="w-4 h-4" />
+                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
+                      <Award className="w-4 h-4" />
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-gray-900 tracking-tight">
-                    {refStats.totalTeamAcc} <span className="text-xs font-medium text-gray-500">Email ACC</span>
+                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
+                    {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-amber-900/70">Email</span>
                   </p>
-                  <p className="text-[11px] text-gray-500 flex items-center gap-1 font-medium">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    Disetujui oleh admin
+                  <p className="text-[11px] text-amber-900/80 font-medium">
+                    Total email disetujui tim
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* 2. REFERRAL LINK SHARE WIDGET */}
+            {/* 3. TAUTAN REFERRAL READ-ONLY + BUTTON SALIN LINK */}
             <Card className="bg-white border-amber-100 shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <Share2 className="w-4 h-4 text-amber-600" />
-                  Bagikan Tautan Referral Anda
+                  Tautan Referral Saya
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-600">
-                  Gunakan link unik Anda untuk merekrut tim baru. Bonus otomatis masuk ke saldo ketika downline mencetak email ACC.
+                  Salin dan bagikan link unik Anda kepada calon worker baru. Komisi referral per email ACC otomatis mengalir ke Saldo Utama Anda.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-700 font-bold">Tautan Referral Resmi Anda</Label>
+                  <Label className="text-xs text-gray-700 font-bold">Link Referral Pengundang</Label>
                   <div className="flex gap-2">
-                    <Input readOnly value={referralLink} className="font-mono text-xs bg-amber-50/40 border-amber-200 text-amber-950 focus-visible:ring-amber-500 rounded-xl" />
-                    <Button onClick={handleCopyReferralLink} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shrink-0 gap-1.5 font-bold text-xs h-10 px-4 rounded-xl border border-amber-400/20 active:scale-95 transition-transform">
-                      {copiedLink ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4" />}
+                    <Input
+                      readOnly
+                      value={referralLink}
+                      className="font-mono text-xs bg-amber-50/40 border-amber-200 text-amber-950 focus-visible:ring-amber-500 rounded-xl"
+                    />
+                    <Button
+                      onClick={handleCopyReferralLink}
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shrink-0 gap-1.5 font-bold text-xs h-10 px-4 rounded-xl border border-amber-400/20 active:scale-95 transition-transform"
+                    >
+                      {copiedLink ? <Check className="w-4 h-4 text-amber-200" /> : <Copy className="w-4 h-4" />}
                       {copiedLink ? "Tersalin!" : "Salin Link"}
                     </Button>
                   </div>
                 </div>
 
-                {/* DAFTAR TIER REWARD REFERRAL PREVIEW */}
-                <div className="pt-2">
-                  <Label className="text-xs text-gray-700 font-bold mb-2 block">
-                    🎁 Skema Multi-Tier Reward Per Downline:
-                  </Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {activeReferralTiers.map((t, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-gradient-to-br from-amber-50/80 to-orange-50/50 border border-amber-200/80 rounded-xl text-center space-y-0.5"
-                      >
-                        <p className="text-[11px] text-gray-600 font-bold">{t.minAcc} Email ACC</p>
-                        <p className="text-sm font-black text-amber-700">
-                          {formatMoney(t.reward)}
-                        </p>
-                      </div>
-                    ))}
+                {/* INFO KODE UNDANGAN & DIHUBUNGKAN */}
+                <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-2 text-xs text-amber-950">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold">Kode Referral Unik Anda:</span>
+                    <Badge variant="outline" className="font-mono bg-white text-amber-950 border-amber-300 font-bold text-xs">
+                      {profile.uid}
+                    </Badge>
                   </div>
-                </div>
-
-                {/* 🎁 KODE UNDANGAN CLAIM CARD */}
-                <div className="p-4 bg-slate-50/80 border border-gray-200/80 rounded-xl space-y-2">
-                  <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-amber-600" />
-                    Klaim Kode Undangan Pengundang
-                  </p>
                   {isAlreadyLinked ? (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-0.5">
-                      <p className="font-bold flex items-center gap-1.5 text-emerald-800">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        ✓ Kode undangan sudah terhubung
-                      </p>
-                      <p className="text-[11px] text-emerald-700">
-                        Akun Anda terhubung dengan pengundang:{" "}
-                        <strong className="font-semibold text-emerald-950">{referrerDisplayName || "Rekan"}</strong>.
-                      </p>
-                    </div>
+                    <p className="text-[11px] text-amber-900">
+                      ✓ Akun Anda terhubung dengan Upline/Pengundang: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
+                    </p>
                   ) : (
-                    <form onSubmit={handleClaimInvitationCode} className="space-y-2.5">
-                      <p className="text-[11px] text-gray-500">
-                        Jika Anda mendaftar tanpa link referral, masukkan kode undangan pengundang Anda di sini:
+                    <form onSubmit={handleClaimInvitationCode} className="pt-2 border-t border-amber-200/60 space-y-2">
+                      <p className="text-[11px] text-amber-900">
+                        Jika Anda belum memiliki pengundang, masukkan kode pengundang Anda di sini:
                       </p>
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex gap-2">
                         <Input
                           value={invitationCodeInput}
                           onChange={(e) => setInvitationCodeInput(e.target.value)}
-                          placeholder="Masukkan kode / UID pengundang"
-                          className="font-mono text-xs bg-white rounded-xl border-gray-200"
+                          placeholder="Masukkan Kode Upline"
+                          className="font-mono text-xs bg-white rounded-xl border-amber-200"
                           disabled={claimingCode}
                         />
                         <Button
                           type="submit"
                           disabled={claimingCode || !invitationCodeInput.trim()}
-                          className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shrink-0 gap-1.5 text-xs font-bold rounded-xl active:scale-95 transition-transform"
+                          className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shrink-0"
                         >
-                          {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                          Gunakan Kode
+                          {claimingCode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Hubungkan"}
                         </Button>
                       </div>
                     </form>
                   )}
                 </div>
-
-                <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-950 space-y-1">
-                  <p className="font-bold flex items-center gap-1 text-amber-900">
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> Aturan Kualifikasi Referral:
-                  </p>
-                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-900/90">
-                    <li>Pendaftaran akun baru saja TIDAK langsung mencairkan bonus.</li>
-                    <li>
-                      Bonus terbuka saat downline mencapai target email ACC terverifikasi ({activeReferralTiers.map((t) => t.minAcc).join(", ")} ACC).
-                    </li>
-                    <li>Reward dapat diklaim bertahap per-tier secara instant tanpa perlu menunggu tier akhir.</li>
-                  </ul>
-                </div>
               </CardContent>
             </Card>
 
-            {/* 3. DOWNLINE LIST & ACTIVITY TABLE */}
+            {/* 4. TABEL / LIST RIWAYAT DOWNLINE & ACTIVITY */}
             <Card className="bg-white border-amber-100 shadow-xs">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <Users className="w-4 h-4 text-amber-600" />
-                  Riwayat Downline Saya ({engagement.referrals.data.length})
+                  Daftar Tim Downline ({downlines.data.length})
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-600">
-                  Daftar seluruh pekerja yang mendaftar melalui tautan referral Anda beserta progress email ACC dan klaim komisi.
+                  Rincian seluruh worker yang terdaftar melalui link referral Anda beserta akumulasi email ACC yang mereka selesaikan.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {engagement.referrals.loading && (
+                {downlines.loading && (
                   <p className="text-sm text-gray-400 text-center py-8">Memuat data downline...</p>
                 )}
-                {!engagement.referrals.loading && engagement.referrals.data.length === 0 && (
-                  <div className="p-8 border border-dashed border-amber-200 rounded-2xl text-center space-y-2 bg-amber-50/20">
-                    <Users className="w-8 h-8 text-amber-400 mx-auto" />
-                    <p className="text-sm font-bold text-gray-800">Belum Ada Downline</p>
-                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                      Bagikan tautan referral Anda ke rekan kerja untuk mulai mencetak komisi pasif income otomatis.
+                {!downlines.loading && downlines.data.length === 0 && (
+                  <div className="p-8 border border-dashed border-amber-200 rounded-2xl text-center space-y-2 bg-[#FFF8F0]">
+                    <Users className="w-8 h-8 text-amber-500 mx-auto" />
+                    <p className="text-sm font-bold text-amber-950">Belum Ada Downline Terdaftar</p>
+                    <p className="text-xs text-amber-900/80 max-w-sm mx-auto">
+                      Bagikan link referral Anda untuk mulai membangun tim dan meraih komisi pasif income otomatis.
                     </p>
-                    <Button onClick={handleCopyReferralLink} size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white gap-1.5 font-bold text-xs mt-2 rounded-xl active:scale-95 transition-transform">
-                      <Copy className="w-3.5 h-3.5" />
-                      Salin Tautan Referral
+                    <Button
+                      onClick={handleCopyReferralLink}
+                      size="sm"
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs mt-2 rounded-xl"
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-1" /> Salin Tautan Referral
                     </Button>
                   </div>
                 )}
-                {!engagement.referrals.loading && engagement.referrals.data.length > 0 && (
-                  <div className="space-y-4">
-                    {engagement.referrals.data.map((ref) => {
-                      const accProgress = ref.currentAccCount ?? 0;
-                      const sortedTiers = [...activeReferralTiers].sort((a, b) => a.minAcc - b.minAcc);
 
-                      return (
-                        <div key={ref.id} className="p-4 rounded-2xl border border-amber-100 bg-amber-50/20 hover:bg-amber-50/40 transition-colors space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-100/80 pb-3">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-gray-900 text-sm">
-                                  {ref.referredWorkerName || shortId(ref.referredWorkerId)}
-                                </p>
-                                <Badge className="bg-amber-100 text-amber-950 border-amber-200 text-[10px] font-mono">
-                                  ID: {shortId(ref.referredWorkerId)}
-                                </Badge>
-                              </div>
-                              <p className="text-[11px] text-gray-500">
-                                Bergabung: <strong className="text-gray-700">{formatDateTime(ref.createdAt)}</strong> · Total ACC: <strong className="text-amber-900 font-bold">{accProgress} Email ACC</strong>
-                              </p>
-                            </div>
+                {!downlines.loading && downlines.data.length > 0 && (
+                  <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
+                          <tr>
+                            <th className="px-4 py-3">Pekerja / Downline</th>
+                            <th className="px-4 py-3">Tanggal Bergabung</th>
+                            <th className="px-4 py-3 text-center">Total Email ACC</th>
+                            <th className="px-4 py-3 text-right">Estimasi Komisi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-amber-100">
+                          {downlines.data.map((dw) => {
+                            const dwAcc = dw.accCount ?? 0;
+                            const commRate = rules.data.referralCommissionPerAcc ?? 200;
+                            const totalComm = dwAcc * commRate;
 
-                            <Badge variant="outline" className="bg-white text-amber-950 border-amber-200 text-xs font-bold w-fit">
-                              Komisi Earned: {formatMoney(ref.rewardAmount ?? 0)}
-                            </Badge>
-                          </div>
+                            return (
+                              <tr key={dw.uid} className="hover:bg-amber-50/50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <p className="font-bold text-gray-900">{dw.name || "Worker"}</p>
+                                  <p className="text-[11px] font-mono text-gray-500">{shortId(dw.uid)}</p>
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 font-mono">
+                                  {formatDateTime(dw.createdAt)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold">
+                                    {dwAcc} Email ACC
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-[#E65100]">
+                                  {formatMoney(totalComm)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                          {/* TIER CLAIM GRID */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {sortedTiers.map((t) => {
-                              const isClaimed = isReferralTierClaimed(ref, t.minAcc, activeReferralTiers);
-                              const isClaimable = isReferralTierClaimable(ref, t.minAcc, activeReferralTiers);
-                              const isPendingClaim = pendingClaimsSet.has(`${ref.id}_${t.minAcc}`);
-                              const busyKey = `${ref.id}_${t.minAcc}`;
-                              const isBusy = busyClaimTierKey === busyKey;
-
-                              return (
-                                <div
-                                  key={t.minAcc}
-                                  className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 transition-all ${
-                                    isClaimed
-                                      ? "bg-emerald-50/80 border-emerald-200"
-                                      : isPendingClaim
-                                        ? "bg-amber-50/80 border-amber-200"
-                                        : isClaimable
-                                          ? "bg-white border-amber-300 shadow-2xs"
-                                          : "bg-gray-50/80 border-gray-200 opacity-75"
-                                  }`}
-                                >
-                                  <div className="space-y-0.5">
-                                    <p className="font-bold text-gray-900">
-                                      Target {t.minAcc} ACC — <span className="text-amber-700 font-black">{formatMoney(t.reward)}</span>
-                                    </p>
-                                    <p className="text-[11px] text-gray-500">
-                                      Progress: <strong className="text-gray-800">{accProgress}/{t.minAcc} ACC</strong>
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    {isClaimed ? (
-                                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 text-[11px] font-semibold">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                        Sudah Diklaim
-                                      </Badge>
-                                    ) : isClaimable ? (
-                                      <Button
-                                        size="sm"
-                                        disabled={isBusy}
-                                        onClick={() => handleClaimTier(ref.id, t.minAcc)}
-                                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs h-7 px-3 gap-1 shrink-0 rounded-lg shadow-2xs active:scale-95 transition-transform"
-                                      >
-                                        {isBusy ? (
-                                          <Loader2 className="w-3 h-3 animate-spin" />
-                                        ) : (
-                                          <Sparkles className="w-3 h-3 text-amber-200" />
-                                        )}
-                                        🎉 Claim
-                                      </Button>
-                                    ) : (
-                                      <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200 gap-1 text-[11px]">
-                                        🔒 Belum Tersedia
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+            {/* 5. TABEL RIWAYAT TRANSAKSI KOMISI REFERRAL */}
+            <Card className="bg-white border-amber-100 shadow-xs">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-amber-600" />
+                  Riwayat Log Komisi Referral ({referralTxs.data.length})
+                </CardTitle>
+                <CardDescription className="text-xs text-gray-600">
+                  Log transaksi komisi otomatis per email ACC yang berhasil dikreditkan ke Saldo Utama Anda.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {referralTxs.loading && (
+                  <p className="text-sm text-gray-400 text-center py-8">Memuat riwayat transaksi komisi...</p>
+                )}
+                {!referralTxs.loading && referralTxs.data.length === 0 && (
+                  <p className="text-xs text-gray-500 text-center py-6 border border-dashed border-amber-200 rounded-xl bg-[#FFF8F0]">
+                    Belum ada riwayat transaksi komisi referral.
+                  </p>
+                )}
+                {!referralTxs.loading && referralTxs.data.length > 0 && (
+                  <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
+                          <tr>
+                            <th className="px-4 py-3">Waktu</th>
+                            <th className="px-4 py-3">Downline</th>
+                            <th className="px-4 py-3 text-center">Email ACC</th>
+                            <th className="px-4 py-3 text-right">Rate / Email</th>
+                            <th className="px-4 py-3 text-right">Total Komisi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-amber-100">
+                          {referralTxs.data.map((tx) => (
+                            <tr key={tx.id} className="hover:bg-amber-50/50 transition-colors">
+                              <td className="px-4 py-3 font-mono text-gray-500 whitespace-nowrap">
+                                {formatDateTime(tx.createdAt)}
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-gray-900">
+                                {tx.downlineName || shortId(tx.downlineId)}
+                              </td>
+                              <td className="px-4 py-3 text-center font-bold text-gray-800">
+                                {tx.accCount} Email
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-gray-600">
+                                {formatMoney(tx.commissionPerEmail)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-black text-[#E65100]">
+                                +{formatMoney(tx.totalCommission)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </CardContent>

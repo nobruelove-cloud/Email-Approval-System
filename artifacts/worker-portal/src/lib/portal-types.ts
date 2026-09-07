@@ -33,6 +33,22 @@ export type PortalUser = {
   tier: UserTier;
   balance: number;
   referredBy?: string;
+  totalReferralEarned?: number;
+  teamAccCount?: number;
+  accCount?: number;
+  createdAt?: unknown;
+};
+
+export type ReferralTransaction = {
+  id: string;
+  uplineId: string;
+  uplineName?: string;
+  downlineId: string;
+  downlineName?: string;
+  accCount: number;
+  commissionPerEmail: number;
+  totalCommission: number;
+  submissionId: string;
   createdAt?: unknown;
 };
 
@@ -302,6 +318,7 @@ export type PortalRules = {
   // Referral Settings
   referralEnabled?: boolean;
   referralReward?: number;
+  referralCommissionPerAcc?: number;
   referralMinAcc?: number;
   referralMinEarnings?: number;
   referralTiers?: ReferralTierConfig[];
@@ -348,6 +365,7 @@ export const DEFAULT_RULES: PortalRules = {
 
   referralEnabled: true,
   referralReward: 500,
+  referralCommissionPerAcc: 200,
   referralMinAcc: 5,
   referralMinEarnings: 0,
   referralTiers: DEFAULT_REFERRAL_TIERS,

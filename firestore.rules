@@ -49,7 +49,8 @@ service cloud.firestore {
         ]) &&
         request.resource.data.keys().hasOnly([
           'uid', 'name', 'email', 'phone', 'referredBy',
-          'role', 'status', 'tier', 'balance', 'createdAt'
+          'role', 'status', 'tier', 'balance',
+          'totalReferralEarned', 'teamAccCount', 'accCount', 'createdAt'
         ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.name is string &&
@@ -186,6 +187,18 @@ service cloud.firestore {
     // ---- announcements/{id} ----
     match /announcements/{id} {
       allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- referral_transactions/{id} ----
+    match /referral_transactions/{id} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('uplineId' in resource.data && resource.data.uplineId == request.auth.uid) ||
+          ('downlineId' in resource.data && resource.data.downlineId == request.auth.uid)
+        )
+      );
       allow write: if isAdmin();
     }
   }
