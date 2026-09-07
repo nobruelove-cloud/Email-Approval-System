@@ -3148,7 +3148,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-100">
-                      <Trophy className="w-5 h-5 text-emerald-400" />
+                      <Trophy className="w-5 h-5 text-amber-400" />
                       Manajemen Leaderboard & Otomatisasi Payout Reward
                     </CardTitle>
                     <CardDescription className="text-xs text-slate-400 mt-0.5">
@@ -3237,8 +3237,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                       Lulus (+{formatMoney(rewardAmt)})
                                     </Badge>
                                   ) : (
-                                    <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-[10px]">
-                                      Tidak Lulus Target ({w.validAccCount}/{minReq} ACC)
+                                    <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px]">
+                                      Belum Lulus Target ({w.validAccCount}/{minReq} ACC)
                                     </Badge>
                                   )}
                                 </div>
@@ -3311,12 +3311,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </div>
                               <div>
                                 <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
-                                <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {minReq} ACC Valid</p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {minReq} ACC Valid</p>
+                                  <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-amber-950/60 text-amber-400/80 border-amber-800/60 text-[10px]"}>
+                                    {isQualified ? "Terkualifikasi" : "Belum Terkualifikasi"}
+                                  </Badge>
+                                </div>
                               </div>
                               <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
                                 <span className="text-slate-400">Bonus Hadiah:</span>
-                                <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-500"}>
-                                  {isQualified ? formatMoney(rewardAmt) : "Tidak Lulus Target"}
+                                <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-400 text-[11px]"}>
+                                  {isQualified ? formatMoney(rewardAmt) : `Belum Lulus Target (Min ${minReq} ACC)`}
                                 </span>
                               </div>
                             </div>
@@ -3382,12 +3387,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <td className="px-3 py-2 font-mono text-slate-400">{formatDateTime(payout.paidAt)}</td>
                               <td className="px-3 py-2 font-bold text-slate-200">{payout.periodKey}</td>
                               <td className="px-3 py-2">
-                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold text-[10px]">
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
                                   Juara #{payout.rank}
                                 </Badge>
                               </td>
                               <td className="px-3 py-2 font-semibold text-slate-200">{payout.workerName || workerName(payout.workerId)}</td>
-                              <td className="px-3 py-2 font-black text-emerald-400 text-right">{formatMoney(payout.rewardAmount)}</td>
+                              <td className="px-3 py-2 font-black text-amber-400 text-right">{formatMoney(payout.rewardAmount)}</td>
                             </tr>
                           ))}
                         </tbody>
