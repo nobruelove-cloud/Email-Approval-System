@@ -1017,78 +1017,143 @@ export async function reviewSubmission(
       // 1. ALL READS FIRST
       const submissionRef = doc(firestore, "emailSubmissions", submissionId);
       const submissionSnap = await tx.get(submissionRef);
-    if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
-    const submission = submissionSnap.data() as EmailSubmission;
-    if (submission.status !== "pending") {
-      throw new Error("Setoran ini sudah pernah ditinjau.");
-    }
-    workerIdToEvaluate = submission.workerId;
+      if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
+      const submission = submissionSnap.data() as EmailSubmission;
+      if (submission.status !== "pending") {
+        throw new Error("Setoran ini sudah pernah ditinjau.");
+      }
+      workerIdToEvaluate = submission.workerId;
 
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const activeTiers =
-      rulesSnap.exists() && Array.isArray(rulesSnap.data()?.tiers) && rulesSnap.data().tiers.length > 0
-        ? (rulesSnap.data().tiers as TierConfig[])
-        : DEFAULT_TIERS;
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const activeTiers =
+        Array.isArray(rulesData?.tiers) && rulesData.tiers.length > 0
+          ? (rulesData.tiers as TierConfig[])
+          : DEFAULT_TIERS;
 
-    const userRef = doc(firestore, "users", submission.workerId);
-    const userSnap = await tx.get(userRef);
+      const userRef = doc(firestore, "users", submission.workerId);
+      const userSnap = await tx.get(userRef);
 
-    // Determine items & status counts
-    const itemCount = getItemCountOfSubmission(submission);
-    let itemsToSave = updatedItems ?? submission.items;
+      // Determine items & status counts
+      const itemCount = getItemCountOfSubmission(submission);
+      let itemsToSave = updatedItems ?? submission.items;
 
-    if (!itemsToSave || itemsToSave.length === 0) {
-      // Legacy single email fallback
-      const singleEmail = submission.email ?? "";
-      const singlePassword = submission.password;
-      const singleStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
-      itemsToSave = [{ email: singleEmail, password: singlePassword, status: singleStatus }];
-    } else if (!updatedItems) {
-      // Bulk decision applied to all batch items
-      const bulkItemStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
-      itemsToSave = itemsToSave.map((it) => ({ ...it, status: it.status ?? bulkItemStatus }));
-    }
+      if (!itemsToSave || itemsToSave.length === 0) {
+        // Legacy single email fallback
+        const singleEmail = submission.email ?? "";
+        const singlePassword = submission.password;
+        const singleStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+        itemsToSave = [{ email: singleEmail, password: singlePassword, status: singleStatus }];
+      } else if (!updatedItems) {
+        // Bulk decision applied to all batch items
+        const bulkItemStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+        itemsToSave = itemsToSave.map((it) => ({ ...it, status: it.status ?? bulkItemStatus }));
+      }
 
-    const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
-    const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
+      const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
+      const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
 
-    // Calculate Tier and Price per item - prioritize manually overridden batch rates over dynamic defaults
-    const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
-    const basePrice = submission.currentPricePerItem ?? submission.pricePerEmail ?? resultingTierCfg.pricePerItem;
-    const baseTier = submission.currentTier ?? resultingTierCfg.tier;
+      // Calculate Tier and Price per item - prioritize manually overridden batch rates over dynamic defaults
+      const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
+      const basePrice = submission.currentPricePerItem ?? submission.pricePerEmail ?? resultingTierCfg.pricePerItem;
+      const baseTier = submission.currentTier ?? resultingTierCfg.tier;
 
-    const appliedPricePerItem = overridePricePerItem ?? basePrice;
-    const appliedTier = overrideTierNum ?? baseTier;
-    const creditAmount = approvedCount * appliedPricePerItem;
+      const appliedPricePerItem = overridePricePerItem ?? basePrice;
+      const appliedTier = overrideTierNum ?? baseTier;
+      const creditAmount = approvedCount * appliedPricePerItem;
 
-    const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
+      const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
 
-    // 2. ALL WRITES AFTER READS
-    tx.update(submissionRef, {
-      status: finalStatus,
-      items: itemsToSave,
-      itemCount,
-      approvedItemCount: approvedCount,
-      rejectedItemCount: rejectedCount,
-      reviewNote,
-      appliedTier,
-      appliedPricePerItem,
-      totalAmount: creditAmount,
-      reviewedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      // Referral / Upline calculations & READS before WRITES
+      let uplineRef: any = null;
+      let uplineSnap: any = null;
+      let referralRef: any = null;
+      let referralSnap: any = null;
+      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 200;
+      let referralCommissionTotal = 0;
 
-    if (userSnap && userSnap.exists()) {
-      const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-      tx.update(userRef, {
-        balance: currentBalance + creditAmount,
-        tier: appliedTier,
+      const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
+      const uplineId = workerData?.referredBy;
+
+      if (approvedCount > 0 && uplineId) {
+        uplineRef = doc(firestore, "users", uplineId);
+        uplineSnap = await tx.get(uplineRef);
+
+        referralRef = doc(firestore, "referrals", submission.workerId);
+        referralSnap = await tx.get(referralRef);
+
+        referralCommissionTotal = approvedCount * referralCommissionPerAcc;
+      }
+
+      // 2. ALL WRITES AFTER READS
+      tx.update(submissionRef, {
+        status: finalStatus,
+        items: itemsToSave,
+        itemCount,
+        approvedItemCount: approvedCount,
+        rejectedItemCount: rejectedCount,
+        reviewNote,
+        appliedTier,
+        appliedPricePerItem,
+        totalAmount: creditAmount,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-    }
-  },
-  "reviewSubmission",
-  `emailSubmissions/${submissionId}`
+
+      if (userSnap && userSnap.exists()) {
+        const currentBalance = workerData?.balance ?? 0;
+        const currentAccCount = workerData?.accCount ?? 0;
+        tx.update(userRef, {
+          balance: currentBalance + creditAmount,
+          accCount: currentAccCount + approvedCount,
+          tier: appliedTier,
+        });
+      }
+
+      // Execute Upline Referral Commission directly to Upline's balance
+      if (approvedCount > 0 && uplineId && uplineSnap && uplineSnap.exists()) {
+        const uplineData = uplineSnap.data() as PortalUser;
+        const currentUplineBalance = uplineData.balance ?? 0;
+        const currentTotalRefEarned = uplineData.totalReferralEarned ?? 0;
+        const currentTeamAccCount = uplineData.teamAccCount ?? 0;
+
+        tx.update(uplineRef, {
+          balance: currentUplineBalance + referralCommissionTotal,
+          totalReferralEarned: currentTotalRefEarned + referralCommissionTotal,
+          teamAccCount: currentTeamAccCount + approvedCount,
+        });
+
+        // Record log to referral_transactions collection
+        const refTxRef = doc(collection(firestore, "referral_transactions"));
+        tx.set(refTxRef, {
+          id: refTxRef.id,
+          uplineId,
+          uplineName: uplineData.name || shortId(uplineId),
+          downlineId: submission.workerId,
+          downlineName: workerData?.name || submission.workerName || shortId(submission.workerId),
+          accCount: approvedCount,
+          commissionPerEmail: referralCommissionPerAcc,
+          totalCommission: referralCommissionTotal,
+          submissionId,
+          createdAt: serverTimestamp(),
+        });
+
+        // Update referrals/{submission.workerId} if doc exists
+        if (referralSnap && referralSnap.exists()) {
+          const refData = referralSnap.data();
+          const newAcc = (refData.currentAccCount ?? 0) + approvedCount;
+          const newReward = (refData.rewardAmount ?? 0) + referralCommissionTotal;
+          tx.update(referralRef, {
+            currentAccCount: newAcc,
+            rewardAmount: newReward,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+    },
+    "reviewSubmission",
+    `emailSubmissions/${submissionId}`
   );
 
   // Automatically evaluate referral qualification if worker has a pending referral
@@ -2406,4 +2471,117 @@ export function useFinancialData(selectedPeriod?: string) {
   }, [data]);
 
   return { transactions: data, summary, loading, error };
+}
+
+export function useReferralTransactions(uid?: string) {
+  const constraints: QueryConstraint[] = uid ? [where("uplineId", "==", uid)] : [];
+  return useCollection<import("@/lib/portal-types").ReferralTransaction>(
+    "referral_transactions",
+    constraints,
+    !!db,
+    { field: "createdAt", direction: "desc" },
+  );
+}
+
+export function useDownlineWorkers(uid?: string) {
+  const constraints: QueryConstraint[] = uid ? [where("referredBy", "==", uid)] : [];
+  return useCollection<PortalUser>(
+    "users",
+    constraints,
+    !!uid,
+    { field: "createdAt", direction: "desc" },
+  );
+}
+
+/**
+ * Master Reset Operasional (Admin Dashboard)
+ * Requires re-authentication with admin email & password.
+ * Deletes all documents in emailSubmissions, withdrawals, and referral_transactions collections.
+ * Resets worker stats (balance, accCount, totalReferralEarned, teamAccCount) to 0 in users collection.
+ * User accounts and system settings remain intact.
+ */
+export async function masterResetOperasional(adminPassword: string) {
+  if (!db || !auth) throw new Error("Firebase is not configured.");
+  const currentUser = auth.currentUser;
+  if (!currentUser || !currentUser.email) {
+    throw new Error("Sesi admin tidak ditemukan. Silakan masuk kembali.");
+  }
+
+  const cleanPass = adminPassword ? adminPassword.trim() : "";
+  if (!cleanPass) {
+    throw new Error("Password / PIN Admin wajib diisi untuk melakukan Master Reset.");
+  }
+
+  // 1. Verify Admin Password / Re-authenticate
+  const { signInWithEmailAndPassword } = await import("firebase/auth");
+  try {
+    await signInWithEmailAndPassword(auth, currentUser.email, cleanPass);
+  } catch (authErr) {
+    console.error("[masterResetOperasional] Re-authentication failed:", authErr);
+    throw new Error("Password / PIN Admin tidak cocok. Master Reset dibatalkan.");
+  }
+
+  const firestore = db;
+
+  // 2. Fetch all documents in emailSubmissions and delete
+  const subSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "emailSubmissions"),
+    [],
+    "masterReset:emailSubmissions",
+    "emailSubmissions"
+  );
+  for (const docSnap of subSnaps.docs) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteSubmission");
+  }
+
+  // 3. Fetch all documents in withdrawals and delete
+  const wdSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "withdrawals"),
+    [],
+    "masterReset:withdrawals",
+    "withdrawals"
+  );
+  for (const docSnap of wdSnaps.docs) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteWithdrawal");
+  }
+
+  // 4. Fetch all documents in referral_transactions and delete
+  const refTxSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "referral_transactions"),
+    [],
+    "masterReset:referral_transactions",
+    "referral_transactions"
+  );
+  for (const docSnap of refTxSnaps.docs) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteReferralTransaction");
+  }
+
+  // 5. Fetch all worker users and reset stats to 0
+  const userSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "users"),
+    [],
+    "masterReset:users",
+    "users"
+  );
+  for (const docSnap of userSnaps.docs) {
+    const userData = docSnap.data() as PortalUser;
+    if (userData.role === "worker") {
+      await updateDocWithDiagnostic(
+        docSnap.ref,
+        {
+          balance: 0,
+          accCount: 0,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          updatedAt: serverTimestamp(),
+        },
+        "masterReset:resetUserStats"
+      );
+    }
+  }
+
+  return {
+    status: "ok",
+    message: "Master Reset Operasional Berhasil! Seluruh setoran, penarikan, dan saldo worker telah di-reset.",
+  };
 }

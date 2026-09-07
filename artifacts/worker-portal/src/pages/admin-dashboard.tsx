@@ -106,6 +106,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
   toggleAnnouncementStatus,
+  masterResetOperasional,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type TierConfig, type ReferralTierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig } from "@/lib/portal-types";
@@ -212,6 +213,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // Master Reset state
+  const [masterResetModalOpen, setMasterResetModalOpen] = useState(false);
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [masterResetBusy, setMasterResetBusy] = useState(false);
+
+  async function handleMasterReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adminConfirmPassword.trim()) {
+      toast.error("Password / PIN Admin wajib diisi.");
+      return;
+    }
+
+    setMasterResetBusy(true);
+    try {
+      const res = await masterResetOperasional(adminConfirmPassword);
+      toast.success(res.message || "Master Reset Operasional Berhasil!");
+      setMasterResetModalOpen(false);
+      setAdminConfirmPassword("");
+    } catch (err) {
+      console.error("[AdminDashboard] Master reset error:", err);
+      toast.error(err instanceof Error ? err.message : "Gagal melakukan Master Reset Operasional.");
+    } finally {
+      setMasterResetBusy(false);
+    }
+  }
 
   // Email sensor toggle state
   const [isEmailVisible, setIsEmailVisible] = useState(false);
@@ -2061,6 +2088,91 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </Button>
                 </div>
               </CardContent>
+            </Card>
+
+            {/* MASTER RESET OPERASIONAL CARD */}
+            <Card className="bg-rose-950/20 border-rose-500/40 backdrop-blur-xl text-slate-100 shadow-xl">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-rose-600 text-white font-bold">
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                          Master Reset Operasional Sistem
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-400">
+                          Menghapus seluruh riwayat setoran email, penarikan saldo, dan log referral, serta mereset saldo & hitungan ACC seluruh worker menjadi 0. Akun user & konfigurasi sistem TIDAK terhapus.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Dialog open={masterResetModalOpen} onOpenChange={setMasterResetModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs h-9 gap-1.5 shadow-lg shadow-rose-600/20 shrink-0"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        Master Reset Operasional
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-rose-400 flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-rose-500" />
+                          Konfirmasi Master Reset Operasional
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-400 text-xs leading-relaxed">
+                          PERHATIAN: Tindakan ini akan menghapus seluruh data setoran email, riwayat penarikan, dan log referral, serta mereset saldo seluruh worker menjadi Rp 0. Masukkan Password/PIN Admin Anda untuk melanjutkan.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <form onSubmit={handleMasterReset} className="space-y-4 pt-2">
+                        <div>
+                          <Label htmlFor="master-reset-pass" className="text-xs text-slate-300 font-semibold">
+                            Password / PIN Admin *
+                          </Label>
+                          <Input
+                            id="master-reset-pass"
+                            type="password"
+                            placeholder="Masukkan Password/PIN Admin"
+                            value={adminConfirmPassword}
+                            onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                            className="mt-1.5 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-rose-500"
+                            required
+                          />
+                        </div>
+
+                        <DialogFooter className="pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setMasterResetModalOpen(false);
+                              setAdminConfirmPassword("");
+                            }}
+                            className="text-xs h-9 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                          >
+                            Batal
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={masterResetBusy || !adminConfirmPassword.trim()}
+                            className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs h-9 gap-1.5 shadow-lg shadow-rose-600/20"
+                          >
+                            {masterResetBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                            Eksekusi Master Reset
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
             </Card>
           </TabsContent>
 
