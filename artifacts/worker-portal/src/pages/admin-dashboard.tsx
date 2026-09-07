@@ -187,6 +187,68 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={variants[status] ?? variants.pending}>{labels[status] ?? status}</Badge>;
 }
 
+function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
+  if (!lastActiveAt) {
+    return (
+      <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+        <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+        Offline - Belum pernah
+      </Badge>
+    );
+  }
+
+  let ms = 0;
+  if (typeof lastActiveAt === "object" && lastActiveAt !== null && "toMillis" in (lastActiveAt as any)) {
+    ms = (lastActiveAt as { toMillis: () => number }).toMillis();
+  } else if (lastActiveAt instanceof Date) {
+    ms = lastActiveAt.getTime();
+  } else if (typeof lastActiveAt === "number") {
+    ms = lastActiveAt;
+  } else if (typeof lastActiveAt === "string") {
+    ms = new Date(lastActiveAt).getTime();
+  }
+
+  if (!ms || isNaN(ms)) {
+    return (
+      <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+        <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+        Offline
+      </Badge>
+    );
+  }
+
+  const diffMs = Date.now() - ms;
+  const isOnline = diffMs <= 5 * 60 * 1000;
+
+  if (isOnline) {
+    return (
+      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold gap-1.5 text-xs py-0.5">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        ONLINE
+      </Badge>
+    );
+  }
+
+  const diffMins = Math.floor(diffMs / (60 * 1000));
+  let timeStr = `${diffMins}m lalu`;
+  if (diffMins >= 60) {
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours >= 24) {
+      const diffDays = Math.floor(diffHours / 24);
+      timeStr = `${diffDays}h lalu`;
+    } else {
+      timeStr = `${diffHours}j lalu`;
+    }
+  }
+
+  return (
+    <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+      Offline - {timeStr}
+    </Badge>
+  );
+}
+
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts } = useAdminData();
   const announcements = useAnnouncements({ includeInactive: true });
@@ -3032,11 +3094,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <CardContent className="pt-4">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-sm text-slate-100">{u.name}</p>
                             <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
                               {currentTierCfg.name} ({formatMoney(currentTierCfg.pricePerItem)}/item)
                             </Badge>
+                            <OnlineStatusBadge lastActiveAt={u.lastActiveAt} />
                           </div>
                           <p className="text-xs text-slate-400 font-mono mt-0.5">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
                           <div className="flex gap-3 text-xs text-slate-300 mt-1">
