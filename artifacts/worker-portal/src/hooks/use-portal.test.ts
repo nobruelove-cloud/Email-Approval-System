@@ -25,6 +25,7 @@ import {
   getPaymentMethodFeeConfig,
   formatBatchEmailsOnly,
   formatBatchEmailsWithPasswords,
+  getLeaderboardUserProgress,
 } from "../lib/portal-utils";
 import {
   DEFAULT_TIERS,
@@ -1154,6 +1155,52 @@ describe("Leaderboard Global Standings & Target Threshold Calculations Unit Test
     expect(standings[1].rank).toBe(2);
     expect(standings[1].validAccCount).toBe(21);
     expect(standings[1].rewardAmount).toBe(0);
+  });
+
+  it("calculates user qualification and progress correctly via getLeaderboardUserProgress", () => {
+    // ACC < 50, Position 1 in array
+    const info1 = getLeaderboardUserProgress(21, 1);
+    expect(info1.positionText).toBe("Belum Terkualifikasi");
+    expect(info1.targetTitle).toBe("Juara 3 (Bonus Rp 15.000)");
+    expect(info1.nextTarget).toBe(50);
+    expect(info1.remaining).toBe(29);
+    expect(info1.progressPercent).toBe(42);
+    expect(info1.descriptionText).toBe("Butuh 29 email ACC lagi untuk masuk kualifikasi Juara 3");
+
+    // ACC < 50, Position 4 (unranked/outside top 3)
+    const info2 = getLeaderboardUserProgress(10, 4);
+    expect(info2.positionText).toBe("Di Luar Top 3");
+    expect(info2.targetTitle).toBe("Juara 3 (Bonus Rp 15.000)");
+    expect(info2.remaining).toBe(40);
+    expect(info2.progressPercent).toBe(20);
+    expect(info2.descriptionText).toBe("Butuh 40 email ACC lagi untuk masuk kualifikasi Juara 3");
+
+    // ACC >= 50 (70 ACC), Position 1 in array (met Juara 3 threshold, targeting Juara 2)
+    const info3 = getLeaderboardUserProgress(70, 1);
+    expect(info3.positionText).toBe("Peringkat #3");
+    expect(info3.targetTitle).toBe("Juara 2 (Bonus Rp 30.000)");
+    expect(info3.nextTarget).toBe(100);
+    expect(info3.remaining).toBe(30);
+    expect(info3.progressPercent).toBe(70);
+    expect(info3.descriptionText).toBe("Butuh 30 email ACC lagi untuk masuk kualifikasi Juara 2");
+
+    // ACC >= 100 (120 ACC), Position 1 in array (met Juara 2 threshold, targeting Juara 1)
+    const info4 = getLeaderboardUserProgress(120, 1);
+    expect(info4.positionText).toBe("Peringkat #2");
+    expect(info4.targetTitle).toBe("Juara 1 (Bonus Rp 50.000)");
+    expect(info4.nextTarget).toBe(200);
+    expect(info4.remaining).toBe(80);
+    expect(info4.progressPercent).toBe(60);
+    expect(info4.descriptionText).toBe("Butuh 80 email ACC lagi untuk masuk kualifikasi Juara 1");
+
+    // ACC >= 200 (200 ACC), Position 1 in array (met Juara 1 threshold)
+    const info5 = getLeaderboardUserProgress(200, 1);
+    expect(info5.positionText).toBe("Peringkat #1");
+    expect(info5.targetTitle).toBe("Juara 1 (Bonus Rp 50.000)");
+    expect(info5.nextTarget).toBe(200);
+    expect(info5.remaining).toBe(0);
+    expect(info5.progressPercent).toBe(100);
+    expect(info5.descriptionText).toBe("🎉 Selamat! Anda telah mencapai target kualifikasi bonus!");
   });
 });
 

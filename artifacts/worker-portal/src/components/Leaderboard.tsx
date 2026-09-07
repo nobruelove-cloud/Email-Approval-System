@@ -11,6 +11,7 @@ import {
   getStartAndEndOfWeek,
   getWeeklyPeriodKey,
   formatMoney,
+  getLeaderboardUserProgress,
 } from "@/lib/portal-utils";
 
 interface LeaderboardProps {
@@ -107,50 +108,12 @@ export function Leaderboard({
     return standings.find((s) => s.workerId === currentUserId) || null;
   }, [standings, currentUserId]);
 
-  // Target requirement calculation for logged-in user based on actual rank
+  // Target requirement and qualification calculation for logged-in user
   const userProgressInfo = useMemo(() => {
     const acc = myPosition ? myPosition.validAccCount : 0;
-    const rank = myPosition ? myPosition.rank : (standings.length > 0 ? standings.length + 1 : 99);
-
-    // Synchronize target requirement strictly with current rank position:
-    // Rank #1: Juara 1 (min 200 ACC, Rp 50.000)
-    // Rank #2: Juara 2 (min 100 ACC, Rp 30.000)
-    // Rank #3: Juara 3 (min 50 ACC, Rp 15.000)
-    // Rank #4+ or unranked: Menembus Juara 3 (min 50 ACC, Rp 15.000)
-    let nextTarget = 50;
-    let targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
-
-    if (myPosition) {
-      if (rank === 1) {
-        nextTarget = 200;
-        targetTitle = "Juara 1 (Bonus Rp 50.000)";
-      } else if (rank === 2) {
-        nextTarget = 100;
-        targetTitle = "Juara 2 (Bonus Rp 30.000)";
-      } else if (rank === 3) {
-        nextTarget = 50;
-        targetTitle = "Juara 3 (Bonus Rp 15.000)";
-      } else {
-        nextTarget = 50;
-        targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
-      }
-    } else {
-      nextTarget = 50;
-      targetTitle = "Menembus Juara 3 (Bonus Rp 15.000)";
-    }
-
-    const remaining = Math.max(0, nextTarget - acc);
-    const progressPercent = Math.min(100, Math.round((acc / nextTarget) * 100));
-
-    return {
-      acc,
-      rank,
-      nextTarget,
-      targetTitle,
-      remaining,
-      progressPercent,
-    };
-  }, [myPosition, standings.length]);
+    const arrayRank = myPosition ? myPosition.rank : null;
+    return getLeaderboardUserProgress(acc, arrayRank);
+  }, [myPosition]);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -202,10 +165,10 @@ export function Leaderboard({
               <span>Periode Aktif: <strong className="text-white">{timeFrame.label}</strong></span>
             </div>
 
-            {myPosition ? (
+            {currentUserId ? (
               <div className="inline-flex items-center gap-2 bg-amber-500/20 px-3 py-1.5 rounded-xl border border-amber-400/30 text-amber-100 font-bold">
                 <Crown className="w-4 h-4 text-amber-300" />
-                <span>Posisi Anda: <strong className="text-white">Peringkat #{myPosition.rank}</strong> ({myPosition.validAccCount} Email ACC)</span>
+                <span>Posisi Anda: <strong className="text-white">{userProgressInfo.positionText}</strong> ({userProgressInfo.acc} Email ACC)</span>
               </div>
             ) : (
               <span className="text-amber-300/80 italic">Setor email ACC sekarang untuk masuk ke papan klasemen global!</span>
@@ -231,7 +194,7 @@ export function Leaderboard({
                     </Badge>
                   </div>
                   <p className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                    {myPosition ? `Peringkat #${userProgressInfo.rank}` : "Belum Masuk Peringkat"}
+                    {userProgressInfo.positionText}
                     <span className="text-xs text-amber-200/80 font-normal ml-2">
                       ({userProgressInfo.acc} Email ACC Terverifikasi)
                     </span>
@@ -261,9 +224,7 @@ export function Leaderboard({
                 />
               </div>
               <p className="text-[11px] text-amber-200/90 font-medium">
-                {userProgressInfo.remaining > 0
-                  ? `Belum Mencapai Target Minimum ${userProgressInfo.targetTitle} (${userProgressInfo.acc}/${userProgressInfo.nextTarget} ACC)`
-                  : "🎉 Selamat! Anda telah mencapai target kualifikasi bonus!"}
+                {userProgressInfo.descriptionText}
               </p>
             </div>
           </CardContent>
