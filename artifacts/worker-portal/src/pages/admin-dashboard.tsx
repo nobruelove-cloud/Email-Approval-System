@@ -108,7 +108,8 @@ import {
   masterResetOperasional,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig } from "@/lib/portal-types";
+import { sendTelegramNotification } from "@/lib/telegram-bot";
 import {
   formatDate,
   formatDateTime,
@@ -848,6 +849,83 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [supportDescription, setSupportDescription] = useState<string | null>(null);
   const [supportEnabled, setSupportEnabled] = useState<boolean | null>(null);
   const [savingSupport, setSavingSupport] = useState(false);
+
+  // Telegram Bot configuration state
+  const activeTelegramConfig = useMemo(() => {
+    return rules.data.telegramConfig ?? DEFAULT_TELEGRAM_CONFIG;
+  }, [rules.data.telegramConfig]);
+
+  const [telegramBotToken, setTelegramBotToken] = useState<string | null>(null);
+  const [telegramAdminChatId, setTelegramAdminChatId] = useState<string | null>(null);
+  const [telegramEnabled, setTelegramEnabled] = useState<boolean | null>(null);
+  const [savingTelegram, setSavingTelegram] = useState(false);
+  const [testingTelegram, setTestingTelegram] = useState(false);
+
+  const currentTelegramBotToken = telegramBotToken ?? activeTelegramConfig.botToken ?? "";
+  const currentTelegramAdminChatId = telegramAdminChatId ?? activeTelegramConfig.adminChatId ?? "";
+  const currentTelegramEnabled = telegramEnabled ?? (activeTelegramConfig.enabled !== false);
+
+  async function handleSaveTelegramConfig() {
+    setSavingTelegram(true);
+    try {
+      const updatedTelegramConfig: TelegramConfig = {
+        enabled: currentTelegramEnabled,
+        botToken: currentTelegramBotToken.trim(),
+        adminChatId: currentTelegramAdminChatId.trim(),
+      };
+
+      await saveSettings("rules", {
+        ...rules.data,
+        telegramConfig: updatedTelegramConfig,
+      });
+
+      // Also sync to settings/telegram document for backward compatibility
+      await saveSettings("telegram", updatedTelegramConfig);
+
+      toast.success("Pengaturan Telegram Bot Notification Service berhasil disimpan!");
+      setTelegramBotToken(null);
+      setTelegramAdminChatId(null);
+      setTelegramEnabled(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengaturan Telegram.");
+    } finally {
+      setSavingTelegram(false);
+    }
+  }
+
+  async function handleTestTelegramNotification() {
+    if (!currentTelegramBotToken.trim()) {
+      toast.error("Telegram Bot Token wajib diisi untuk melakukan test.");
+      return;
+    }
+    if (!currentTelegramAdminChatId.trim()) {
+      toast.error("Telegram Admin Chat ID / Group ID wajib diisi untuk melakukan test.");
+      return;
+    }
+
+    setTestingTelegram(true);
+    try {
+      const testMessage =
+        `🤖 TEST NOTIFIKASI TELEGRAM BOT\n\n` +
+        `Koneksi Telegram Bot Notification Service BERHASIL terhubung ke Obsidian Command Center Admin!\n\n` +
+        `🕒 Waktu Test: ${formatDateTime(new Date())}`;
+
+      const res = await sendTelegramNotification(testMessage, {
+        botToken: currentTelegramBotToken.trim(),
+        adminChatId: currentTelegramAdminChatId.trim(),
+      });
+
+      if (res.success) {
+        toast.success("Notifikasi test BERHASIL dikirim ke Telegram!");
+      } else {
+        toast.error(`Gagal mengirim notifikasi test: ${res.error || "Terjadi kesalahan"}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menguji koneksi Telegram Bot.");
+    } finally {
+      setTestingTelegram(false);
+    }
+  }
 
   const activeSupportConfig = useMemo(() => {
     return rules.data.supportConfig ?? DEFAULT_RULES.supportConfig!;
@@ -4041,6 +4119,85 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     {savingOperatingHours && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan Jam Operasional
                   </Button>
+                </CardContent>
+              </Card>
+
+              {/* TELEGRAM BOT NOTIFICATION SERVICE CONFIGURATION */}
+              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
+                    <Megaphone className="w-5 h-5 text-emerald-400" /> Telegram Bot Notification Service
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Konfigurasi Telegram Bot untuk menerima notifikasi otomatis secara real-time saat ada Storan Email Masuk dan Request Penarikan Saldo Worker.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-slate-300 font-semibold">Telegram Bot Token (botToken)</Label>
+                    <Input
+                      type="password"
+                      value={currentTelegramBotToken}
+                      onChange={(e) => setTelegramBotToken(e.target.value)}
+                      placeholder="Contoh: 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Token resmi dari BotFather di Telegram.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-slate-300 font-semibold">Telegram Admin Chat ID / Group ID (adminChatId)</Label>
+                    <Input
+                      value={currentTelegramAdminChatId}
+                      onChange={(e) => setTelegramAdminChatId(e.target.value)}
+                      placeholder="Contoh: 123456789 atau -100123456789"
+                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      ID User Admin atau ID Group Telegram tujuan pengiriman notifikasi.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-slate-300 font-semibold">Status Layanan Notifikasi</Label>
+                    <Select
+                      value={currentTelegramEnabled ? "ON" : "OFF"}
+                      onValueChange={(val) => setTelegramEnabled(val === "ON")}
+                    >
+                      <SelectTrigger className="mt-1.5 w-36 text-xs bg-slate-950/80 border-slate-800 text-slate-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectItem value="ON" className="text-xs font-semibold text-emerald-400">Aktif (ON)</SelectItem>
+                        <SelectItem value="OFF" className="text-xs font-semibold text-slate-400">Nonaktif (OFF)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleTestTelegramNotification}
+                      disabled={testingTelegram || !currentTelegramBotToken.trim() || !currentTelegramAdminChatId.trim()}
+                      className="bg-slate-950 border-slate-800 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold gap-2 text-xs h-9"
+                    >
+                      {testingTelegram ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+                      Test Kirim Notifikasi
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={handleSaveTelegramConfig}
+                      disabled={savingTelegram}
+                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 text-xs h-9 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                    >
+                      {savingTelegram && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Simpan Pengaturan Telegram
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 

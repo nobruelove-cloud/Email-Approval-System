@@ -257,6 +257,19 @@ export const DEFAULT_MAINTENANCE: MaintenanceConfig = {
   message: "Sistem sedang dalam perbaikan & pembaruan server. Silakan cek kembali beberapa saat lagi.",
 };
 
+export type TelegramConfig = {
+  enabled?: boolean;
+  botToken: string;
+  adminChatId: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
+  enabled: true,
+  botToken: "",
+  adminChatId: "",
+};
+
 export type SupportConfig = {
   enabled: boolean;
   title: string;
@@ -338,6 +351,9 @@ export type PortalRules = {
 
   // Support / Help Center Settings
   supportConfig?: SupportConfig;
+
+  // Telegram Bot Notification Settings
+  telegramConfig?: TelegramConfig;
 
   // Operating Hours Settings
   operatingHours?: OperatingHoursConfig;
