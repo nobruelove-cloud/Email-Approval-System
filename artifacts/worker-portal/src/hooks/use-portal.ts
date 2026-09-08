@@ -336,6 +336,37 @@ export async function runTransactionWithDiagnostic<T>(
     throw err;
   }
 }
+export async function createPortalUser(uid: string, userData: Partial<PortalUser>) {
+  if (!db) throw new Error("Database belum terkonfigurasi.");
+  
+  const userRef = doc(db, "users", uid);
+  await setDocWithDiagnostic(userRef, {
+    uid,
+    createdAt: serverTimestamp(),
+    ...userData,
+  }, undefined, "createPortalUser");
+
+  // Trigger Notifikasi Telegram Worker Baru
+  try {
+    const settingsSnap = await getDoc(doc(db, "settings", "global"));
+    if (settingsSnap.exists()) {
+      const settings = settingsSnap.data();
+      if (settings?.telegramBotToken && settings?.telegramAdminChatId) {
+        await sendTelegramNotification(
+          settings as any,
+          `👤 <b>WORKER BARU TERDAFTAR!</b>\n\n` +
+          `• <b>Nama/User:</b> ${userData.name || "Worker Baru"}\n` +
+          `• <b>Email:</b> ${userData.email || "-"}\n` +
+          `• <b>Waktu:</b> ${new Date().toLocaleString('id-ID')}\n\n` +
+          `Silakan cek Dashboard Admin untuk detail akun.`
+        );
+      }
+    }
+  } catch (err) {
+    console.error("Gagal mengirim notifikasi worker baru ke Telegram:", err);
+  }
+}
+
 
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
