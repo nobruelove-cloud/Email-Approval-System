@@ -675,37 +675,97 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         </Card>
 
         {isSupportEnabled && (
-          <Card className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white border-blue-800 shadow-sm relative overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 text-white font-bold">
-                <div className="p-1.5 rounded-lg bg-blue-500/30 border border-blue-400/40 text-blue-200">
-                  <HelpCircle className="w-4 h-4 shrink-0" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                Pusat Bantuan & Komunitas
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Kartu 1: CS Telegram */}
+              <div className="p-3 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                      <TelegramIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-xs text-[#FFB74D] truncate">CS Telegram</span>
+                  </div>
+                  <p className="text-[11px] text-[#FFE0B2]/80 leading-tight">
+                    Kendala akun & payout
+                  </p>
                 </div>
-                {supportConfig.title || "Pusat Bantuan CS Telegram"}
-              </CardTitle>
-              <CardDescription className="text-xs text-blue-200/90 whitespace-pre-wrap leading-relaxed">
-                {supportConfig.description || "Ada kendala saat menggunakan platform? Hubungi Customer Service kami melalui Telegram."}
-              </CardDescription>
-            </CardHeader>
-            {supportConfig.telegramUrl ? (
-              <CardContent className="pt-1">
-                <Button
-                  asChild
-                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold gap-2 text-xs h-9 px-4 rounded-xl shadow-sm border border-amber-400/30 transition-transform active:scale-95"
-                >
-                  <a
-                    href={supportConfig.telegramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2"
+                {supportConfig.telegramUrl ? (
+                  <Button
+                    asChild
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-[11px] h-7 px-2 rounded-lg border border-amber-400/30 transition-transform active:scale-95 shadow-2xs"
                   >
-                    <TelegramIcon className="w-4 h-4 text-white shrink-0" />
-                    <span>Hubungi CS Telegram</span>
-                  </a>
-                </Button>
-              </CardContent>
-            ) : null}
-          </Card>
+                    <a
+                      href={supportConfig.telegramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1"
+                    >
+                      <TelegramIcon className="w-3 h-3 shrink-0" />
+                      <span>Hubungi CS</span>
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    disabled
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-[11px] h-7 px-2 bg-slate-900/80 text-slate-500 border-slate-800 cursor-not-allowed"
+                  >
+                    Belum Diatur
+                  </Button>
+                )}
+              </div>
+
+              {/* Kartu 2: Komunitas WA */}
+              <div className="p-3 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-xs text-[#FFB74D] truncate">Komunitas WA</span>
+                  </div>
+                  <p className="text-[11px] text-[#FFE0B2]/80 leading-tight">
+                    Info & saluran resmi
+                  </p>
+                </div>
+                {supportConfig.communityWaLink ? (
+                  <Button
+                    asChild
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-[11px] h-7 px-2 rounded-lg border border-amber-400/30 transition-transform active:scale-95 shadow-2xs"
+                  >
+                    <a
+                      href={supportConfig.communityWaLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1"
+                    >
+                      <MessageCircle className="w-3 h-3 shrink-0" />
+                      <span>Gabung WA</span>
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    disabled
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-[11px] h-7 px-2 bg-slate-900/80 text-slate-500 border-slate-800 cursor-not-allowed"
+                  >
+                    Belum Diatur
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         <Tabs value={mainTab} onValueChange={setMainTab}>
@@ -1859,25 +1919,50 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <ChevronRight className="w-4 h-4 text-slate-500" />
               </button>
 
-              {isSupportEnabled && supportConfig.telegramUrl && (
-                <a
-                  href={supportConfig.telegramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
-                      <TelegramIcon className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold">Pusat Bantuan CS Telegram</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Hubungi CS jika ada kendala</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-500" />
-                </a>
+              {isSupportEnabled && (
+                <div className="space-y-2 pt-1">
+                  {supportConfig.telegramUrl ? (
+                    <a
+                      href={supportConfig.telegramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                          <TelegramIcon className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold">CS Telegram</p>
+                          <p className="text-[10px] text-slate-400 font-normal">Kendala akun & payout</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-500" />
+                    </a>
+                  ) : null}
+
+                  {supportConfig.communityWaLink ? (
+                    <a
+                      href={supportConfig.communityWaLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                          <MessageCircle className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold">Komunitas WA</p>
+                          <p className="text-[10px] text-slate-400 font-normal">Info & saluran resmi</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-500" />
+                    </a>
+                  ) : null}
+                </div>
               )}
 
               <button

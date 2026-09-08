@@ -262,6 +262,7 @@ export type SupportConfig = {
   title: string;
   description: string;
   telegramUrl: string;
+  communityWaLink?: string;
 };
 
 export type DayOperatingHours = {
@@ -407,6 +408,7 @@ export const DEFAULT_RULES: PortalRules = {
     title: "Pusat Bantuan",
     description: "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
     telegramUrl: "",
+    communityWaLink: "",
   },
 
   operatingHours: DEFAULT_OPERATING_HOURS,

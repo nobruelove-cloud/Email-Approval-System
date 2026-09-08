@@ -844,6 +844,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   // Support / Help Center configuration state
   const [supportTitle, setSupportTitle] = useState<string | null>(null);
   const [supportTelegramUrl, setSupportTelegramUrl] = useState<string | null>(null);
+  const [communityWaLink, setCommunityWaLink] = useState<string | null>(null);
   const [supportDescription, setSupportDescription] = useState<string | null>(null);
   const [supportEnabled, setSupportEnabled] = useState<boolean | null>(null);
   const [savingSupport, setSavingSupport] = useState(false);
@@ -854,6 +855,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const currentSupportTitle = supportTitle ?? activeSupportConfig.title ?? "Customer Service";
   const currentSupportTelegramUrl = supportTelegramUrl ?? activeSupportConfig.telegramUrl ?? "";
+  const currentCommunityWaLink = communityWaLink ?? activeSupportConfig.communityWaLink ?? "";
   const currentSupportDescription = supportDescription ?? activeSupportConfig.description ?? "Ada kendala? Hubungi Customer Service kami melalui Telegram.";
   const currentSupportEnabled = supportEnabled ?? (activeSupportConfig.enabled !== false);
 
@@ -914,8 +916,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }
 
   async function handleSaveSupportConfig() {
-    const trimmedUrl = currentSupportTelegramUrl.trim();
-    if (!isValidTelegramUrl(trimmedUrl)) {
+    const trimmedTelegramUrl = currentSupportTelegramUrl.trim();
+    if (trimmedTelegramUrl && !isValidTelegramUrl(trimmedTelegramUrl)) {
       toast.error("Masukkan link Telegram yang valid.");
       return;
     }
@@ -925,8 +927,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       const updatedSupportConfig: SupportConfig = {
         enabled: currentSupportEnabled,
         title: currentSupportTitle.trim() || "Customer Service",
-        description: currentSupportDescription.trim() || "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
-        telegramUrl: trimmedUrl,
+        description: currentSupportDescription.trim() || "Ada kendala? Hubungi Customer Service kami melalui Telegram & Komunitas WhatsApp.",
+        telegramUrl: trimmedTelegramUrl,
+        communityWaLink: currentCommunityWaLink.trim(),
       };
 
       await saveSettings("rules", {
@@ -934,7 +937,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         supportConfig: updatedSupportConfig,
       });
 
-      toast.success("Pengaturan pusat bantuan berhasil disimpan.");
+      toast.success("Pengaturan Pusat Bantuan & Komunitas berhasil disimpan.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan pengaturan pusat bantuan.");
     } finally {
@@ -4044,9 +4047,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               {/* PUSAT BANTUAN / CUSTOMER SERVICE */}
               <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100">Pusat Bantuan / Customer Service</CardTitle>
+                  <CardTitle className="text-lg text-slate-100">Pusat Bantuan & Komunitas</CardTitle>
                   <CardDescription className="text-slate-400">
-                    Atur tautan dan informasi Customer Service Telegram yang tampil untuk seluruh pekerja.
+                    Atur tautan CS Telegram dan Saluran / Grup WhatsApp yang tampil di Worker Dashboard.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -4056,26 +4059,35 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       value={currentSupportTitle}
                       onChange={(e) => setSupportTitle(e.target.value)}
                       placeholder="Customer Service"
-                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Link Telegram</Label>
+                    <Label className="text-xs text-slate-300">Link CS Telegram (supportTelegramLink)</Label>
                     <Input
                       value={currentSupportTelegramUrl}
                       onChange={(e) => setSupportTelegramUrl(e.target.value)}
                       placeholder="https://t.me/username"
-                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Deskripsi</Label>
+                    <Label className="text-xs text-slate-300">Link Saluran / Grup WhatsApp (communityWaLink)</Label>
+                    <Input
+                      value={currentCommunityWaLink}
+                      onChange={(e) => setCommunityWaLink(e.target.value)}
+                      placeholder="https://chat.whatsapp.com/..."
+                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-slate-300">Deskripsi Ringkas</Label>
                     <Textarea
                       rows={3}
                       value={currentSupportDescription}
                       onChange={(e) => setSupportDescription(e.target.value)}
-                      placeholder="Ada kendala? Hubungi Customer Service kami melalui Telegram."
-                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      placeholder="Ada kendala? Hubungi Customer Service kami melalui Telegram atau gabung Komunitas WA."
+                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
                     />
                   </div>
                   <div>
