@@ -347,9 +347,10 @@ export async function createPortalUser(uid: string, userData: Partial<PortalUser
   }, undefined, "createPortalUser");
 
   // Trigger Notifikasi Telegram Worker Baru
-  try {
-    const settingsSnap = await getDoc(doc(db, "settings", "global"));
+    try {
+    const settingsSnap = await getDoc(doc(db, "settings", "telegram"));
     if (settingsSnap.exists()) {
+
       const settings = settingsSnap.data();
       if (settings?.telegramBotToken && settings?.telegramAdminChatId) {
         await sendTelegramNotification(
