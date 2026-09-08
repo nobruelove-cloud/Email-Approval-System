@@ -32,8 +32,9 @@ import {
   type FinancialTransaction,
   type FinancialTransactionType,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers, formatDateTime } from "@/lib/portal-utils";
 import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
+import { sendTelegramNotification } from "@/lib/telegram-bot";
 
 import { useRef } from "react";
 
@@ -960,6 +961,30 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
       hook: "createSubmission",
       message: `Submission created: ${res.id}`,
     });
+
+    // Asynchronously send Telegram Notification without blocking submission
+    (async () => {
+      try {
+        const workerSnap = await getDoc(doc(db, "users", payload.workerId));
+        const workerData = workerSnap.exists() ? (workerSnap.data() as PortalUser) : null;
+        const workerName = payload.workerName || workerData?.name || shortId(payload.workerId);
+        const totalAcc = workerData?.accCount ?? 0;
+        const itemCount = payload.itemCount ?? payload.items?.length ?? 1;
+        const nowStr = formatDateTime(new Date());
+
+        const message =
+          `📩 STORAN EMAIL MASUK\n\n` +
+          `👤 Nama Worker: ${workerName}\n` +
+          `📦 Jumlah Email Disetor: ${itemCount} email\n` +
+          `🕒 Waktu Submit: ${nowStr}\n` +
+          `✅ Total ACC Terkini: ${totalAcc} ACC`;
+
+        await sendTelegramNotification(message);
+      } catch (tgErr) {
+        console.warn("[createSubmission] Telegram notification notice:", tgErr);
+      }
+    })();
+
     return res;
   } catch (err) {
     logFirestoreDiagnostic({
@@ -1283,6 +1308,29 @@ export async function createWithdrawal(payload: {
     "createWithdrawal",
     "withdrawals"
   );
+
+  // Asynchronously send Telegram Notification without blocking withdrawal
+  (async () => {
+    try {
+      const workerSnap = await getDoc(doc(db, "users", payload.workerId));
+      const workerData = workerSnap.exists() ? (workerSnap.data() as PortalUser) : null;
+      const workerName = workerData?.name || shortId(payload.workerId);
+      const formattedAmount = formatMoney(payload.amount);
+      const nowStr = formatDateTime(new Date());
+      const holderName = payload.accountHolderName ? ` (a.n. ${payload.accountHolderName})` : "";
+
+      const message =
+        `💸 REQUEST PENARIKAN SALDO\n\n` +
+        `👤 Nama Worker: ${workerName}\n` +
+        `💰 Nominal Penarikan: ${formattedAmount}\n` +
+        `💳 Metode Payout: ${payload.method} - ${payload.account}${holderName}\n` +
+        `🕒 Waktu Request: ${nowStr}`;
+
+      await sendTelegramNotification(message);
+    } catch (tgErr) {
+      console.warn("[createWithdrawal] Telegram notification notice:", tgErr);
+    }
+  })();
 }
 
 /**
