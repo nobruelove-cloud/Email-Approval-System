@@ -720,6 +720,8 @@ export interface LeaderboardEntry {
   maskedName: string;
   validAccCount: number;
   rank: number;
+  officialRank: number | null;
+  isQualified: boolean;
   rewardAmount?: number;
 }
 
@@ -931,20 +933,51 @@ export function calculateLeaderboardStandings(
     3: 50,  // Juara 3: Min 50 ACC
   };
 
-  return sorted.map((entry, idx) => {
-    const rank = idx + 1;
-    const baseReward = rewardMap.get(rank) ?? 0;
-    const minAccRequired = WEEKLY_MIN_ACC_THRESHOLDS[rank];
+  // Determine official ranks sequentially based on sorted position and minimum ACC thresholds
+  let assignedRank1 = false;
+  let assignedRank2 = false;
+  let assignedRank3 = false;
 
-    // Enforce minimum ACC threshold check for reward eligibility
-    let eligibleReward = baseReward;
-    if (minAccRequired !== undefined && entry.validAccCount < minAccRequired) {
-      eligibleReward = 0;
+  return sorted.map((entry, idx) => {
+    const sortedPosition = idx + 1;
+    const isQualified = entry.validAccCount >= 50;
+
+    let officialRank: number | null = null;
+
+    if (sortedPosition === 1) {
+      if (entry.validAccCount >= 200) {
+        officialRank = 1;
+        assignedRank1 = true;
+      } else if (entry.validAccCount >= 100) {
+        officialRank = 2;
+        assignedRank2 = true;
+      } else if (entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
+    } else if (sortedPosition === 2) {
+      if (assignedRank1 && entry.validAccCount >= 100) {
+        officialRank = 2;
+        assignedRank2 = true;
+      } else if ((assignedRank1 || assignedRank2) && !assignedRank3 && entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
+    } else if (sortedPosition === 3) {
+      if (assignedRank1 && assignedRank2 && !assignedRank3 && entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
     }
+
+    const baseReward = officialRank ? (rewardMap.get(officialRank) ?? (officialRank === 1 ? 50000 : officialRank === 2 ? 30000 : 15000)) : 0;
+    const eligibleReward = officialRank !== null ? baseReward : 0;
 
     return {
       ...entry,
-      rank,
+      rank: sortedPosition,
+      officialRank,
+      isQualified,
       rewardAmount: eligibleReward,
     };
   });

@@ -1144,15 +1144,19 @@ describe("Leaderboard Global Standings & Target Threshold Calculations Unit Test
 
     expect(standings.length).toBe(2);
 
-    // Rank #1: Worker A with 200 ACC (Eligible for Rp 50.000)
+    // Rank #1: Worker A with 200 ACC (Eligible for Juara 1 Gold: Rp 50.000)
     expect(standings[0].workerId).toBe("worker_a");
     expect(standings[0].rank).toBe(1);
+    expect(standings[0].officialRank).toBe(1);
+    expect(standings[0].isQualified).toBe(true);
     expect(standings[0].validAccCount).toBe(200);
     expect(standings[0].rewardAmount).toBe(50000);
 
-    // Rank #2: Sena with 21 ACC (Ineligible for Juara 2 since 21 < 100 ACC, reward = 0)
+    // Rank #2 in table sorting: Sena with 21 ACC (Unqualified since 21 < 50 ACC, officialRank = null, reward = 0)
     expect(standings[1].workerId).toBe("sena_uid");
     expect(standings[1].rank).toBe(2);
+    expect(standings[1].officialRank).toBe(null);
+    expect(standings[1].isQualified).toBe(false);
     expect(standings[1].validAccCount).toBe(21);
     expect(standings[1].rewardAmount).toBe(0);
   });

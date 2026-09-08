@@ -100,7 +100,17 @@ export function Leaderboard({
     );
   }, [activeSubmissions, users, timeFrame.start, timeFrame.end, rewards]);
 
-  const topThree = useMemo(() => standings.slice(0, 3), [standings]);
+  // Only workers who meet the minimum qualification (ACC >= 50) and official rank slot are eligible for podium slots
+  const podiumQualifiedWorkers = useMemo(() => {
+    return standings.filter((s) => s.validAccCount >= 50 && s.officialRank !== null);
+  }, [standings]);
+
+  // Map podium slots for Rank 1 (Gold, >= 200 ACC), Rank 2 (Silver, >= 100 ACC), Rank 3 (Bronze, >= 50 ACC)
+  const podiumSlot1 = useMemo(() => podiumQualifiedWorkers.find((w) => w.officialRank === 1) || null, [podiumQualifiedWorkers]);
+  const podiumSlot2 = useMemo(() => podiumQualifiedWorkers.find((w) => w.officialRank === 2) || null, [podiumQualifiedWorkers]);
+  const podiumSlot3 = useMemo(() => podiumQualifiedWorkers.find((w) => w.officialRank === 3) || null, [podiumQualifiedWorkers]);
+
+  const hasAnyPodiumWinner = podiumSlot1 !== null || podiumSlot2 !== null || podiumSlot3 !== null;
 
   // Find current user position if present
   const myPosition = useMemo(() => {
@@ -265,7 +275,7 @@ export function Leaderboard({
       </div>
 
       {/* TOP 3 PODIUM DISPLAY */}
-      {topThree.length > 0 ? (
+      {hasAnyPodiumWinner ? (
         <Card className="bg-white border-amber-100 shadow-xs">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -273,38 +283,37 @@ export function Leaderboard({
               Podium Juara Paling Produktif
             </CardTitle>
             <CardDescription className="text-xs text-gray-600">
-              Top 3 pekerja dengan jumlah email ACC tertinggi pada periode ini. Username disamarkan demi privasi.
+              Pekerja terkualifikasi yang berhasil mengunci tempat di podium Juara periode ini. Username disamarkan demi privasi.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {topThree.map((item) => {
-                const isFirst = item.rank === 1;
-                const isSecond = item.rank === 2;
-                const isThird = item.rank === 3;
-                const isMe = item.workerId === currentUserId;
-
-                let cardStyle = "border-gray-200 bg-white";
-                let badgeBg = "bg-gray-100 text-gray-800";
-                let badgeLabel = `#${item.rank}`;
-                let icon = <Award className="w-5 h-5 text-gray-500" />;
-
-                if (isFirst) {
-                  cardStyle = "border-amber-400 bg-gradient-to-b from-amber-50/90 via-orange-50/40 to-white ring-2 ring-amber-400/40 shadow-sm";
-                  badgeBg = "bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold shadow-2xs";
-                  badgeLabel = "🥇 JUARA 1 GOLD";
-                  icon = <Crown className="w-6 h-6 text-amber-500" />;
-                } else if (isSecond) {
-                  cardStyle = "border-slate-300 bg-gradient-to-b from-slate-50/90 to-white shadow-2xs";
-                  badgeBg = "bg-slate-700 text-white font-extrabold";
-                  badgeLabel = "🥈 JUARA 2 SILVER";
-                  icon = <Medal className="w-6 h-6 text-slate-500" />;
-                } else if (isThird) {
-                  cardStyle = "border-amber-300 bg-gradient-to-b from-amber-50/50 to-white shadow-2xs";
-                  badgeBg = "bg-amber-800 text-white font-extrabold";
-                  badgeLabel = "🥉 JUARA 3 BRONZE";
-                  icon = <Award className="w-6 h-6 text-amber-700" />;
+              {[
+                { rankNum: 1, item: podiumSlot1, badgeLabel: "🥇 JUARA 1 GOLD", cardStyle: "border-amber-400 bg-gradient-to-b from-amber-50/90 via-orange-50/40 to-white ring-2 ring-amber-400/40 shadow-sm", badgeBg: "bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold shadow-2xs", icon: <Crown className="w-6 h-6 text-amber-500" />, minAccText: "Min. 200 ACC" },
+                { rankNum: 2, item: podiumSlot2, badgeLabel: "🥈 JUARA 2 SILVER", cardStyle: "border-slate-300 bg-gradient-to-b from-slate-50/90 to-white shadow-2xs", badgeBg: "bg-slate-700 text-white font-extrabold", icon: <Medal className="w-6 h-6 text-slate-500" />, minAccText: "Min. 100 ACC" },
+                { rankNum: 3, item: podiumSlot3, badgeLabel: "🥉 JUARA 3 BRONZE", cardStyle: "border-amber-300 bg-gradient-to-b from-amber-50/50 to-white shadow-2xs", badgeBg: "bg-amber-800 text-white font-extrabold", icon: <Award className="w-6 h-6 text-amber-700" />, minAccText: "Min. 50 ACC" },
+              ].map(({ rankNum, item, badgeLabel, cardStyle, badgeBg, icon, minAccText }) => {
+                if (!item) {
+                  return (
+                    <div
+                      key={`empty-podium-${rankNum}`}
+                      className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 text-center flex flex-col items-center justify-center gap-2 min-h-[180px]"
+                    >
+                      <div className="p-2 rounded-full bg-slate-200/80 text-slate-400">
+                        {icon}
+                      </div>
+                      <Badge className="text-[10px] bg-slate-200 text-slate-600 border-0 font-bold">
+                        {badgeLabel}
+                      </Badge>
+                      <p className="text-xs font-bold text-slate-600 mt-1">Belum Terisi</p>
+                      <p className="text-[11px] text-slate-400 max-w-[180px]">
+                        {minAccText} untuk mengunci slot ini
+                      </p>
+                    </div>
+                  );
                 }
+
+                const isMe = item.workerId === currentUserId;
 
                 return (
                   <div
@@ -346,13 +355,21 @@ export function Leaderboard({
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-white border-amber-100">
-          <CardContent className="p-8 text-center space-y-2">
-            <Trophy className="w-10 h-10 text-amber-300 mx-auto" />
-            <p className="font-bold text-gray-800 text-sm">Belum Ada Setoran ACC di Periode Ini</p>
-            <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              Jadilah pekerja pertama yang menyetorkan email valid untuk menduduki peringkat #1 Klasemen!
-            </p>
+        <Card className="bg-gradient-to-br from-[#2D1B00] via-[#211300] to-amber-950 text-white border-amber-800/80 shadow-md">
+          <CardContent className="p-8 text-center space-y-3">
+            <Trophy className="w-12 h-12 text-amber-400 mx-auto animate-bounce" />
+            <div className="space-y-1">
+              <h3 className="font-black text-amber-200 text-lg">Belum Ada Pekerja Terkualifikasi</h3>
+              <p className="text-xs text-amber-100/80 max-w-md mx-auto">
+                Minimal 50 ACC Valid untuk mengunci tempat di podium Juara 3
+              </p>
+            </div>
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                Setor email sekarang & kunci Juara 3!
+              </span>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -387,7 +404,8 @@ export function Leaderboard({
                 <tbody className="divide-y divide-amber-100/60">
                   {standings.map((item) => {
                     const isMe = item.workerId === currentUserId;
-                    const isTopThree = item.rank <= 3;
+                    const isQualified = item.isQualified && item.validAccCount >= 50;
+                    const officialRank = item.officialRank;
 
                     return (
                       <tr
@@ -395,26 +413,30 @@ export function Leaderboard({
                         className={`transition-colors ${
                           isMe
                             ? "bg-amber-100/70 font-bold text-amber-950"
-                            : isTopThree
+                            : isQualified
                               ? "bg-amber-50/30 hover:bg-amber-50/60"
                               : "hover:bg-slate-50/80"
                         }`}
                       >
                         <td className="py-3 px-3 align-middle text-center font-black">
-                          {item.rank === 1 ? (
+                          {isQualified && officialRank === 1 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-white shadow-2xs font-extrabold text-xs">
                               🥇
                             </span>
-                          ) : item.rank === 2 ? (
+                          ) : isQualified && officialRank === 2 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-500 text-white font-extrabold text-xs">
                               🥈
                             </span>
-                          ) : item.rank === 3 ? (
+                          ) : isQualified && officialRank === 3 ? (
                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-800 text-white font-extrabold text-xs">
                               🥉
                             </span>
-                          ) : (
+                          ) : isQualified ? (
                             <span className="text-gray-500 font-mono text-sm">#{item.rank}</span>
+                          ) : (
+                            <Badge className="bg-slate-800 text-amber-200 border border-amber-900/40 text-[10px] font-bold px-2 py-0.5">
+                              Belum Terkualifikasi
+                            </Badge>
                           )}
                         </td>
 
@@ -434,10 +456,12 @@ export function Leaderboard({
                         </td>
 
                         <td className="py-3 px-3 align-middle text-right font-black">
-                          {item.rewardAmount && item.rewardAmount > 0 ? (
+                          {isQualified && item.rewardAmount && item.rewardAmount > 0 ? (
                             <span className="text-amber-700">{formatMoney(item.rewardAmount)}</span>
                           ) : (
-                            <span className="text-gray-400 font-normal text-[11px]">-</span>
+                            <span className="text-slate-500 font-medium text-[11px]">
+                              Butuh {Math.max(0, 50 - item.validAccCount)} lagi
+                            </span>
                           )}
                         </td>
                       </tr>
