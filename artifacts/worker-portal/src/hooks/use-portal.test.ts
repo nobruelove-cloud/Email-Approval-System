@@ -48,6 +48,7 @@ const {
   mockAuthObj,
   mockSetDoc,
   mockGetDoc,
+  mockGetDocs,
   mockOnSnapshot,
   mockDoc,
   mockOnAuthStateChanged,
@@ -55,6 +56,7 @@ const {
   mockAuthObj: { currentUser: { uid: "test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any },
   mockSetDoc: vi.fn().mockResolvedValue(undefined),
   mockGetDoc: vi.fn().mockResolvedValue({ exists: () => false, data: () => ({}) }),
+  mockGetDocs: vi.fn().mockResolvedValue({ empty: true, docs: [], size: 0 }),
   mockOnSnapshot: vi.fn(),
   mockDoc: vi.fn((dbOrColl: any, colOrId?: string, id?: string) => {
     if (dbOrColl && typeof dbOrColl === "object" && dbOrColl.path) {
@@ -72,6 +74,7 @@ vi.mock("firebase/firestore", async () => {
     ...actual,
     setDoc: (...args: any[]) => mockSetDoc(...args),
     getDoc: (...args: any[]) => mockGetDoc(...args),
+    getDocs: (...args: any[]) => mockGetDocs(...args),
     onSnapshot: (...args: any[]) => mockOnSnapshot(...args),
     doc: (...args: any[]) => mockDoc(...args),
     collection: vi.fn((db: any, name: string) => ({ path: name })),
@@ -114,6 +117,8 @@ import {
   claimReferralTier,
   updateSubmissionTier,
   reviewSubmission,
+  bindReferral,
+  processEmailACC,
   logFirestoreDiagnostic,
   formatQueryConstraint,
   formatQueryConstraints,
@@ -2290,5 +2295,209 @@ describe("Admin Batch Tier Override & Recalculation System Unit Tests", () => {
     const userUpdate = tx._writes.find((w: any) => w.type === "update" && w.ref === "users/worker_overridden_456");
     expect(userUpdate.updates.balance).toBe(10000 + 5600); // 15600
     expect(userUpdate.updates.tier).toBe(1);
+  });
+});
+
+describe("Reciprocal Referral Binding & Passive Income Distribution System Unit Tests (bindReferral & processEmailACC)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("bindReferral Unit Tests", () => {
+    it("1. Rejects empty referral code", async () => {
+      await expect(bindReferral("workerB_1", "")).rejects.toThrow("Kode referral wajib diisi.");
+      await expect(bindReferral("workerB_1", "   ")).rejects.toThrow("Kode referral wajib diisi.");
+    });
+
+    it("2. Rejects invalid referral code when Worker A is not found", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => false } as any);
+
+      await expect(bindReferral("workerB_1", "INVALID_CODE")).rejects.toThrow("Kode referral tidak valid!");
+    });
+
+    it("3. Rejects self-referral (workerAId === workerBId)", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerB_1", data: () => ({ name: "Worker B" }) } as any);
+
+      await expect(bindReferral("workerB_1", "workerB_1")).rejects.toThrow("Tidak bisa menggunakan kode referral sendiri!");
+    });
+
+    it("4. Rejects binding if Worker B has already used a referral (hasUsedReferral === true)", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerA_100", data: () => ({ name: "Worker A" }) } as any);
+
+      const store: Record<string, any> = {
+        "users/workerB_1": { uid: "workerB_1", name: "Worker B", hasUsedReferral: true },
+        "users/workerA_100": { uid: "workerA_100", name: "Worker A" },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(bindReferral("workerB_1", "workerA_100")).rejects.toThrow(
+        "Akun ini sudah terikat dengan referral lain dan tidak bisa diubah!"
+      );
+    });
+
+    it("5. Successfully binds Worker B to Worker A bidirectionally in Firestore transaction", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerA_100", data: () => ({ name: "Worker A" }) } as any);
+
+      const store: Record<string, any> = {
+        "users/workerB_1": { uid: "workerB_1", name: "Worker B", balance: 0 },
+        "users/workerA_100": { uid: "workerA_100", name: "Worker A", balance: 0 },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await bindReferral("workerB_1", "workerA_100");
+
+      expect(res.success).toBe(true);
+      expect(res.message).toBe("Berhasil terhubung dengan partner referral secara permanen!");
+
+      // Worker B points to Worker A and is locked permanently
+      expect(store["users/workerB_1"].referredBy).toBe("workerA_100");
+      expect(store["users/workerB_1"].hasUsedReferral).toBe(true);
+
+      // Worker A records reciprocal partner Worker B
+      expect(store["users/workerA_100"].reciprocalPartner).toBe("workerB_1");
+
+      // Referral tracking document is created
+      expect(store["referrals/workerB_1"]).toBeDefined();
+      expect(store["referrals/workerB_1"].referrerId).toBe("workerA_100");
+      expect(store["referrals/workerB_1"].referredWorkerId).toBe("workerB_1");
+    });
+  });
+
+  describe("processEmailACC Unit Tests", () => {
+    it("1. Rejects non-existent submission", async () => {
+      const store: Record<string, any> = {};
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(processEmailACC("non_existent_sub")).rejects.toThrow("Data storan tidak ditemukan!");
+    });
+
+    it("2. Rejects already processed/ACC submission", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_already_acc": {
+          id: "sub_already_acc",
+          workerId: "worker_1",
+          status: "ACC",
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(processEmailACC("sub_already_acc")).rejects.toThrow("Email ini sudah pernah di-ACC sebelumnya!");
+    });
+
+    it("3. Approves submission and pays main salary to submitting Worker B and Rp100 passive income to partner Worker A (referredBy)", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_b_100": {
+          id: "sub_b_100",
+          workerId: "worker_B",
+          status: "pending",
+          approvedItemCount: 1,
+          items: [{ email: "test@gmail.com", password: "pass" }],
+        },
+        "users/worker_B": {
+          uid: "worker_B",
+          name: "Worker B",
+          balance: 0,
+          accCount: 0,
+          totalACC: 0,
+          referredBy: "worker_A",
+        },
+        "users/worker_A": {
+          uid: "worker_A",
+          name: "Worker A",
+          balance: 500,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          reciprocalPartner: "worker_B",
+        },
+        "settings/rules": {
+          pricePerEmail: 3000,
+          referralCommissionPerAcc: 100,
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await processEmailACC("sub_b_100");
+
+      expect(res.success).toBe(true);
+
+      // Submitting Worker B gets main salary 3000 and 1 totalACC
+      expect(store["users/worker_B"].balance).toBe(3000);
+      expect(store["users/worker_B"].totalACC).toBe(1);
+
+      // Partner Worker A gets Rp100 passive income
+      expect(store["users/worker_A"].balance).toBe(600); // 500 + 100
+      expect(store["users/worker_A"].totalReferralEarned).toBe(100);
+      expect(store["users/worker_A"].teamAccCount).toBe(1);
+
+      // Submission status updated to ACC
+      expect(store["emailSubmissions/sub_b_100"].status).toBe("ACC");
+    });
+
+    it("4. Approves submission from Worker A and pays Rp100 passive income to reciprocal partner Worker B (reciprocalPartner)", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_a_200": {
+          id: "sub_a_200",
+          workerId: "worker_A",
+          status: "pending",
+          approvedItemCount: 2, // 2 emails
+          items: [
+            { email: "test1@gmail.com", password: "pass" },
+            { email: "test2@gmail.com", password: "pass" },
+          ],
+        },
+        "users/worker_A": {
+          uid: "worker_A",
+          name: "Worker A",
+          balance: 3000,
+          accCount: 1,
+          totalACC: 1,
+          reciprocalPartner: "worker_B",
+        },
+        "users/worker_B": {
+          uid: "worker_B",
+          name: "Worker B",
+          balance: 1000,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          referredBy: "worker_A",
+        },
+        "settings/rules": {
+          pricePerEmail: 3000,
+          referralCommissionPerAcc: 100,
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await processEmailACC("sub_a_200");
+
+      expect(res.success).toBe(true);
+
+      // Submitting Worker A gets main salary (2 * 3000 = 6000) -> balance 3000 + 6000 = 9000, totalACC 1 + 2 = 3
+      expect(store["users/worker_A"].balance).toBe(9000);
+      expect(store["users/worker_A"].totalACC).toBe(3);
+
+      // Partner Worker B gets 2 * 100 = 200 passive income -> balance 1000 + 200 = 1200
+      expect(store["users/worker_B"].balance).toBe(1200);
+      expect(store["users/worker_B"].totalReferralEarned).toBe(200);
+      expect(store["users/worker_B"].teamAccCount).toBe(2);
+
+      // Submission status updated to ACC
+      expect(store["emailSubmissions/sub_a_200"].status).toBe("ACC");
+    });
   });
 });

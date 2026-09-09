@@ -48,9 +48,10 @@ service cloud.firestore {
           'tier', 'balance', 'createdAt'
         ]) &&
         request.resource.data.keys().hasOnly([
-          'uid', 'name', 'email', 'phone', 'referredBy',
+          'uid', 'name', 'email', 'phone', 'referredBy', 'referralCode',
+          'hasUsedReferral', 'reciprocalPartner',
           'role', 'status', 'tier', 'balance',
-          'totalReferralEarned', 'teamAccCount', 'accCount', 'createdAt'
+          'totalReferralEarned', 'teamAccCount', 'accCount', 'totalACC', 'createdAt'
         ]) &&
         request.resource.data.uid == uid &&
         request.resource.data.name is string &&
@@ -70,7 +71,10 @@ service cloud.firestore {
 
       allow update: if isAdmin() || (
         isSelf(uid) &&
-        request.resource.data.balance >= 0
+        request.resource.data.balance >= 0 &&
+        (!('role' in request.resource.data) || request.resource.data.role == resource.data.role) &&
+        (!('status' in request.resource.data) || request.resource.data.status == resource.data.status) &&
+        (!('tier' in request.resource.data) || request.resource.data.tier == resource.data.tier)
       );
 
       allow delete: if isAdmin();
@@ -132,7 +136,14 @@ service cloud.firestore {
         request.resource.data.currentAccCount == 0 &&
         request.resource.data.rewardAmount == 0;
 
-      allow update: if isSignedIn();
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          id == request.auth.uid ||
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+          ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
+        )
+      );
       allow delete: if isAdmin();
     }
 

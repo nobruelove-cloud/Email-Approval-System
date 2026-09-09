@@ -336,36 +336,63 @@ export async function runTransactionWithDiagnostic<T>(
     throw err;
   }
 }
-export async function createPortalUser(uid: string, userData: Partial<PortalUser>) {
-  if (!db) throw new Error("Database belum terkonfigurasi.");
-  
-  const userRef = doc(db, "users", uid);
-  await setDocWithDiagnostic(userRef, {
-    uid,
-    createdAt: serverTimestamp(),
-    ...userData,
-  }, undefined, "createPortalUser");
+export async function createPortalUser(uid: string, data: Partial<PortalUser>) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const cleanData = Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
 
-  // Trigger Notifikasi Telegram Worker Baru
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+  console.log(`[Stage 2: users/{uid} CREATE] Initiating profile creation for path: users/${uid}, ProjectID: ${projectId}`);
+
+  const maxAttempts = 3;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-    const settingsSnap = await getDoc(doc(db, "settings", "telegram"));
-    if (settingsSnap.exists()) {
+      console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
+      await setDocWithDiagnostic(
+        doc(db, "users", uid),
+        { uid, ...cleanData, createdAt: serverTimestamp() },
+        undefined,
+        "createPortalUser"
+      );
+      console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
 
-      const settings = settingsSnap.data();
-      if (settings?.telegramBotToken && settings?.telegramAdminChatId) {
-        await sendTelegramNotification(
-          settings as any,
-          `👤 <b>WORKER BARU TERDAFTAR!</b>\n\n` +
-          `• <b>Nama/User:</b> ${userData.name || "Worker Baru"}\n` +
-          `• <b>Email:</b> ${userData.email || "-"}\n` +
-          `• <b>Waktu:</b> ${new Date().toLocaleString('id-ID')}\n\n` +
-          `Silakan cek Dashboard Admin untuk detail akun.`
-        );
+      // Asynchronously trigger Telegram notification
+      (async () => {
+        try {
+          const settingsSnap = await getDoc(doc(db, "settings", "telegram"));
+          if (settingsSnap.exists()) {
+            const settings = settingsSnap.data();
+            if (settings?.telegramBotToken && settings?.telegramAdminChatId) {
+              await sendTelegramNotification(
+                `👤 <b>WORKER BARU TERDAFTAR!</b>\n\n` +
+                `• <b>Nama/User:</b> ${data.name || "Worker Baru"}\n` +
+                `• <b>Email:</b> ${data.email || "-"}\n` +
+                `• <b>Waktu:</b> ${new Date().toLocaleString('id-ID')}\n\n` +
+                `Silakan cek Dashboard Admin untuk detail akun.`,
+                { botToken: settings.telegramBotToken, adminChatId: settings.telegramAdminChatId }
+              );
+            }
+          }
+        } catch (err) {
+          console.error("Gagal mengirim notifikasi worker baru ke Telegram:", err);
+        }
+      })();
+
+      return;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[createPortalUser] Attempt ${attempt}/${maxAttempts} failed for users/${uid}:`, err);
+      if (attempt < maxAttempts) {
+        const delay = attempt * 500;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-  } catch (err) {
-    console.error("Gagal mengirim notifikasi worker baru ke Telegram:", err);
   }
+
+  throw lastError;
 }
 
 
@@ -1152,7 +1179,7 @@ export async function reviewSubmission(
       let referralCommissionTotal = 0;
 
       const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
-      const uplineId = workerData?.referredBy;
+      const uplineId = workerData?.referredBy || workerData?.reciprocalPartner;
 
       if (approvedCount > 0 && uplineId) {
         uplineRef = doc(firestore, "users", uplineId);
@@ -1405,42 +1432,6 @@ export async function updatePortalUser(uid: string, data: Partial<PortalUser>) {
   return updateDocWithDiagnostic(doc(db, "users", uid), data, "updatePortalUser");
 }
 
-export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid">) {
-  if (!db) throw new Error("Firebase is not configured.");
-  const cleanData = Object.fromEntries(
-    Object.entries(data).filter(([_, v]) => v !== undefined)
-  );
-
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
-  console.log(`[Stage 2: users/{uid} CREATE] Initiating profile creation for path: users/${uid}, ProjectID: ${projectId}`);
-
-  const maxAttempts = 3;
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
-      await setDocWithDiagnostic(
-        doc(db, "users", uid),
-        { uid, ...cleanData, createdAt: serverTimestamp() },
-        undefined,
-        "createPortalUser"
-      );
-      console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
-      return;
-    } catch (err) {
-      lastError = err;
-      console.warn(`[createPortalUser] Attempt ${attempt}/${maxAttempts} failed for users/${uid}:`, err);
-      if (attempt < maxAttempts) {
-        const delay = attempt * 500;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  throw lastError;
-}
-
 export async function createWorkerAccount(data: {
   name: string;
   email: string;
@@ -1525,6 +1516,257 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
  * Self-referral is rejected.
  * Validates that referrer exists before creating false relationships.
  */
+/**
+ * 1. Fungsi saat Worker B mendaftar dan memasukkan kode referral Worker A
+ */
+export async function bindReferral(workerBId: string, referralCode: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const cleanCode = referralCode ? referralCode.trim() : "";
+  if (!cleanCode) {
+    throw new Error("Kode referral wajib diisi.");
+  }
+
+  const firestore = db;
+
+  // Search for Worker A by referralCode or UID
+  let workerAId: string | null = null;
+  let workerAName: string = "";
+
+  const refCodeQuery = query(collection(firestore, "users"), where("referralCode", "==", cleanCode));
+  const refCodeSnaps = await getDocsWithDiagnostic(
+    refCodeQuery,
+    [where("referralCode", "==", cleanCode)],
+    "bindReferral:findWorkerA",
+    "users"
+  );
+
+  if (!refCodeSnaps.empty) {
+    const docSnap = refCodeSnaps.docs[0];
+    workerAId = docSnap.id;
+    const data = docSnap.data() as Record<string, any>;
+    workerAName = data.name || docSnap.id;
+  } else {
+    const directWorkerASnap = await getDocWithDiagnostic(
+      doc(firestore, "users", cleanCode),
+      "bindReferral:findWorkerADirect"
+    );
+    if (directWorkerASnap.exists()) {
+      workerAId = directWorkerASnap.id;
+      const data = directWorkerASnap.data() as Record<string, any>;
+      workerAName = data.name || directWorkerASnap.id;
+    }
+  }
+
+  if (!workerAId) {
+    throw new Error("Kode referral tidak valid!");
+  }
+
+  if (workerAId === workerBId) {
+    throw new Error("Tidak bisa menggunakan kode referral sendiri!");
+  }
+
+  const workerBRef = doc(firestore, "users", workerBId);
+  const workerARef = doc(firestore, "users", workerAId);
+  const referralDocRef = doc(firestore, "referrals", workerBId);
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (transaction) => {
+      // 1. ALL READS FIRST
+      const workerBDoc = await transaction.get(workerBRef);
+      if (!workerBDoc.exists()) throw new Error("Worker B tidak ditemukan!");
+
+      const workerBData = workerBDoc.data() as PortalUser;
+      if (workerBData.hasUsedReferral === true || workerBData.referredBy) {
+        throw new Error("Akun ini sudah terikat dengan referral lain dan tidak bisa diubah!");
+      }
+
+      const workerADoc = await transaction.get(workerARef);
+      if (!workerADoc.exists()) throw new Error("Data worker A tidak ditemukan!");
+
+      const referralSnap = await transaction.get(referralDocRef);
+
+      // 2. ALL WRITES AFTER READS
+      transaction.update(workerBRef, {
+        referredBy: workerAId,
+        hasUsedReferral: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.update(workerARef, {
+        reciprocalPartner: workerBId,
+        updatedAt: serverTimestamp(),
+      });
+
+      if (referralSnap.exists()) {
+        transaction.update(referralDocRef, {
+          referrerId: workerAId,
+          referrerName: workerAName || shortId(workerAId),
+          referredWorkerId: workerBId,
+          referredWorkerName: workerBData.name || shortId(workerBId),
+          status: "PENDING",
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        transaction.set(referralDocRef, {
+          id: workerBId,
+          referrerId: workerAId,
+          referrerName: workerAName || shortId(workerAId),
+          referredWorkerId: workerBId,
+          referredWorkerName: workerBData.name || shortId(workerBId),
+          currentAccCount: 0,
+          rewardAmount: 0,
+          status: "PENDING",
+          createdAt: serverTimestamp(),
+        });
+      }
+    },
+    "bindReferral",
+    `users/${workerBId}`
+  );
+
+  return { success: true, message: "Berhasil terhubung dengan partner referral secara permanen!" };
+}
+
+/**
+ * 2. Fungsi saat Admin mengubah status email menjadi 'ACC'
+ * Mengatur Gaji Utama, Pasif Income Rp100, dan Poin Klasemen
+ */
+export async function processEmailACC(submissionId: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (transaction) => {
+      // 1. ALL READS FIRST
+      const submissionDoc = await transaction.get(submissionRef);
+      if (!submissionDoc.exists()) throw new Error("Data storan tidak ditemukan!");
+
+      const submissionData = submissionDoc.data() as EmailSubmission;
+      if (submissionData.status === "ACC" || submissionData.status === "approved" || submissionData.status === "available" || submissionData.status === "sold") {
+        throw new Error("Email ini sudah pernah di-ACC sebelumnya!");
+      }
+
+      const workerId = submissionData.workerId;
+      const workerRef = doc(firestore, "users", workerId);
+      const workerDoc = await transaction.get(workerRef);
+      if (!workerDoc.exists()) throw new Error("Data worker tidak ditemukan!");
+
+      const workerData = workerDoc.data() as PortalUser;
+
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await transaction.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+
+      const approvedCount = submissionData.approvedItemCount ?? getItemCountOfSubmission(submissionData) ?? 1;
+      const mainSalaryPerItem = submissionData.currentPricePerItem ?? submissionData.pricePerEmail ?? rulesData?.pricePerEmail ?? 3000;
+      const mainSalaryTotal = approvedCount * mainSalaryPerItem;
+      const passiveCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
+      const passiveCommissionTotal = approvedCount * passiveCommissionPerAcc;
+
+      // Check 1-on-1 reciprocal relationship
+      let partnerIdToPay: string | null = null;
+      if (workerData.referredBy) {
+        // Jika worker ini adalah B, maka kirim pasif komisi ke A
+        partnerIdToPay = workerData.referredBy;
+      } else if (workerData.reciprocalPartner) {
+        // Jika worker ini adalah A, maka kirim pasif komisi ke B
+        partnerIdToPay = workerData.reciprocalPartner;
+      }
+
+      let partnerRef: any = null;
+      let partnerDoc: any = null;
+      if (partnerIdToPay) {
+        partnerRef = doc(firestore, "users", partnerIdToPay);
+        partnerDoc = await transaction.get(partnerRef);
+      }
+
+      let referralRef: any = null;
+      let referralSnap: any = null;
+      if (partnerIdToPay) {
+        referralRef = doc(firestore, "referrals", workerId);
+        referralSnap = await transaction.get(referralRef);
+      }
+
+      // 2. ALL WRITES AFTER READS
+      // A. Berikan Gaji Utama ke Worker yang mengerjakan
+      const currentMainBalance = workerData.balance || 0;
+      const currentAccCount = workerData.accCount || 0;
+      const currentTotalACC = workerData.totalACC || 0;
+
+      transaction.update(workerRef, {
+        balance: currentMainBalance + mainSalaryTotal,
+        accCount: currentAccCount + approvedCount,
+        totalACC: currentTotalACC + approvedCount,
+        updatedAt: serverTimestamp(),
+      });
+
+      // B. Berikan Pasif Income Rp100 ke Partner-nya
+      if (partnerIdToPay && partnerDoc && partnerDoc.exists()) {
+        const partnerData = partnerDoc.data() as PortalUser;
+        const currentPassiveBalance = partnerData.balance || 0;
+        const currentTotalRefEarned = partnerData.totalReferralEarned || 0;
+        const currentTeamAccCount = partnerData.teamAccCount || 0;
+
+        transaction.update(partnerRef, {
+          balance: currentPassiveBalance + passiveCommissionTotal,
+          totalReferralEarned: currentTotalRefEarned + passiveCommissionTotal,
+          teamAccCount: currentTeamAccCount + approvedCount,
+          updatedAt: serverTimestamp(),
+        });
+
+        // Record log to referral_transactions
+        const refTxRef = doc(collection(firestore, "referral_transactions"));
+        transaction.set(refTxRef, {
+          id: refTxRef.id,
+          uplineId: partnerIdToPay,
+          uplineName: partnerData.name || shortId(partnerIdToPay),
+          downlineId: workerId,
+          downlineName: workerData.name || shortId(workerId),
+          accCount: approvedCount,
+          commissionPerEmail: passiveCommissionPerAcc,
+          totalCommission: passiveCommissionTotal,
+          submissionId,
+          createdAt: serverTimestamp(),
+        });
+
+        if (referralSnap && referralSnap.exists()) {
+          const refData = referralSnap.data();
+          transaction.update(referralRef, {
+            currentAccCount: (refData.currentAccCount ?? 0) + approvedCount,
+            rewardAmount: (refData.rewardAmount ?? 0) + passiveCommissionTotal,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // C. Ubah status submission jadi ACC
+      const itemsToSave = submissionData.items && submissionData.items.length > 0
+        ? submissionData.items.map((it) => ({ ...it, status: "approved" as const }))
+        : [{ email: submissionData.email ?? "", password: submissionData.password, status: "approved" as const }];
+
+      transaction.update(submissionRef, {
+        status: "ACC",
+        items: itemsToSave,
+        approvedItemCount: approvedCount,
+        rejectedItemCount: 0,
+        appliedPricePerItem: mainSalaryPerItem,
+        totalAmount: mainSalaryTotal,
+        processedAt: serverTimestamp(),
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    },
+    "processEmailACC",
+    `emailSubmissions/${submissionId}`
+  );
+
+  return { success: true, message: "Email berhasil di-ACC, gaji dan pasif income otomatis terdistribusi!" };
+}
+
 /**
  * Claims an invitation code post-registration for an existing worker.
  * Enforces atomic validation & writes inside a Firestore transaction.
