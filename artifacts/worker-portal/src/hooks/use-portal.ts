@@ -1207,10 +1207,11 @@ export async function reviewSubmission(
       });
 
       if (userSnap && userSnap.exists()) {
-        const currentBalance = workerData?.balance ?? 0;
+        const currentBalance = workerData?.balance ?? (workerData as any)?.saldoUtama ?? 0;
         const currentAccCount = workerData?.accCount ?? 0;
         tx.update(userRef, {
           balance: currentBalance + creditAmount,
+          saldoUtama: currentBalance + creditAmount,
           accCount: currentAccCount + approvedCount,
           tier: appliedTier,
         });
@@ -1219,12 +1220,13 @@ export async function reviewSubmission(
       // Execute Upline Referral Commission directly to Upline's balance
       if (approvedCount > 0 && uplineId && uplineSnap && uplineSnap.exists()) {
         const uplineData = uplineSnap.data() as PortalUser;
-        const currentUplineBalance = uplineData.balance ?? 0;
+        const currentUplineBalance = uplineData.balance ?? (uplineData as any)?.saldoUtama ?? 0;
         const currentTotalRefEarned = uplineData.totalReferralEarned ?? 0;
         const currentTeamAccCount = uplineData.teamAccCount ?? 0;
 
         tx.update(uplineRef, {
           balance: currentUplineBalance + referralCommissionTotal,
+          saldoUtama: currentUplineBalance + referralCommissionTotal,
           totalReferralEarned: currentTotalRefEarned + referralCommissionTotal,
           teamAccCount: currentTeamAccCount + approvedCount,
         });
@@ -1693,12 +1695,13 @@ export async function processEmailACC(submissionId: string) {
 
       // 2. ALL WRITES AFTER READS
       // A. Berikan Gaji Utama ke Worker yang mengerjakan
-      const currentMainBalance = workerData.balance || 0;
+      const currentMainBalance = workerData.balance || (workerData as any)?.saldoUtama || 0;
       const currentAccCount = workerData.accCount || 0;
       const currentTotalACC = workerData.totalACC || 0;
 
       transaction.update(workerRef, {
         balance: currentMainBalance + mainSalaryTotal,
+        saldoUtama: currentMainBalance + mainSalaryTotal,
         accCount: currentAccCount + approvedCount,
         totalACC: currentTotalACC + approvedCount,
         updatedAt: serverTimestamp(),
@@ -1707,12 +1710,13 @@ export async function processEmailACC(submissionId: string) {
       // B. Berikan Pasif Income Rp100 ke Partner-nya
       if (partnerIdToPay && partnerDoc && partnerDoc.exists()) {
         const partnerData = partnerDoc.data() as PortalUser;
-        const currentPassiveBalance = partnerData.balance || 0;
+        const currentPassiveBalance = partnerData.balance || (partnerData as any)?.saldoUtama || 0;
         const currentTotalRefEarned = partnerData.totalReferralEarned || 0;
         const currentTeamAccCount = partnerData.teamAccCount || 0;
 
         transaction.update(partnerRef, {
           balance: currentPassiveBalance + passiveCommissionTotal,
+          saldoUtama: currentPassiveBalance + passiveCommissionTotal,
           totalReferralEarned: currentTotalRefEarned + passiveCommissionTotal,
           teamAccCount: currentTeamAccCount + approvedCount,
           updatedAt: serverTimestamp(),
@@ -2828,13 +2832,92 @@ export function useReferralTransactions(uid?: string) {
 }
 
 export function useDownlineWorkers(uid?: string) {
-  const constraints: QueryConstraint[] = uid ? [where("referredBy", "==", uid)] : [];
-  return useCollection<PortalUser>(
-    "users",
-    constraints,
-    !!uid,
-    { field: "createdAt", direction: "desc" },
-  );
+  const [data, setData] = useState<PortalUser[]>([]);
+  const [loading, setLoading] = useState(!!uid && uid !== "worker_demo" && !!db);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!db || !uid || uid === "worker_demo") {
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    let referredByUsers: PortalUser[] = [];
+    let reciprocalUsers: PortalUser[] = [];
+
+    const mergeAndSetData = () => {
+      if (!isMounted) return;
+      const userMap = new Map<string, PortalUser>();
+      referredByUsers.forEach((u) => userMap.set(u.uid, u));
+      reciprocalUsers.forEach((u) => userMap.set(u.uid, u));
+
+      const merged = Array.from(userMap.values()).sort((a, b) => {
+        const av = a.createdAt;
+        const bv = b.createdAt;
+        const at = av && typeof av === "object" && "toMillis" in av ? (av as { toMillis: () => number }).toMillis() : Number(av) || 0;
+        const bt = bv && typeof bv === "object" && "toMillis" in bv ? (bv as { toMillis: () => number }).toMillis() : Number(bv) || 0;
+        return bt - at;
+      });
+
+      setData(merged);
+      setLoading(false);
+    };
+
+    const q1 = query(collection(db, "users"), where("referredBy", "==", uid));
+    const unsub1 = onSnapshot(
+      q1,
+      (snap) => {
+        referredByUsers = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...(docSnap.data() as Omit<PortalUser, "uid">) }));
+        mergeAndSetData();
+      },
+      (err) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: "users",
+          collection: "users",
+          query: [where("referredBy", "==", uid)],
+          hook: "useDownlineWorkers:referredBy",
+          error: err,
+        });
+        setError(err instanceof Error ? err.message : "Gagal membaca downline.");
+        setLoading(false);
+      }
+    );
+
+    const q2 = query(collection(db, "users"), where("reciprocalPartner", "==", uid));
+    const unsub2 = onSnapshot(
+      q2,
+      (snap) => {
+        reciprocalUsers = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...(docSnap.data() as Omit<PortalUser, "uid">) }));
+        mergeAndSetData();
+      },
+      (err) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: "users",
+          collection: "users",
+          query: [where("reciprocalPartner", "==", uid)],
+          hook: "useDownlineWorkers:reciprocalPartner",
+          error: err,
+        });
+        // Non-fatal error fallback
+        mergeAndSetData();
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsub1();
+      unsub2();
+    };
+  }, [uid]);
+
+  return { data, loading, error };
 }
 
 /**
