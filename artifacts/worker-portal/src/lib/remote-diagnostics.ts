@@ -14,20 +14,21 @@ export async function sendRemoteDiagnostic(payload: FirestoreDiagnosticPayload):
   try {
     const endpoint = "/api/diagnostics";
 
-    // Perform best-effort async fetch
-    fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      keepalive: true,
-    }).catch((err) => {
-      // Quietly ignore network or endpoint errors to guarantee zero impact on user experience
-      if (import.meta.env.DEV) {
-        console.debug("[sendRemoteDiagnostic] Network delivery failed (ignored):", err);
-      }
-    });
+    // Perform best-effort async fetch only when window/fetch is defined and not in test environment
+    if (typeof window !== "undefined" && typeof fetch === "function" && process.env.NODE_ENV !== "test") {
+      fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch((err) => {
+        if (import.meta.env.DEV) {
+          console.debug("[sendRemoteDiagnostic] Network delivery failed (ignored):", err);
+        }
+      });
+    }
   } catch (err) {
     // Quietly ignore any unexpected exceptions
     if (import.meta.env.DEV) {
