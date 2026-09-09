@@ -225,12 +225,13 @@ export async function getDocWithDiagnostic(docRef: any, hook = "getDoc") {
 export async function getDocsWithDiagnostic(queryRef: any, constraints: unknown[] = [], hook = "getDocs", path?: string) {
   try {
     const snaps = await getDocs(queryRef);
+    const count = snaps && typeof snaps.size === "number" ? snaps.size : (snaps && Array.isArray(snaps.docs) ? snaps.docs.length : 0);
     logFirestoreDiagnostic({
       operation: "getDocs",
       path: path || "collection",
       query: constraints,
       hook,
-      message: `getDocs retrieved ${snaps.size} docs`,
+      message: `getDocs retrieved ${count} docs`,
     });
     return snaps;
   } catch (err) {
@@ -1175,7 +1176,7 @@ export async function reviewSubmission(
       let uplineSnap: any = null;
       let referralRef: any = null;
       let referralSnap: any = null;
-      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 200;
+      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
       let referralCommissionTotal = 0;
 
       const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
@@ -1540,20 +1541,21 @@ export async function bindReferral(workerBId: string, referralCode: string) {
     "users"
   );
 
-  if (!refCodeSnaps.empty) {
+  const isRefCodeFound = Boolean(refCodeSnaps && !refCodeSnaps.empty && refCodeSnaps.docs && refCodeSnaps.docs.length > 0);
+  if (isRefCodeFound) {
     const docSnap = refCodeSnaps.docs[0];
     workerAId = docSnap.id;
-    const data = docSnap.data() as Record<string, any>;
-    workerAName = data.name || docSnap.id;
+    const data = docSnap.data ? (docSnap.data() as Record<string, any>) : {};
+    workerAName = data?.name || docSnap.id;
   } else {
     const directWorkerASnap = await getDocWithDiagnostic(
       doc(firestore, "users", cleanCode),
       "bindReferral:findWorkerADirect"
     );
-    if (directWorkerASnap.exists()) {
+    if (directWorkerASnap && typeof directWorkerASnap.exists === "function" && directWorkerASnap.exists()) {
       workerAId = directWorkerASnap.id;
-      const data = directWorkerASnap.data() as Record<string, any>;
-      workerAName = data.name || directWorkerASnap.id;
+      const data = typeof directWorkerASnap.data === "function" ? (directWorkerASnap.data() as Record<string, any>) : {};
+      workerAName = data?.name || directWorkerASnap.id;
     }
   }
 
@@ -2828,13 +2830,35 @@ export function useReferralTransactions(uid?: string) {
 }
 
 export function useDownlineWorkers(uid?: string) {
-  const constraints: QueryConstraint[] = uid ? [where("referredBy", "==", uid)] : [];
-  return useCollection<PortalUser>(
+  const byReferredBy = useCollection<PortalUser>(
     "users",
-    constraints,
+    uid ? [where("referredBy", "==", uid)] : [],
     !!uid,
-    { field: "createdAt", direction: "desc" },
+    { field: "createdAt", direction: "desc" }
   );
+  const byReciprocal = useCollection<PortalUser>(
+    "users",
+    uid ? [where("reciprocalPartner", "==", uid)] : [],
+    !!uid,
+    { field: "createdAt", direction: "desc" }
+  );
+
+  const combinedData = useMemo(() => {
+    const map = new Map<string, PortalUser>();
+    byReferredBy.data.forEach((u) => {
+      if (u.uid) map.set(u.uid, u);
+    });
+    byReciprocal.data.forEach((u) => {
+      if (u.uid) map.set(u.uid, u);
+    });
+    return Array.from(map.values());
+  }, [byReferredBy.data, byReciprocal.data]);
+
+  return {
+    data: combinedData,
+    loading: byReferredBy.loading || byReciprocal.loading,
+    error: byReferredBy.error || byReciprocal.error,
+  };
 }
 
 /**
