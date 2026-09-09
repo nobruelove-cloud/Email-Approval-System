@@ -70,11 +70,19 @@ service cloud.firestore {
       );
 
       allow update: if isAdmin() || (
-        isSelf(uid) &&
-        request.resource.data.balance >= 0 &&
+        isSignedIn() &&
+        (!('balance' in request.resource.data) || request.resource.data.balance >= 0) &&
+        (!('saldoUtama' in request.resource.data) || request.resource.data.saldoUtama >= 0) &&
         (!('role' in request.resource.data) || request.resource.data.role == resource.data.role) &&
         (!('status' in request.resource.data) || request.resource.data.status == resource.data.status) &&
-        (!('tier' in request.resource.data) || request.resource.data.tier == resource.data.tier)
+        (!('tier' in request.resource.data) || request.resource.data.tier == resource.data.tier) &&
+        (
+          isSelf(uid) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'reciprocalPartner', 'balance', 'saldoUtama', 'totalReferralEarned',
+            'teamAccCount', 'accCount', 'totalACC', 'lastClaimId', 'updatedAt'
+          ])
+        )
       );
 
       allow delete: if isAdmin();
@@ -210,7 +218,8 @@ service cloud.firestore {
           ('downlineId' in resource.data && resource.data.downlineId == request.auth.uid)
         )
       );
-      allow write: if isAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
     }
   }
 }

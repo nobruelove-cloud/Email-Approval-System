@@ -387,7 +387,7 @@ export const DEFAULT_RULES: PortalRules = {
 
   referralEnabled: true,
   referralReward: 500,
-  referralCommissionPerAcc: 200,
+  referralCommissionPerAcc: 100,
   referralMinAcc: 5,
   referralMinEarnings: 0,
   referralTiers: DEFAULT_REFERRAL_TIERS,

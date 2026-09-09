@@ -822,7 +822,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [refCommission, setRefCommission] = useState<number | null>(null);
   const [savingRefCommission, setSavingRefCommission] = useState(false);
 
-  const currentRefCommission = refCommission ?? (rules.data.referralCommissionPerAcc ?? 200);
+  const currentRefCommission = refCommission ?? (rules.data.referralCommissionPerAcc ?? 100);
 
   async function handleSaveRefCommission() {
     if (typeof currentRefCommission !== "number" || currentRefCommission < 0) {
@@ -3657,7 +3657,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                               <div className="flex flex-wrap items-center gap-3 text-slate-400 font-medium">
                                 <span>Total Email ACC: <strong className="text-slate-100">{currentAcc}</strong></span>
-                                <span>Total Komisi Dicairkan: <strong className="text-emerald-400">{formatMoney(ref.rewardAmount ?? (currentAcc * (rules.data.referralCommissionPerAcc || 200)))}</strong></span>
+                                <span>Total Komisi Dicairkan: <strong className="text-emerald-400">{formatMoney(ref.rewardAmount ?? (currentAcc * (rules.data.referralCommissionPerAcc || 100)))}</strong></span>
                               </div>
 
                               <div className="text-[11px] text-slate-500 font-mono flex flex-wrap gap-2">
