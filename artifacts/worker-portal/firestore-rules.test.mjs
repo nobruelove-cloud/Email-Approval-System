@@ -97,6 +97,9 @@ async function main() {
         email: 'casec@example.com',
         phone: '08123456789',
         referredBy: workerUid,
+        referralCode: 'REF123',
+        hasUsedReferral: true,
+        reciprocalPartner: 'partner_456',
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -104,7 +107,7 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Case C: Self-registration with optional phone & referredBy succeeded.');
+    console.log('[PASS] Case C: Self-registration with optional phone, referredBy, referralCode, hasUsedReferral, reciprocalPartner succeeded.');
   } catch (err) {
     console.error('[FAIL] Case C: Self-registration failed:', err);
     process.exitCode = 1;
@@ -611,17 +614,20 @@ async function main() {
   }
 
   console.log('\nScenario 4: Unauthorized worker cannot claim another referrer\'s reward');
-  const otherWorkerDb = testEnv.authenticatedContext(regWorker2).firestore();
+  const unauthorizedWorkerDb = testEnv.authenticatedContext(otherWorkerUid).firestore();
   try {
     await assertFails(
-      runTransaction(otherWorkerDb, async (tx) => {
-        const refDocRef = doc(otherWorkerDb, 'referrals', workerClaimRefId);
+      runTransaction(unauthorizedWorkerDb, async (tx) => {
+        const refDocRef = doc(unauthorizedWorkerDb, 'referrals', workerClaimRefId);
         const refSnap = await tx.get(refDocRef);
-        const referrerUserRef = doc(otherWorkerDb, 'users', regWorker1);
+        const referrerUserRef = doc(unauthorizedWorkerDb, 'users', regWorker1);
         const referrerSnap = await tx.get(referrerUserRef);
 
         tx.update(refDocRef, {
           rewardAmount: 1000,
+        });
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data()?.balance || 0) + 1000,
         });
       })
     );

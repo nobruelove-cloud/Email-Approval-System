@@ -12,7 +12,7 @@ export interface Announcement {
 export type Role = "admin" | "worker";
 export type UserStatus = "pending" | "approved" | "active" | "rejected" | "inactive";
 export type UserTier = number;
-export type SubmissionStatus = "pending" | "approved" | "available" | "sold" | "rejected";
+export type SubmissionStatus = "pending" | "approved" | "available" | "sold" | "rejected" | "ACC";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "rejected";
 
 export type TierConfig = {
@@ -33,9 +33,13 @@ export type PortalUser = {
   tier: UserTier;
   balance: number;
   referredBy?: string;
+  referralCode?: string;
+  hasUsedReferral?: boolean;
+  reciprocalPartner?: string;
   totalReferralEarned?: number;
   teamAccCount?: number;
   accCount?: number;
+  totalACC?: number;
   createdAt?: unknown;
   lastActiveAt?: unknown;
 };
