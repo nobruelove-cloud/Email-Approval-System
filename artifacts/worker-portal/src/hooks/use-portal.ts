@@ -230,7 +230,7 @@ export async function getDocsWithDiagnostic(queryRef: any, constraints: unknown[
       path: path || "collection",
       query: constraints,
       hook,
-      message: `getDocs retrieved ${snaps.size} docs`,
+      message: `getDocs retrieved ${snaps?.size ?? 0} docs`,
     });
     return snaps;
   } catch (err) {
@@ -1175,7 +1175,7 @@ export async function reviewSubmission(
       let uplineSnap: any = null;
       let referralRef: any = null;
       let referralSnap: any = null;
-      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 200;
+      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
       let referralCommissionTotal = 0;
 
       const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
@@ -1540,7 +1540,7 @@ export async function bindReferral(workerBId: string, referralCode: string) {
     "users"
   );
 
-  if (!refCodeSnaps.empty) {
+  if (refCodeSnaps && !refCodeSnaps.empty) {
     const docSnap = refCodeSnaps.docs[0];
     workerAId = docSnap.id;
     const data = docSnap.data() as Record<string, any>;
@@ -1550,7 +1550,7 @@ export async function bindReferral(workerBId: string, referralCode: string) {
       doc(firestore, "users", cleanCode),
       "bindReferral:findWorkerADirect"
     );
-    if (directWorkerASnap.exists()) {
+    if (directWorkerASnap && typeof directWorkerASnap.exists === "function" && directWorkerASnap.exists()) {
       workerAId = directWorkerASnap.id;
       const data = directWorkerASnap.data() as Record<string, any>;
       workerAName = data.name || directWorkerASnap.id;
