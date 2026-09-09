@@ -1051,7 +1051,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     Kalkulator Simulasi Pasif Income
                   </CardTitle>
                   <Badge variant="outline" className="bg-amber-500/10 text-[#FFB74D] border-amber-500/30 font-bold text-[10px] px-2 py-0.5">
-                    Flat: {formatMoney(rules.data.referralCommissionPerAcc || 200)} / ACC
+                    Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
                   </Badge>
                 </div>
                 <CardDescription className="text-[11px] text-[#FFE0B2]/80 mt-0.5">
@@ -1126,7 +1126,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         Estimasi / Hari
                       </p>
                       <p className="text-base sm:text-lg font-black text-[#FFB74D] tracking-tight">
-                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 200))}
+                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
                       </p>
                     </div>
 
@@ -1136,7 +1136,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         Estimasi / Bulan (30 Hari)
                       </p>
                       <p className="text-base sm:text-lg font-black text-[#FFB74D] tracking-tight">
-                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 200) * 30)}
+                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
                       </p>
                     </div>
                   </div>
@@ -1323,7 +1323,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         <tbody className="divide-y divide-amber-100">
                           {downlines.data.map((dw) => {
                             const dwAcc = dw.accCount ?? 0;
-                            const commRate = rules.data.referralCommissionPerAcc ?? 200;
+                            const commRate = rules.data.referralCommissionPerAcc ?? 100;
                             const totalComm = dwAcc * commRate;
 
                             return (

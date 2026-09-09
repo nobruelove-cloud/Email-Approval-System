@@ -230,7 +230,7 @@ export async function getDocsWithDiagnostic(queryRef: any, constraints: unknown[
       path: path || "collection",
       query: constraints,
       hook,
-      message: `getDocs retrieved ${snaps.size} docs`,
+      message: `getDocs retrieved ${snaps?.size ?? snaps?.docs?.length ?? 0} docs`,
     });
     return snaps;
   } catch (err) {
@@ -1175,7 +1175,7 @@ export async function reviewSubmission(
       let uplineSnap: any = null;
       let referralRef: any = null;
       let referralSnap: any = null;
-      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 200;
+      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
       let referralCommissionTotal = 0;
 
       const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
@@ -2828,13 +2828,35 @@ export function useReferralTransactions(uid?: string) {
 }
 
 export function useDownlineWorkers(uid?: string) {
-  const constraints: QueryConstraint[] = uid ? [where("referredBy", "==", uid)] : [];
-  return useCollection<PortalUser>(
+  const referredByCollection = useCollection<PortalUser>(
     "users",
-    constraints,
+    uid ? [where("referredBy", "==", uid)] : [],
     !!uid,
     { field: "createdAt", direction: "desc" },
   );
+  const reciprocalCollection = useCollection<PortalUser>(
+    "users",
+    uid ? [where("reciprocalPartner", "==", uid)] : [],
+    !!uid,
+    { field: "createdAt", direction: "desc" },
+  );
+
+  const combinedData = useMemo(() => {
+    const map = new Map<string, PortalUser>();
+    referredByCollection.data.forEach((u) => {
+      if (u.uid !== uid) map.set(u.uid, u);
+    });
+    reciprocalCollection.data.forEach((u) => {
+      if (u.uid !== uid) map.set(u.uid, u);
+    });
+    return Array.from(map.values());
+  }, [referredByCollection.data, reciprocalCollection.data, uid]);
+
+  return {
+    data: combinedData,
+    loading: referredByCollection.loading || reciprocalCollection.loading,
+    error: referredByCollection.error || reciprocalCollection.error,
+  };
 }
 
 /**

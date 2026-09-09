@@ -810,7 +810,7 @@ describe("3. PortalGate Production Component Real Component Tests", () => {
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText("STORAN")[0]).toBeDefined();
   });
 
   it("renders error UI on definitive error", () => {
@@ -1405,7 +1405,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText("STORAN")[0]).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1530,7 +1530,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText("STORAN")[0]).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1570,7 +1570,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText("STORAN")[0]).toBeDefined();
     expect(screen.getByText(/Existing Worker/)).toBeDefined();
   });
 
@@ -1635,7 +1635,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText("STORAN")[0]).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1643,7 +1643,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText("STORAN")[0]).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -1690,7 +1690,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText("STORAN")[0]).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1698,7 +1698,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText("STORAN")[0]).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -1746,7 +1746,7 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
       snapshotErrorCb?.(permErr);
     });
 
-    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]" && call[1]?.operation === "onSnapshot");
     expect(diagCall).toBeDefined();
 
     const payload = diagCall[1];
@@ -1787,7 +1787,7 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
     const permErr = new Error("Permission denied for getDocs");
     (permErr as any).code = "permission-denied";
 
-    vi.mocked(await import("firebase/firestore")).getDocs = vi.fn().mockRejectedValueOnce(permErr);
+    mockGetDocs.mockRejectedValueOnce(permErr);
 
     const queryDesc = [{ field: "workerId", operator: "==", value: "worker_c" }];
 
