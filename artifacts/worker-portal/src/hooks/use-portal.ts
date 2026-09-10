@@ -3012,3 +3012,24 @@ export async function masterResetOperasional(adminPassword: string) {
     message: "Master Reset Operasional Berhasil! Seluruh setoran, penarikan, dan saldo worker telah di-reset.",
   };
 }
+
+/**
+ * Custom hook wrapper combining authentication state and referral operations
+ * for ReferralSection and component consumers.
+ */
+export function usePortal() {
+  const portalAuth = usePortalAuth();
+
+  const bindReferralCode = async (code: string) => {
+    if (!portalAuth.profile?.uid) {
+      throw new Error("Sesi pengguna tidak terautentikasi.");
+    }
+    return await bindReferral(portalAuth.profile.uid, code);
+  };
+
+  return {
+    ...portalAuth,
+    currentUser: portalAuth.profile,
+    bindReferralCode,
+  };
+}
