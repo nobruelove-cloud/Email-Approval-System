@@ -119,6 +119,8 @@ import {
   reviewSubmission,
   bindReferral,
   processEmailACC,
+  executeMasterReset,
+  masterResetOperasional,
   logFirestoreDiagnostic,
   formatQueryConstraint,
   formatQueryConstraints,
@@ -2488,5 +2490,56 @@ describe("Reciprocal Referral Binding & Passive Income Distribution System Unit 
       // Submission status updated to ACC
       expect(store["emailSubmissions/sub_a_200"].status).toBe("ACC");
     });
+  });
+});
+
+describe("Master Reset System Unit Tests (executeMasterReset & masterResetOperasional)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. throws error if input PIN does not match database PIN", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ adminPin: "123456" }),
+    } as any);
+
+    await expect(executeMasterReset("654321")).rejects.toThrow(
+      "Password / PIN Admin tidak cocok. Master Reset dibatalkan."
+    );
+  });
+
+  it("2. matches PIN accurately with String() conversion and whitespace trim", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ adminPin: "888888" }),
+    } as any);
+
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [], size: 0 } as any);
+
+    const res = await executeMasterReset("   888888   ");
+
+    expect(res.success).toBe(true);
+    expect(res.message).toBe("Master Reset berhasil dieksekusi!");
+  });
+
+  it("3. falls back to rules/default PIN if settings/general doc does not exist", async () => {
+    // settings/general snap returns exists=false
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => false,
+      data: () => ({}),
+    } as any);
+
+    // fallback settings/rules snap returns adminPin="123456"
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ adminPin: "123456" }),
+    } as any);
+
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [], size: 0 } as any);
+
+    const res = await executeMasterReset("123456");
+
+    expect(res.success).toBe(true);
   });
 });
