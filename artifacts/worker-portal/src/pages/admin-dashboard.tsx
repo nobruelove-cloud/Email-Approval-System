@@ -47,6 +47,7 @@ import {
   Legend,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { MasterResetModal } from "@/components/MasterResetModal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
@@ -2199,67 +2200,19 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
                   </div>
 
-                  <Dialog open={masterResetModalOpen} onOpenChange={setMasterResetModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        type="button"
-                        className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs h-9 gap-1.5 shadow-lg shadow-rose-600/20 shrink-0"
-                      >
-                        <AlertTriangle className="w-4 h-4" />
-                        Master Reset Operasional
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
-                      <DialogHeader>
-                        <DialogTitle className="text-rose-400 flex items-center gap-2">
-                          <AlertTriangle className="w-5 h-5 text-rose-500" />
-                          Konfirmasi Master Reset Operasional
-                        </DialogTitle>
-                        <DialogDescription className="text-slate-400 text-xs leading-relaxed">
-                          PERHATIAN: Tindakan ini akan menghapus seluruh data setoran email, riwayat penarikan, dan log referral, serta mereset saldo seluruh worker menjadi Rp 0. Masukkan Password/PIN Admin Anda untuk melanjutkan.
-                        </DialogDescription>
-                      </DialogHeader>
+                  <Button
+                    type="button"
+                    onClick={() => setMasterResetModalOpen(true)}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs h-9 gap-1.5 shadow-lg shadow-rose-600/20 shrink-0"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Master Reset Operasional
+                  </Button>
 
-                      <form onSubmit={handleMasterReset} className="space-y-4 pt-2">
-                        <div>
-                          <Label htmlFor="master-reset-pass" className="text-xs text-slate-300 font-semibold">
-                            Password / PIN Admin *
-                          </Label>
-                          <Input
-                            id="master-reset-pass"
-                            type="password"
-                            placeholder="Masukkan Password/PIN Admin"
-                            value={adminConfirmPassword}
-                            onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                            className="mt-1.5 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-rose-500"
-                            required
-                          />
-                        </div>
-
-                        <DialogFooter className="pt-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setMasterResetModalOpen(false);
-                              setAdminConfirmPassword("");
-                            }}
-                            className="text-xs h-9 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800"
-                          >
-                            Batal
-                          </Button>
-                          <Button
-                            type="submit"
-                            disabled={masterResetBusy || !adminConfirmPassword.trim()}
-                            className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs h-9 gap-1.5 shadow-lg shadow-rose-600/20"
-                          >
-                            {masterResetBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-                            Eksekusi Master Reset
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                  <MasterResetModal
+                    isOpen={masterResetModalOpen}
+                    onClose={() => setMasterResetModalOpen(false)}
+                  />
                 </div>
               </CardHeader>
             </Card>
