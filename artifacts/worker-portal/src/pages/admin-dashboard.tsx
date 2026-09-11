@@ -109,7 +109,7 @@ import {
   masterResetOperasional,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
-import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
 import { sendTelegramNotification } from "@/lib/telegram-bot";
 import {
   formatDate,
@@ -272,6 +272,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   }, [profile]);
   const missionClaims = useCollection<{ id: string; workerId: string; missionId: string; periodKey: string; status: string; workerName?: string }>("missionClaims");
   const rules = useSettings("rules", DEFAULT_RULES);
+  const generalSettingsHook = useSettings("general", DEFAULT_GENERAL_SETTINGS);
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
@@ -938,15 +939,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const currentSupportDescription = supportDescription ?? activeSupportConfig.description ?? "Ada kendala? Hubungi Customer Service kami melalui Telegram.";
   const currentSupportEnabled = supportEnabled ?? (activeSupportConfig.enabled !== false);
 
-  // Jam Operasional configuration state
+  // Jam Operasional & Submission Lock configuration state
   const activeOperatingHours = useMemo(() => {
     return rules.data.operatingHours ?? DEFAULT_OPERATING_HOURS;
   }, [rules.data.operatingHours]);
 
   const [operatingHoursState, setOperatingHoursState] = useState<OperatingHoursConfig | null>(null);
+  const [submissionOpenState, setSubmissionOpenState] = useState<boolean | null>(null);
   const [savingOperatingHours, setSavingOperatingHours] = useState(false);
 
   const currentOperatingHours = operatingHoursState ?? activeOperatingHours;
+  const currentSubmissionOpen = submissionOpenState ?? (generalSettingsHook.data?.submissionOpen !== false);
 
   function handleUpdateDayOperatingHours(
     dayKey: keyof OperatingHoursConfig["days"],
@@ -985,8 +988,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         ...rules.data,
         operatingHours: currentOperatingHours,
       });
-      toast.success("Jam operasional berhasil disimpan.");
+
+      await saveSettings("general", {
+        ...generalSettingsHook.data,
+        submissionOpen: currentSubmissionOpen,
+      });
+
+      toast.success("Jam operasional & pengaturan kunci setoran berhasil disimpan.");
       setOperatingHoursState(null);
+      setSubmissionOpenState(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan jam operasional.");
     } finally {
@@ -2982,7 +2992,107 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
           <TabsContent value="workers" className="space-y-3">
-            <div className="flex justify-end">
+            {/* REALTIME REGISTERED WORKERS COUNTER CARD */}
+            <Card className="bg-[#0f172a] border border-slate-800 shadow-xl text-slate-100">
+              <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered Workers</p>
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold gap-1.5 px-2 py-0.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                        REALTIME LIVE
+                      </Badge>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-black text-slate-100 mt-0.5 tracking-tight">
+                      {users.data.filter((u) => u.role === "worker").length}{" "}
+                      <span className="text-xs font-semibold text-slate-400 font-sans">Worker Terdaftar</span>
+                    </p>
+                  </div>
+                </div>
+
+                <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500 text-xs h-9">
+                      <UserPlus className="w-4 h-4" /> Tambah Pekerja
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="text-slate-100">Tambah Pekerja Baru</DialogTitle>
+                      <DialogDescription className="text-slate-400">Akun akan langsung berstatus aktif.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleAddWorker} className="space-y-3">
+                      <div>
+                        <Label className="text-xs text-slate-300">Nama</Label>
+                        <Input
+                          value={newWorker.name}
+                          onChange={(e) => setNewWorker((p) => ({ ...p, name: e.target.value }))}
+                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-300">Email</Label>
+                        <Input
+                          type="email"
+                          value={newWorker.email}
+                          onChange={(e) => setNewWorker((p) => ({ ...p, email: e.target.value }))}
+                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-300">Nomor HP (opsional)</Label>
+                        <Input
+                          value={newWorker.phone}
+                          onChange={(e) => setNewWorker((p) => ({ ...p, phone: e.target.value }))}
+                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs text-slate-300">Kata Sandi</Label>
+                          <Input
+                            type="password"
+                            value={newWorker.password}
+                            onChange={(e) => setNewWorker((p) => ({ ...p, password: e.target.value }))}
+                            className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-slate-300">Tier Awal</Label>
+                          <Select value={newWorker.tier} onValueChange={(v) => setNewWorker((p) => ({ ...p, tier: v }))}>
+                            <SelectTrigger className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                              {activeTiersList.map((t) => (
+                                <SelectItem key={t.tier} value={String(t.tier)}>
+                                  {t.name} ({formatMoney(t.pricePerItem)}/item)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter className="pt-2">
+                        <Button type="submit" disabled={addBusy} className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 w-full hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20">
+                          {addBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+                          Buat Akun
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+
+            <div className="hidden">
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500">
@@ -3973,15 +4083,35 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </CardContent>
               </Card>
 
-              {/* JAM OPERASIONAL */}
+              {/* JAM OPERASIONAL & SUBMISSION LOCK */}
               <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100">Jam Operasional</CardTitle>
+                  <CardTitle className="text-lg text-slate-100">Jam Operasional & Control Form Setoran</CardTitle>
                   <CardDescription className="text-slate-400">
-                    Atur jadwal operasional harian dan zona waktu platform.
+                    Atur jadwal operasional harian, saklar kunci setoran manual admin, dan zona waktu platform.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* MANUAL SUBMISSION LOCK TOGGLE */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl">
+                    <div>
+                      <Label className="font-bold text-sm text-slate-200">Kunci Formulir Setoran Email (Manual Override)</Label>
+                      <p className="text-xs text-slate-400 mt-0.5">Buka atau tutup akses formulir setoran email worker secara manual kapan saja.</p>
+                    </div>
+                    <Select
+                      value={currentSubmissionOpen ? "OPEN" : "CLOSED"}
+                      onValueChange={(val) => setSubmissionOpenState(val === "OPEN")}
+                    >
+                      <SelectTrigger className="w-36 text-xs h-8 font-bold bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectItem value="OPEN" className="text-xs font-bold text-emerald-400">🟢 Buka (Terbuka)</SelectItem>
+                        <SelectItem value="CLOSED" className="text-xs font-bold text-rose-400">🔴 Tutup (Kunci)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex items-center justify-between p-3 bg-slate-950/80 border border-slate-800 rounded-lg">
                     <div>
                       <Label className="font-bold text-sm text-slate-200">Status Jam Operasional Global</Label>

@@ -77,7 +77,7 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { SubmissionHistory } from "@/components/SubmissionHistory";
 import { TransactionHistory } from "@/components/TransactionHistory";
@@ -132,6 +132,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const referralTxs = useReferralTransactions(profile.uid);
   const downlines = useDownlineWorkers(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
+  const generalSettingsHook = useSettings("general", DEFAULT_GENERAL_SETTINGS);
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const myReferral = useMyReferral(profile.uid);
@@ -367,6 +368,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const operatingStatus = useMemo(() => {
     return getOperatingStatus(operatingHoursConfig);
   }, [operatingHoursConfig]);
+
+  const isSubmissionClosed = useMemo(() => {
+    const isManualClosed = generalSettingsHook.data?.submissionOpen === false;
+    return isManualClosed || !operatingStatus.isOpen;
+  }, [generalSettingsHook.data?.submissionOpen, operatingStatus.isOpen]);
 
   // Profile fields display with robust fallbacks
   const displayName = profile?.name && profile.name.trim() ? profile.name.trim() : "Worker";
@@ -966,6 +972,23 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardContent>
             </Card>
 
+            {/* OPERATIONAL CLOSED / SUBMISSION LOCK WARNING BANNER */}
+            {isSubmissionClosed && (
+              <Card className="bg-rose-50 border-rose-200 shadow-xs">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-rose-900 text-sm">Pemberitahuan Setoran Ditutup</h4>
+                    <p className="text-xs text-rose-800 font-medium leading-relaxed mt-1">
+                      Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="bg-white border-amber-100 shadow-xs">
               <CardHeader>
                 <CardTitle className="text-lg font-bold text-gray-900">Detail Batch Setoran</CardTitle>
@@ -973,6 +996,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitEmails} className="space-y-4">
+                  <fieldset disabled={isSubmissionClosed} className="space-y-4 disabled:opacity-60 disabled:pointer-events-none">
                   <div>
                     <Label htmlFor="emails" className="text-xs font-bold text-gray-800">
                       Daftar Alamat Email ({emailList.length} item)
@@ -1011,9 +1035,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <span className="font-black text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
                   </div>
 
-                  <Button type="submit" disabled={submitting} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-11 gap-2 rounded-xl shadow-sm border border-amber-400/20 active:scale-95 transition-transform">
+                  </fieldset>
+
+                  <Button type="submit" disabled={submitting || isSubmissionClosed} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-11 gap-2 rounded-xl shadow-sm border border-amber-400/20 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Kirim Batch ({emailList.length} Item)
+                    {isSubmissionClosed ? "Setoran Sedang Ditutup" : `Kirim Batch (${emailList.length} Item)`}
                   </Button>
                 </form>
               </CardContent>

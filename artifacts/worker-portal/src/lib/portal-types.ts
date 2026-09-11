@@ -282,6 +282,16 @@ export type SupportConfig = {
   communityWaLink?: string;
 };
 
+export type GeneralSettings = {
+  submissionOpen?: boolean;
+  adminPin?: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  submissionOpen: true,
+};
+
 export type DayOperatingHours = {
   enabled: boolean;
   open: string;
