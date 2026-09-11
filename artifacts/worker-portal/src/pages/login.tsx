@@ -1040,8 +1040,8 @@ export default function LoginPage() {
                   <Clock className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-amber-400 tracking-tight">&lt; 12 Jam</p>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Process Pencairan</p>
+              <p className="text-2xl font-black text-amber-400 tracking-tight">1 – 5 Menit</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Proses Pencairan Saldo</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
@@ -1087,17 +1087,30 @@ export default function LoginPage() {
             </div>
 
             {/* Step 02 */}
-            <div className="bg-slate-900/90 rounded-2xl p-7 border border-slate-800 relative hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl">
-              <div className="flex items-center justify-between mb-5">
+            <div className="bg-slate-900/90 rounded-2xl p-7 border border-amber-500/30 relative hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl shadow-amber-500/5 space-y-3">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-mono">02</span>
                 <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
                   <Send className="w-6 h-6" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Setor Pekerjaan Email</h3>
+              <h3 className="text-lg font-bold text-white">Setor Pekerjaan Email</h3>
               <p className="text-slate-300 text-sm leading-relaxed">
-                Salin dan masukkan daftar email ke dashboard. Sistem kami akan memproses dan memverifikasi kelayakan akun secara otomatis.
+                Salin dan masukkan daftar email ke dashboard. Sistem akan memproses dan memverifikasi kelayakan akun secara bertahap.
               </p>
+              {/* Badge Transparansi Estimasi ACC */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <div className="bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-xl text-xs text-amber-300 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5 text-xs">
+                    <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    Estimasi ACC Verifikasi:
+                  </p>
+                  <p className="text-slate-300 text-[11px] pl-5 leading-normal">
+                    • Normal: <b>1 – 2 Hari Kerja</b><br />
+                    • Kendala antrean/sistem: BISA <b>3+ Hari</b> (Transparan)
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Step 03 */}
@@ -1105,12 +1118,12 @@ export default function LoginPage() {
               <div className="flex items-center justify-between mb-5">
                 <span className="text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-mono">03</span>
                 <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
-                  <Wallet className="w-6 h-6" />
+                  <Zap className="w-6 h-6" />
                 </div>
               </div>
               <h3 className="text-lg font-bold text-white mb-2">Cairkan Saldo Langsung</h3>
               <p className="text-slate-300 text-sm leading-relaxed">
-                Setiap email yang lolos verifikasi ACC akan langsung menambahkan saldo ke akun Anda. Tarik saldo kapan saja ke DANA, OVO, atau Bank.
+                Setiap email yang lolos verifikasi ACC akan langsung menambahkan saldo ke akun Anda. Tarik saldo super cepat dalam <b>1–5 menit</b> ke DANA, OVO, GoPay, atau Bank.
               </p>
             </div>
           </div>
@@ -1137,9 +1150,9 @@ export default function LoginPage() {
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
                 <Wallet className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Pencairan Saldo Instan</h3>
+              <h3 className="text-base font-bold text-white mb-2">Pencairan Saldo Kilat (1–5 Menit)</h3>
               <p className="text-slate-400 text-xs leading-relaxed">
-                Penarikan diproses cepat tanpa penundaan. Dukungan lengkap untuk E-Wallet utama dan seluruh bank lokal Indonesia.
+                Penarikan saldo diproses otomatis tanpa penundaan panjang. Hanya butuh waktu <b>1–5 menit</b> sampai dana mendarat di e-wallet atau bank lokal Indonesia.
               </p>
             </div>
 
@@ -1148,9 +1161,9 @@ export default function LoginPage() {
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
                 <Gift className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Sistem Multi-Tier Referral</h3>
+              <h3 className="text-base font-bold text-white mb-2">Sistem Referral Pasif Income</h3>
               <p className="text-slate-400 text-xs leading-relaxed">
-                Undang teman untuk bergabung dan dapatkan komisi tambahan bertingkat sesuai akumulasi pencapaian tim Anda.
+                Undang teman untuk bergabung dan dapatkan komisi tambahan flat <b>Rp 100 / ACC</b> dari setiap hasil kerja downline Anda secara otomatis.
               </p>
             </div>
 
