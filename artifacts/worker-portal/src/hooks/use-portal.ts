@@ -21,6 +21,7 @@ import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/fir
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
+  DEFAULT_OPERATING_HOURS,
   type EmailSubmission,
   type PortalUser,
   type Withdrawal,
@@ -31,8 +32,9 @@ import {
   type ReferralTierConfig,
   type FinancialTransaction,
   type FinancialTransactionType,
+  type OperatingHoursConfig,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers, formatDateTime } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers, formatDateTime, getOperatingStatus } from "@/lib/portal-utils";
 import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
 import { sendTelegramNotification } from "@/lib/telegram-bot";
 
@@ -1007,6 +1009,32 @@ export function useMyReferral(uid?: string) {
 
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
   if (!db) throw new Error("Firebase is not configured.");
+
+  // Check general settings and operating hours before allowing submission
+  try {
+    const generalSnap = await getDoc(doc(db, "settings", "general"));
+    if (generalSnap.exists()) {
+      const generalData = generalSnap.data();
+      if (generalData?.submissionOpen === false) {
+        throw new Error("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+      }
+    }
+
+    const rulesSnap = await getDoc(doc(db, "settings", "rules"));
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : null;
+    const opHours: OperatingHoursConfig = rulesData?.operatingHours ?? DEFAULT_OPERATING_HOURS;
+    const opStatus = getOperatingStatus(opHours);
+
+    if (!opStatus.isOpen) {
+      throw new Error("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+    }
+  } catch (checkErr) {
+    if (checkErr instanceof Error && checkErr.message.includes("DITUTUP")) {
+      throw checkErr;
+    }
+    console.warn("[createSubmission] Notice when checking operational status:", checkErr);
+  }
+
   try {
     const res = await addDoc(collection(db, "emailSubmissions"), {
       ...payload,

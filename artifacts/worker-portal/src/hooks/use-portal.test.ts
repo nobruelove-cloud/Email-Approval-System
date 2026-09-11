@@ -42,6 +42,7 @@ import {
   type FinancialTransaction,
   type MaintenanceConfig,
 } from "../lib/portal-types";
+import { createSubmission, executeMasterReset, masterResetOperasional } from "./use-portal";
 
 // Setup hoisted mocks for Firebase modules
 const {
@@ -2493,6 +2494,59 @@ describe("Reciprocal Referral Binding & Passive Income Distribution System Unit 
   });
 });
 
+describe("Operational Hours & Submission Lock Unit Tests (createSubmission)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. throws rejection error when settings/general submissionOpen is false", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ submissionOpen: false }),
+    } as any);
+
+    await expect(
+      createSubmission({
+        workerId: "worker_test_lock",
+        items: [{ email: "test@example.com", password: "pass" }],
+      })
+    ).rejects.toThrow("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+  });
+
+  it("2. throws rejection error when operational hours status is closed", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ submissionOpen: true }),
+    } as any);
+
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        operatingHours: {
+          enabled: true,
+          timezone: "Asia/Jakarta",
+          days: {
+            monday: { enabled: false, open: "08:00", close: "18:00" },
+            tuesday: { enabled: false, open: "08:00", close: "18:00" },
+            wednesday: { enabled: false, open: "08:00", close: "18:00" },
+            thursday: { enabled: false, open: "08:00", close: "18:00" },
+            friday: { enabled: false, open: "08:00", close: "18:00" },
+            saturday: { enabled: false, open: "08:00", close: "18:00" },
+            sunday: { enabled: false, open: "08:00", close: "18:00" },
+          },
+        },
+      }),
+    } as any);
+
+    await expect(
+      createSubmission({
+        workerId: "worker_test_lock",
+        items: [{ email: "test@example.com", password: "pass" }],
+      })
+    ).rejects.toThrow("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+  });
+});
+
 describe("Master Reset System Unit Tests (executeMasterReset & masterResetOperasional)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -2510,7 +2564,7 @@ describe("Master Reset System Unit Tests (executeMasterReset & masterResetOperas
   });
 
   it("2. matches PIN accurately with String() conversion and whitespace trim", async () => {
-    mockGetDoc.mockResolvedValueOnce({
+    mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({ adminPin: "888888" }),
     } as any);
