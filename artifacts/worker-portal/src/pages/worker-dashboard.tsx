@@ -40,6 +40,7 @@ import {
   ChevronRight,
   X,
   BookOpen,
+  Tag,
 } from "lucide-react";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Button } from "@/components/ui/button";
@@ -583,8 +584,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-bold text-gray-900 text-sm leading-tight">{profile.name}</p>
                 <Badge variant="outline" className="text-[11px] bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-300 font-bold gap-1 shadow-2xs">
-                  <Award className="w-3 h-3 text-amber-600 shrink-0" />
-                  {currentTierConfig.name} ({formatMoney(currentTierConfig.pricePerItem)}/item)
+                  <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                  Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
                 </Badge>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
@@ -902,52 +903,34 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* SETOR EMAIL (BATCH) */}
           <TabsContent value="submit" className="space-y-4">
-            {/* TIER CONFIGURATION LIST FOR WORKER */}
+            {/* CURRENT RATE DISPLAY CARD */}
             <Card className="bg-white border-amber-100 shadow-xs">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <Award className="w-4 h-4 text-amber-600" />
-                    Daftar Tier & Harga Setor
+                    <Tag className="w-4 h-4 text-amber-600" />
+                    Informasi Rate Harga Setor
                   </CardTitle>
                   <Badge variant="outline" className="text-xs bg-amber-50 text-amber-900 border-amber-300 font-bold">
-                    Tier Anda Saat Ini: {currentTierConfig.name}
+                    RATE AKTIF
                   </Badge>
                 </div>
                 <CardDescription className="text-xs text-gray-600">
-                  Semakin banyak email yang Anda setor dan disetujui, semakin tinggi tier dan harga per akun.
+                  Harga komisi per akun valid yang berlaku saat ini ditentukan oleh Admin secara transparan.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {(rules.data.tiers && rules.data.tiers.length > 0 ? rules.data.tiers : [currentTierConfig]).map((t) => {
-                    const isCurrentTier = Number(t.tier) === Number(currentTierConfig.tier);
-                    const qtyText = t.maxQty >= 99999 ? `${t.minQty}+ akun` : `${t.minQty}–${t.maxQty} akun`;
-
-                    return (
-                      <div
-                        key={t.tier}
-                        className={`p-3.5 rounded-xl border text-center transition-all ${
-                          isCurrentTier
-                            ? "bg-gradient-to-br from-amber-500/10 via-amber-50 to-orange-500/10 border-amber-400 ring-2 ring-amber-400/30 shadow-xs"
-                            : "bg-slate-50/80 border-gray-200 text-gray-700 hover:border-amber-200"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-1.5 mb-1">
-                          <span className="font-bold text-sm text-gray-900">{t.name}</span>
-                          {isCurrentTier && (
-                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] px-1.5 py-0 h-4 font-bold border-0">
-                              Aktif
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 font-medium mb-1">{qtyText}</p>
-                        <p className="text-base font-black text-amber-700">
-                          {formatMoney(t.pricePerItem)} <span className="text-[11px] font-normal text-gray-500">/ akun</span>
-                        </p>
-                      </div>
-                    );
-                  })}
+                <div className="p-5 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-500/10 via-amber-50/80 to-orange-500/10 text-center shadow-xs">
+                  <div className="flex items-center justify-center gap-2 mb-1.5 text-amber-900 font-medium text-xs">
+                    <Tag className="w-4 h-4 text-amber-600" />
+                    <span>Rate Akun Valid</span>
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight my-1">
+                    {formatMoney(currentTierConfig.pricePerItem)} <span className="text-sm sm:text-base font-semibold text-amber-900/80">/ akun valid</span>
+                  </p>
+                  <p className="text-xs text-amber-900/80 mt-2 font-medium">
+                    Komisi langsung masuk ke saldo utama setiap email selesai diverifikasi ACC.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -960,14 +943,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     Aturan Setor Email
                   </div>
                   <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs border-0 shadow-2xs">
-                    {currentTierConfig.name} · {formatMoney(currentTierConfig.pricePerItem)}/item
+                    Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
                   </Badge>
                 </div>
                 <ul className="space-y-1.5 text-xs text-amber-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
                   {rules.data.submissionNotes.map((note, idx) => (
                     <li key={idx} className="whitespace-pre-wrap">{note}</li>
                   ))}
-                  <li>Harga aktif Anda: <strong className="text-amber-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per item ({currentTierConfig.name}).</li>
+                  <li>Harga komisi aktif saat ini: <strong className="text-amber-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
                 </ul>
               </CardContent>
             </Card>
@@ -1837,7 +1820,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-white text-sm">{profile.name}</p>
                     <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold">
-                      {currentTierConfig.name}
+                      Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
                     </Badge>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
@@ -2005,7 +1988,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </div>
                   <div className="text-left">
                     <p className="font-bold">Cara Kerja & Aturan Setor</p>
-                    <p className="text-[10px] text-slate-400 font-normal">Panduan pengerjaan & tier harga</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Panduan pengerjaan & rate harga</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -2082,7 +2065,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         Status per Alamat Email ({baseItems.length} item):
                       </Label>
                       <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
-                        {tierCfg.name} ({formatMoney(pricePerItem)}/item)
+                        Rate: {formatMoney(pricePerItem)}/akun
                       </Badge>
                     </div>
 
