@@ -35,6 +35,7 @@ import {
   ShieldAlert,
   BarChart3,
   AlertTriangle,
+  SearchCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -47,6 +48,7 @@ import {
   Legend,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { EmailChecker } from "@/components/EmailChecker";
 import { MasterResetModal } from "@/components/MasterResetModal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1707,9 +1709,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue="overview">
-          <TabsList className="grid grid-cols-4 sm:grid-cols-8 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1">
+          <TabsList className="grid grid-cols-3 sm:grid-cols-9 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all">
               Ringkasan
+            </TabsTrigger>
+            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+              <SearchCheck className="w-3.5 h-3.5" /> Master Riset
             </TabsTrigger>
             <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
               <Megaphone className="w-3.5 h-3.5" /> Pengumuman
@@ -1739,6 +1744,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
+
+          {/* MASTER RISET / BULK EMAIL CHECKER */}
+          <TabsContent value="checker" className="space-y-4">
+            <EmailChecker isAdminView={true} />
+          </TabsContent>
 
           {/* TAB KELOLA PENGUMUMAN ADMIN */}
           <TabsContent value="announcements" className="space-y-6">

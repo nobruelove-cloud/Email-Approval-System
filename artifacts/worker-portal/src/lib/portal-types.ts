@@ -312,6 +312,40 @@ export type OperatingHoursConfig = {
   };
 };
 
+export type CheckerRulesConfig = {
+  enabled: boolean;
+  minBirthYear: number;
+  maxBirthYear: number;
+  maxUsernameDigits: number;
+  requirePasswordLowercaseOnly: boolean;
+};
+
+export const DEFAULT_CHECKER_RULES: CheckerRulesConfig = {
+  enabled: true,
+  minBirthYear: 1990,
+  maxBirthYear: 1998,
+  maxUsernameDigits: 3,
+  requirePasswordLowercaseOnly: true,
+};
+
+export type CheckedEmailItem = {
+  originalLine: string;
+  email: string;
+  password?: string;
+  username: string;
+  status: "GOOD" | "BAD";
+  reasons: string[];
+  birthYearDetected?: number;
+  digitCountDetected?: number;
+};
+
+export type BulkCheckResult = {
+  total: number;
+  goodCount: number;
+  badCount: number;
+  items: CheckedEmailItem[];
+};
+
 export const DEFAULT_OPERATING_HOURS: OperatingHoursConfig = {
   enabled: true,
   timezone: "Asia/Jakarta",
@@ -371,6 +405,9 @@ export type PortalRules = {
 
   // Operating Hours Settings
   operatingHours?: OperatingHoursConfig;
+
+  // Bulk Email Checker / Master Riset Settings
+  checkerRules?: CheckerRulesConfig;
 
   updatedAt?: unknown;
 };
@@ -442,4 +479,5 @@ export const DEFAULT_RULES: PortalRules = {
   },
 
   operatingHours: DEFAULT_OPERATING_HOURS,
+  checkerRules: DEFAULT_CHECKER_RULES,
 };
