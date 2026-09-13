@@ -41,7 +41,9 @@ import {
   X,
   BookOpen,
   Tag,
+  SearchCheck,
 } from "lucide-react";
+import { EmailChecker } from "@/components/EmailChecker";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -776,16 +778,22 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         )}
 
         <Tabs value={mainTab} onValueChange={setMainTab}>
-          <TabsList className="hidden md:grid grid-cols-6 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
+          <TabsList className="hidden md:grid grid-cols-7 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
             <TabsTrigger
               value="submit"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
+              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
             >
               <Send className="w-3.5 h-3.5" /> STORAN
             </TabsTrigger>
             <TabsTrigger
+              value="checker"
+              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
+            >
+              <SearchCheck className="w-3.5 h-3.5" /> CHECKER
+            </TabsTrigger>
+            <TabsTrigger
               value="leaderboard"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
+              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
             >
               <Trophy className="w-3.5 h-3.5" /> KLASEMEN
             </TabsTrigger>
@@ -819,6 +827,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <History className="w-3.5 h-3.5" /> RIWAYAT
             </TabsTrigger>
           </TabsList>
+
+          {/* CHECKER EMAIL / RISET STATUS */}
+          <TabsContent value="checker" className="space-y-4">
+            <EmailChecker isAdminView={false} />
+          </TabsContent>
 
           {/* KLASEMEN / LEADERBOARD */}
           <TabsContent value="leaderboard" className="space-y-4">
@@ -1845,6 +1858,30 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
             <div className="p-4 space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2">Menu & Fitur Portal</p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMainTab("checker");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
+                  mainTab === "checker"
+                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                    : "bg-slate-955/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                    <SearchCheck className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold">Checker Email & Master Riset</p>
+                    <p className="text-[10px] text-slate-400 font-normal">Screening format & status email</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
 
               <button
                 type="button"

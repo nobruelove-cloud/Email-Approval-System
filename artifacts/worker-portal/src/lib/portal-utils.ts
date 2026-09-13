@@ -4,6 +4,7 @@ import {
   DEFAULT_REFERRAL_TIERS,
   DEFAULT_OPERATING_HOURS,
   DEFAULT_PAYMENT_METHOD_FEES,
+  DEFAULT_CHECKER_RULES,
   type EmailSubmission,
   type TierConfig,
   type ReferralTierConfig,
@@ -12,6 +13,9 @@ import {
   type PaymentMethodFeeConfig,
   type WithdrawalSettings,
   type PortalRules,
+  type CheckerRulesConfig,
+  type CheckedEmailItem,
+  type BulkCheckResult,
 } from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
@@ -981,6 +985,147 @@ export function calculateLeaderboardStandings(
       rewardAmount: eligibleReward,
     };
   });
+}
+
+/**
+ * Bulk Email Checker / Master Riset Screening Logic
+ */
+export function parseAndCheckEmailLine(
+  rawLine: string,
+  rulesConfig?: CheckerRulesConfig | null
+): CheckedEmailItem {
+  const activeRules = rulesConfig ?? DEFAULT_CHECKER_RULES;
+  const line = (rawLine || "").trim();
+
+  if (!line) {
+    return {
+      originalLine: rawLine,
+      email: "",
+      username: "",
+      status: "BAD",
+      reasons: ["Baris kosong"],
+    };
+  }
+
+  // Split by |, :, or whitespace (space/tab)
+  let emailPart = "";
+  let passwordPart: string | undefined = undefined;
+
+  if (line.includes("|")) {
+    const parts = line.split("|");
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join("|").trim();
+  } else if (line.includes(":")) {
+    const parts = line.split(":");
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join(":").trim();
+  } else if (/\s+/.test(line)) {
+    const parts = line.split(/\s+/);
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join(" ").trim();
+  } else {
+    emailPart = line;
+  }
+
+  const reasons: string[] = [];
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(emailPart)) {
+    reasons.push("Format email tidak valid");
+  }
+
+  const username = emailPart.includes("@") ? emailPart.split("@")[0] : emailPart;
+
+  // 1. Birth year range check in username
+  let detectedBirthYear: number | undefined = undefined;
+  let birthYearStr: string | null = null;
+  if (activeRules.enabled) {
+    // Look for 4-digit year in username (e.g. 1992, 2005)
+    const yearMatches = username.match(/(19\d\d|20\d\d)/g);
+    if (yearMatches && yearMatches.length > 0) {
+      birthYearStr = yearMatches[yearMatches.length - 1];
+      detectedBirthYear = parseInt(birthYearStr, 10);
+      if (
+        detectedBirthYear < activeRules.minBirthYear ||
+        detectedBirthYear > activeRules.maxBirthYear
+      ) {
+        reasons.push(`Tahun di luar ${activeRules.minBirthYear}-${activeRules.maxBirthYear}`);
+      }
+    }
+  }
+
+  // 2. Digit count in username check (excluding birth year digits if present)
+  let usernameForDigitCount = username;
+  if (birthYearStr) {
+    usernameForDigitCount = username.replace(birthYearStr, "");
+  }
+  const digitsInUsername = (usernameForDigitCount.match(/\d/g) || []).length;
+  if (activeRules.enabled && activeRules.maxUsernameDigits >= 0) {
+    if (digitsInUsername > activeRules.maxUsernameDigits) {
+      reasons.push(`Digit angka > ${activeRules.maxUsernameDigits}`);
+    }
+  }
+
+  // 3. Password rules check
+  if (passwordPart !== undefined && passwordPart.length > 0) {
+    if (activeRules.enabled && activeRules.requirePasswordLowercaseOnly) {
+      if (/[A-Z]/.test(passwordPart)) {
+        reasons.push("Format password tidak valid (mengandung huruf kapital)");
+      }
+    }
+  }
+
+  return {
+    originalLine: line,
+    email: emailPart,
+    password: passwordPart,
+    username,
+    status: reasons.length === 0 ? "GOOD" : "BAD",
+    reasons,
+    birthYearDetected: detectedBirthYear,
+    digitCountDetected: digitsInUsername,
+  };
+}
+
+export function bulkCheckEmails(
+  rawText: string,
+  rulesConfig?: CheckerRulesConfig | null
+): BulkCheckResult {
+  if (!rawText || typeof rawText !== "string") {
+    return {
+      total: 0,
+      goodCount: 0,
+      badCount: 0,
+      items: [],
+    };
+  }
+
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const items = lines.map((line) => parseAndCheckEmailLine(line, rulesConfig));
+  const goodCount = items.filter((i) => i.status === "GOOD").length;
+  const badCount = items.length - goodCount;
+
+  return {
+    total: items.length,
+    goodCount,
+    badCount,
+    items,
+  };
+}
+
+export function formatGoodEmailsForCopy(
+  items: CheckedEmailItem[],
+  includePassword = true
+): string {
+  if (!Array.isArray(items)) return "";
+  const goodItems = items.filter((i) => i.status === "GOOD");
+  return goodItems
+    .map((i) => (includePassword && i.password ? `${i.email}|${i.password}` : i.email))
+    .join("\n");
 }
 
 export function validatePasswordAgainstRules(password: string, submissionNotes: string[] = []): string | null {

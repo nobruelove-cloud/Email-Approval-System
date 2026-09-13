@@ -26,7 +26,11 @@ import {
   formatBatchEmailsOnly,
   formatBatchEmailsWithPasswords,
   getLeaderboardUserProgress,
+  parseAndCheckEmailLine,
+  bulkCheckEmails,
+  formatGoodEmailsForCopy,
 } from "../lib/portal-utils";
+import { DEFAULT_CHECKER_RULES, type CheckerRulesConfig } from "../lib/portal-types";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -2595,5 +2599,74 @@ describe("Master Reset System Unit Tests (executeMasterReset & masterResetOperas
     const res = await executeMasterReset("123456");
 
     expect(res.success).toBe(true);
+  });
+});
+
+describe("Bulk Email Checker & Master Riset Utility Unit Tests", () => {
+  const customRules: CheckerRulesConfig = {
+    enabled: true,
+    minBirthYear: 1990,
+    maxBirthYear: 1998,
+    maxUsernameDigits: 3,
+    requirePasswordLowercaseOnly: true,
+  };
+
+  it("1. parseAndCheckEmailLine parses various separators (|, :, whitespace)", () => {
+    const pipeLine = parseAndCheckEmailLine("ahmad1992@gmail.com|pass123", customRules);
+    expect(pipeLine.email).toBe("ahmad1992@gmail.com");
+    expect(pipeLine.password).toBe("pass123");
+    expect(pipeLine.status).toBe("GOOD");
+
+    const colonLine = parseAndCheckEmailLine("budi1995@gmail.com:pass456", customRules);
+    expect(colonLine.email).toBe("budi1995@gmail.com");
+    expect(colonLine.password).toBe("pass456");
+    expect(colonLine.status).toBe("GOOD");
+
+    const spaceLine = parseAndCheckEmailLine("dedi1997@gmail.com pass789", customRules);
+    expect(spaceLine.email).toBe("dedi1997@gmail.com");
+    expect(spaceLine.password).toBe("pass789");
+    expect(spaceLine.status).toBe("GOOD");
+  });
+
+  it("2. parseAndCheckEmailLine flags BAD status for invalid birth year, excess digits, and uppercase password", () => {
+    // Birth year 2005 (outside 1990-1998)
+    const badYear = parseAndCheckEmailLine("eka2005@gmail.com|pass123", customRules);
+    expect(badYear.status).toBe("BAD");
+    expect(badYear.reasons).toContain("Tahun di luar 1990-1998");
+
+    // Excess username digits (> 3 digits)
+    const badDigits = parseAndCheckEmailLine("user12345@gmail.com|pass123", customRules);
+    expect(badDigits.status).toBe("BAD");
+    expect(badDigits.reasons).toContain("Digit angka > 3");
+
+    // Password containing uppercase letter
+    const badPassword = parseAndCheckEmailLine("ahmad1992@gmail.com|Pass123", customRules);
+    expect(badPassword.status).toBe("BAD");
+    expect(badPassword.reasons).toContain("Format password tidak valid (mengandung huruf kapital)");
+  });
+
+  it("3. bulkCheckEmails accurately categorizes total, GOOD, and BAD counts", () => {
+    const multiLineInput = `
+ahmad1992@gmail.com|pass123
+budi2002@gmail.com|pass123
+user9999@gmail.com:pass123
+dedi1994@gmail.com|SandiKapital
+    `;
+
+    const result = bulkCheckEmails(multiLineInput, customRules);
+    expect(result.total).toBe(4);
+    expect(result.goodCount).toBe(1); // Only ahmad1992
+    expect(result.badCount).toBe(3);
+  });
+
+  it("4. formatGoodEmailsForCopy extracts GOOD emails for single-click copy", () => {
+    const multiLineInput = `
+ahmad1992@gmail.com|pass123
+budi2002@gmail.com|pass123
+    `;
+
+    const result = bulkCheckEmails(multiLineInput, customRules);
+    const goodCopyText = formatGoodEmailsForCopy(result.items, true);
+    expect(goodCopyText).toBe("ahmad1992@gmail.com|pass123");
   });
 });
