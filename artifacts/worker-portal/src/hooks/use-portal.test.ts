@@ -2669,4 +2669,44 @@ budi2002@gmail.com|pass123
     const goodCopyText = formatGoodEmailsForCopy(result.items, true);
     expect(goodCopyText).toBe("ahmad1992@gmail.com|pass123");
   });
+
+  it("5. Single Master Password input is applied to raw email lines without inline passwords", () => {
+    const rawEmailInput = "ahmad1992@gmail.com";
+    const masterPassword = "mastersandi123";
+
+    const item = parseAndCheckEmailLine(rawEmailInput, customRules, masterPassword);
+    expect(item.status).toBe("GOOD");
+    expect(item.password).toBe("mastersandi123");
+  });
+
+  it("6. Required password rules mismatch marks items as BAD with specific reason", () => {
+    const rulesWithRequiredPwd = {
+      ...customRules,
+      requiredPassword: "sandiwajib123",
+    };
+
+    // Raw email line with matching master password
+    const goodMasterItem = parseAndCheckEmailLine("ahmad1992@gmail.com", rulesWithRequiredPwd, "sandiwajib123");
+    expect(goodMasterItem.status).toBe("GOOD");
+    expect(goodMasterItem.password).toBe("sandiwajib123");
+
+    // Raw email line with wrong master password
+    const wrongMasterItem = parseAndCheckEmailLine("ahmad1992@gmail.com", rulesWithRequiredPwd, "sandysalah");
+    expect(wrongMasterItem.status).toBe("BAD");
+    expect(wrongMasterItem.reasons).toContain("Password tidak sesuai dengan rules / sandi wajib");
+
+    // Inline email|password line with wrong inline password
+    const wrongInlineItem = parseAndCheckEmailLine("ahmad1992@gmail.com|sandiLain", rulesWithRequiredPwd, "sandiwajib123");
+    expect(wrongInlineItem.status).toBe("BAD");
+    expect(wrongInlineItem.reasons).toContain("Password tidak sesuai dengan rules / sandi wajib");
+  });
+
+  it("7. formatGoodEmailsForCopy uses fallback master password for raw email lines", () => {
+    const rawEmailInput = "ahmad1992@gmail.com";
+    const masterPassword = "sandiwajib123";
+
+    const result = bulkCheckEmails(rawEmailInput, customRules, masterPassword);
+    const goodCopyText = formatGoodEmailsForCopy(result.items, true, masterPassword);
+    expect(goodCopyText).toBe("ahmad1992@gmail.com|sandiwajib123");
+  });
 });

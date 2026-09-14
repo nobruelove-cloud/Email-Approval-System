@@ -992,7 +992,8 @@ export function calculateLeaderboardStandings(
  */
 export function parseAndCheckEmailLine(
   rawLine: string,
-  rulesConfig?: CheckerRulesConfig | null
+  rulesConfig?: CheckerRulesConfig | null,
+  masterPassword?: string
 ): CheckedEmailItem {
   const activeRules = rulesConfig ?? DEFAULT_CHECKER_RULES;
   const line = (rawLine || "").trim();
@@ -1026,6 +1027,13 @@ export function parseAndCheckEmailLine(
   } else {
     emailPart = line;
   }
+
+  const effectivePassword =
+    passwordPart !== undefined && passwordPart.length > 0
+      ? passwordPart
+      : masterPassword && masterPassword.trim().length > 0
+      ? masterPassword.trim()
+      : undefined;
 
   const reasons: string[] = [];
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1066,10 +1074,17 @@ export function parseAndCheckEmailLine(
     }
   }
 
-  // 3. Password rules check
-  if (passwordPart !== undefined && passwordPart.length > 0) {
+  // 3. Password rules & required password check
+  const requiredPwd = activeRules.requiredPassword?.trim();
+  if (requiredPwd && requiredPwd.length > 0) {
+    if (!effectivePassword || effectivePassword !== requiredPwd) {
+      reasons.push("Password tidak sesuai dengan rules / sandi wajib");
+    }
+  }
+
+  if (effectivePassword !== undefined && effectivePassword.length > 0) {
     if (activeRules.enabled && activeRules.requirePasswordLowercaseOnly) {
-      if (/[A-Z]/.test(passwordPart)) {
+      if (/[A-Z]/.test(effectivePassword)) {
         reasons.push("Format password tidak valid (mengandung huruf kapital)");
       }
     }
@@ -1078,7 +1093,7 @@ export function parseAndCheckEmailLine(
   return {
     originalLine: line,
     email: emailPart,
-    password: passwordPart,
+    password: effectivePassword,
     username,
     status: reasons.length === 0 ? "GOOD" : "BAD",
     reasons,
@@ -1089,7 +1104,8 @@ export function parseAndCheckEmailLine(
 
 export function bulkCheckEmails(
   rawText: string,
-  rulesConfig?: CheckerRulesConfig | null
+  rulesConfig?: CheckerRulesConfig | null,
+  masterPassword?: string
 ): BulkCheckResult {
   if (!rawText || typeof rawText !== "string") {
     return {
@@ -1105,7 +1121,7 @@ export function bulkCheckEmails(
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  const items = lines.map((line) => parseAndCheckEmailLine(line, rulesConfig));
+  const items = lines.map((line) => parseAndCheckEmailLine(line, rulesConfig, masterPassword));
   const goodCount = items.filter((i) => i.status === "GOOD").length;
   const badCount = items.length - goodCount;
 
@@ -1119,12 +1135,16 @@ export function bulkCheckEmails(
 
 export function formatGoodEmailsForCopy(
   items: CheckedEmailItem[],
-  includePassword = true
+  includePassword = true,
+  fallbackMasterPassword?: string
 ): string {
   if (!Array.isArray(items)) return "";
   const goodItems = items.filter((i) => i.status === "GOOD");
   return goodItems
-    .map((i) => (includePassword && i.password ? `${i.email}|${i.password}` : i.email))
+    .map((i) => {
+      const pwd = i.password || fallbackMasterPassword || "";
+      return includePassword && pwd ? `${i.email}|${pwd}` : i.email;
+    })
     .join("\n");
 }
 

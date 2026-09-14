@@ -34,10 +34,18 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   const currentRules = rulesHook.data ?? DEFAULT_RULES;
   const checkerRulesConfig = currentRules.checkerRules ?? DEFAULT_CHECKER_RULES;
 
+  const activeRequiredPassword = checkerRulesConfig.requiredPassword ?? currentRules.requiredPassword ?? "";
+
   const [rawText, setRawText] = useState("");
+  const [masterPasswordInput, setMasterPasswordInput] = useState<string>(activeRequiredPassword);
   const [filterTab, setFilterTab] = useState<"ALL" | "GOOD" | "BAD" | "ACTIVE">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Sync masterPasswordInput when remote requiredPassword changes unless user edited it
+  React.useEffect(() => {
+    setMasterPasswordInput(activeRequiredPassword);
+  }, [activeRequiredPassword]);
 
   // Admin Configurator State
   const [adminRules, setAdminRules] = useState<CheckerRulesConfig>(checkerRulesConfig);
@@ -130,8 +138,8 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   // Execute Line-by-Line Screening Logic using active rules
   const activeConfigToUse = isAdminView ? adminRules : checkerRulesConfig;
   const checkResult = useMemo(() => {
-    return bulkCheckEmails(rawText, activeConfigToUse);
-  }, [rawText, activeConfigToUse]);
+    return bulkCheckEmails(rawText, activeConfigToUse, masterPasswordInput);
+  }, [rawText, activeConfigToUse, masterPasswordInput]);
 
   // Filtered list based on tab & search query
   const displayedItems = useMemo(() => {
@@ -151,7 +159,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   }, [checkResult.items, filterTab, searchQuery]);
 
   function handleCopyGoodEmails() {
-    const goodText = formatGoodEmailsForCopy(checkResult.items, true);
+    const goodText = formatGoodEmailsForCopy(checkResult.items, true, masterPasswordInput);
     if (!goodText) {
       toast.error("Tidak ada email berstatus Active / Good yang dapat disalin.");
       return;
@@ -286,6 +294,18 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 </div>
               </div>
 
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-955 border border-slate-800">
+                <Label className="text-xs font-bold text-slate-300">Password Wajib / Master Setoran (Rules Required Password)</Label>
+                <Input
+                  type="text"
+                  value={adminRules.requiredPassword ?? ""}
+                  onChange={(e) => setAdminRules({ ...adminRules, requiredPassword: e.target.value })}
+                  placeholder="Contoh: sandiwajib123"
+                  className="bg-slate-900 border-slate-800 text-slate-100 text-xs font-mono h-9"
+                />
+                <p className="text-[10px] text-slate-400">Jika diisi, seluruh email yang disetor wajib menggunakan kata sandi ini.</p>
+              </div>
+
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-955 border border-slate-800">
                 <div className="space-y-0.5">
                   <Label className="text-xs font-bold text-slate-200">Wajib Password Huruf Kecil Sahaja</Label>
@@ -328,6 +348,57 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* DEDICATED MASTER PASSWORD INPUT FIELD */}
+          <div className={`p-4 rounded-xl border space-y-2 ${
+            isAdminView ? "bg-slate-955 border-slate-800" : "bg-amber-50/60 border-amber-200/80"
+          }`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <Label className={`text-xs font-extrabold uppercase tracking-wide flex items-center gap-1.5 ${
+                isAdminView ? "text-emerald-400" : "text-amber-950"
+              }`}>
+                <span>Master Password Setoran</span>
+              </Label>
+              {/* STATUS BADGES FOR MASTER PASSWORD MATCHING RULES */}
+              {activeConfigToUse.requiredPassword && activeConfigToUse.requiredPassword.trim() ? (
+                masterPasswordInput.trim() === activeConfigToUse.requiredPassword.trim() ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] font-bold gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Sesuai Rules Sandi Wajib ({activeConfigToUse.requiredPassword})
+                  </Badge>
+                ) : (
+                  <Badge className="bg-rose-500/15 text-rose-400 border-rose-500/30 text-[10px] font-bold gap-1">
+                    <XCircle className="w-3 h-3" /> Tidak Sesuai Rules Sandi Wajib ({activeConfigToUse.requiredPassword})
+                  </Badge>
+                )
+              ) : activeConfigToUse.requirePasswordLowercaseOnly && /[A-Z]/.test(masterPasswordInput) ? (
+                <Badge className="bg-rose-500/15 text-rose-400 border-rose-500/30 text-[10px] font-bold gap-1">
+                  <XCircle className="w-3 h-3" /> Sandi Mengandung Huruf Kapital
+                </Badge>
+              ) : masterPasswordInput.trim() ? (
+                <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] font-bold gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Master Password Aktif
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-slate-400 text-[10px]">
+                  Master Password Kosong (Gunakan password di baris/inline)
+                </Badge>
+              )}
+            </div>
+            <Input
+              type="text"
+              value={masterPasswordInput}
+              onChange={(e) => setMasterPasswordInput(e.target.value)}
+              placeholder="Masukkan Master Password Setoran (contoh: sandiwajib123)"
+              className={`font-mono text-xs h-9 rounded-lg ${
+                isAdminView
+                  ? "bg-slate-900 border-slate-800 text-slate-100 focus-visible:ring-emerald-500"
+                  : "bg-white border-gray-200 text-gray-900 focus-visible:ring-amber-500"
+              }`}
+            />
+            <p className={`text-[11px] ${isAdminView ? "text-slate-400" : "text-gray-500"}`}>
+              Jika baris email hanya berisi alamat email tanpa sandi (contoh: <code className="font-mono text-[10px]">user@gmail.com</code>), Master Password ini akan digunakan secara otomatis.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <Label className={`font-bold ${isAdminView ? "text-slate-300" : "text-gray-800"}`}>

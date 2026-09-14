@@ -318,6 +318,7 @@ export type CheckerRulesConfig = {
   maxBirthYear: number;
   maxUsernameDigits: number;
   requirePasswordLowercaseOnly: boolean;
+  requiredPassword?: string;
 };
 
 export const DEFAULT_CHECKER_RULES: CheckerRulesConfig = {
@@ -326,6 +327,7 @@ export const DEFAULT_CHECKER_RULES: CheckerRulesConfig = {
   maxBirthYear: 1998,
   maxUsernameDigits: 3,
   requirePasswordLowercaseOnly: true,
+  requiredPassword: "",
 };
 
 export type CheckedEmailItem = {
@@ -408,6 +410,7 @@ export type PortalRules = {
 
   // Bulk Email Checker / Master Riset Settings
   checkerRules?: CheckerRulesConfig;
+  requiredPassword?: string;
 
   updatedAt?: unknown;
 };
