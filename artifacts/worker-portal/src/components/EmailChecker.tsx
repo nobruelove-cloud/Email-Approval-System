@@ -35,7 +35,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   const checkerRulesConfig = currentRules.checkerRules ?? DEFAULT_CHECKER_RULES;
 
   const [rawText, setRawText] = useState("");
-  const [filterTab, setFilterTab] = useState<"ALL" | "GOOD" | "BAD">("ALL");
+  const [filterTab, setFilterTab] = useState<"ALL" | "GOOD" | "BAD" | "ACTIVE">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -43,12 +43,89 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   const [adminRules, setAdminRules] = useState<CheckerRulesConfig>(checkerRulesConfig);
   const [savingAdminRules, setSavingAdminRules] = useState(false);
 
+  // String state for input fields to allow empty string during editing without defaulting immediately to 0
+  const [minBirthYearStr, setMinBirthYearStr] = useState<string>(
+    String(checkerRulesConfig.minBirthYear ?? DEFAULT_CHECKER_RULES.minBirthYear)
+  );
+  const [maxBirthYearStr, setMaxBirthYearStr] = useState<string>(
+    String(checkerRulesConfig.maxBirthYear ?? DEFAULT_CHECKER_RULES.maxBirthYear)
+  );
+  const [maxUsernameDigitsStr, setMaxUsernameDigitsStr] = useState<string>(
+    String(checkerRulesConfig.maxUsernameDigits ?? DEFAULT_CHECKER_RULES.maxUsernameDigits)
+  );
+
   // Keep admin local rules updated if remote changes
   React.useEffect(() => {
     if (currentRules.checkerRules) {
       setAdminRules(currentRules.checkerRules);
+      setMinBirthYearStr(String(currentRules.checkerRules.minBirthYear ?? DEFAULT_CHECKER_RULES.minBirthYear));
+      setMaxBirthYearStr(String(currentRules.checkerRules.maxBirthYear ?? DEFAULT_CHECKER_RULES.maxBirthYear));
+      setMaxUsernameDigitsStr(String(currentRules.checkerRules.maxUsernameDigits ?? DEFAULT_CHECKER_RULES.maxUsernameDigits));
     }
   }, [currentRules.checkerRules]);
+
+  const handleMinBirthYearChange = (valStr: string) => {
+    setMinBirthYearStr(valStr);
+    const parsed = parseInt(valStr, 10);
+    setAdminRules((prev) => ({
+      ...prev,
+      minBirthYear: isNaN(parsed) ? 0 : parsed,
+    }));
+  };
+
+  const handleMinBirthYearBlur = () => {
+    const parsed = parseInt(minBirthYearStr, 10);
+    if (isNaN(parsed) || minBirthYearStr.trim() === "") {
+      const fallback = DEFAULT_CHECKER_RULES.minBirthYear;
+      setMinBirthYearStr(String(fallback));
+      setAdminRules((prev) => ({ ...prev, minBirthYear: fallback }));
+    } else {
+      setMinBirthYearStr(String(parsed));
+      setAdminRules((prev) => ({ ...prev, minBirthYear: parsed }));
+    }
+  };
+
+  const handleMaxBirthYearChange = (valStr: string) => {
+    setMaxBirthYearStr(valStr);
+    const parsed = parseInt(valStr, 10);
+    setAdminRules((prev) => ({
+      ...prev,
+      maxBirthYear: isNaN(parsed) ? 0 : parsed,
+    }));
+  };
+
+  const handleMaxBirthYearBlur = () => {
+    const parsed = parseInt(maxBirthYearStr, 10);
+    if (isNaN(parsed) || maxBirthYearStr.trim() === "") {
+      const fallback = DEFAULT_CHECKER_RULES.maxBirthYear;
+      setMaxBirthYearStr(String(fallback));
+      setAdminRules((prev) => ({ ...prev, maxBirthYear: fallback }));
+    } else {
+      setMaxBirthYearStr(String(parsed));
+      setAdminRules((prev) => ({ ...prev, maxBirthYear: parsed }));
+    }
+  };
+
+  const handleMaxUsernameDigitsChange = (valStr: string) => {
+    setMaxUsernameDigitsStr(valStr);
+    const parsed = parseInt(valStr, 10);
+    setAdminRules((prev) => ({
+      ...prev,
+      maxUsernameDigits: isNaN(parsed) ? 0 : parsed,
+    }));
+  };
+
+  const handleMaxUsernameDigitsBlur = () => {
+    const parsed = parseInt(maxUsernameDigitsStr, 10);
+    if (isNaN(parsed) || maxUsernameDigitsStr.trim() === "") {
+      const fallback = DEFAULT_CHECKER_RULES.maxUsernameDigits;
+      setMaxUsernameDigitsStr(String(fallback));
+      setAdminRules((prev) => ({ ...prev, maxUsernameDigits: fallback }));
+    } else {
+      setMaxUsernameDigitsStr(String(parsed));
+      setAdminRules((prev) => ({ ...prev, maxUsernameDigits: parsed }));
+    }
+  };
 
   // Execute Line-by-Line Screening Logic using active rules
   const activeConfigToUse = isAdminView ? adminRules : checkerRulesConfig;
@@ -59,7 +136,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   // Filtered list based on tab & search query
   const displayedItems = useMemo(() => {
     return checkResult.items.filter((item) => {
-      if (filterTab === "GOOD" && item.status !== "GOOD") return false;
+      if ((filterTab === "GOOD" || filterTab === "ACTIVE") && item.status !== "GOOD") return false;
       if (filterTab === "BAD" && item.status !== "BAD") return false;
 
       if (searchQuery.trim()) {
@@ -76,14 +153,14 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   function handleCopyGoodEmails() {
     const goodText = formatGoodEmailsForCopy(checkResult.items, true);
     if (!goodText) {
-      toast.error("Tidak ada email berstatus GOOD / Valid yang dapat disalin.");
+      toast.error("Tidak ada email berstatus Active / Good yang dapat disalin.");
       return;
     }
 
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(goodText);
       setCopied(true);
-      toast.success(`${checkResult.goodCount} Email Valid (GOOD) berhasil disalin ke clipboard!`);
+      toast.success(`${checkResult.goodCount} Email Valid (Active / Good) berhasil disalin ke clipboard!`);
       setTimeout(() => setCopied(false), 2500);
     }
   }
@@ -91,11 +168,27 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   async function handleSaveAdminRules(e: React.FormEvent) {
     e.preventDefault();
     setSavingAdminRules(true);
+
+    const parsedMin = parseInt(minBirthYearStr, 10);
+    const parsedMax = parseInt(maxBirthYearStr, 10);
+    const parsedDigits = parseInt(maxUsernameDigitsStr, 10);
+
+    const updatedRules: CheckerRulesConfig = {
+      ...adminRules,
+      minBirthYear: isNaN(parsedMin) ? DEFAULT_CHECKER_RULES.minBirthYear : parsedMin,
+      maxBirthYear: isNaN(parsedMax) ? DEFAULT_CHECKER_RULES.maxBirthYear : parsedMax,
+      maxUsernameDigits: isNaN(parsedDigits) ? DEFAULT_CHECKER_RULES.maxUsernameDigits : parsedDigits,
+    };
+
     try {
       await saveSettings("rules", {
         ...currentRules,
-        checkerRules: adminRules,
+        checkerRules: updatedRules,
       });
+      setAdminRules(updatedRules);
+      setMinBirthYearStr(String(updatedRules.minBirthYear));
+      setMaxBirthYearStr(String(updatedRules.maxBirthYear));
+      setMaxUsernameDigitsStr(String(updatedRules.maxUsernameDigits));
       toast.success("Aturan Screening Checker Email berhasil diperbarui!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan aturan checker.");
@@ -160,8 +253,9 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   <Label className="text-xs font-bold text-slate-300">Min. Tahun Lahir</Label>
                   <Input
                     type="number"
-                    value={adminRules.minBirthYear}
-                    onChange={(e) => setAdminRules({ ...adminRules, minBirthYear: Number(e.target.value) })}
+                    value={minBirthYearStr}
+                    onChange={(e) => handleMinBirthYearChange(e.target.value)}
+                    onBlur={handleMinBirthYearBlur}
                     className="bg-slate-900 border-slate-800 text-slate-100 text-xs font-mono h-9"
                   />
                   <p className="text-[10px] text-slate-400">Contoh: 1990</p>
@@ -171,8 +265,9 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   <Label className="text-xs font-bold text-slate-300">Maks. Tahun Lahir</Label>
                   <Input
                     type="number"
-                    value={adminRules.maxBirthYear}
-                    onChange={(e) => setAdminRules({ ...adminRules, maxBirthYear: Number(e.target.value) })}
+                    value={maxBirthYearStr}
+                    onChange={(e) => handleMaxBirthYearChange(e.target.value)}
+                    onBlur={handleMaxBirthYearBlur}
                     className="bg-slate-900 border-slate-800 text-slate-100 text-xs font-mono h-9"
                   />
                   <p className="text-[10px] text-slate-400">Contoh: 1998</p>
@@ -182,8 +277,9 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   <Label className="text-xs font-bold text-slate-300">Maks. Digit Angka Username</Label>
                   <Input
                     type="number"
-                    value={adminRules.maxUsernameDigits}
-                    onChange={(e) => setAdminRules({ ...adminRules, maxUsernameDigits: Number(e.target.value) })}
+                    value={maxUsernameDigitsStr}
+                    onChange={(e) => handleMaxUsernameDigitsChange(e.target.value)}
+                    onBlur={handleMaxUsernameDigitsBlur}
                     className="bg-slate-900 border-slate-800 text-slate-100 text-xs font-mono h-9"
                   />
                   <p className="text-[10px] text-slate-400">Maksimal digit (Contoh: 3)</p>
@@ -271,11 +367,11 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   <span className="font-black text-sm text-gray-900 dark:text-slate-100">{checkResult.total} Item</span>
                 </div>
                 <div>
-                  <span className="text-emerald-600 block text-[10px] uppercase font-bold">Passed (GOOD)</span>
+                  <span className="text-emerald-600 block text-[10px] uppercase font-bold">Active / Good</span>
                   <span className="font-black text-sm text-emerald-600">{checkResult.goodCount} Item</span>
                 </div>
                 <div>
-                  <span className="text-rose-600 block text-[10px] uppercase font-bold">Problem (BAD)</span>
+                  <span className="text-rose-600 block text-[10px] uppercase font-bold">Bad / Dead</span>
                   <span className="font-black text-sm text-rose-600">{checkResult.badCount} Item</span>
                 </div>
               </div>
@@ -290,7 +386,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? "Tersalin!" : `Copy Valid Emails (${checkResult.goodCount})`}
+                {copied ? "Tersalin!" : `Copy Active / Good Emails (${checkResult.goodCount})`}
               </Button>
             </div>
           )}
@@ -321,13 +417,13 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   type="button"
                   onClick={() => setFilterTab("GOOD")}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                    filterTab === "GOOD"
+                    filterTab === "GOOD" || filterTab === "ACTIVE"
                       ? "bg-emerald-600 text-white shadow-xs"
                       : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Good ({checkResult.goodCount})
+                  Active / Good ({checkResult.goodCount})
                 </button>
                 <button
                   type="button"
@@ -339,7 +435,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   }`}
                 >
                   <XCircle className="w-3.5 h-3.5" />
-                  Bad ({checkResult.badCount})
+                  Bad / Dead ({checkResult.badCount})
                 </button>
               </div>
 
@@ -407,11 +503,11 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                           <td className="px-3.5 py-2.5 text-center font-sans">
                             {item.status === "GOOD" ? (
                               <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold text-[10px] gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> GOOD
+                                <CheckCircle2 className="w-3 h-3" /> ACTIVE / GOOD
                               </Badge>
                             ) : (
                               <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 font-bold text-[10px] gap-1">
-                                <XCircle className="w-3 h-3" /> BAD
+                                <XCircle className="w-3 h-3" /> BAD / DEAD
                               </Badge>
                             )}
                           </td>
