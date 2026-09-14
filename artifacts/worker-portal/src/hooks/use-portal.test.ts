@@ -817,7 +817,7 @@ describe("3. PortalGate Production Component Real Component Tests", () => {
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText(/STORAN/i)).toBeDefined();
+    expect(screen.getByText("Layanan Cepat")).toBeDefined();
   });
 
   it("renders error UI on definitive error", () => {
@@ -1412,7 +1412,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText(/STORAN/i)).toBeDefined();
+    expect(screen.getByText("Layanan Cepat")).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1537,7 +1537,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText(/STORAN/i)).toBeDefined();
+    expect(screen.getByText("Layanan Cepat")).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1577,7 +1577,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText(/STORAN/i)).toBeDefined();
+    expect(screen.getByText("Layanan Cepat")).toBeDefined();
     expect(screen.getByText(/Existing Worker/)).toBeDefined();
   });
 
@@ -1642,7 +1642,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText(/STORAN/i)).toBeDefined();
+      expect(screen.getByText("Layanan Cepat")).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1650,7 +1650,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText(/STORAN/i)).toBeDefined();
+      expect(screen.getByText("Layanan Cepat")).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -1697,7 +1697,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText(/STORAN/i)).toBeDefined();
+      expect(screen.getByText("Layanan Cepat")).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1705,7 +1705,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText(/STORAN/i)).toBeDefined();
+      expect(screen.getByText("Layanan Cepat")).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();

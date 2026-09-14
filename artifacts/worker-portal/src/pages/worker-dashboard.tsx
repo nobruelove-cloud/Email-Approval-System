@@ -21,27 +21,20 @@ import {
   MessageCircle,
   User,
   Mail,
-  Phone,
   Megaphone,
   Building2,
   Smartphone,
   ArrowRight,
   Sparkles,
-  CreditCard,
-  Share2,
   Coins,
-  Wrench,
-  Sparkles as SparklesIcon,
-  RefreshCw,
   Trophy,
   Home,
   PlusCircle,
-  Menu,
   ChevronRight,
-  X,
   BookOpen,
   Tag,
   SearchCheck,
+  Share2,
 } from "lucide-react";
 import { EmailChecker } from "@/components/EmailChecker";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -52,14 +45,6 @@ import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -80,23 +65,26 @@ import {
   createSubmission,
   createWithdrawal,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
+import {
+  DEFAULT_RULES,
+  DEFAULT_OPERATING_HOURS,
+  DEFAULT_WITHDRAWAL_SETTINGS,
+  DEFAULT_MAINTENANCE,
+  DEFAULT_GENERAL_SETTINGS,
+  type EmailSubmission,
+  type PortalUser,
+  type PaymentMethodFeeConfig,
+} from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { SubmissionHistory } from "@/components/SubmissionHistory";
 import { TransactionHistory } from "@/components/TransactionHistory";
 import {
   formatDateTime,
   formatMoney,
-  getItemCountOfSubmission,
   getTierConfig,
   shortId,
   validatePasswordAgainstRules,
-  getReferralRewardForAccCount,
-  getReferralTierForAccCount,
-  getNextReferralTierForAccCount,
   getOperatingStatus,
-  isReferralTierClaimed,
-  isReferralTierClaimable,
   getPaymentMethodFeeConfig,
   calculateWithdrawalFee,
   formatFeeBadge,
@@ -145,7 +133,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
   const isMaintenanceActive = maintenance.enabled && profile.role !== "admin";
 
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number; totalMs: number }>({
+  const [, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number; totalMs: number }>({
     hours: 0,
     minutes: 0,
     seconds: 0,
@@ -199,40 +187,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const [copiedLink, setCopiedLink] = useState(false);
   const [invitationCodeInput, setInvitationCodeInput] = useState("");
   const [claimingCode, setClaimingCode] = useState(false);
-  const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
 
   // Pasif Income Simulation state
   const [simFriends, setSimFriends] = useState(10);
   const [simAccPerFriend, setSimAccPerFriend] = useState(10);
-
-  const pendingClaimsSet = useMemo(() => {
-    const set = new Set<string>();
-    if (Array.isArray(engagement.referralClaims?.data)) {
-      engagement.referralClaims.data.forEach((c) => {
-        if (c.status === "pending") {
-          set.add(`${c.referralId}_${c.minAcc}`);
-        }
-      });
-    }
-    return set;
-  }, [engagement.referralClaims?.data]);
-
-  async function handleClaimTier(referralId: string, minAcc: number) {
-    const key = `${referralId}_${minAcc}`;
-    if (busyClaimTierKey) return;
-    setBusyClaimTierKey(key);
-    try {
-      const res = await claimReferralReward(referralId, minAcc);
-      toast.success(res.message || `🎉 Reward referral berhasil diklaim +${formatMoney(res.rewardAmount || 0)}`);
-    } catch (err) {
-      console.error("REFERRAL_CLAIM_ERROR_DETAIL:", err);
-      const errMsg = err instanceof Error ? err.message : String(err || "Gagal mengklaim reward tier referral.");
-      const errCode = (err as { code?: string })?.code ? ` [${(err as { code?: string }).code}]` : "";
-      toast.error(`${errMsg}${errCode}`);
-    } finally {
-      setBusyClaimTierKey(null);
-    }
-  }
 
   const isAlreadyLinked = !!profile.referredBy || !!myReferral.data;
   const referrerDisplayName = myReferral.data?.referrerName || (profile.referredBy ? shortId(profile.referredBy) : "");
@@ -325,7 +283,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       });
     });
 
-    // 2. Reward Ledger Entries (Referral, Mission, Leaderboard)
+    // 2. Reward Ledger Entries
     engagement.rewardLedger.data.forEach((r) => {
       const typeLabel =
         r.rewardType === "referral"
@@ -344,7 +302,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       });
     });
 
-    // Sort descending by timestamp
     return list.sort((a, b) => {
       const at =
         a.date && typeof a.date === "object" && "toMillis" in (a.date as any)
@@ -377,12 +334,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     return isManualClosed || !operatingStatus.isOpen;
   }, [generalSettingsHook.data?.submissionOpen, operatingStatus.isOpen]);
 
-  // Profile fields display with robust fallbacks
+  // Profile fields display
   const displayName = profile?.name && profile.name.trim() ? profile.name.trim() : "Worker";
   const displayEmail = profile?.email && profile.email.trim() ? profile.email.trim() : "-";
-  const displayPhone = profile?.phone && profile.phone.trim() ? profile.phone.trim() : "Belum ditambahkan";
 
-  // --- Submit emails ---
+  // Active Tab state
+  const [mainTab, setMainTab] = useState<"submit" | "checker" | "leaderboard" | "referral" | "withdraw" | "history" | "cs" | "announcements">("submit");
+
+  // Submit emails
   const [emailsText, setEmailsText] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -390,8 +349,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Detail Dialog state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
 
-  // Mobile menu drawer state
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Mobile menu / Akun drawer state
+  const [isAccountDrawerOpen, setIsAccountDrawerOpen] = useState(false);
 
   const emailList = useMemo(
     () =>
@@ -452,10 +411,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
-  // --- Withdraw ---
+  // Withdraw
   const [amount, setAmount] = useState<number>(0);
 
-  // Active payment method fee configurations
   const activeWithdrawalSettings = useMemo(() => {
     return {
       minWithdraw: withdrawalSettingsHook.data?.minWithdraw ?? rules.data.minWithdraw ?? 50000,
@@ -477,14 +435,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   const [method, setMethod] = useState<string>(() => enabledMethods[0]?.method ?? "DANA");
 
-  // Keep selected method valid if enabled methods list updates
   const activeMethodConfig = useMemo(() => {
     return getPaymentMethodFeeConfig(method, activeWithdrawalSettings, rules.data);
   }, [method, activeWithdrawalSettings, rules.data]);
 
   const [account, setAccount] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
-  const [mainTab, setMainTab] = useState("submit");
   const [categoryTab, setCategoryTab] = useState<"ewallet" | "bank">("ewallet");
   const [withdrawing, setWithdrawing] = useState(false);
 
@@ -511,7 +467,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
-  // Dynamic fee calculation
   const calculatedFee = useMemo(() => {
     return calculateWithdrawalFee(amount, activeMethodConfig);
   }, [amount, activeMethodConfig]);
@@ -574,1269 +529,1060 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
+  // Menu items for "LAYANAN CEPAT" Grid Menu
+  const quickServices = [
+    {
+      id: "submit" as const,
+      title: "Job Gmail",
+      subtitle: "Form Batch Email",
+      icon: <Mail className="w-5 h-5 text-amber-700" />,
+      badge: "Utama",
+    },
+    {
+      id: "checker" as const,
+      title: "Status ACC",
+      subtitle: "Checker Status",
+      icon: <SearchCheck className="w-5 h-5 text-amber-700" />,
+      badge: "Real-time",
+    },
+    {
+      id: "leaderboard" as const,
+      title: "Klasemen",
+      subtitle: "Event Reward",
+      icon: <Trophy className="w-5 h-5 text-amber-700" />,
+      badge: "Rp15k-50k",
+    },
+    {
+      id: "referral" as const,
+      title: "Referral",
+      subtitle: "Komisi Pasif",
+      icon: <Users className="w-5 h-5 text-amber-700" />,
+      badge: "Rp 100",
+    },
+    {
+      id: "withdraw" as const,
+      title: "Tarik Saldo",
+      subtitle: "Form Withdraw",
+      icon: <Wallet className="w-5 h-5 text-amber-700" />,
+      badge: "Instant",
+    },
+    {
+      id: "history" as const,
+      title: "Riwayat Job",
+      subtitle: "Riwayat Setoran",
+      icon: <History className="w-5 h-5 text-amber-700" />,
+    },
+    {
+      id: "cs" as const,
+      title: "Bantuan CS",
+      subtitle: "Telegram & WA",
+      icon: <MessageCircle className="w-5 h-5 text-amber-700" />,
+      badge: "CS 24/7",
+    },
+    {
+      id: "announcements" as const,
+      title: "Info Resmi",
+      subtitle: "Pengumuman",
+      icon: <Megaphone className="w-5 h-5 text-amber-700" />,
+      badge: announcements.data.length > 0 ? `${announcements.data.length}` : undefined,
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50/80">
-      <header className="bg-white/95 backdrop-blur-md border-b border-amber-100 sticky top-0 z-20 shadow-xs">
-        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-extrabold flex items-center justify-center text-base shadow-sm ring-2 ring-amber-400/30">
-              {profile.name?.charAt(0).toUpperCase() || "W"}
+    <div className="min-h-screen bg-slate-100/80 flex flex-col items-center">
+      {/* MOBILE SMARTPHONE CONTAINER WRAPPER (MAX-W-MD) */}
+      <div className="w-full max-w-md min-h-screen bg-slate-50 border-x border-slate-200/80 shadow-2xl relative flex flex-col pb-28">
+
+        {/* 1. TOP BAR (OPERASIONAL) - UKURAN RINGKAS */}
+        <div className="bg-slate-900 text-slate-100 text-[11px] px-3.5 py-1.5 flex items-center justify-between border-b border-slate-800 font-medium sticky top-0 z-30 shadow-xs">
+          <div className="flex items-center gap-1.5 truncate">
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-slate-300 font-sans truncate">
+              Senin - Jumat: 08:00 - 15:00 WIB
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                operatingStatus.isOpen
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  operatingStatus.isOpen ? "bg-emerald-400" : "bg-rose-400"
+                }`}
+              />
+              {operatingStatus.isOpen ? "OPEN" : "CLOSED"}
+            </span>
+          </div>
+        </div>
+
+        {/* TOP USER BAR (PROFILE & LOGOUT SHORTCUT) */}
+        <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 flex items-center justify-between border-b border-amber-100/60 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-extrabold flex items-center justify-center text-xs shadow-xs ring-2 ring-amber-400/30 shrink-0">
+              {displayName.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-bold text-gray-900 text-sm leading-tight">{profile.name}</p>
-                <Badge variant="outline" className="text-[11px] bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-300 font-bold gap-1 shadow-2xs">
-                  <Tag className="w-3 h-3 text-amber-600 shrink-0" />
-                  Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
-                </Badge>
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+            <div className="min-w-0">
+              <p className="font-bold text-gray-900 text-xs truncate leading-tight">{displayName}</p>
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
                 <span className="font-mono">
                   {isEmailVisible ? displayEmail : "*".repeat(displayEmail.length || 10)}
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsEmailVisible(!isEmailVisible)}
-                  className="text-gray-400 hover:text-amber-600 transition-colors p-0.5 rounded focus:outline-none"
+                  className="text-gray-400 hover:text-amber-600 p-0.5 focus:outline-none"
                   title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                 >
-                  {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 </button>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right bg-gradient-to-r from-amber-500/10 to-orange-500/10 px-3 py-1.5 rounded-xl border border-amber-200/80">
-              <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider">Saldo Utama</p>
-              <p className="font-black text-amber-700 text-sm">{formatMoney(profile.balance)}</p>
-            </div>
-            <Button variant="outline" size="icon" onClick={onLogout} title="Keluar" className="border-gray-200 hover:border-amber-300 hover:bg-amber-50 text-gray-700">
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsAccountDrawerOpen(true)}
+            className="text-amber-900 bg-amber-50 hover:bg-amber-100 hover:text-amber-950 font-bold text-xs h-8 px-2.5 rounded-xl border border-amber-200/60 gap-1"
+          >
+            <User className="w-3.5 h-3.5 text-amber-600" />
+            <span>Akun</span>
+          </Button>
         </div>
-      </header>
 
-      <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 md:pb-6 space-y-6">
-        {/* JAM OPERASIONAL CARD */}
-        <Card className="bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-100/30 border-amber-200/80 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-300/20 to-transparent rounded-bl-full pointer-events-none" />
-          <CardHeader className="pb-3 relative z-10">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-amber-500 text-white shadow-2xs">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <span>Jam Operasional Layanan</span>
-              </CardTitle>
-              {operatingStatus.isDisabled ? (
-                <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300 font-medium text-xs px-2.5 py-1">
-                  {operatingStatus.statusText}
-                </Badge>
-              ) : (
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-2xs border ${
-                  operatingStatus.isOpen
-                    ? "bg-emerald-500 text-white border-emerald-400 ring-2 ring-emerald-400/20"
-                    : "bg-rose-500 text-white border-rose-400 ring-2 ring-rose-400/20"
-                }`}>
-                  <span className={`w-2 h-2 rounded-full animate-pulse ${operatingStatus.isOpen ? "bg-emerald-200" : "bg-rose-200"}`} />
-                  {operatingStatus.statusText}
-                </div>
-              )}
+        {/* DASHBOARD CONTENT BODY */}
+        <div className="p-4 space-y-4 flex-1">
+
+          {/* 2. HEADER & SALDO CARD */}
+          <div className="space-y-3">
+            {/* Greeting */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Selamat Datang!</p>
+                <h1 className="text-lg font-black text-gray-900 tracking-tight">
+                  Hai, {displayName.split(" ")[0]} 👋
+                </h1>
+              </div>
+              <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px] px-2 py-0.5">
+                Worker Portal
+              </Badge>
             </div>
-            <CardDescription className="text-xs text-gray-600">
-              Jadwal jam operasional layanan peninjauan dan pengerjaan (WIB - Asia/Jakarta).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              {[
-                { key: "monday" as const, label: "Senin" },
-                { key: "tuesday" as const, label: "Selasa" },
-                { key: "wednesday" as const, label: "Rabu" },
-                { key: "thursday" as const, label: "Kamis" },
-                { key: "friday" as const, label: "Jumat" },
-                { key: "saturday" as const, label: "Sabtu" },
-                { key: "sunday" as const, label: "Minggu" },
-              ].map((d) => {
-                const dayCfg = operatingHoursConfig?.days?.[d.key];
-                const isDayActive = dayCfg?.enabled;
-                const scheduleText = isDayActive ? `${dayCfg.open} - ${dayCfg.close}` : "Tutup";
 
+            {/* Card Saldo Utama */}
+            <Card className="bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl shadow-lg border-amber-400/40 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-6 -left-6 w-28 h-28 bg-amber-300/20 rounded-full blur-xl pointer-events-none" />
+
+              <CardContent className="p-4 sm:p-5 space-y-3.5 relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-100 text-[11px] font-extrabold uppercase tracking-wider">
+                    <Wallet className="w-3.5 h-3.5 text-amber-200" />
+                    <span>Saldo Utama</span>
+                  </div>
+                  <Sparkles className="w-4 h-4 text-amber-200 animate-pulse" />
+                </div>
+
+                {/* Saldo Besar */}
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
+                    {formatMoney(profile.balance)}
+                  </p>
+                </div>
+
+                {/* Badges Info Rate & Referral */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white border border-white/25">
+                    <Tag className="w-3 h-3 text-amber-200 shrink-0" />
+                    Rate Saat Ini: {formatMoney(currentTierConfig.pricePerItem)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white border border-white/25">
+                    <Coins className="w-3 h-3 text-amber-200 shrink-0" />
+                    Bonus Referral: {formatMoney(rules.data.referralCommissionPerAcc || 100)}/ACC
+                  </span>
+                </div>
+
+                {/* 2 Tombol Aksi Cepat: [Tarik Saldo] & [Setor Email] */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <Button
+                    type="button"
+                    onClick={() => setMainTab("withdraw")}
+                    className="bg-white text-amber-900 hover:bg-amber-50 font-black text-xs h-9 rounded-xl shadow-xs border border-white/80 gap-1.5 transition-transform active:scale-95"
+                  >
+                    <Wallet className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Tarik Saldo</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setMainTab("submit")}
+                    className="bg-amber-950/40 hover:bg-amber-950/60 text-white font-black text-xs h-9 rounded-xl border border-white/30 backdrop-blur-md shadow-xs gap-1.5 transition-transform active:scale-95"
+                  >
+                    <Send className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Setor Email</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 3. SECTION "LAYANAN CEPAT" (GRID MENU IKON) */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                Layanan Cepat
+              </h2>
+              <span className="text-[10px] text-gray-400 font-medium">Menu Akses Fitur</span>
+            </div>
+
+            {/* 4 KOLOM GRID MENU IKON */}
+            <div className="grid grid-cols-4 gap-2.5">
+              {quickServices.map((srv) => {
+                const isActive = mainTab === srv.id;
                 return (
-                  <div
-                    key={d.key}
-                    className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${
-                      isDayActive
-                        ? "bg-white/90 border border-amber-200/80 shadow-2xs text-gray-900"
-                        : "bg-gray-100/60 border border-gray-200 text-gray-500"
+                  <button
+                    key={srv.id}
+                    type="button"
+                    onClick={() => setMainTab(srv.id)}
+                    className={`relative p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1.5 select-none active:scale-95 ${
+                      isActive
+                        ? "bg-gradient-to-b from-amber-500 to-orange-500 text-white border-amber-400 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/40"
+                        : "bg-gradient-to-b from-amber-50/90 to-orange-50/50 hover:from-amber-100 hover:to-orange-100 text-gray-800 border-amber-200/80 shadow-2xs"
                     }`}
                   >
-                    <span className={`font-bold ${isDayActive ? "text-amber-950" : "text-gray-500"}`}>{d.label}</span>
-                    <span className={`font-mono ${isDayActive ? "font-extrabold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200/60" : "font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md"}`}>
-                      {scheduleText}
-                    </span>
-                  </div>
+                    {/* Badge Kecil jika ada */}
+                    {srv.badge && (
+                      <span
+                        className={`absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full text-[9px] font-black shadow-2xs ${
+                          isActive
+                            ? "bg-white text-amber-900"
+                            : "bg-amber-500 text-white"
+                        }`}
+                      >
+                        {srv.badge}
+                      </span>
+                    )}
+
+                    {/* Lingkaran Ikon */}
+                    <div
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${
+                        isActive
+                          ? "bg-white/20 text-white border border-white/30"
+                          : "bg-white text-amber-600 shadow-2xs border border-amber-200/60"
+                      }`}
+                    >
+                      {srv.icon}
+                    </div>
+
+                    <div className="w-full text-center">
+                      <p className={`text-[11px] font-extrabold leading-tight ${isActive ? "text-white" : "text-gray-900"}`}>
+                        {srv.title}
+                      </p>
+                      <p className={`text-[9px] truncate font-medium mt-0.5 ${isActive ? "text-amber-100" : "text-gray-500"}`}>
+                        {srv.subtitle}
+                      </p>
+                    </div>
+                  </button>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-
-        {isSupportEnabled && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
-                Pusat Bantuan & Komunitas
-              </h3>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* Kartu 1: CS Telegram */}
-              <div className="p-3 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-2">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
-                      <TelegramIcon className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="font-extrabold text-xs text-[#FFB74D] truncate">CS Telegram</span>
-                  </div>
-                  <p className="text-[11px] text-[#FFE0B2]/80 leading-tight">
-                    Kendala akun & payout
-                  </p>
-                </div>
-                {supportConfig.telegramUrl ? (
-                  <Button
-                    asChild
-                    size="sm"
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-[11px] h-7 px-2 rounded-lg border border-amber-400/30 transition-transform active:scale-95 shadow-2xs"
-                  >
-                    <a
-                      href={supportConfig.telegramUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1"
-                    >
-                      <TelegramIcon className="w-3 h-3 shrink-0" />
-                      <span>Hubungi CS</span>
-                    </a>
-                  </Button>
-                ) : (
-                  <Button
-                    disabled
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-[11px] h-7 px-2 bg-slate-900/80 text-slate-500 border-slate-800 cursor-not-allowed"
-                  >
-                    Belum Diatur
-                  </Button>
-                )}
-              </div>
-
-              {/* Kartu 2: Komunitas WA */}
-              <div className="p-3 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-2">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
-                      <MessageCircle className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="font-extrabold text-xs text-[#FFB74D] truncate">Komunitas WA</span>
-                  </div>
-                  <p className="text-[11px] text-[#FFE0B2]/80 leading-tight">
-                    Info & saluran resmi
-                  </p>
-                </div>
-                {supportConfig.communityWaLink ? (
-                  <Button
-                    asChild
-                    size="sm"
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-[11px] h-7 px-2 rounded-lg border border-amber-400/30 transition-transform active:scale-95 shadow-2xs"
-                  >
-                    <a
-                      href={supportConfig.communityWaLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1"
-                    >
-                      <MessageCircle className="w-3 h-3 shrink-0" />
-                      <span>Gabung WA</span>
-                    </a>
-                  </Button>
-                ) : (
-                  <Button
-                    disabled
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-[11px] h-7 px-2 bg-slate-900/80 text-slate-500 border-slate-800 cursor-not-allowed"
-                  >
-                    Belum Diatur
-                  </Button>
-                )}
-              </div>
-            </div>
           </div>
-        )}
 
-        <Tabs value={mainTab} onValueChange={setMainTab}>
-          <TabsList className="hidden md:grid grid-cols-7 w-full h-auto p-1.5 mb-6 bg-amber-100/60 border border-amber-200/80 rounded-2xl gap-1">
-            <TabsTrigger
-              value="submit"
-              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <Send className="w-3.5 h-3.5" /> STORAN
-            </TabsTrigger>
-            <TabsTrigger
-              value="checker"
-              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <SearchCheck className="w-3.5 h-3.5" /> CHECKER
-            </TabsTrigger>
-            <TabsTrigger
-              value="leaderboard"
-              className="gap-1 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <Trophy className="w-3.5 h-3.5" /> KLASEMEN
-            </TabsTrigger>
-            <TabsTrigger
-              value="announcements"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <Megaphone className="w-3.5 h-3.5" /> PENGUMUMAN
-              {announcements.data.length > 0 && (
-                <span className="ml-0.5 text-[10px] bg-rose-500 text-white rounded-full px-1.5 font-bold shadow-2xs">
-                  {announcements.data.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="withdraw"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <Wallet className="w-3.5 h-3.5" /> PENARIKAN
-            </TabsTrigger>
-            <TabsTrigger
-              value="referral"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <Users className="w-3.5 h-3.5" /> REFERRAL
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="gap-1.5 text-xs py-2.5 rounded-xl font-bold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-amber-300/50 text-amber-950 hover:text-amber-900 hover:bg-amber-200/50"
-            >
-              <History className="w-3.5 h-3.5" /> RIWAYAT
-            </TabsTrigger>
-          </TabsList>
+          {/* 4. AREA KONTEN DINAMIS */}
+          <div className="space-y-4 pt-2">
 
-          {/* CHECKER EMAIL / RISET STATUS */}
-          <TabsContent value="checker" className="space-y-4">
-            <EmailChecker isAdminView={false} />
-          </TabsContent>
+            {/* A. JOB GMAIL (BATCH SETORAN EMAIL) */}
+            {mainTab === "submit" && (
+              <div className="space-y-4">
+                {/* RATE CARD BANNER */}
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-3.5 pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                        <Tag className="w-4 h-4 text-amber-600" />
+                        Informasi Rate Harga Setor
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-900 border-amber-300 font-bold">
+                        RATE AKTIF
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3.5 pt-0">
+                    <div className="p-3.5 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-500/10 via-amber-50/80 to-orange-500/10 text-center shadow-2xs">
+                      <div className="flex items-center justify-center gap-1.5 mb-1 text-amber-900 font-medium text-xs">
+                        <Tag className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Rate Akun Valid</span>
+                      </div>
+                      <p className="text-2xl font-black text-amber-700 tracking-tight my-0.5">
+                        {formatMoney(currentTierConfig.pricePerItem)}{" "}
+                        <span className="text-xs font-semibold text-amber-900/80">/ akun valid</span>
+                      </p>
+                      <p className="text-[11px] text-amber-900/80 mt-1 font-medium">
+                        Komisi langsung masuk ke saldo utama setelah verifikasi ACC.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* KLASEMEN / LEADERBOARD */}
-          <TabsContent value="leaderboard" className="space-y-4">
-            <Leaderboard
-              currentUserId={profile.uid}
-              rewards={rules.data.leaderboardRewards}
-            />
-          </TabsContent>
+                {/* ATURAN SETOR EMAIL */}
+                <Card className="bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-100/40 border-amber-200/90 shadow-2xs">
+                  <CardContent className="p-3.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        Aturan Setor Email
+                      </div>
+                      <Badge className="bg-amber-500 text-white font-bold text-[10px] border-0">
+                        {formatMoney(currentTierConfig.pricePerItem)} / akun
+                      </Badge>
+                    </div>
+                    <ul className="space-y-1 text-[11px] text-amber-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
+                      {rules.data.submissionNotes.map((note, idx) => (
+                        <li key={idx} className="whitespace-pre-wrap">{note}</li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
 
-          {/* PENGUMUMAN & INFORMASI RESMI */}
-          <TabsContent value="announcements" className="space-y-4">
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                  <Megaphone className="w-4 h-4 text-amber-600" />
-                  Pusat Pengumuman & Informasi Resmi
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Informasi terbaru langsung dari admin.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {announcements.loading && (
-                  <p className="text-sm text-gray-400 text-center py-8">Memuat pengumuman...</p>
+                {/* OPERATIONAL CLOSED / LOCK WARNING BANNER */}
+                {isSubmissionClosed && (
+                  <Card className="bg-rose-50 border-rose-200 shadow-2xs">
+                    <CardContent className="p-3.5 flex items-start gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-rose-500 text-white shrink-0 mt-0.5">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-rose-900 text-xs">Pemberitahuan Setoran Ditutup</h4>
+                        <p className="text-[11px] text-rose-800 font-medium leading-relaxed mt-0.5">
+                          Setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba kembali pada jam operasional.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
-                {announcements.error && (
-                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg text-center">
-                    Gagal memuat pengumuman: {announcements.error}
-                  </div>
-                )}
-                {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
-                  <div className="p-8 border border-dashed border-gray-200 rounded-lg text-center text-xs text-gray-400">
-                    Belum ada pengumuman resmi saat ini.
-                  </div>
-                )}
-                {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
-                  <div className="space-y-3">
-                    {announcements.data.map((item) => {
-                      const badgeUpper = item.badge?.toUpperCase().trim() || "";
-                      let badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                      if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
-                        badgeStyle = "bg-red-100 text-red-800 hover:bg-red-100";
-                      } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
-                        badgeStyle = "bg-amber-100 text-amber-800 hover:bg-amber-100";
-                      } else if (badgeUpper === "INFO") {
-                        badgeStyle = "bg-sky-100 text-sky-800 hover:bg-sky-100";
-                      }
 
-                      return (
-                        <Card key={item.id} className="bg-white border-gray-200/80 shadow-2xs hover:border-gray-300 transition-colors">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-start justify-between gap-3 flex-wrap">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <CardTitle className="text-base font-bold text-gray-900">{item.title}</CardTitle>
-                                  {item.badge && (
-                                    <Badge className={`text-xs font-bold ${badgeStyle}`}>
-                                      {item.badge}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-gray-400">
-                                  {item.updatedAt ? "Diperbarui pada: " : "Diterbitkan pada: "}
-                                  {formatDateTime(item.updatedAt || item.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                              {item.content}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                {/* FORM BATCH SETORAN */}
+                <Card className="bg-white border-amber-200/80 shadow-xs">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-extrabold text-gray-900 flex items-center gap-1.5">
+                      <Mail className="w-4 h-4 text-amber-600" />
+                      Form Batch Setoran Email
+                    </CardTitle>
+                    <CardDescription className="text-[11px] text-gray-600">
+                      Masukkan satu atau banyak email sekaligus. Seluruh item dikirim sebagai 1 batch.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2">
+                    <form onSubmit={handleSubmitEmails} className="space-y-3.5">
+                      <fieldset disabled={isSubmissionClosed} className="space-y-3.5 disabled:opacity-60 disabled:pointer-events-none">
+                        <div>
+                          <Label htmlFor="emails" className="text-xs font-bold text-gray-800">
+                            Daftar Alamat Email ({emailList.length} item)
+                          </Label>
+                          <Textarea
+                            id="emails"
+                            rows={5}
+                            value={emailsText}
+                            onChange={(e) => setEmailsText(e.target.value)}
+                            placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
+                            className="mt-1 font-mono text-xs border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
+                            required
+                          />
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            Pisahkan setiap email dengan baris baru. Multi-item otomatis digabung.
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="password" className="text-xs font-bold text-gray-800">Kata Sandi Akun</Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Kata sandi untuk seluruh email di atas"
+                            className="mt-1 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl text-xs"
+                            required
+                          />
+                        </div>
 
-          {/* SETOR EMAIL (BATCH) */}
-          <TabsContent value="submit" className="space-y-4">
-            {/* CURRENT RATE DISPLAY CARD */}
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-amber-600" />
-                    Informasi Rate Harga Setor
-                  </CardTitle>
-                  <Badge variant="outline" className="text-xs bg-amber-50 text-amber-900 border-amber-300 font-bold">
-                    RATE AKTIF
-                  </Badge>
-                </div>
-                <CardDescription className="text-xs text-gray-600">
-                  Harga komisi per akun valid yang berlaku saat ini ditentukan oleh Admin secara transparan.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-5 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-500/10 via-amber-50/80 to-orange-500/10 text-center shadow-xs">
-                  <div className="flex items-center justify-center gap-2 mb-1.5 text-amber-900 font-medium text-xs">
-                    <Tag className="w-4 h-4 text-amber-600" />
-                    <span>Rate Akun Valid</span>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight my-1">
-                    {formatMoney(currentTierConfig.pricePerItem)} <span className="text-sm sm:text-base font-semibold text-amber-900/80">/ akun valid</span>
-                  </p>
-                  <p className="text-xs text-amber-900/80 mt-2 font-medium">
-                    Komisi langsung masuk ke saldo utama setiap email selesai diverifikasi ACC.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                        <div className="p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-gray-600 font-medium text-[11px]">Estimasi Total Setoran: </span>
+                            <strong className="text-gray-900 font-bold text-[11px]">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
+                          </div>
+                          <span className="font-black text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
+                        </div>
+                      </fieldset>
 
-            <Card className="bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-100/40 border-amber-200/90 shadow-2xs">
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-amber-950 font-bold text-sm">
-                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                    Aturan Setor Email
-                  </div>
-                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs border-0 shadow-2xs">
-                    Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
-                  </Badge>
-                </div>
-                <ul className="space-y-1.5 text-xs text-amber-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
-                  {rules.data.submissionNotes.map((note, idx) => (
-                    <li key={idx} className="whitespace-pre-wrap">{note}</li>
-                  ))}
-                  <li>Harga komisi aktif saat ini: <strong className="text-amber-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* OPERATIONAL CLOSED / SUBMISSION LOCK WARNING BANNER */}
-            {isSubmissionClosed && (
-              <Card className="bg-rose-50 border-rose-200 shadow-xs">
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
-                    <AlertCircle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-rose-900 text-sm">Pemberitahuan Setoran Ditutup</h4>
-                    <p className="text-xs text-rose-800 font-medium leading-relaxed mt-1">
-                      Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                      <Button
+                        type="submit"
+                        disabled={submitting || isSubmissionClosed}
+                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 text-xs gap-1.5 rounded-xl shadow-xs border border-amber-400/20 active:scale-95 transition-transform disabled:opacity-50"
+                      >
+                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {isSubmissionClosed ? "Setoran Ditutup" : `Kirim Batch (${emailList.length} Item)`}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
             )}
 
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold text-gray-900">Detail Batch Setoran</CardTitle>
-                <CardDescription className="text-xs text-gray-600">Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitEmails} className="space-y-4">
-                  <fieldset disabled={isSubmissionClosed} className="space-y-4 disabled:opacity-60 disabled:pointer-events-none">
-                  <div>
-                    <Label htmlFor="emails" className="text-xs font-bold text-gray-800">
-                      Daftar Alamat Email ({emailList.length} item)
-                    </Label>
-                    <Textarea
-                      id="emails"
-                      rows={6}
-                      value={emailsText}
-                      onChange={(e) => setEmailsText(e.target.value)}
-                      placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
-                      className="mt-1.5 font-mono text-sm border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
-                      required
-                    />
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch.
+            {/* B. STATUS ACC (CHECKER EMAIL REAL-TIME) */}
+            {mainTab === "checker" && (
+              <div className="space-y-3">
+                <EmailChecker isAdminView={false} />
+              </div>
+            )}
+
+            {/* C. KLASEMEN (LEADERBOARD & EVENT REWARDS) */}
+            {mainTab === "leaderboard" && (
+              <div className="space-y-3">
+                <Leaderboard
+                  currentUserId={profile.uid}
+                  rewards={rules.data.leaderboardRewards}
+                />
+              </div>
+            )}
+
+            {/* D. REFERRAL & PASIF INCOME */}
+            {mainTab === "referral" && (
+              <div className="space-y-4">
+                {/* BANNER REFERRAL */}
+                <Card className="bg-gradient-to-r from-[#2D1B00] via-[#4A2800] to-[#5C3A00] text-white border-amber-900/80 shadow-md overflow-hidden relative">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+                  <CardContent className="p-4 sm:p-5 space-y-2 relative z-10">
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      Pasif Income
+                    </div>
+                    <h2 className="text-xl font-black text-white leading-tight">
+                      Pasif Income Tanpa Batas
+                    </h2>
+                    <p className="text-xs text-amber-100/90 leading-relaxed">
+                      Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC), komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda!
                     </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="password" className="text-xs font-bold text-gray-800">Kata Sandi Akun</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Kata sandi untuk seluruh email di atas"
-                      className="mt-1.5 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
-                      required
-                    />
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="p-3.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-gray-600 font-medium">Estimasi Total Setoran: </span>
-                      <strong className="text-gray-900 font-bold">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
+                {/* SIMULATOR PASIF INCOME */}
+                <Card className="bg-gradient-to-br from-[#211300] via-[#321D00] to-[#211300] text-[#FFE0B2] border-amber-900/60 shadow-md">
+                  <CardHeader className="p-3.5 pb-2 border-b border-amber-900/50">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="text-xs font-black text-[#FFB74D] flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5" />
+                        Kalkulator Simulasi Pasif Income
+                      </CardTitle>
+                      <Badge variant="outline" className="bg-amber-500/10 text-[#FFB74D] border-amber-500/30 font-bold text-[10px] px-2 py-0.5">
+                        Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
+                      </Badge>
                     </div>
-                    <span className="font-black text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
-                  </div>
-
-                  </fieldset>
-
-                  <Button type="submit" disabled={submitting || isSubmissionClosed} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-11 gap-2 rounded-xl shadow-sm border border-amber-400/20 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
-                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {isSubmissionClosed ? "Setoran Sedang Ditutup" : `Kirim Batch (${emailList.length} Item)`}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* REFERRAL SYSTEM */}
-          <TabsContent value="referral" className="space-y-6">
-            {/* 1. BANNER REFERRAL: DARK BRONZE GRADIENT (#2D1B00 ke #5C3A00) */}
-            <Card className="bg-gradient-to-r from-[#2D1B00] via-[#4A2800] to-[#5C3A00] text-white border-amber-900/80 shadow-lg overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-              <CardContent className="p-6 sm:p-8 space-y-3 relative z-10">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  Program Pasif Income Kerja
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
-                  Pasif Income Tanpa Batas
-                </h2>
-                <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed max-w-2xl">
-                  Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC) oleh admin, komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda tanpa perlu penarikan terpisah!
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* WIDGET SIMULASI PASIF INCOME (COMPACT VERSION) */}
-            <Card className="bg-gradient-to-br from-[#211300] via-[#321D00] to-[#211300] text-[#FFE0B2] border-amber-900/60 shadow-lg overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-36 h-36 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
-              <CardHeader className="p-3 sm:p-4 pb-2 border-b border-amber-900/50 relative z-10">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <CardTitle className="text-xs sm:text-sm font-black text-[#FFB74D] flex items-center gap-1.5">
-                    <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
-                      <Coins className="w-3.5 h-3.5" />
-                    </div>
-                    Kalkulator Simulasi Pasif Income
-                  </CardTitle>
-                  <Badge variant="outline" className="bg-amber-500/10 text-[#FFB74D] border-amber-500/30 font-bold text-[10px] px-2 py-0.5">
-                    Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
-                  </Badge>
-                </div>
-                <CardDescription className="text-[11px] text-[#FFE0B2]/80 mt-0.5">
-                  Geser slider untuk mensimulasikan estimasi komisi harian dan bulanan dari downline Anda.
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="p-3 sm:p-4 space-y-3 relative z-10">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* SLIDER 1: JUMLAH TEMAN / DOWNLINE (1 - 50) */}
-                  <div className="space-y-1.5 p-2.5 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-[11px] font-bold text-[#FFE0B2] uppercase tracking-wider">
-                        Jumlah Downline
-                      </Label>
-                      <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-2 py-0.5 rounded border border-amber-800/60">
-                        {simFriends} Orang
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={1}
-                      max={50}
-                      value={simFriends}
-                      onChange={(e) => setSimFriends(Number(e.target.value))}
-                      className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
-                    />
-                    <div className="flex justify-between text-[9px] text-amber-300/60 font-mono">
-                      <span>1 Orang</span>
-                      <span>25</span>
-                      <span>50 Orang</span>
-                    </div>
-                  </div>
-
-                  {/* SLIDER 2: RATA-RATA EMAIL ACC PER TEMAN / HARI (1 - 50) */}
-                  <div className="space-y-1.5 p-2.5 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-[11px] font-bold text-[#FFE0B2] uppercase tracking-wider">
-                        Email ACC / Downline / Hari
-                      </Label>
-                      <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-2 py-0.5 rounded border border-amber-800/60">
-                        {simAccPerFriend} Email
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={1}
-                      max={50}
-                      value={simAccPerFriend}
-                      onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
-                      className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
-                    />
-                    <div className="flex justify-between text-[9px] text-amber-300/60 font-mono">
-                      <span>1 Email</span>
-                      <span>25</span>
-                      <span>50 Email</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* REAL-TIME CALCULATION SUMMARY */}
-                <div className="p-2.5 sm:p-3 rounded-xl bg-[#1A0E00] border border-amber-800/50 space-y-2">
-                  <div className="text-[11px] text-amber-200/80 flex items-center justify-between border-b border-amber-900/60 pb-1.5">
-                    <span>Total Volume Email ACC Tim / Hari:</span>
-                    <strong className="text-[#FFB74D] font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-0.5">
-                    {/* HARIAN */}
-                    <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60 space-y-0.5">
-                      <p className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider">
-                        Estimasi / Hari
-                      </p>
-                      <p className="text-base sm:text-lg font-black text-[#FFB74D] tracking-tight">
-                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
-                      </p>
-                    </div>
-
-                    {/* BULANAN */}
-                    <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60 space-y-0.5">
-                      <p className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider">
-                        Estimasi / Bulan (30 Hari)
-                      </p>
-                      <p className="text-base sm:text-lg font-black text-[#FFB74D] tracking-tight">
-                        {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 2. 3 STATS CARDS: Warm Krem (#FFF8F0), Border Emas (#FFE0B2), Highlight Text Oranye/Amber (#E65100) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* CARD 1: TOTAL BONUS DIDAPAT */}
-              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
-                      TOTAL BONUS DIDAPAT
-                    </p>
-                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
-                      <Wallet className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
-                    {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
-                  </p>
-                  <p className="text-[11px] text-amber-900/80 font-medium">
-                    * Otomatis masuk ke Saldo Utama
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* CARD 2: TOTAL DOWNLINE */}
-              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
-                      TOTAL DOWNLINE
-                    </p>
-                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
-                      <Users className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
-                    {downlines.data.length || refStats.total} <span className="text-xs font-medium text-amber-900/70">Worker</span>
-                  </p>
-                  <p className="text-[11px] text-amber-900/80 font-medium">
-                    Terdaftar dengan tautan Anda
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* CARD 3: TOTAL EMAIL ACC TIM */}
-              <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs hover:border-amber-300 transition-colors">
-                <CardContent className="p-4 sm:p-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-amber-900/70 uppercase tracking-wider">
-                      TOTAL EMAIL ACC TIM
-                    </p>
-                    <div className="p-2 rounded-xl bg-amber-100/80 text-[#E65100] border border-[#FFE0B2]">
-                      <Award className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-black text-[#E65100] tracking-tight">
-                    {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-amber-900/70">Email</span>
-                  </p>
-                  <p className="text-[11px] text-amber-900/80 font-medium">
-                    Total email disetujui tim
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* 3. TAUTAN REFERRAL READ-ONLY + BUTTON SALIN LINK */}
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Share2 className="w-4 h-4 text-amber-600" />
-                  Tautan Referral Saya
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Salin dan bagikan link unik Anda kepada calon worker baru. Komisi referral per email ACC otomatis mengalir ke Saldo Utama Anda.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-700 font-bold">Link Referral Pengundang</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={referralLink}
-                      className="font-mono text-xs bg-amber-50/40 border-amber-200 text-amber-950 focus-visible:ring-amber-500 rounded-xl"
-                    />
-                    <Button
-                      onClick={handleCopyReferralLink}
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shrink-0 gap-1.5 font-bold text-xs h-10 px-4 rounded-xl border border-amber-400/20 active:scale-95 transition-transform"
-                    >
-                      {copiedLink ? <Check className="w-4 h-4 text-amber-200" /> : <Copy className="w-4 h-4" />}
-                      {copiedLink ? "Tersalin!" : "Salin Link"}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* INFO KODE UNDANGAN & DIHUBUNGKAN */}
-                <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-2 text-xs text-amber-950">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="font-bold">Kode Referral Unik Anda:</span>
-                    <Badge variant="outline" className="font-mono bg-white text-amber-950 border-amber-300 font-bold text-xs">
-                      {profile.uid}
-                    </Badge>
-                  </div>
-                  {isAlreadyLinked ? (
-                    <p className="text-[11px] text-amber-900">
-                      ✓ Akun Anda terhubung dengan Upline/Pengundang: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
-                    </p>
-                  ) : (
-                    <form onSubmit={handleClaimInvitationCode} className="pt-2 border-t border-amber-200/60 space-y-2">
-                      <p className="text-[11px] text-amber-900">
-                        Jika Anda belum memiliki pengundang, masukkan kode pengundang Anda di sini:
-                      </p>
-                      <div className="flex gap-2">
-                        <Input
-                          value={invitationCodeInput}
-                          onChange={(e) => setInvitationCodeInput(e.target.value)}
-                          placeholder="Masukkan Kode Upline"
-                          className="font-mono text-xs bg-white rounded-xl border-amber-200"
-                          disabled={claimingCode}
+                  </CardHeader>
+                  <CardContent className="p-3.5 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Downline Slider */}
+                      <div className="space-y-1 p-2 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-bold text-[#FFE0B2] uppercase">
+                            Jumlah Downline
+                          </Label>
+                          <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800/60">
+                            {simFriends} Orang
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={50}
+                          value={simFriends}
+                          onChange={(e) => setSimFriends(Number(e.target.value))}
+                          className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
                         />
-                        <Button
-                          type="submit"
-                          disabled={claimingCode || !invitationCodeInput.trim()}
-                          className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shrink-0"
-                        >
-                          {claimingCode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Hubungkan"}
-                        </Button>
                       </div>
-                    </form>
-                  )}
+
+                      {/* Email ACC Slider */}
+                      <div className="space-y-1 p-2 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-bold text-[#FFE0B2] uppercase">
+                            Email ACC / Downline / Hari
+                          </Label>
+                          <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800/60">
+                            {simAccPerFriend} Email
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={50}
+                          value={simAccPerFriend}
+                          onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
+                          className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Proyeksi Hasil */}
+                    <div className="p-2.5 rounded-xl bg-[#1A0E00] border border-amber-800/50 space-y-2">
+                      <div className="text-[10px] text-amber-200/80 flex items-center justify-between border-b border-amber-900/60 pb-1">
+                        <span>Total Volume Email ACC Tim / Hari:</span>
+                        <strong className="text-[#FFB74D] font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60">
+                          <p className="text-[9px] font-bold text-amber-300/80 uppercase">Estimasi / Hari</p>
+                          <p className="text-sm sm:text-base font-black text-[#FFB74D]">
+                            {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
+                          </p>
+                        </div>
+                        <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60">
+                          <p className="text-[9px] font-bold text-amber-300/80 uppercase">Estimasi / Bulan</p>
+                          <p className="text-sm sm:text-base font-black text-[#FFB74D]">
+                            {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 3 KARTU STATISTIK REFERRAL */}
+                <div className="grid grid-cols-3 gap-2">
+                  <Card className="bg-[#FFF8F0] border-[#FFE0B2]">
+                    <CardContent className="p-3 text-center space-y-1">
+                      <p className="text-[9px] font-bold text-amber-900/70 uppercase">Total Bonus</p>
+                      <p className="text-sm font-black text-[#E65100]">
+                        {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[#FFF8F0] border-[#FFE0B2]">
+                    <CardContent className="p-3 text-center space-y-1">
+                      <p className="text-[9px] font-bold text-amber-900/70 uppercase">Downline</p>
+                      <p className="text-sm font-black text-[#E65100]">
+                        {downlines.data.length || refStats.total} <span className="text-[10px] font-normal">Worker</span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[#FFF8F0] border-[#FFE0B2]">
+                    <CardContent className="p-3 text-center space-y-1">
+                      <p className="text-[9px] font-bold text-amber-900/70 uppercase">ACC Tim</p>
+                      <p className="text-sm font-black text-[#E65100]">
+                        {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-[10px] font-normal">ACC</span>
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* 4. TABEL / LIST RIWAYAT DOWNLINE & ACTIVITY */}
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-amber-600" />
-                  Daftar Tim Downline ({downlines.data.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Rincian seluruh worker yang terdaftar melalui link referral Anda beserta akumulasi email ACC yang mereka selesaikan.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {downlines.loading && (
-                  <p className="text-sm text-gray-400 text-center py-8">Memuat data downline...</p>
-                )}
-                {!downlines.loading && downlines.data.length === 0 && (
-                  <div className="p-8 border border-dashed border-amber-200 rounded-2xl text-center space-y-2 bg-[#FFF8F0]">
-                    <Users className="w-8 h-8 text-amber-500 mx-auto" />
-                    <p className="text-sm font-bold text-amber-950">Belum Ada Downline Terdaftar</p>
-                    <p className="text-xs text-amber-900/80 max-w-sm mx-auto">
-                      Bagikan link referral Anda untuk mulai membangun tim dan meraih komisi pasif income otomatis.
-                    </p>
-                    <Button
-                      onClick={handleCopyReferralLink}
-                      size="sm"
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs mt-2 rounded-xl"
-                    >
-                      <Copy className="w-3.5 h-3.5 mr-1" /> Salin Tautan Referral
-                    </Button>
-                  </div>
-                )}
-
-                {!downlines.loading && downlines.data.length > 0 && (
-                  <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
-                          <tr>
-                            <th className="px-4 py-3">Pekerja / Downline</th>
-                            <th className="px-4 py-3">Tanggal Bergabung</th>
-                            <th className="px-4 py-3 text-center">Total Email ACC</th>
-                            <th className="px-4 py-3 text-right">Estimasi Komisi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-amber-100">
-                          {downlines.data.map((dw) => {
-                            const dwAcc = dw.accCount ?? 0;
-                            const commRate = rules.data.referralCommissionPerAcc ?? 100;
-                            const totalComm = dwAcc * commRate;
-
-                            return (
-                              <tr key={dw.uid} className="hover:bg-amber-50/50 transition-colors">
-                                <td className="px-4 py-3">
-                                  <p className="font-bold text-gray-900">{dw.name || "Worker"}</p>
-                                  <p className="text-[11px] font-mono text-gray-500">{shortId(dw.uid)}</p>
-                                </td>
-                                <td className="px-4 py-3 text-gray-600 font-mono">
-                                  {formatDateTime(dw.createdAt)}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold">
-                                    {dwAcc} Email ACC
-                                  </Badge>
-                                </td>
-                                <td className="px-4 py-3 text-right font-bold text-[#E65100]">
-                                  {formatMoney(totalComm)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 5. TABEL RIWAYAT TRANSAKSI KOMISI REFERRAL */}
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-amber-600" />
-                  Riwayat Log Komisi Referral ({referralTxs.data.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Log transaksi komisi otomatis per email ACC yang berhasil dikreditkan ke Saldo Utama Anda.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {referralTxs.loading && (
-                  <p className="text-sm text-gray-400 text-center py-8">Memuat riwayat transaksi komisi...</p>
-                )}
-                {!referralTxs.loading && referralTxs.data.length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-6 border border-dashed border-amber-200 rounded-xl bg-[#FFF8F0]">
-                    Belum ada riwayat transaksi komisi referral.
-                  </p>
-                )}
-                {!referralTxs.loading && referralTxs.data.length > 0 && (
-                  <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
-                          <tr>
-                            <th className="px-4 py-3">Waktu</th>
-                            <th className="px-4 py-3">Downline</th>
-                            <th className="px-4 py-3 text-center">Email ACC</th>
-                            <th className="px-4 py-3 text-right">Rate / Email</th>
-                            <th className="px-4 py-3 text-right">Total Komisi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-amber-100">
-                          {referralTxs.data.map((tx) => (
-                            <tr key={tx.id} className="hover:bg-amber-50/50 transition-colors">
-                              <td className="px-4 py-3 font-mono text-gray-500 whitespace-nowrap">
-                                {formatDateTime(tx.createdAt)}
-                              </td>
-                              <td className="px-4 py-3 font-semibold text-gray-900">
-                                {tx.downlineName || shortId(tx.downlineId)}
-                              </td>
-                              <td className="px-4 py-3 text-center font-bold text-gray-800">
-                                {tx.accCount} Email
-                              </td>
-                              <td className="px-4 py-3 text-right font-mono text-gray-600">
-                                {formatMoney(tx.commissionPerEmail)}
-                              </td>
-                              <td className="px-4 py-3 text-right font-black text-[#E65100]">
-                                +{formatMoney(tx.totalCommission)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TARIK SALDO */}
-          <TabsContent value="withdraw" className="space-y-6">
-            {/* SALDO HIGHLIGHT BANNER */}
-            <Card className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-amber-400/50 shadow-md overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <CardContent className="p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-amber-100 text-xs font-bold uppercase tracking-wider">
-                      <Wallet className="w-4 h-4 text-amber-200" />
-                      Saldo Siap Ditarik
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
-                      {formatMoney(profile.balance)}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-amber-100/90 pt-1">
-                      <span>
-                        Min: <strong className="text-white">{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Max: <strong className="text-white">{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={() => setMainTab("referral")}
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold text-xs h-9 px-4 rounded-xl border border-white/30 shadow-2xs gap-1.5 shrink-0 transition-transform active:scale-95"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-200" />
-                    Bonus Saldo Referral
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white border-amber-100 shadow-xs">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-lg font-bold text-gray-900">Formulir Penarikan Saldo</CardTitle>
-                    <CardDescription className="text-xs text-gray-600">
-                      Pilih penyedia layanan, nominal, dan detail akun penerima.
-                    </CardDescription>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs font-bold px-2.5 py-1 ${
-                      activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                        : "bg-amber-50 text-amber-800 border-amber-300"
-                    }`}
-                  >
-                    {currentFeeBadgeText}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form onSubmit={handleWithdraw} className="space-y-6">
-                  {/* STEP 1: PAYMENT CATEGORY & PROVIDER GRID SELECTION */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] flex items-center justify-center font-bold">1</span>
-                        Pilih Metode & Penyedia Pembayaran
-                      </Label>
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        {enabledMethods.length} metode aktif
-                      </span>
-                    </div>
-
-                    {/* CATEGORY TOGGLE PILLS */}
-                    <div className="inline-flex p-1 bg-amber-100/60 border border-amber-200/60 rounded-xl gap-1 text-xs font-medium w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectCategory("ewallet")}
-                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          categoryTab === "ewallet"
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs"
-                            : "text-amber-950 hover:text-amber-900"
-                        }`}
+                {/* TAUTAN REFERRAL */}
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-3.5 pb-2">
+                    <CardTitle className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      <Share2 className="w-3.5 h-3.5 text-amber-600" />
+                      Tautan Referral Saya
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3.5 pt-0 space-y-2.5">
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={referralLink}
+                        className="font-mono text-xs bg-amber-50/40 border-amber-200 text-amber-950 rounded-xl"
+                      />
+                      <Button
+                        onClick={handleCopyReferralLink}
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 gap-1 font-bold text-xs h-9 px-3 rounded-xl active:scale-95 transition-transform"
                       >
-                        <Smartphone className="w-3.5 h-3.5" />
-                        E-Wallet (Instant)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectCategory("bank")}
-                        className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          categoryTab === "bank"
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs"
-                            : "text-amber-950 hover:text-amber-900"
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5" />
-                        Transfer Bank
-                      </button>
+                        {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedLink ? "Tersalin!" : "Salin"}
+                      </Button>
                     </div>
 
-                    {/* PROVIDER GRID CARDS */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                      {visibleMethods.map((m) => {
-                        const isSelected = method === m.method;
-                        const feeBadge = formatFeeBadge(m);
-                        const isEWallet = isEWalletMethod(m);
+                    <div className="p-2.5 bg-amber-50/60 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[11px]">Kode Referral:</span>
+                        <Badge variant="outline" className="font-mono bg-white text-amber-950 border-amber-300 font-bold text-[10px]">
+                          {profile.uid}
+                        </Badge>
+                      </div>
+                      {isAlreadyLinked ? (
+                        <p className="text-[10px] text-amber-900">
+                          ✓ Terhubung dengan Pengundang: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
+                        </p>
+                      ) : (
+                        <form onSubmit={handleClaimInvitationCode} className="pt-1.5 border-t border-amber-200/60 space-y-1.5">
+                          <p className="text-[10px] text-amber-900">Masukkan kode pengundang Anda jika ada:</p>
+                          <div className="flex gap-2">
+                            <Input
+                              value={invitationCodeInput}
+                              onChange={(e) => setInvitationCodeInput(e.target.value)}
+                              placeholder="Kode Upline"
+                              className="font-mono text-xs bg-white rounded-xl border-amber-200 h-8"
+                              disabled={claimingCode}
+                            />
+                            <Button
+                              type="submit"
+                              disabled={claimingCode || !invitationCodeInput.trim()}
+                              className="bg-amber-600 text-white text-xs font-bold rounded-xl h-8 px-3"
+                            >
+                              {claimingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : "Klaim"}
+                            </Button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                        return (
-                          <div
-                            key={m.method}
-                            onClick={() => setMethod(m.method)}
-                            className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none ${
-                              isSelected
-                                ? "border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50/80 ring-2 ring-amber-500/30 shadow-xs"
-                                : "border-gray-200 bg-white hover:border-amber-300 hover:bg-slate-50/60"
+                {/* DAFTAR DOWNLINE TIM */}
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-3.5 pb-2">
+                    <CardTitle className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-amber-600" />
+                      Daftar Tim Downline ({downlines.data.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3.5 pt-0">
+                    {downlines.loading && <p className="text-xs text-gray-400 text-center py-4">Memuat data downline...</p>}
+                    {!downlines.loading && downlines.data.length === 0 && (
+                      <p className="text-xs text-gray-500 text-center py-6 border border-dashed border-amber-200 rounded-xl bg-[#FFF8F0]">
+                        Belum ada downline. Bagikan tautan referral untuk mulai mengajak tim.
+                      </p>
+                    )}
+                    {!downlines.loading && downlines.data.length > 0 && (
+                      <div className="space-y-2">
+                        {downlines.data.map((dw) => (
+                          <div key={dw.uid} className="p-2.5 rounded-xl border border-amber-100 bg-amber-50/30 flex items-center justify-between text-xs">
+                            <div>
+                              <p className="font-bold text-gray-900">{dw.name || "Worker"}</p>
+                              <p className="text-[10px] text-gray-400 font-mono">{formatDateTime(dw.createdAt)}</p>
+                            </div>
+                            <div className="text-right">
+                              <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px]">
+                                {dw.accCount ?? 0} ACC
+                              </Badge>
+                              <p className="text-[10px] font-bold text-[#E65100] mt-0.5">
+                                +{formatMoney((dw.accCount ?? 0) * (rules.data.referralCommissionPerAcc ?? 100))}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* E. TARIK SALDO */}
+            {mainTab === "withdraw" && (
+              <div className="space-y-4">
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <CardTitle className="text-sm font-bold text-gray-900">Formulir Penarikan Saldo</CardTitle>
+                      <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border-emerald-300">
+                        {currentFeeBadgeText}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-4">
+                    <form onSubmit={handleWithdraw} className="space-y-4">
+                      {/* Step 1: Kategori & Provider */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">1</span>
+                          Metode Pembayaran
+                        </Label>
+
+                        <div className="inline-flex p-0.5 bg-amber-100/60 border border-amber-200/60 rounded-xl gap-1 text-xs w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectCategory("ewallet")}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                              categoryTab === "ewallet"
+                                ? "bg-amber-500 text-white shadow-2xs"
+                                : "text-amber-950"
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                {isEWallet ? (
-                                  <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
-                                ) : (
-                                  <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
-                                )}
-                                <span className="font-bold text-sm text-gray-900 truncate">{m.method}</span>
+                            <Smartphone className="w-3.5 h-3.5" /> E-Wallet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectCategory("bank")}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                              categoryTab === "bank"
+                                ? "bg-amber-500 text-white shadow-2xs"
+                                : "text-amber-950"
+                            }`}
+                          >
+                            <Building2 className="w-3.5 h-3.5" /> Transfer Bank
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          {visibleMethods.map((m) => {
+                            const isSelected = method === m.method;
+                            return (
+                              <div
+                                key={m.method}
+                                onClick={() => setMethod(m.method)}
+                                className={`p-2.5 rounded-xl border text-left cursor-pointer flex items-center justify-between select-none ${
+                                  isSelected
+                                    ? "border-amber-500 bg-amber-50/80 ring-2 ring-amber-500/30"
+                                    : "border-gray-200 bg-white hover:border-amber-300"
+                                }`}
+                              >
+                                <span className="font-bold text-xs text-gray-900">{m.method}</span>
+                                {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />}
                               </div>
-                              {isSelected && (
-                                <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-                              )}
-                            </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                            <Badge
-                              variant="secondary"
-                              className={`text-[10px] w-fit font-semibold px-2 py-0.5 ${
-                                m.feeType === "free" || m.feeValue <= 0
-                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                  : "bg-amber-100 text-amber-800 border-amber-200"
-                              }`}
-                            >
-                              {feeBadge}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* STEP 2: NOMINAL QUICK CHIPS & INPUT */}
-                  <div className="space-y-3 pt-2 border-t border-gray-100">
-                    <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] flex items-center justify-center font-bold">2</span>
-                      Nominal Penarikan
-                    </Label>
-
-                    <div className="space-y-2">
-                      <FormattedNumberInput
-                        id="amount"
-                        value={amount}
-                        onChange={(val) => setAmount(val)}
-                        placeholder="Contoh: 100.000"
-                        className="font-mono text-base font-semibold h-11 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
-                        required
-                      />
-
-                      {/* QUICK-SELECT PRESET CHIPS */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { label: `Maksimal (${formatMoney(profile.balance)})`, value: profile.balance },
-                          { label: "Rp 25.000", value: 25000 },
-                          { label: "Rp 50.000", value: 50000 },
-                          { label: "Rp 100.000", value: 100000 },
-                          { label: "Rp 250.000", value: 250000 },
-                          { label: "Rp 500.000", value: 500000 },
-                        ].map((chip, idx) => {
-                          const isActive = amount === chip.value;
-                          return (
+                      {/* Step 2: Nominal */}
+                      <div className="space-y-2 pt-1 border-t border-gray-100">
+                        <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">2</span>
+                          Nominal Penarikan
+                        </Label>
+                        <FormattedNumberInput
+                          id="amount"
+                          value={amount}
+                          onChange={(val) => setAmount(val)}
+                          placeholder="Contoh: 100.000"
+                          className="font-mono text-sm font-semibold h-10 border-gray-200 focus-visible:ring-amber-500 rounded-xl"
+                          required
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { label: `Maksimal (${formatMoney(profile.balance)})`, value: profile.balance },
+                            { label: "Rp 25.000", value: 25000 },
+                            { label: "Rp 50.000", value: 50000 },
+                            { label: "Rp 100.000", value: 100000 },
+                          ].map((chip, idx) => (
                             <Button
                               key={idx}
                               type="button"
                               variant="outline"
                               size="sm"
                               onClick={() => setAmount(chip.value)}
-                              className={`text-xs h-7 px-3 rounded-full transition-colors ${
-                                isActive
-                                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 font-bold shadow-2xs"
-                                  : "bg-slate-50 text-gray-700 hover:bg-amber-50 hover:text-amber-900 border-gray-200"
+                              className={`text-[11px] h-6 px-2.5 rounded-full ${
+                                amount === chip.value
+                                  ? "bg-amber-500 text-white border-amber-400 font-bold"
+                                  : "bg-slate-50 text-gray-700 hover:bg-amber-50 border-gray-200"
                               }`}
                             >
                               {chip.label}
                             </Button>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* STEP 3: ACCOUNT DETAILS & REAL-TIME CALCULATION SUMMARY */}
-                  <div className="space-y-3 pt-2 border-t border-gray-100">
-                    <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] flex items-center justify-center font-bold">3</span>
-                      Detail Akun & Ringkasan Penarikan
-                    </Label>
+                      {/* Step 3: Detail Akun */}
+                      <div className="space-y-2 pt-1 border-t border-gray-100">
+                        <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">3</span>
+                          Detail Rekening / Wallet
+                        </Label>
+                        <div className="space-y-2">
+                          <Input
+                            id="account"
+                            value={account}
+                            onChange={(e) => setAccount(e.target.value)}
+                            placeholder={`Nomor HP ${method} / Rekening`}
+                            className="border-gray-200 focus-visible:ring-amber-500 rounded-xl text-xs h-9"
+                            required
+                          />
+                          <Input
+                            id="accountHolderName"
+                            value={accountHolderName}
+                            onChange={(e) => setAccountHolderName(e.target.value)}
+                            placeholder="Atas Nama Pemilik Rekening/Wallet"
+                            className="border-gray-200 focus-visible:ring-amber-500 rounded-xl text-xs h-9"
+                            required
+                          />
+                        </div>
 
+                        {/* Summary breakdown */}
+                        <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/80 space-y-1.5 text-xs mt-2">
+                          <div className="flex justify-between text-gray-600">
+                            <span>Jumlah:</span>
+                            <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+                          </div>
+                          <div className="flex justify-between text-gray-600">
+                            <span>Biaya Admin:</span>
+                            <span className="font-bold text-emerald-700">
+                              {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
+                            </span>
+                          </div>
+                          <div className="pt-1.5 border-t border-amber-200 flex justify-between items-center text-xs">
+                            <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
+                            <span className="font-black text-emerald-700 text-sm">{formatMoney(calculatedNet)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={withdrawing}
+                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 gap-1.5 text-xs shadow-xs rounded-xl border border-amber-400/20 active:scale-95 transition-transform"
+                      >
+                        {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+                        Ajukan Penarikan ({formatMoney(calculatedNet)})
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* RIWAYAT PENARIKAN */}
+                <TransactionHistory
+                  transactions={transactionHistory}
+                  loading={withdrawals.loading || engagement.rewardLedger.loading}
+                />
+              </div>
+            )}
+
+            {/* F. RIWAYAT JOB / SETORAN */}
+            {mainTab === "history" && (
+              <div className="space-y-3">
+                <SubmissionHistory
+                  submissions={submissions.data}
+                  loading={submissions.loading}
+                  rules={rules.data}
+                  userTier={profile.tier}
+                  onViewDetail={setDetailSubmission}
+                />
+              </div>
+            )}
+
+            {/* G. BANTUAN CS */}
+            {mainTab === "cs" && (
+              <div className="space-y-3">
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                      <HelpCircle className="w-4 h-4 text-amber-600" />
+                      Pusat Bantuan CS & Komunitas
+                    </CardTitle>
+                    <CardDescription className="text-xs text-gray-600">
+                      Hubungi tim dukungan kami jika mengalami kendala akun atau payout.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="account" className="text-xs text-gray-600 font-semibold">
-                          Nomor Rekening / Nomor {method}
-                        </Label>
-                        <Input
-                          id="account"
-                          value={account}
-                          onChange={(e) => setAccount(e.target.value)}
-                          placeholder={`Nomor HP ${method} / Rekening`}
-                          className="mt-1 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
-                          required
-                        />
+                      {/* Telegram CS */}
+                      <div className="p-3.5 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#FFB74D]">
+                            <TelegramIcon className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-xs text-[#FFB74D]">CS Telegram</p>
+                            <p className="text-[10px] text-[#FFE0B2]/80">Kendala Akun & Payout</p>
+                          </div>
+                        </div>
+                        {supportConfig.telegramUrl ? (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-slate-950 font-bold text-xs h-8 rounded-lg"
+                          >
+                            <a href={supportConfig.telegramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1">
+                              <TelegramIcon className="w-3.5 h-3.5" />
+                              <span>Hubungi Telegram</span>
+                            </a>
+                          </Button>
+                        ) : (
+                          <p className="text-[10px] text-amber-200/60 italic">Kontak belum dikonfigurasi admin.</p>
+                        )}
                       </div>
-                      <div>
-                        <Label htmlFor="accountHolderName" className="text-xs text-gray-600 font-semibold">
-                          Atas Nama (Pemilik Rekening/Wallet)
-                        </Label>
-                        <Input
-                          id="accountHolderName"
-                          value={accountHolderName}
-                          onChange={(e) => setAccountHolderName(e.target.value)}
-                          placeholder="Masukkan nama sesuai rekening/wallet"
-                          className="mt-1 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
-                          required
-                        />
+
+                      {/* Komunitas WhatsApp */}
+                      <div className="p-3.5 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#FFB74D]">
+                            <MessageCircle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-xs text-[#FFB74D]">Komunitas WhatsApp</p>
+                            <p className="text-[10px] text-[#FFE0B2]/80">Info & Saluran Resmi</p>
+                          </div>
+                        </div>
+                        {supportConfig.communityWaLink ? (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-slate-950 font-bold text-xs h-8 rounded-lg"
+                          >
+                            <a href={supportConfig.communityWaLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1">
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Gabung Grup WA</span>
+                            </a>
+                          </Button>
+                        ) : (
+                          <p className="text-[10px] text-amber-200/60 italic">Kontak belum dikonfigurasi admin.</p>
+                        )}
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                    {/* DYNAMIC BREAKDOWN SUMMARY CARD */}
-                    <div className="p-4 bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-amber-100/30 rounded-xl border border-amber-200/80 space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center text-gray-600 font-medium">
-                        <span>Jumlah Penarikan:</span>
-                        <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
+            {/* H. PENGUMUMAN RESMI */}
+            {mainTab === "announcements" && (
+              <div className="space-y-3">
+                <Card className="bg-white border-amber-200/80 shadow-2xs">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-gray-900">
+                      <Megaphone className="w-4 h-4 text-amber-600" />
+                      Pusat Pengumuman Resmi
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-3">
+                    {announcements.loading && <p className="text-xs text-gray-400 text-center py-4">Memuat pengumuman...</p>}
+                    {!announcements.loading && announcements.data.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-xl">
+                        Belum ada pengumuman resmi saat ini.
+                      </p>
+                    )}
+                    {!announcements.loading && announcements.data.length > 0 && (
+                      <div className="space-y-2.5">
+                        {announcements.data.map((item) => (
+                          <Card key={item.id} className="bg-slate-50 border-slate-200">
+                            <CardHeader className="p-3 pb-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <CardTitle className="text-xs font-bold text-gray-900">{item.title}</CardTitle>
+                                {item.badge && (
+                                  <Badge className="text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-400">{formatDateTime(item.createdAt)}</p>
+                            </CardHeader>
+                            <CardContent className="p-3 pt-1">
+                              <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                      <div className="flex justify-between items-center text-gray-600 font-medium">
-                        <span>Biaya Admin / Layanan ({activeMethodConfig.method}):</span>
-                        <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-emerald-700"}>
-                          {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Bebas Biaya)"}
-                        </span>
-                      </div>
-                      <div className="pt-2 border-t border-amber-200/80 flex justify-between items-center text-sm">
-                        <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
-                        <span className="font-black text-emerald-700 text-base">{formatMoney(calculatedNet)}</span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                  <Button
-                    type="submit"
-                    disabled={withdrawing}
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-11 gap-2 text-sm shadow-sm rounded-xl border border-amber-400/20 active:scale-95 transition-transform"
-                  >
-                    {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan ({formatMoney(calculatedNet)})
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+          </div>
 
-            {/* RIWAYAT TRANSAKSI / PENARIKAN */}
-            <TransactionHistory
-              transactions={transactionHistory}
-              loading={withdrawals.loading || engagement.rewardLedger.loading}
-            />
-          </TabsContent>
+        </div>
 
-          {/* RIWAYAT STORAN EMAIL */}
-          <TabsContent value="history" className="space-y-4">
-            <SubmissionHistory
-              submissions={submissions.data}
-              loading={submissions.loading}
-              rules={rules.data}
-              userTier={profile.tier}
-              onViewDetail={setDetailSubmission}
-            />
-          </TabsContent>
-        </Tabs>
-
-        {/* MOBILE BOTTOM NAVIGATION BAR (STYLE #1) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-200 shadow-2xl px-2 py-1.5 flex items-center justify-around">
-          {/* 1. DASHBOARD */}
+        {/* 5. BOTTOM NAVIGATION BAR (FIXED MELAYANG DI BAWAH SMARTPHONE) */}
+        <nav className="fixed bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-50 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl px-2 py-1.5 flex items-center justify-around text-slate-200">
+          {/* 1. HOME */}
           <button
             type="button"
-            onClick={() => {
-              setMainTab("submit");
-              setIsMobileMenuOpen(false);
-            }}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-              mainTab === "submit" && !isMobileMenuOpen
+            onClick={() => setMainTab("submit")}
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+              mainTab === "submit"
                 ? "text-amber-400 font-bold scale-105"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {mainTab === "submit" && !isMobileMenuOpen && (
-              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            {mainTab === "submit" && (
+              <span className="absolute -top-1.5 w-6 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
-            <Home className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Dashboard</span>
+            <Home className="w-4 h-4 mb-0.5" />
+            <span className="text-[9px] tracking-tight">Home</span>
           </button>
 
-          {/* 2. SUBMIT / STORAN */}
+          {/* 2. SETOR */}
           <button
             type="button"
-            onClick={() => {
-              setMainTab("submit");
-              setIsMobileMenuOpen(false);
-            }}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-              mainTab === "submit" && !isMobileMenuOpen
+            onClick={() => setMainTab("submit")}
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+              mainTab === "submit"
                 ? "text-amber-400 font-bold scale-105"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            <div className="p-1.5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 shadow-md shadow-amber-500/20 mb-0.5">
-              <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+            <div className="p-1 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 shadow-md shadow-amber-500/20 mb-0.5">
+              <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
-            <span className="text-[10px] tracking-tight font-semibold">Submit</span>
+            <span className="text-[9px] tracking-tight font-semibold">Setor</span>
           </button>
 
-          {/* 3. RIWAYAT */}
+          {/* 3. WITHDRAW */}
           <button
             type="button"
-            onClick={() => {
-              setMainTab("history");
-              setIsMobileMenuOpen(false);
-            }}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-              mainTab === "history" && !isMobileMenuOpen
+            onClick={() => setMainTab("withdraw")}
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+              mainTab === "withdraw"
                 ? "text-amber-400 font-bold scale-105"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {mainTab === "history" && !isMobileMenuOpen && (
-              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            {mainTab === "withdraw" && (
+              <span className="absolute -top-1.5 w-6 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
-            <History className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Riwayat</span>
+            <Wallet className="w-4 h-4 mb-0.5" />
+            <span className="text-[9px] tracking-tight">Withdraw</span>
           </button>
 
-          {/* 4. WITHDRAW */}
+          {/* 4. CS */}
           <button
             type="button"
-            onClick={() => {
-              setMainTab("withdraw");
-              setIsMobileMenuOpen(false);
-            }}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-              mainTab === "withdraw" && !isMobileMenuOpen
+            onClick={() => setMainTab("cs")}
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+              mainTab === "cs"
                 ? "text-amber-400 font-bold scale-105"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {mainTab === "withdraw" && !isMobileMenuOpen && (
-              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            {mainTab === "cs" && (
+              <span className="absolute -top-1.5 w-6 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
-            <Wallet className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Withdraw</span>
+            <MessageCircle className="w-4 h-4 mb-0.5" />
+            <span className="text-[9px] tracking-tight">CS</span>
           </button>
 
-          {/* 5. PROFIL / MENU */}
+          {/* 5. AKUN */}
           <button
             type="button"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-              isMobileMenuOpen || mainTab === "referral" || mainTab === "leaderboard" || mainTab === "announcements"
+            onClick={() => setIsAccountDrawerOpen(true)}
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+              isAccountDrawerOpen
                 ? "text-amber-400 font-bold scale-105"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {(isMobileMenuOpen || mainTab === "referral" || mainTab === "leaderboard" || mainTab === "announcements") && (
-              <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            {isAccountDrawerOpen && (
+              <span className="absolute -top-1.5 w-6 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
-            <User className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Profil/Menu</span>
+            <User className="w-4 h-4 mb-0.5" />
+            <span className="text-[9px] tracking-tight">Akun</span>
           </button>
         </nav>
 
-        {/* MOBILE PROFIL / MENU SHEET */}
-        <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        {/* AKUN / PROFIL DRAWER MODAL SHEET */}
+        <Dialog open={isAccountDrawerOpen} onOpenChange={setIsAccountDrawerOpen}>
           <DialogContent className="max-w-md w-full bg-slate-900/95 backdrop-blur-xl border-slate-800 text-slate-100 p-0 overflow-hidden rounded-t-3xl sm:rounded-2xl border shadow-2xl">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 font-extrabold flex items-center justify-center text-base shadow-lg shadow-amber-500/20 ring-2 ring-amber-400/30">
-                  {profile.name?.charAt(0).toUpperCase() || "W"}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 font-extrabold flex items-center justify-center text-sm shadow-md ring-2 ring-amber-400/30">
+                  {displayName.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-white text-sm">{profile.name}</p>
-                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold">
-                      Rate Active: {formatMoney(currentTierConfig.pricePerItem)} / akun
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-white text-xs">{displayName}</p>
+                    <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold">
+                      Rate: {formatMoney(currentTierConfig.pricePerItem)}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
                     <span className="font-mono">
                       {isEmailVisible ? displayEmail : "*".repeat(displayEmail.length || 10)}
                     </span>
@@ -1845,40 +1591,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       onClick={() => setIsEmailVisible(!isEmailVisible)}
                       className="text-slate-400 hover:text-amber-400 p-0.5 rounded"
                     >
-                      {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                     </button>
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">Saldo</p>
-                <p className="font-black text-amber-400 text-sm">{formatMoney(profile.balance)}</p>
+                <p className="text-[9px] text-slate-400 uppercase font-semibold">Saldo</p>
+                <p className="font-black text-amber-400 text-xs">{formatMoney(profile.balance)}</p>
               </div>
             </div>
 
-            <div className="p-4 space-y-2">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2">Menu & Fitur Portal</p>
+            <div className="p-3.5 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">Menu Portal</p>
 
               <button
                 type="button"
                 onClick={() => {
                   setMainTab("checker");
-                  setIsMobileMenuOpen(false);
+                  setIsAccountDrawerOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
-                  mainTab === "checker"
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                    : "bg-slate-955/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
-                }`}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 text-xs font-bold"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
                     <SearchCheck className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-bold">Checker Email & Master Riset</p>
-                    <p className="text-[10px] text-slate-400 font-normal">Screening format & status email</p>
-                  </div>
+                  <span className="text-xs">Checker Email & Status</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
               </button>
@@ -1887,22 +1626,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 type="button"
                 onClick={() => {
                   setMainTab("referral");
-                  setIsMobileMenuOpen(false);
+                  setIsAccountDrawerOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
-                  mainTab === "referral"
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
-                }`}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 text-xs font-bold"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
                     <Users className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-bold">Referral & Pasif Income</p>
-                    <p className="text-[10px] text-slate-400 font-normal">Undang teman & klaim bonus komisi</p>
-                  </div>
+                  <span className="text-xs">Referral & Pasif Income</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
               </button>
@@ -1911,22 +1643,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 type="button"
                 onClick={() => {
                   setMainTab("leaderboard");
-                  setIsMobileMenuOpen(false);
+                  setIsAccountDrawerOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
-                  mainTab === "leaderboard"
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
-                }`}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 text-xs font-bold"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
                     <Trophy className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-bold">Klasemen / Top Worker</p>
-                    <p className="text-[10px] text-slate-400 font-normal">Peringkat mingguan & reward bonus</p>
-                  </div>
+                  <span className="text-xs">Klasemen & Reward</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
               </button>
@@ -1934,126 +1659,43 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <button
                 type="button"
                 onClick={() => {
-                  setMainTab("announcements");
-                  setIsMobileMenuOpen(false);
+                  setMainTab("cs");
+                  setIsAccountDrawerOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
-                  mainTab === "announcements"
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                    : "bg-slate-950/60 border-slate-800/80 text-slate-200 hover:bg-slate-800/60"
-                }`}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-200 text-xs font-bold"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 relative">
-                    <Megaphone className="w-4 h-4" />
-                    {announcements.data.length > 0 && (
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                    )}
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                    <MessageCircle className="w-4 h-4" />
                   </div>
-                  <div className="text-left">
-                    <p className="font-bold flex items-center gap-1.5">
-                      Pengumuman Resmi
-                      {announcements.data.length > 0 && (
-                        <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.2 rounded-full font-bold">
-                          {announcements.data.length}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-normal">Informasi terbaru dari admin</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-500" />
-              </button>
-
-              {isSupportEnabled && (
-                <div className="space-y-2 pt-1">
-                  {supportConfig.telegramUrl ? (
-                    <a
-                      href={supportConfig.telegramUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
-                          <TelegramIcon className="w-4 h-4" />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-bold">CS Telegram</p>
-                          <p className="text-[10px] text-slate-400 font-normal">Kendala akun & payout</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </a>
-                  ) : null}
-
-                  {supportConfig.communityWaLink ? (
-                    <a
-                      href={supportConfig.communityWaLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
-                          <MessageCircle className="w-4 h-4" />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-bold">Komunitas WA</p>
-                          <p className="text-[10px] text-slate-400 font-normal">Info & saluran resmi</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </a>
-                  ) : null}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMainTab("submit");
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 text-slate-200 hover:bg-slate-800/60 text-xs font-bold transition-all"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold">Cara Kerja & Aturan Setor</p>
-                    <p className="text-[10px] text-slate-400 font-normal">Panduan pengerjaan & rate harga</p>
-                  </div>
+                  <span className="text-xs">Bantuan CS & WA</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
               </button>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/80">
+            <div className="p-3.5 border-t border-slate-800 bg-slate-950/80">
               <Button
                 variant="outline"
                 onClick={() => {
-                  setIsMobileMenuOpen(false);
+                  setIsAccountDrawerOpen(false);
                   onLogout();
                 }}
-                className="w-full bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 font-bold gap-2 text-xs h-10 rounded-xl"
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 font-bold gap-2 text-xs h-9 rounded-xl"
               >
-                <LogOut className="w-4 h-4" />
-                Keluar dari Akun (Logout)
+                <LogOut className="w-3.5 h-3.5" />
+                Keluar dari Akun
               </Button>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* DIALOG LIHAT DETAIL BATCH (WORKER PER-ITEM VIEW) */}
+        {/* DIALOG DETAIL BATCH SETORAN */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detail Setoran Batch Email</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-sm">Detail Setoran Batch Email</DialogTitle>
+              <DialogDescription className="text-xs">
                 Waktu setor: {formatDateTime(detailSubmission?.submittedAt)} · #{shortId(detailSubmission?.id ?? "")}
               </DialogDescription>
             </DialogHeader>
@@ -2076,43 +1718,43 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               const earned = detailSubmission.totalAmount ?? (approvedCount * pricePerItem);
 
               return (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-2.5 bg-gray-50 rounded-lg text-xs">
                     <div>
-                      <span className="text-gray-500">Total Email:</span>
+                      <span className="text-gray-500 text-[10px]">Total Email:</span>
                       <p className="font-bold text-gray-900">{baseItems.length} item</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Terjual (✓):</span>
+                      <span className="text-gray-500 text-[10px]">Terjual (✓):</span>
                       <p className="font-bold text-green-600">{approvedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Ditolak (X):</span>
+                      <span className="text-gray-500 text-[10px]">Ditolak (X):</span>
                       <p className="font-bold text-red-600">{rejectedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Total Didapat:</span>
+                      <span className="text-gray-500 text-[10px]">Total Didapat:</span>
                       <p className="font-bold text-amber-700">{formatMoney(earned)}</p>
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-1">
                       <Label className="text-xs text-gray-600">
-                        Status per Alamat Email ({baseItems.length} item):
+                        Status per Email ({baseItems.length} item):
                       </Label>
-                      <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
+                      <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300">
                         Rate: {formatMoney(pricePerItem)}/akun
                       </Badge>
                     </div>
 
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
                       {baseItems.map((it, idx) => {
                         const st = it.status ?? (detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending");
                         return (
                           <div
                             key={idx}
-                            className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs font-mono transition-colors ${
+                            className={`p-2 rounded-md border flex items-center justify-between gap-2 text-xs font-mono transition-colors ${
                               st === "approved"
                                 ? "bg-green-50/60 border-green-200"
                                 : st === "rejected"
@@ -2121,14 +1763,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             }`}
                           >
                             <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-gray-900 truncate">
+                              <p className="font-semibold text-gray-900 truncate text-[11px]">
                                 {idx + 1}. {it.email}
                               </p>
-                              {it.password && <p className="text-[11px] text-gray-500 font-sans">Sandi: {it.password}</p>}
+                              {it.password && <p className="text-[10px] text-gray-500 font-sans">Sandi: {it.password}</p>}
                             </div>
 
                             <Badge
-                              className={`shrink-0 text-[11px] font-sans ${
+                              className={`shrink-0 text-[10px] font-sans ${
                                 st === "approved"
                                   ? "bg-green-100 text-green-800 hover:bg-green-100"
                                   : st === "rejected"
@@ -2145,9 +1787,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </div>
 
                   {detailSubmission.reviewNote && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-                      <p className="font-bold mb-0.5">Catatan Admin:</p>
-                      <p className="italic">{detailSubmission.reviewNote}</p>
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                      <p className="font-bold text-[11px]">Catatan Admin:</p>
+                      <p className="italic text-[11px]">{detailSubmission.reviewNote}</p>
                     </div>
                   )}
                 </div>
@@ -2155,7 +1797,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             })()}
           </DialogContent>
         </Dialog>
-      </main>
+      </div>
     </div>
   );
 }
