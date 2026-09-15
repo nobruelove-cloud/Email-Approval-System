@@ -1326,7 +1326,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     const totalWorkers = workerUsers.length;
     const pendingWorkers = workerUsers.filter((u) => u.status === "pending").length;
     const activeWorkers = workerUsers.filter((u) => u.status === "approved" || u.status === "active").length;
-    const totalBalance = workerUsers.reduce((sum, u) => sum + (u.balance ?? 0), 0);
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
     const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
     const availableStock = submissions.data.reduce((sum, s) => {
