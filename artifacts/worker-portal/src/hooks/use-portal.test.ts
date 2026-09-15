@@ -1578,7 +1578,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
     expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
-    expect(screen.getByText(/Existing Worker/)).toBeDefined();
+    expect(screen.getAllByText(/Existing Worker/)[0]).toBeDefined();
   });
 
   it("Test F — Referral Security: registerReferral writes to referrals/referredWorkerId without setDoc merge", async () => {

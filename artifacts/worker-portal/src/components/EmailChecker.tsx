@@ -533,74 +533,128 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 Tidak ada item yang sesuai dengan filter.
               </p>
             ) : (
-              <div className="border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className={`border-b font-bold ${
-                      isAdminView ? "bg-slate-955 border-slate-800 text-slate-300" : "bg-amber-50/80 border-amber-200 text-amber-950"
-                    }`}>
-                      <tr>
-                        <th className="px-3.5 py-2.5">#</th>
-                        <th className="px-3.5 py-2.5">Email & Sandi</th>
-                        <th className="px-3.5 py-2.5">Username Screening</th>
-                        <th className="px-3.5 py-2.5 text-center">Status</th>
-                        <th className="px-3.5 py-2.5">Keterangan / Alasan Bad</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800 font-mono">
-                      {displayedItems.map((item, idx) => (
-                        <tr
-                          key={idx}
-                          className={`transition-colors ${
-                            item.status === "GOOD"
-                              ? "bg-emerald-50/30 dark:bg-emerald-500/5 hover:bg-emerald-50/60"
-                              : "bg-rose-50/30 dark:bg-rose-500/5 hover:bg-rose-50/60"
-                          }`}
-                        >
-                          <td className="px-3.5 py-2.5 text-gray-400 dark:text-slate-500 font-sans">{idx + 1}</td>
-                          <td className="px-3.5 py-2.5">
-                            <p className="font-bold text-gray-900 dark:text-slate-100">{item.email}</p>
-                            {item.password && (
-                              <p className="text-[11px] text-gray-500 dark:text-slate-400 font-sans">Sandi: {item.password}</p>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-2.5 text-gray-700 dark:text-slate-300">
-                            <span>{item.username}</span>
-                            <div className="text-[10px] text-gray-400 dark:text-slate-500 font-sans flex items-center gap-1.5 mt-0.5">
-                              <span>Digits: {item.digitCountDetected}</span>
-                              {item.birthYearDetected && <span>· Thn: {item.birthYearDetected}</span>}
-                            </div>
-                          </td>
-                          <td className="px-3.5 py-2.5 text-center font-sans">
-                            {item.status === "GOOD" ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold text-[10px] gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> ACTIVE / GOOD
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 font-bold text-[10px] gap-1">
-                                <XCircle className="w-3 h-3" /> BAD / DEAD
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-2.5 font-sans">
-                            {item.status === "GOOD" ? (
-                              <span className="text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-                                ✓ Lolos rules screening awal
-                              </span>
-                            ) : (
-                              <div className="space-y-0.5 text-xs text-rose-700 dark:text-rose-400">
-                                {item.reasons.map((r, rIdx) => (
-                                  <p key={rIdx}>• {r}</p>
-                                ))}
-                              </div>
-                            )}
-                          </td>
+              <>
+                {/* Desktop Table */}
+                <div className="hidden sm:block border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className={`border-b font-bold ${
+                        isAdminView ? "bg-slate-955 border-slate-800 text-slate-300" : "bg-amber-50/80 border-amber-200 text-amber-950"
+                      }`}>
+                        <tr>
+                          <th className="px-3.5 py-2.5">#</th>
+                          <th className="px-3.5 py-2.5">Email & Sandi</th>
+                          <th className="px-3.5 py-2.5">Username Screening</th>
+                          <th className="px-3.5 py-2.5 text-center">Status</th>
+                          <th className="px-3.5 py-2.5">Keterangan / Alasan Bad</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-800 font-mono">
+                        {displayedItems.map((item, idx) => (
+                          <tr
+                            key={idx}
+                            className={`transition-colors ${
+                              item.status === "GOOD"
+                                ? "bg-emerald-50/30 dark:bg-emerald-500/5 hover:bg-emerald-50/60"
+                                : "bg-rose-50/30 dark:bg-rose-500/5 hover:bg-rose-50/60"
+                            }`}
+                          >
+                            <td className="px-3.5 py-2.5 text-gray-400 dark:text-slate-500 font-sans">{idx + 1}</td>
+                            <td className="px-3.5 py-2.5">
+                              <p className="font-bold text-gray-900 dark:text-slate-100">{item.email}</p>
+                              {item.password && (
+                                <p className="text-[11px] text-gray-500 dark:text-slate-400 font-sans">Sandi: {item.password}</p>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-gray-700 dark:text-slate-300">
+                              <span>{item.username}</span>
+                              <div className="text-[10px] text-gray-400 dark:text-slate-500 font-sans flex items-center gap-1.5 mt-0.5">
+                                <span>Digits: {item.digitCountDetected}</span>
+                                {item.birthYearDetected && <span>· Thn: {item.birthYearDetected}</span>}
+                              </div>
+                            </td>
+                            <td className="px-3.5 py-2.5 text-center font-sans">
+                              {item.status === "GOOD" ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold text-[10px] gap-1">
+                                  <CheckCircle2 className="w-3 h-3" /> ACTIVE / GOOD
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 font-bold text-[10px] gap-1">
+                                  <XCircle className="w-3 h-3" /> BAD / DEAD
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-2.5 font-sans">
+                              {item.status === "GOOD" ? (
+                                <span className="text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                                  ✓ Lolos rules screening awal
+                                </span>
+                              ) : (
+                                <div className="space-y-0.5 text-xs text-rose-700 dark:text-rose-400">
+                                  {item.reasons.map((r, rIdx) => (
+                                    <p key={rIdx}>• {r}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+
+                {/* Mobile Cards */}
+                <div className="sm:hidden space-y-3 font-mono">
+                  {displayedItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3.5 rounded-xl border space-y-2 text-xs ${
+                        item.status === "GOOD"
+                          ? "bg-emerald-50/30 dark:bg-emerald-500/5 border-emerald-500/30"
+                          : "bg-rose-50/30 dark:bg-rose-500/5 border-rose-500/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-gray-900 dark:text-slate-100 text-sm truncate">{idx + 1}. {item.email}</p>
+                          {item.password && (
+                            <p className="text-[11px] text-gray-500 dark:text-slate-400 font-sans">Sandi: {item.password}</p>
+                          )}
+                        </div>
+                        {item.status === "GOOD" ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold text-[10px] gap-1 shrink-0">
+                            <CheckCircle2 className="w-3 h-3" /> GOOD
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300 font-bold text-[10px] gap-1 shrink-0">
+                            <XCircle className="w-3 h-3" /> BAD
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-gray-600 dark:text-slate-400 font-sans flex items-center justify-between pt-1 border-t border-gray-100 dark:border-slate-800">
+                        <span>User: {item.username}</span>
+                        <span>Digits: {item.digitCountDetected}{item.birthYearDetected ? ` · Thn: ${item.birthYearDetected}` : ""}</span>
+                      </div>
+
+                      <div className="pt-1 font-sans text-xs">
+                        {item.status === "GOOD" ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                            ✓ Lolos rules screening awal
+                          </span>
+                        ) : (
+                          <div className="space-y-0.5 text-rose-700 dark:text-rose-400">
+                            {item.reasons.map((r, rIdx) => (
+                              <p key={rIdx}>• {r}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
