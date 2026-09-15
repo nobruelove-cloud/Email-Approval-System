@@ -206,19 +206,19 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* 1. DISCLAIMER BANNER (WORKER & ADMIN) */}
       {!isAdminView && (
         <Card className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-amber-300/80 shadow-xs">
-          <CardContent className="p-4 sm:p-5 flex items-start gap-3.5">
-            <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shrink-0 mt-0.5 shadow-xs">
-              <AlertTriangle className="w-5 h-5" />
+          <CardContent className="p-3 sm:p-5 flex items-start gap-2.5 sm:gap-3.5">
+            <div className="p-2 rounded-lg sm:rounded-xl bg-amber-500 text-slate-950 font-black shrink-0 mt-0.5 shadow-xs">
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="space-y-1">
-              <h4 className="font-extrabold text-amber-950 text-sm tracking-tight uppercase flex items-center gap-1.5">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h4 className="font-extrabold text-amber-950 text-xs sm:text-sm tracking-tight uppercase flex items-center gap-1.5">
                 <span>CATATAN PENTING (DISCLAIMER)</span>
               </h4>
-              <p className="text-xs text-amber-900 leading-relaxed font-medium">
+              <p className="text-[11px] sm:text-xs text-amber-900 leading-relaxed font-medium">
                 Tools Checker ini berfungsi sebagai alat bantu screening awal (Format Rules & Status Aktif). Hasil di Checker <strong>TIDAK MENJAMIN 100%</strong> email pasti di-ACC oleh Vendor. Keputusan akhir ACC dan pencairan saldo tetap sepenuhnya mengikuti verifikasi akhir sistem Vendor.
               </p>
             </div>
@@ -229,21 +229,21 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
       {/* ADMIN RULE CONFIGURATOR CARD */}
       {isAdminView && (
         <Card className="bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl backdrop-blur-xl">
-          <CardHeader className="pb-3 border-b border-slate-800">
+          <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-3 border-b border-slate-800">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base font-bold text-emerald-400 flex items-center gap-2">
-                <Sliders className="w-4 h-4" />
+              <CardTitle className="text-sm sm:text-base font-bold text-emerald-400 flex items-center gap-2">
+                <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 Pengaturan Rules Screening Master Riset / Checker
               </CardTitle>
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] sm:text-xs">
                 Sync Real-time ke Worker
               </Badge>
             </div>
-            <CardDescription className="text-xs text-slate-400">
+            <CardDescription className="text-[11px] sm:text-xs text-slate-400">
               Konfigurasi parameter penyaringan otomatis email untuk seluruh worker di Worker Portal.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="p-3.5 sm:p-6 pt-3 sm:pt-4">
             <form onSubmit={handleSaveAdminRules} className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-955 border border-slate-800">
                 <div className="space-y-0.5">
@@ -331,23 +331,23 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
 
       {/* 2. BULK TEXTAREA INPUT & CHECKER PANEL */}
       <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-amber-100 shadow-xs"}>
-        <CardHeader className="pb-3">
+        <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className={`text-base font-bold flex items-center gap-2 ${isAdminView ? "text-slate-100" : "text-gray-900"}`}>
-                <ShieldCheck className={`w-4 h-4 ${isAdminView ? "text-emerald-400" : "text-amber-600"}`} />
+              <CardTitle className={`text-sm sm:text-base font-bold flex items-center gap-2 ${isAdminView ? "text-slate-100" : "text-gray-900"}`}>
+                <ShieldCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isAdminView ? "text-emerald-400" : "text-amber-600"}`} />
                 Input Massal Checker Status & Screening Format
               </CardTitle>
-              <CardDescription className={`text-xs ${isAdminView ? "text-slate-400" : "text-gray-600"}`}>
-                Masukkan multi-line email. Dukungan format: <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email|password</code>, <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email:password</code>, atau pemisah spasi.
+              <CardDescription className={`text-[11px] sm:text-xs ${isAdminView ? "text-slate-400" : "text-gray-600"}`}>
+                Masukkan multi-line email. Dukungan format: <code className="font-mono bg-slate-800 text-slate-200 px-1 py-0.5 rounded text-[10px] sm:text-[11px]">email|password</code>, <code className="font-mono bg-slate-800 text-slate-200 px-1 py-0.5 rounded text-[10px] sm:text-[11px]">email:password</code>, atau pemisah spasi.
               </CardDescription>
             </div>
-            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-xs" : "bg-amber-50 text-amber-900 border-amber-300 font-bold text-xs"}>
+            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-[10px] sm:text-xs" : "bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px] sm:text-xs"}>
               Rules: {activeConfigToUse.minBirthYear}-{activeConfigToUse.maxBirthYear} · Digit ≤ {activeConfigToUse.maxUsernameDigits}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-3.5 sm:p-6 space-y-3 sm:space-y-4 pt-0">
           {/* DEDICATED MASTER PASSWORD INPUT FIELD */}
           <div className={`p-4 rounded-xl border space-y-2 ${
             isAdminView ? "bg-slate-955 border-slate-800" : "bg-amber-50/60 border-amber-200/80"
