@@ -1326,10 +1326,66 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     const totalWorkers = workerUsers.length;
     const pendingWorkers = workerUsers.filter((u) => u.status === "pending").length;
     const activeWorkers = workerUsers.filter((u) => u.status === "approved" || u.status === "active").length;
-    const totalBalance = workerUsers.reduce(
-      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
-      0
-    );
+
+    // Track approved submission payouts and completed withdrawals per worker to reconcile uncredited balances
+    const workerApprovedPayouts = new Map<string, number>();
+    const workerCompletedWithdrawals = new Map<string, number>();
+
+    let unattachedApprovedPayouts = 0;
+    let unattachedCompletedWithdrawals = 0;
+
+    submissions.data.forEach((sub) => {
+      const st = (sub.status || "").toLowerCase();
+      const isApproved = st === "approved" || st === "available" || st === "sold" || st === "acc" || st === "terjual";
+      if (isApproved) {
+        const count = typeof sub.approvedItemCount === "number"
+          ? sub.approvedItemCount
+          : Array.isArray(sub.items) && sub.items.length > 0
+          ? sub.items.filter((it) => it.status === "approved").length
+          : getItemCountOfSubmission(sub);
+        const pricePerItem = sub.appliedPricePerItem ?? sub.currentPricePerItem ?? sub.pricePerEmail ?? 2000;
+        const payout = sub.totalAmount ?? (count * pricePerItem);
+
+        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail);
+        if (workerObj && workerObj.uid) {
+          const prev = workerApprovedPayouts.get(workerObj.uid) || 0;
+          workerApprovedPayouts.set(workerObj.uid, prev + payout);
+        } else {
+          unattachedApprovedPayouts += payout;
+        }
+      }
+    });
+
+    withdrawals.data.forEach((w) => {
+      const st = (w.status || "").toLowerCase();
+      const isSuccess = st === "success" || st === "withdrawn";
+      if (isSuccess) {
+        const workerObj = getWorkerObj(w.workerId);
+        if (workerObj && workerObj.uid) {
+          const prev = workerCompletedWithdrawals.get(workerObj.uid) || 0;
+          workerCompletedWithdrawals.set(workerObj.uid, prev + w.amount);
+        } else {
+          unattachedCompletedWithdrawals += w.amount;
+        }
+      }
+    });
+
+    let totalBalance = 0;
+    workerUsers.forEach((u) => {
+      const explicitBal = Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0;
+      const approvedPayouts = workerApprovedPayouts.get(u.uid) || 0;
+      const completedWithdrawals = workerCompletedWithdrawals.get(u.uid) || 0;
+      const netSubmissionPayout = Math.max(0, approvedPayouts - completedWithdrawals);
+
+      // Effective balance per worker combines explicit profile balance with any uncredited approved submission payouts
+      const effectiveWorkerBalance = Math.max(explicitBal, netSubmissionPayout);
+      totalBalance += effectiveWorkerBalance;
+    });
+
+    // Add net payouts for any workers not listed in user documents
+    const unattachedNet = Math.max(0, unattachedApprovedPayouts - unattachedCompletedWithdrawals);
+    totalBalance += unattachedNet;
+
     const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
     const availableStock = submissions.data.reduce((sum, s) => {
@@ -1349,7 +1405,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       .filter((w) => w.status === "pending" || w.status === "processing")
       .reduce((sum, w) => sum + w.amount, 0);
     const totalPaidOut = withdrawals.data
-      .filter((w) => w.status === "success")
+      .filter((w) => (w.status || "").toLowerCase() === "success" || (w.status || "").toLowerCase() === "withdrawn")
       .reduce((sum, w) => sum + w.amount, 0);
 
     return {
@@ -1365,7 +1421,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       pendingWithdrawalAmount,
       totalPaidOut,
     };
-  }, [users.data, submissions.data, withdrawals.data]);
+  }, [users.data, submissions.data, withdrawals.data, workerMap]);
 
   async function handleBatchTierChange(submissionId: string, newTierStr: string) {
     const selectedTierNum = Number(newTierStr);
