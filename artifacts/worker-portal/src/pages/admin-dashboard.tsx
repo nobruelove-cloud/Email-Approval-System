@@ -1406,64 +1406,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     const pendingWorkers = workerUsers.filter((u) => u.status === "pending").length;
     const activeWorkers = workerUsers.filter((u) => u.status === "approved" || u.status === "active").length;
 
-    // Track approved submission payouts and completed withdrawals per worker to reconcile uncredited balances
-    const workerApprovedPayouts = new Map<string, number>();
-    const workerCompletedWithdrawals = new Map<string, number>();
-
-    let unattachedApprovedPayouts = 0;
-    let unattachedCompletedWithdrawals = 0;
-
-    submissions.data.forEach((sub) => {
-      const st = (sub.status || "").toLowerCase();
-      const isApproved = st === "approved" || st === "available" || st === "sold" || st === "acc" || st === "terjual";
-      if (isApproved) {
-        const count = typeof sub.approvedItemCount === "number"
-          ? sub.approvedItemCount
-          : Array.isArray(sub.items) && sub.items.length > 0
-          ? sub.items.filter((it) => it.status === "approved").length
-          : getItemCountOfSubmission(sub);
-        const pricePerItem = sub.appliedPricePerItem ?? sub.currentPricePerItem ?? sub.pricePerEmail ?? 2000;
-        const payout = sub.totalAmount ?? (count * pricePerItem);
-
-        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail || (sub as any).userEmail, sub.workerName);
-        if (workerObj && workerObj.uid) {
-          const prev = workerApprovedPayouts.get(workerObj.uid) || 0;
-          workerApprovedPayouts.set(workerObj.uid, prev + payout);
-        } else {
-          unattachedApprovedPayouts += payout;
-        }
-      }
-    });
-
-    withdrawals.data.forEach((w) => {
-      const st = (w.status || "").toLowerCase();
-      const isSuccess = st === "success" || st === "withdrawn";
-      if (isSuccess) {
-        const workerObj = getWorkerObj(w.workerId, (w as any).workerEmail, (w as any).accountHolderName);
-        if (workerObj && workerObj.uid) {
-          const prev = workerCompletedWithdrawals.get(workerObj.uid) || 0;
-          workerCompletedWithdrawals.set(workerObj.uid, prev + w.amount);
-        } else {
-          unattachedCompletedWithdrawals += w.amount;
-        }
-      }
-    });
-
-    let totalBalance = 0;
-    workerUsers.forEach((u) => {
-      const explicitBal = Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0;
-      const approvedPayouts = workerApprovedPayouts.get(u.uid) || 0;
-      const completedWithdrawals = workerCompletedWithdrawals.get(u.uid) || 0;
-      const netSubmissionPayout = Math.max(0, approvedPayouts - completedWithdrawals);
-
-      // Effective balance per worker combines explicit profile balance with any uncredited approved submission payouts
-      const effectiveWorkerBalance = Math.max(explicitBal, netSubmissionPayout);
-      totalBalance += effectiveWorkerBalance;
-    });
-
-    // Add net payouts for any workers not listed in user documents
-    const unattachedNet = Math.max(0, unattachedApprovedPayouts - unattachedCompletedWithdrawals);
-    totalBalance += unattachedNet;
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
 
     const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
@@ -3164,8 +3110,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             )}
             {filteredSubmissions.map((item) => {
               const count = getItemCountOfSubmission(item);
-              const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail);
-              const displayWorkerName = item.workerName || workerObj?.name || shortId(item.workerId);
+              const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail || (item as any).userEmail, item.workerName);
+              const workerRegisteredEmail = workerObj?.email || (item as any).workerEmail || (item as any).userEmail;
+              const subName = item.workerName || workerObj?.name;
+
+              let displayWorkerName = workerRegisteredEmail || subName || shortId(item.workerId);
+              if (subName && workerRegisteredEmail && subName.toLowerCase() !== workerRegisteredEmail.toLowerCase()) {
+                displayWorkerName = `${subName} • ${workerRegisteredEmail}`;
+              }
 
               const isFinalized = item.status !== "pending";
               const approvedCount = item.approvedItemCount ?? (item.status === "available" || item.status === "approved" || item.status === "sold" ? count : 0);
