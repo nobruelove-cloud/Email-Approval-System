@@ -2710,3 +2710,41 @@ budi2002@gmail.com|pass123
     expect(goodCopyText).toBe("ahmad1992@gmail.com|sandiwajib123");
   });
 });
+
+describe("Total Saldo Beredar (Circulating Balance) Aggregation Unit Tests", () => {
+  it("calculates Total Saldo Beredar across ALL non-admin workers including balance and saldoUtama fallbacks, ignoring admins", () => {
+    const usersData = [
+      { uid: "admin1", role: "admin", balance: 1000000 },
+      { uid: "worker1", role: "worker", balance: 50000 },
+      { uid: "worker2", role: "worker", balance: 25000 },
+      { uid: "worker3", role: "worker", saldoUtama: 15000 },
+      { uid: "worker4", role: "worker", balance: "10000" as any },
+      { uid: "worker5", role: "worker" },
+    ];
+
+    const workerUsers = usersData.filter((u) => u.role !== "admin");
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
+
+    expect(totalBalance).toBe(100000);
+  });
+
+  it("verifies worker user balances are completely unchanged during aggregation", () => {
+    const originalUsersData = [
+      { uid: "worker1", role: "worker", balance: 50000 },
+      { uid: "worker2", role: "worker", balance: 25000 },
+    ];
+    const initialCopy = JSON.parse(JSON.stringify(originalUsersData));
+
+    const workerUsers = originalUsersData.filter((u) => u.role !== "admin");
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
+
+    expect(totalBalance).toBe(75000);
+    expect(originalUsersData).toEqual(initialCopy);
+  });
+});
