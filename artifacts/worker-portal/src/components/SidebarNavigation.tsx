@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import {
+  Mail,
   Home,
   Send,
   SearchCheck,
@@ -105,7 +106,7 @@ export function SidebarNavigation({
     },
     {
       id: "checker",
-      label: "Status ACC",
+      label: "Screening Email",
       icon: <SearchCheck className="w-5 h-5 shrink-0" />,
     },
     {
@@ -173,7 +174,7 @@ export function SidebarNavigation({
         <div className="p-3.5 sm:p-4 border-b border-amber-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-orange-50/30">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black flex items-center justify-center text-sm shadow-sm ring-2 ring-amber-400/30 shrink-0">
-              G
+              <Mail className="w-5 h-5 text-white" />
             </div>
             {(!isCollapsedDesktop || isOpenMobile) && (
               <div className="min-w-0 flex-1">
