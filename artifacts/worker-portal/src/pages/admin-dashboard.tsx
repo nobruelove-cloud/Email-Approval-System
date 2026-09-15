@@ -200,7 +200,11 @@ function StatusBadge({ status }: { status: string }) {
     rejected: "Ditolak",
     inactive: "Nonaktif",
   };
-  return <Badge className={variants[status] ?? variants.pending}>{labels[status] ?? status}</Badge>;
+  return (
+    <Badge className={`whitespace-nowrap shrink-0 text-xs px-2.5 py-0.5 ${variants[status] ?? variants.pending}`}>
+      {labels[status] ?? status}
+    </Badge>
+  );
 }
 
 function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
@@ -1694,9 +1698,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300 pb-20 sm:pb-8">
-      <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border">
+      <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl w-full max-w-full box-border">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 w-full max-w-full box-border">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10 shrink-0">
               <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1737,7 +1741,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 w-full max-w-full overflow-x-hidden box-border">
         {/* SUB-PAGE TOP NAVIGATION BAR (Shows on dedicated feature pages on mobile) */}
         {activeTab !== "overview" && (
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -2971,16 +2975,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           </TabsContent>
 
           {/* KELOLA BATCH SETORAN & STOK EMAIL */}
-          <TabsContent value="submissions" className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+          <TabsContent value="submissions" className="space-y-3 sm:space-y-4 w-full max-w-full overflow-x-hidden box-border">
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full max-w-full">
               <Input
                 placeholder="Cari email, ID pekerja, atau nama..."
                 value={submissionSearch}
                 onChange={(e) => setSubmissionSearch(e.target.value)}
-                className="text-xs h-9 flex-1 bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                className="text-xs min-h-[44px] flex-1 bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500 w-full"
               />
               <Select value={submissionStatusFilter} onValueChange={setSubmissionStatusFilter}>
-                <SelectTrigger className="h-9 w-full sm:w-44 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                <SelectTrigger className="min-h-[44px] w-full sm:w-44 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
@@ -3011,108 +3015,117 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               const totalVal = item.totalAmount ?? (approvedCount * pricePerItem);
 
               return (
-                <Card key={item.id} className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-md hover:border-slate-700 transition-all">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-base text-slate-100">{displayWorkerName}</p>
-                          {!isFinalized ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-slate-400 font-medium">Tier Batch:</span>
-                              <Select
-                                disabled={busyId === item.id}
-                                value={String(tierNum)}
-                                onValueChange={(val) => handleBatchTierChange(item.id, val)}
-                              >
-                                <SelectTrigger className="h-7 text-xs bg-slate-950 border-emerald-500/40 text-emerald-400 font-bold min-w-[130px]">
-                                  <SelectValue placeholder="Pilih Tier" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                  {activeTiersList.map((t) => (
-                                    <SelectItem key={t.tier} value={String(t.tier)} className="text-xs font-medium">
-                                      {t.name} ({formatMoney(t.pricePerItem)}/item)
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                <Card key={item.id} className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-md hover:border-slate-700 transition-all w-full max-w-full overflow-x-hidden box-border">
+                  <CardContent className="p-3 sm:p-5 space-y-3 w-full max-w-full overflow-x-hidden box-border">
+                    {/* Top Row: Worker Name + Status Badge & ID/Date */}
+                    <div className="flex items-start justify-between gap-2 w-full max-w-full">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-sm sm:text-base text-slate-100 truncate max-w-[180px] sm:max-w-xs">{displayWorkerName}</p>
+                          {isFinalized && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shrink-0">
                               {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                             </Badge>
                           )}
                         </div>
-                        {isFinalized ? (
-                          <div className="text-xs text-slate-300 font-medium flex flex-wrap items-center gap-2">
-                            <span>Disetujui (ACC): <strong className="text-emerald-400">{approvedCount}</strong>/{count}</span>
-                            <span>·</span>
-                            <span>Ditolak: <strong className="text-rose-400">{rejectedCount}</strong></span>
-                            <span>·</span>
-                            <span>Total Payout: <strong className="text-teal-300">{formatMoney(totalVal)}</strong></span>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-300 font-medium">
-                            <strong>{count} email disetorkan</strong> · Estimasi Awal: <span className="text-emerald-400 font-bold">{formatMoney(item.totalAmount ?? (count * pricePerItem))}</span>
-                          </p>
-                        )}
-                        <p className="text-xs text-slate-500 font-mono">
+                        <p className="text-[10px] sm:text-xs text-slate-500 font-mono truncate mt-0.5">
                           #{shortId(item.id)} · {formatDateTime(item.submittedAt)}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <StatusBadge status={item.status} />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openDetailModal(item)}
-                          className="text-xs h-7 gap-1 border-slate-800 bg-slate-950 text-slate-300 hover:text-slate-100 hover:bg-slate-800"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> {item.status === "pending" ? "Tinjau Per Email" : "Lihat Detail"}
-                        </Button>
-                      </div>
+                      <StatusBadge status={item.status} />
                     </div>
 
-                    {item.status !== "pending" && (
-                      <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
-                        <span>Status Stok:</span>
-                        {(item.status === "available" || item.status === "approved") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busyId === item.id}
-                            onClick={() => handleStockStatusChange(item.id, "sold")}
-                            className="h-7 text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                          >
-                            Tandai Terjual (Sold)
-                          </Button>
-                        )}
-                        {item.status === "sold" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busyId === item.id}
-                            onClick={() => handleStockStatusChange(item.id, "available")}
-                            className="h-7 text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                          >
-                            Kembalikan ke Stok Tersedia
-                          </Button>
-                        )}
-                        {item.status !== "rejected" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busyId === item.id}
-                            onClick={() => handleStockStatusChange(item.id, "rejected")}
-                            className="h-7 text-xs text-rose-400 hover:bg-rose-500/10"
-                          >
-                            Nonaktifkan / Tolak
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                    {/* Middle Info & Tier Selector */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs w-full max-w-full">
+                      {isFinalized ? (
+                        <div className="text-xs text-slate-300 font-medium flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <span>Disetujui: <strong className="text-emerald-400">{approvedCount}</strong>/{count}</span>
+                          <span>·</span>
+                          <span>Ditolak: <strong className="text-rose-400">{rejectedCount}</strong></span>
+                          <span>·</span>
+                          <span>Payout: <strong className="text-teal-300 font-bold">{formatMoney(totalVal)}</strong></span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between w-full">
+                          <p className="text-xs text-slate-300 font-medium">
+                            <strong>{count} email disetorkan</strong> · Estimasi: <span className="text-emerald-400 font-bold">{formatMoney(item.totalAmount ?? (count * pricePerItem))}</span>
+                          </p>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs text-slate-400 font-medium">Tier Batch:</span>
+                            <Select
+                              disabled={busyId === item.id}
+                              value={String(tierNum)}
+                              onValueChange={(val) => handleBatchTierChange(item.id, val)}
+                            >
+                              <SelectTrigger className="min-h-[44px] text-xs bg-slate-950 border-emerald-500/40 text-emerald-400 font-bold w-full sm:w-[150px]">
+                                <SelectValue placeholder="Pilih Tier" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                {activeTiersList.map((t) => (
+                                  <SelectItem key={t.tier} value={String(t.tier)} className="text-xs font-medium">
+                                    {t.name} ({formatMoney(t.pricePerItem)}/item)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                    {item.reviewNote && <p className="text-xs text-slate-400 mt-2 italic">Catatan: {item.reviewNote}</p>}
+                    {/* Bottom Action Row */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80 w-full max-w-full">
+                      {item.status !== "pending" ? (
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                          <span className="shrink-0">Stok:</span>
+                          {(item.status === "available" || item.status === "approved") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busyId === item.id}
+                              onClick={() => handleStockStatusChange(item.id, "sold")}
+                              className="min-h-[44px] text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                            >
+                              Tandai Terjual
+                            </Button>
+                          )}
+                          {item.status === "sold" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busyId === item.id}
+                              onClick={() => handleStockStatusChange(item.id, "available")}
+                              className="min-h-[44px] text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                            >
+                              Kembalikan ke Stok
+                            </Button>
+                          )}
+                          {item.status !== "rejected" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busyId === item.id}
+                              onClick={() => handleStockStatusChange(item.id, "rejected")}
+                              className="min-h-[44px] text-xs text-rose-400 hover:bg-rose-500/10"
+                            >
+                              Tolak Stok
+                            </Button>
+                          )}
+                        </div>
+                      ) : <div />}
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDetailModal(item)}
+                        className="min-h-[44px] text-xs font-bold gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 w-full sm:w-auto shrink-0"
+                      >
+                        <Eye className="w-4 h-4 text-emerald-400" />
+                        {item.status === "pending" ? "Tinjau Per Email" : "Lihat Detail Batch"}
+                      </Button>
+                    </div>
+
+                    {item.reviewNote && <p className="text-xs text-slate-400 mt-1 italic">Catatan: {item.reviewNote}</p>}
                   </CardContent>
                 </Card>
               );
@@ -4691,10 +4704,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
         {/* DIALOG LIHAT & TINJAU DETAIL BATCH (PER EMAIL) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
+          <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-3 sm:p-6 w-full box-border">
             <DialogHeader>
-              <DialogTitle className="text-slate-100">Tinjau Batch Setoran Email</DialogTitle>
-              <DialogDescription className="text-slate-400">
+              <DialogTitle className="text-slate-100 text-base sm:text-lg">Tinjau Batch Setoran Email</DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs truncate">
                 Pekerja: <strong className="text-slate-200">{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong> · <span className="font-mono">#{shortId(detailSubmission?.id ?? "")}</span>
               </DialogDescription>
             </DialogHeader>
@@ -4719,7 +4732,6 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 ? 0
                 : baseItems.filter((_, idx) => (itemStatuses[idx] ?? "pending") === "pending").length;
 
-              // Resolved tier and price based on submission override or dynamic default
               const currentBatchTierNum = detailSubmission.appliedTier ?? detailSubmission.currentTier;
               const recTierCfg = isReadOnly
                 ? getTierConfig(currentBatchTierNum ?? 1, activeTiersList)
@@ -4734,48 +4746,48 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 : (approvedCount * pricePerItem);
 
               return (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-slate-950/80 border border-slate-800 rounded-lg text-xs">
+                <div className="space-y-3 sm:space-y-4 pt-1 w-full max-w-full overflow-x-hidden box-border">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 sm:p-3 bg-slate-950/80 border border-slate-800 rounded-lg text-xs w-full">
                     <div>
-                      <span className="text-slate-400">Total Item:</span>
+                      <span className="text-slate-400 text-[10px] sm:text-xs">Total Item:</span>
                       <p className="font-bold text-slate-100">{baseItems.length} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">ACC:</span>
+                      <span className="text-slate-400 text-[10px] sm:text-xs">ACC:</span>
                       <p className="font-bold text-emerald-400">{approvedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Ditolak:</span>
+                      <span className="text-slate-400 text-[10px] sm:text-xs">Ditolak:</span>
                       <p className="font-bold text-rose-400">{rejectedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400">Hasil Tier:</span>
-                      <p className="font-bold text-teal-300">{recTierCfg.name}</p>
+                      <span className="text-slate-400 text-[10px] sm:text-xs">Tier:</span>
+                      <p className="font-bold text-teal-300 truncate">{recTierCfg.name}</p>
                     </div>
-                    <div>
-                      <span className="text-slate-400">Total Saldo:</span>
+                    <div className="col-span-2 sm:col-span-1">
+                      <span className="text-slate-400 text-[10px] sm:text-xs">Total Saldo:</span>
                       <p className="font-bold text-emerald-400">{formatMoney(calcTotal)}</p>
                     </div>
                   </div>
 
                   {/* BULK COPY TOOLBAR */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 text-xs">
-                    <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 text-xs w-full">
+                    <span className="text-slate-300 font-semibold flex items-center gap-1.5 shrink-0">
                       <Copy className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       Salin Rekap Email:
                     </span>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-col sm:flex-row gap-1.5 w-full sm:w-auto">
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyAllEmails(baseItems)}
-                        className="h-7 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1 font-medium"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "emails" ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                         ) : (
-                          <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <Copy className="w-4 h-4 text-slate-400 shrink-0" />
                         )}
                         Salin Semua Email
                       </Button>
@@ -4784,12 +4796,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyEmailsWithPasswords(baseItems)}
-                        className="h-7 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1 font-medium"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "passwords" ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                         ) : (
-                          <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <Copy className="w-4 h-4 text-slate-400 shrink-0" />
                         )}
                         Salin Email | Sandi
                       </Button>
@@ -4797,9 +4809,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {!isReadOnly && (
-                    <div className="flex items-center justify-between gap-2 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-xs">
-                      <span className="text-slate-300 font-medium">Setujui/Tolak Semua:</span>
-                      <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-xs w-full">
+                      <span className="text-slate-300 font-medium">Setujui / Tolak Semua:</span>
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
                         <Button
                           type="button"
                           size="sm"
@@ -4809,7 +4821,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             baseItems.forEach((_, idx) => { newMap[idx] = "approved"; });
                             setItemStatuses(newMap);
                           }}
-                          className="h-7 text-xs text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
+                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 font-bold"
                         >
                           Setujui Semua (✓)
                         </Button>
@@ -4822,7 +4834,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             baseItems.forEach((_, idx) => { newMap[idx] = "rejected"; });
                             setItemStatuses(newMap);
                           }}
-                          className="h-7 text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20"
+                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold"
                         >
                           Tolak Semua (X)
                         </Button>
@@ -4830,18 +4842,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
                   )}
 
-                  <div>
+                  <div className="w-full">
                     <Label className="text-xs text-slate-400 mb-1.5 block">
                       Tinjau Item Email Individu ({baseItems.length} item):
                     </Label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-800 rounded-lg p-2 bg-slate-950/80">
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-800 rounded-lg p-2 bg-slate-950/80 w-full max-w-full overflow-x-hidden box-border">
                       {baseItems.map((it, idx) => {
                         const currentSt = itemStatuses[idx] ?? "pending";
                         const isCopied = copiedSingleIndex === idx;
                         return (
                           <div
                             key={idx}
-                            className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs transition-colors ${
+                            className={`p-2.5 rounded-md border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors w-full ${
                               currentSt === "approved"
                                 ? "bg-emerald-950/30 border-emerald-500/30"
                                 : currentSt === "rejected"
@@ -4850,63 +4862,63 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             }`}
                           >
                             <div className="min-w-0 flex-1 font-mono">
-                              <div className="flex items-center gap-1.5 font-semibold text-slate-100">
-                                <span className="truncate">{idx + 1}. {it.email}</span>
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-100 min-w-0">
+                                <span className="truncate flex-1">{idx + 1}. {it.email}</span>
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 shrink-0"
+                                  className="min-h-[36px] min-w-[36px] sm:h-6 sm:w-6 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 shrink-0"
                                   title="Salin Email"
                                   onClick={() => handleCopySingleEmail(it.email, idx)}
                                 >
                                   {isCopied ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-400" />
                                   ) : (
-                                    <Copy className="w-3.5 h-3.5" />
+                                    <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                   )}
                                 </Button>
                               </div>
-                              {it.password && <p className="text-[11px] text-slate-400">Sandi: {it.password}</p>}
+                              {it.password && <p className="text-[11px] text-slate-400 truncate">Sandi: {it.password}</p>}
                             </div>
 
                             {isReadOnly ? (
                               <Badge
-                                className={
+                                className={`self-start sm:self-center shrink-0 ${
                                   currentSt === "approved"
                                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                                     : currentSt === "rejected"
                                       ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                                       : "bg-slate-800 text-slate-400"
-                                }
+                                }`}
                               >
                                 {currentSt === "approved" ? "Terjual (✓)" : currentSt === "rejected" ? "Ditolak (X)" : "Menunggu"}
                               </Badge>
                             ) : (
-                              <div className="flex items-center gap-1 shrink-0">
+                              <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-slate-800">
                                 <Button
                                   type="button"
                                   size="sm"
                                   onClick={() => setItemStatuses((prev) => ({ ...prev, [idx]: "approved" }))}
-                                  className={`h-7 px-2.5 text-xs gap-1 ${
+                                  className={`min-h-[44px] sm:min-h-0 sm:h-8 px-2.5 text-xs font-bold gap-1 ${
                                     currentSt === "approved"
-                                      ? "bg-emerald-500 text-slate-950 font-bold"
+                                      ? "bg-emerald-500 text-slate-950"
                                       : "bg-slate-900 text-slate-400 hover:bg-emerald-500/20 hover:text-emerald-400 border border-slate-800"
                                   }`}
                                 >
-                                  ✓ Disetujui
+                                  ✓ ACC
                                 </Button>
                                 <Button
                                   type="button"
                                   size="sm"
                                   onClick={() => setItemStatuses((prev) => ({ ...prev, [idx]: "rejected" }))}
-                                  className={`h-7 px-2.5 text-xs gap-1 ${
+                                  className={`min-h-[44px] sm:min-h-0 sm:h-8 px-2.5 text-xs font-bold gap-1 ${
                                     currentSt === "rejected"
-                                      ? "bg-rose-600 text-white font-bold"
+                                      ? "bg-rose-600 text-white"
                                       : "bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-800"
                                   }`}
                                 >
-                                  X Ditolak
+                                  X Tolak
                                 </Button>
                               </div>
                             )}
@@ -4917,7 +4929,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {!isReadOnly && (
-                    <div className="space-y-3 pt-2 border-t border-slate-800">
+                    <div className="space-y-3 pt-2 border-t border-slate-800 w-full">
                       <div>
                         <Label htmlFor="batch-note" className="text-xs text-slate-300">Catatan Review Admin (opsional)</Label>
                         <Input
@@ -4925,14 +4937,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           placeholder="Contoh: 3 email valid, 2 email tidak bisa login"
                           value={notes[detailSubmission.id] ?? ""}
                           onChange={(e) => setNotes((prev) => ({ ...prev, [detailSubmission.id]: e.target.value }))}
-                          className="mt-1 h-8 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1 min-h-[44px] text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
                         />
                       </div>
                       <Button
                         type="button"
                         disabled={busyId === detailSubmission.id || pendingCount > 0}
                         onClick={() => handleFinalizeBatchReview(detailSubmission)}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs gap-2 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                        className="w-full min-h-[44px] bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-extrabold text-xs gap-2 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
                       >
                         {busyId === detailSubmission.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
