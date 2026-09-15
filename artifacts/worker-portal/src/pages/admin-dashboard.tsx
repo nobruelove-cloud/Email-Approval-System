@@ -1282,11 +1282,28 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const workerMap = useMemo(() => {
     const map = new Map<string, PortalUser>();
-    users.data.forEach((u) => map.set(u.uid, u));
+    users.data.forEach((u) => {
+      if (u.uid) map.set(u.uid, u);
+      if (u.email && u.email.trim()) {
+        map.set(u.email.trim().toLowerCase(), u);
+      }
+    });
     return map;
   }, [users.data]);
 
-  const workerName = (id: string) => workerMap.get(id)?.name ?? shortId(id);
+  const getWorkerObj = (id?: string, email?: string) => {
+    if (id && workerMap.has(id)) return workerMap.get(id);
+    if (email && workerMap.has(email.trim().toLowerCase())) {
+      return workerMap.get(email.trim().toLowerCase());
+    }
+    return undefined;
+  };
+
+  const workerName = (idOrEmail: string) => {
+    if (!idOrEmail) return "-";
+    const found = getWorkerObj(idOrEmail, idOrEmail);
+    return found?.name ?? shortId(idOrEmail);
+  };
 
   // Map worker accumulated approved item counts
   const workerApprovedQtyMap = useMemo(() => {
@@ -1295,18 +1312,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       const isApprovedOrStock = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
       if (isApprovedOrStock) {
         const count = getItemCountOfSubmission(sub);
-        const current = map.get(sub.workerId) ?? 0;
-        map.set(sub.workerId, current + count);
+        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail);
+        const primaryKey = workerObj?.uid || sub.workerId;
+        const current = map.get(primaryKey) ?? 0;
+        map.set(primaryKey, current + count);
       }
     });
     return map;
-  }, [submissions.data]);
+  }, [submissions.data, workerMap]);
 
   const stats = useMemo(() => {
-    const totalWorkers = users.data.filter((u) => u.role === "worker").length;
-    const pendingWorkers = users.data.filter((u) => u.role === "worker" && u.status === "pending").length;
-    const activeWorkers = users.data.filter((u) => u.role === "worker" && (u.status === "approved" || u.status === "active")).length;
-    const totalBalance = users.data.reduce((sum, u) => sum + (u.balance ?? 0), 0);
+    const workerUsers = users.data.filter((u) => u.role !== "admin");
+    const totalWorkers = workerUsers.length;
+    const pendingWorkers = workerUsers.filter((u) => u.status === "pending").length;
+    const activeWorkers = workerUsers.filter((u) => u.status === "approved" || u.status === "active").length;
+    const totalBalance = workerUsers.reduce((sum, u) => sum + (u.balance ?? 0), 0);
     const totalSubmissions = submissions.data.length;
     const pendingSubmissions = submissions.data.filter((s) => s.status === "pending").length;
     const availableStock = submissions.data.reduce((sum, s) => {
@@ -1428,13 +1448,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const filteredSubmissions = useMemo(() => {
     return submissions.data.filter((item) => {
-      const wName = (item.workerName || workerName(item.workerId)).toLowerCase();
+      const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail);
+      const wName = (item.workerName || workerObj?.name || workerName(item.workerId)).toLowerCase();
+      const wEmail = ((item as any).workerEmail || workerObj?.email || "").toLowerCase();
       const search = submissionSearch.toLowerCase().trim();
       const firstEmail = item.items?.[0]?.email ?? item.email ?? "";
       const matchesSearch =
         !search ||
         firstEmail.toLowerCase().includes(search) ||
         item.workerId.toLowerCase().includes(search) ||
+        wEmail.includes(search) ||
         wName.includes(search);
 
       let matchesStatus = true;
@@ -1448,7 +1471,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       return matchesSearch && matchesStatus;
     });
-  }, [submissions.data, submissionSearch, submissionStatusFilter, workerName]);
+  }, [submissions.data, submissionSearch, submissionStatusFilter, workerName, workerMap]);
 
   async function handleWithdrawalDecision(id: string, status: "processing" | "success" | "rejected") {
     setBusyId(id);
@@ -3002,7 +3025,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             )}
             {filteredSubmissions.map((item) => {
               const count = getItemCountOfSubmission(item);
-              const workerObj = workerMap.get(item.workerId);
+              const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail);
               const displayWorkerName = item.workerName || workerObj?.name || shortId(item.workerId);
 
               const isFinalized = item.status !== "pending";
@@ -3222,7 +3245,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       </Badge>
                     </div>
                     <p className="text-2xl sm:text-3xl font-black text-slate-100 mt-0.5 tracking-tight">
-                      {users.data.filter((u) => u.role === "worker").length}{" "}
+                      {users.data.filter((u) => u.role !== "admin").length}{" "}
                       <span className="text-xs font-semibold text-slate-400 font-sans">Worker Terdaftar</span>
                     </p>
                   </div>
@@ -3386,7 +3409,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {users.loading && <p className="text-sm text-slate-400 text-center py-8">Memuat…</p>}
             {users.data
-              .filter((u) => u.role === "worker")
+              .filter((u) => u.role !== "admin")
               .map((u) => {
                 const currentTierCfg = getTierConfig(u.tier ?? 1, activeTiersList);
                 const approvedCount = workerApprovedQtyMap.get(u.uid) ?? 0;
