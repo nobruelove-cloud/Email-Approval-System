@@ -408,7 +408,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setRawText("")}
-                  className="text-[11px] text-rose-500 hover:underline flex items-center gap-1 font-semibold"
+                  className="text-[11px] text-rose-500 hover:underline inline-flex items-center gap-1 font-semibold min-h-[44px] py-2 px-1 cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" /> Bersihkan Input
                 </button>
@@ -450,7 +450,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
               <Button
                 onClick={handleCopyGoodEmails}
                 disabled={checkResult.goodCount === 0}
-                className={`font-bold text-xs h-10 px-4 rounded-xl shrink-0 gap-1.5 shadow-sm active:scale-95 transition-transform ${
+                className={`font-bold text-xs h-11 min-h-[44px] px-4 rounded-xl shrink-0 gap-1.5 shadow-sm active:scale-95 transition-transform ${
                   isAdminView
                     ? "bg-emerald-500 hover:bg-emerald-600 text-slate-955"
                     : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
@@ -474,7 +474,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("ALL")}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                  className={`px-3 py-2 min-h-[44px] inline-flex items-center justify-center rounded-lg transition-all ${
                     filterTab === "ALL"
                       ? isAdminView
                         ? "bg-emerald-500 text-slate-955 shadow-xs"
@@ -487,7 +487,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("GOOD")}
-                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all ${
                     filterTab === "GOOD" || filterTab === "ACTIVE"
                       ? "bg-emerald-600 text-white shadow-xs"
                       : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
@@ -499,7 +499,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("BAD")}
-                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                  className={`px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all ${
                     filterTab === "BAD"
                       ? "bg-rose-600 text-white shadow-xs"
                       : "text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10"
@@ -517,7 +517,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Cari email / username..."
-                  className={`pl-8 h-8 text-xs rounded-lg ${
+                  className={`pl-8 h-10 min-h-[44px] text-xs rounded-lg ${
                     isAdminView
                       ? "bg-slate-955 border-slate-800 text-slate-100"
                       : "bg-gray-50 border-gray-200 text-gray-900"
