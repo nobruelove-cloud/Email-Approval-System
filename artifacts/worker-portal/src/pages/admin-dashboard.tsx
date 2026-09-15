@@ -36,7 +36,21 @@ import {
   BarChart3,
   AlertTriangle,
   SearchCheck,
+  ArrowLeft,
+  Home,
+  HelpCircle,
 } from "lucide-react";
+
+export type AdminTab =
+  | "overview"
+  | "checker"
+  | "announcements"
+  | "finance"
+  | "submissions"
+  | "withdrawals"
+  | "workers"
+  | "rewards"
+  | "rules";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -252,6 +266,7 @@ function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
 }
 
 export default function AdminDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts } = useAdminData();
   const announcements = useAnnouncements({ includeInactive: true });
 
@@ -1663,8 +1678,23 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
 
 
+  const getTabTitle = (tab: AdminTab) => {
+    switch (tab) {
+      case "overview": return "Command Center";
+      case "checker": return "Screening Email";
+      case "announcements": return "Kelola Pengumuman";
+      case "finance": return "Keuangan Platform";
+      case "submissions": return "Kelola Batch Setoran";
+      case "withdrawals": return "Kelola Penarikan Saldo";
+      case "workers": return "Manajemen Pekerja";
+      case "rewards": return "Rewards & Klasemen";
+      case "rules": return "Aturan & Operasional";
+      default: return "Admin Dashboard";
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300">
+    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300 pb-20 sm:pb-8">
       <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -1707,40 +1737,59 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <Tabs defaultValue="overview">
-          <TabsList className="flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-9 w-full mb-4 sm:mb-6 bg-slate-900/80 border border-slate-800 p-1 sm:p-1.5 rounded-xl backdrop-blur-xl gap-1 shrink-0">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+        {/* SUB-PAGE TOP NAVIGATION BAR (Shows on dedicated feature pages on mobile) */}
+        {activeTab !== "overview" && (
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveTab("overview")}
+              className="gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-3 h-9 rounded-xl border border-emerald-500/30"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <span>Kembali ke Command Center</span>
+            </Button>
+            <Badge variant="outline" className="text-xs bg-slate-900/90 text-emerald-400 border-emerald-500/40 font-bold px-3 py-1 shadow-md">
+              {getTabTitle(activeTab)}
+            </Badge>
+          </div>
+        )}
+
+        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as AdminTab)} className="w-full">
+          {/* DESKTOP TOP TAB NAVIGATION (Hidden on mobile to avoid crowded tab bars) */}
+          <TabsList className="hidden sm:grid sm:grid-cols-9 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1 shrink-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               Ringkasan
             </TabsTrigger>
-            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <SearchCheck className="w-3.5 h-3.5" /> Master Riset
             </TabsTrigger>
-            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Megaphone className="w-3.5 h-3.5" /> Pengumuman
             </TabsTrigger>
-            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <DollarSign className="w-3.5 h-3.5" /> Keuangan
             </TabsTrigger>
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <FileText className="w-3.5 h-3.5" /> Batch
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Gift className="w-3.5 h-3.5" /> Hadiah
             </TabsTrigger>
-            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
@@ -1994,29 +2043,171 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Dialog>
           </TabsContent>
 
-          {/* RINGKASAN */}
+          {/* RINGKASAN / COMMAND CENTER */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "Batch Menunggu Review", value: stats.pendingSubmissions, highlight: true, accent: "emerald" },
-                { label: "Stok Email Tersedia", value: `${stats.availableStock} item`, highlight: true, accent: "emerald" },
-                { label: "Total Saldo Beredar", value: formatMoney(stats.totalBalance), highlight: true, accent: "teal" },
-                { label: "Pekerja Aktif", value: stats.activeWorkers, highlight: true, accent: "emerald" },
-                { label: "Total Pekerja", value: stats.totalWorkers },
-                { label: "Pekerja Menunggu", value: stats.pendingWorkers },
-                { label: "Total Batch Setoran", value: stats.totalSubmissions },
-                { label: "Stok Email Terjual", value: `${stats.soldStock} item` },
-                { label: "Penarikan Menunggu", value: `${stats.pendingWithdrawals} (${formatMoney(stats.pendingWithdrawalAmount)})` },
-                { label: "Total Dicairkan", value: formatMoney(stats.totalPaidOut) },
-              ].map((s) => (
-                <Card key={s.label} className={`bg-slate-900/80 border backdrop-blur-xl transition-all shadow-md ${s.highlight ? "border-emerald-500/30 bg-emerald-500/5" : "border-slate-800"}`}>
-                  <CardContent className="pt-5 pb-5">
-                    <p className="text-xs text-slate-400 font-medium">{s.label}</p>
-                    <p className={`text-lg font-black mt-1 ${s.accent === "emerald" ? "text-emerald-400" : s.accent === "teal" ? "text-teal-400" : "text-slate-100"}`}>{s.value}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            {/* CORE OVERVIEW STATISTICS - Focused & Clean */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
+              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
+                <CardContent className="p-0">
+                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 shrink-0" /> Batch Review
+                  </p>
+                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.pendingSubmissions}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Menunggu verifikasi</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
+                <CardContent className="p-0">
+                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <SearchCheck className="w-3.5 h-3.5 shrink-0" /> Stok Email
+                  </p>
+                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.availableStock}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Siap dijual ke vendor</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
+                <CardContent className="p-0">
+                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 shrink-0" /> Pekerja Aktif
+                  </p>
+                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.activeWorkers}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Total: {stats.totalWorkers} pekerja</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
+                <CardContent className="p-0">
+                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Wallet className="w-3.5 h-3.5 shrink-0" /> Penarikan Pending
+                  </p>
+                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.pendingWithdrawals}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-2 sm:col-span-1 bg-teal-500/10 border-teal-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
+                <CardContent className="p-0">
+                  <p className="text-[11px] sm:text-xs text-teal-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5 shrink-0" /> Total Saldo Beredar
+                  </p>
+                  <p className="text-xl sm:text-2xl font-black mt-1 text-teal-300 truncate">{formatMoney(stats.totalBalance)}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Dompet seluruh pekerja</p>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* LAYANAN CEPAT ADMIN (Quick Action Feature Shortcuts) */}
+            <Card className="bg-slate-900/90 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl overflow-hidden">
+              <CardHeader className="pb-3 border-b border-slate-800/80 p-3.5 sm:p-5">
+                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 text-slate-100">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  Layanan Cepat Admin
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-400 mt-0.5">
+                  Pilih fitur untuk membuka halaman manajemen khusus.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-3.5 sm:p-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
+                  {[
+                    {
+                      id: "submissions" as AdminTab,
+                      label: "Batch Review",
+                      desc: "Tinjau setoran email",
+                      icon: <FileText className="w-5 h-5 text-emerald-400" />,
+                      badge: stats.pendingSubmissions > 0 ? `${stats.pendingSubmissions} Menunggu` : undefined,
+                      badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+                    },
+                    {
+                      id: "withdrawals" as AdminTab,
+                      label: "Penarikan",
+                      desc: "Proses penarikan saldo",
+                      icon: <Wallet className="w-5 h-5 text-emerald-400" />,
+                      badge: stats.pendingWithdrawals > 0 ? `${stats.pendingWithdrawals} Pending` : undefined,
+                      badgeStyle: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+                    },
+                    {
+                      id: "checker" as AdminTab,
+                      label: "Screening Email",
+                      desc: "Master Riset Bulk Email",
+                      icon: <SearchCheck className="w-5 h-5 text-emerald-400" />,
+                    },
+                    {
+                      id: "finance" as AdminTab,
+                      label: "Keuangan",
+                      desc: "Ledger & simulator profit",
+                      icon: <DollarSign className="w-5 h-5 text-teal-400" />,
+                    },
+                    {
+                      id: "workers" as AdminTab,
+                      label: "Workers",
+                      desc: "Kelola akun pekerja",
+                      icon: <Users className="w-5 h-5 text-emerald-400" />,
+                      badge: `${stats.activeWorkers} Aktif`,
+                      badgeStyle: "bg-slate-800 text-slate-300 border-slate-700",
+                    },
+                    {
+                      id: "rewards" as AdminTab,
+                      label: "Rewards / Klasemen",
+                      desc: "Cairkan bonus mingguan",
+                      icon: <Gift className="w-5 h-5 text-amber-400" />,
+                    },
+                    {
+                      id: "rules" as AdminTab,
+                      label: "Rules & Setting",
+                      desc: "Rate, jam, & fee portal",
+                      icon: <SettingsIcon className="w-5 h-5 text-emerald-400" />,
+                    },
+                    {
+                      id: "announcements" as AdminTab,
+                      label: "Pengumuman",
+                      desc: "Buat info resmi pekerja",
+                      icon: <Megaphone className="w-5 h-5 text-emerald-400" />,
+                    },
+                    {
+                      id: "rules" as AdminTab,
+                      label: "Jam Operasional",
+                      desc: "Kontrol saklar setoran",
+                      icon: <Clock className="w-5 h-5 text-emerald-400" />,
+                    },
+                    {
+                      id: "rules" as AdminTab,
+                      label: "Support Config",
+                      desc: "Telegram & WhatsApp CS",
+                      icon: <HelpCircle className="w-5 h-5 text-emerald-400" />,
+                    },
+                  ].map((item, idx) => (
+                    <button
+                      key={`${item.id}-${idx}`}
+                      type="button"
+                      onClick={() => setActiveTab(item.id)}
+                      className="flex flex-col justify-between p-3.5 sm:p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all text-left group min-h-[90px] min-w-[44px] shadow-sm relative focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-colors">
+                            {item.icon}
+                          </div>
+                          {item.badge && (
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${item.badgeStyle || "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"}`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-bold text-xs text-slate-100 group-hover:text-emerald-400 transition-colors line-clamp-1">
+                          {item.label}
+                        </p>
+                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* VISUAL ANALYTICS & TREND CHART CARD */}
             <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
@@ -4762,6 +4953,86 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* MOBILE STICKY BOTTOM NAVIGATION BAR */}
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl sm:hidden">
+          <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("overview")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
+                activeTab === "overview"
+                  ? "text-emerald-400 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Home className="w-5 h-5" />
+              <span className="text-[10px] truncate max-w-full">Home</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("submissions")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
+                activeTab === "submissions"
+                  ? "text-emerald-400 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+              {stats.pendingSubmissions > 0 && (
+                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-slate-950 font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                  {stats.pendingSubmissions}
+                </span>
+              )}
+              <span className="text-[10px] truncate max-w-full">Batch</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("withdrawals")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
+                activeTab === "withdrawals"
+                  ? "text-emerald-400 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Wallet className="w-5 h-5" />
+              {stats.pendingWithdrawals > 0 && (
+                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-slate-950 font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                  {stats.pendingWithdrawals}
+                </span>
+              )}
+              <span className="text-[10px] truncate max-w-full">Penarikan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("finance")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
+                activeTab === "finance"
+                  ? "text-emerald-400 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <DollarSign className="w-5 h-5" />
+              <span className="text-[10px] truncate max-w-full">Keuangan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("rules")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
+                activeTab === "rules"
+                  ? "text-emerald-400 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <SettingsIcon className="w-5 h-5" />
+              <span className="text-[10px] truncate max-w-full">Aturan</span>
+            </button>
+          </div>
+        </nav>
       </main>
     </div>
   );
