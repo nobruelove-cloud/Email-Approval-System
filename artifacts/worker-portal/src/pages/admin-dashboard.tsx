@@ -1759,37 +1759,37 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as AdminTab)} className="w-full">
           {/* DESKTOP TOP TAB NAVIGATION (Hidden on mobile to avoid crowded tab bars) */}
           <TabsList className="hidden sm:grid sm:grid-cols-9 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1 shrink-0">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               Ringkasan
             </TabsTrigger>
-            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <SearchCheck className="w-3.5 h-3.5" /> Master Riset
             </TabsTrigger>
-            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Megaphone className="w-3.5 h-3.5" /> Pengumuman
             </TabsTrigger>
-            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <DollarSign className="w-3.5 h-3.5" /> Keuangan
             </TabsTrigger>
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <FileText className="w-3.5 h-3.5" /> Batch
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Gift className="w-3.5 h-3.5" /> Hadiah
             </TabsTrigger>
-            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[36px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
