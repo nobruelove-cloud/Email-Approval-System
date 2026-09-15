@@ -53,6 +53,43 @@ export function shortId(id: string) {
 /**
  * Masks worker usernames for privacy (e.g., "Ahmad Fauzi" -> "Ahm***", "User" -> "Use***").
  */
+/**
+ * Resolves a worker profile object from a list of users using workerId, workerEmail, or workerName.
+ * Matches across UID, normalized email, and normalized name/username.
+ */
+export function resolveWorkerUser<T extends { uid: string; name?: string; email?: string }>(
+  workerQuery: { workerId?: string; workerEmail?: string; workerName?: string },
+  users: T[]
+): T | undefined {
+  if (!users || !Array.isArray(users) || users.length === 0) return undefined;
+
+  const id = workerQuery.workerId?.trim();
+  const email = workerQuery.workerEmail?.trim().toLowerCase();
+  const name = workerQuery.workerName?.trim().toLowerCase();
+
+  // 1. Direct UID match
+  if (id) {
+    const directUidMatch = users.find((u) => u.uid === id);
+    if (directUidMatch) return directUidMatch;
+  }
+
+  // 2. Direct Email match
+  const searchEmail = email || (id && id.includes("@") ? id.toLowerCase() : undefined);
+  if (searchEmail) {
+    const emailMatch = users.find((u) => u.email && u.email.trim().toLowerCase() === searchEmail);
+    if (emailMatch) return emailMatch;
+  }
+
+  // 3. Direct Name match
+  const searchName = name || (id && !id.includes("@") ? id.toLowerCase() : undefined);
+  if (searchName) {
+    const nameMatch = users.find((u) => u.name && u.name.trim().toLowerCase() === searchName);
+    if (nameMatch) return nameMatch;
+  }
+
+  return undefined;
+}
+
 export function maskWorkerName(name?: string | null): string {
   if (!name || typeof name !== "string") return "User***";
   const trimmed = name.trim();
@@ -682,12 +719,29 @@ export function getWorkerAccInPeriod(
   startDate: Date,
   endDate: Date,
   workerId?: string,
+  users?: Array<{ uid: string; name?: string; role?: string; email?: string }>
 ): number {
   const startMs = startDate.getTime();
   const endMs = endDate.getTime();
 
   return submissions.reduce((sum, sub) => {
-    if (workerId && sub.workerId !== workerId) return sum;
+    if (workerId) {
+      let isMatch = sub.workerId === workerId;
+      if (!isMatch && Array.isArray(users) && users.length > 0) {
+        const resolved = resolveWorkerUser(
+          {
+            workerId: sub.workerId || (sub as any).userId,
+            workerEmail: (sub as any).workerEmail || (sub as any).userEmail,
+            workerName: sub.workerName,
+          },
+          users
+        );
+        if (resolved && resolved.uid === workerId) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch) return sum;
+    }
 
     let subDate: Date | null = null;
     if (sub.submittedAt) {
@@ -698,7 +752,8 @@ export function getWorkerAccInPeriod(
     const t = subDate.getTime();
     if (t < startMs || t > endMs) return sum;
 
-    const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+    const statusNorm = typeof sub.status === "string" ? sub.status.trim().toLowerCase() : "";
+    const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold" || statusNorm === "acc" || statusNorm === "terjual";
     if (!isFinalized) return sum;
 
     let approvedCount = 0;
@@ -852,7 +907,7 @@ export function getLeaderboardUserProgress(
  */
 export function calculateLeaderboardStandings(
   submissions: EmailSubmission[],
-  users: Array<{ uid: string; name?: string; role?: string }>,
+  users: Array<{ uid: string; name?: string; role?: string; email?: string }>,
   startDate: Date,
   endDate: Date,
   rewardConfigs?: { rank: number; rewardAmount: number }[]
@@ -860,21 +915,14 @@ export function calculateLeaderboardStandings(
   const startMs = startDate.getTime();
   const endMs = endDate.getTime();
 
-  const userMap = new Map<string, string>();
-  if (Array.isArray(users)) {
-    users.forEach((u) => {
-      if (u.role === "worker" || !u.role) {
-        userMap.set(u.uid, u.name || "Worker");
-      }
-    });
-  }
+  const workerUsers = Array.isArray(users) ? users.filter((u) => u.role === "worker" || !u.role) : [];
 
   const accMap = new Map<string, { name: string; count: number }>();
 
   if (Array.isArray(submissions)) {
     submissions.forEach((sub) => {
       const statusNorm = typeof sub.status === "string" ? sub.status.trim().toLowerCase() : "";
-      const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold";
+      const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold" || statusNorm === "acc" || statusNorm === "terjual";
       if (!isFinalized) return;
 
       let subDate: Date | null = null;
@@ -901,10 +949,18 @@ export function calculateLeaderboardStandings(
 
       if (approvedCount <= 0) return;
 
-      const wId = sub.workerId || (sub as any).userId || (sub as any).userEmail;
-      if (!wId) return;
+      const resolvedWorker = resolveWorkerUser(
+        {
+          workerId: sub.workerId || (sub as any).userId,
+          workerEmail: (sub as any).workerEmail || (sub as any).userEmail,
+          workerName: sub.workerName,
+        },
+        workerUsers
+      );
 
-      const resolvedName = userMap.get(wId) || sub.workerName || "Worker";
+      const wId = resolvedWorker ? resolvedWorker.uid : (sub.workerId || (sub as any).userId || "unknown");
+      const resolvedName = resolvedWorker ? (resolvedWorker.name || "Worker") : (sub.workerName || "Worker");
+
       const existing = accMap.get(wId);
       if (existing) {
         existing.count += approvedCount;

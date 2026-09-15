@@ -29,6 +29,7 @@ import {
   parseAndCheckEmailLine,
   bulkCheckEmails,
   formatGoodEmailsForCopy,
+  resolveWorkerUser,
 } from "../lib/portal-utils";
 import { DEFAULT_CHECKER_RULES, type CheckerRulesConfig } from "../lib/portal-types";
 import {
@@ -2746,5 +2747,78 @@ describe("Total Saldo Beredar (Circulating Balance) Aggregation Unit Tests", () 
 
     expect(totalBalance).toBe(75000);
     expect(originalUsersData).toEqual(initialCopy);
+  });
+});
+
+describe("Unified Worker Lookup & Auto-Credit Approved Payouts Unit Tests", () => {
+  it("resolveWorkerUser matches worker profile across UID, email, and name/username", () => {
+    const usersList = [
+      { uid: "uid_zamm", name: "zammrorr77", email: "zammrorr77@gmail.com" },
+      { uid: "uid_kalmiyadi", name: "Kalmiyadi", email: "kalmiyadi@gmail.com" },
+      { uid: "uid_rehan", name: "rehan permadi", email: "rehanpermadi@gmail.com" },
+    ];
+
+    // Submission with workerName "azam" and workerEmail "zammrorr77@gmail.com"
+    const resolvedAzam = resolveWorkerUser(
+      { workerId: "azam", workerEmail: "zammrorr77@gmail.com", workerName: "azam" },
+      usersList
+    );
+    expect(resolvedAzam).toBeDefined();
+    expect(resolvedAzam?.uid).toBe("uid_zamm");
+    expect(resolvedAzam?.name).toBe("zammrorr77");
+
+    // Submission with workerId "Kalmiyadi"
+    const resolvedKalmiyadi = resolveWorkerUser(
+      { workerId: "Kalmiyadi" },
+      usersList
+    );
+    expect(resolvedKalmiyadi).toBeDefined();
+    expect(resolvedKalmiyadi?.uid).toBe("uid_kalmiyadi");
+
+    // Submission with workerName "rehan permadi"
+    const resolvedRehan = resolveWorkerUser(
+      { workerId: "rehan", workerName: "rehan permadi" },
+      usersList
+    );
+    expect(resolvedRehan).toBeDefined();
+    expect(resolvedRehan?.uid).toBe("uid_rehan");
+  });
+
+  it("Verifies total circulating balance reflects Rp 9.000 across 3 approved Sept 14 submissions", () => {
+    const usersList = [
+      { uid: "uid_zamm", name: "zammrorr77", email: "zammrorr77@gmail.com", balance: 3000 },
+      { uid: "uid_kalmiyadi", name: "Kalmiyadi", email: "kalmiyadi@gmail.com", balance: 3000 },
+      { uid: "uid_rehan", name: "rehan permadi", email: "rehanpermadi@gmail.com", balance: 3000 },
+    ];
+
+    const approvedSubmissions = [
+      { id: "sub_1", workerId: "azam", workerEmail: "zammrorr77@gmail.com", workerName: "azam", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+      { id: "sub_2", workerId: "Kalmiyadi", workerName: "Kalmiyadi", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+      { id: "sub_3", workerId: "rehan", workerName: "rehan permadi", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+    ];
+
+    // Build worker map using resolveWorkerUser
+    const workerApprovedPayouts = new Map<string, number>();
+
+    approvedSubmissions.forEach((sub) => {
+      const resolved = resolveWorkerUser(
+        { workerId: sub.workerId, workerEmail: sub.workerEmail, workerName: sub.workerName },
+        usersList
+      );
+      expect(resolved).toBeDefined();
+      if (resolved) {
+        const prev = workerApprovedPayouts.get(resolved.uid) || 0;
+        workerApprovedPayouts.set(resolved.uid, prev + sub.totalAmount);
+      }
+    });
+
+    // Check individual worker payouts
+    expect(workerApprovedPayouts.get("uid_zamm")).toBe(3000);
+    expect(workerApprovedPayouts.get("uid_kalmiyadi")).toBe(3000);
+    expect(workerApprovedPayouts.get("uid_rehan")).toBe(3000);
+
+    // Sum total circulating balance across all 3 approved Sept 14 submissions
+    const totalCirculatingBalance = Array.from(workerApprovedPayouts.values()).reduce((a, b) => a + b, 0);
+    expect(totalCirculatingBalance).toBe(9000);
   });
 });

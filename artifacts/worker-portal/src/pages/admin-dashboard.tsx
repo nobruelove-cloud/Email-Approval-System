@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import {
@@ -1287,32 +1287,111 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       if (u.email && u.email.trim()) {
         map.set(u.email.trim().toLowerCase(), u);
       }
+      if (u.name && u.name.trim()) {
+        map.set(u.name.trim().toLowerCase(), u);
+      }
     });
     return map;
   }, [users.data]);
 
-  const getWorkerObj = (id?: string, email?: string) => {
+  const getWorkerObj = (id?: string, email?: string, name?: string) => {
     if (id && workerMap.has(id)) return workerMap.get(id);
+    if (id && workerMap.has(id.trim().toLowerCase())) return workerMap.get(id.trim().toLowerCase());
     if (email && workerMap.has(email.trim().toLowerCase())) {
       return workerMap.get(email.trim().toLowerCase());
+    }
+    if (name && workerMap.has(name.trim().toLowerCase())) {
+      return workerMap.get(name.trim().toLowerCase());
     }
     return undefined;
   };
 
-  const workerName = (idOrEmail: string) => {
-    if (!idOrEmail) return "-";
-    const found = getWorkerObj(idOrEmail, idOrEmail);
-    return found?.name ?? shortId(idOrEmail);
+  const workerName = (idOrEmail?: string, email?: string, name?: string) => {
+    if (!idOrEmail && !email && !name) return "-";
+    const found = getWorkerObj(idOrEmail, email, name);
+    return found?.name ?? name ?? (idOrEmail ? shortId(idOrEmail) : "-");
   };
+
+  // One-time auto-sync migration effect for missing approved payouts
+  const hasSyncedBalancesRef = useRef(false);
+
+  useEffect(() => {
+    if (hasSyncedBalancesRef.current || users.loading || submissions.loading || withdrawals.loading) {
+      return;
+    }
+
+    if (!users.data.length || !submissions.data.length) {
+      return;
+    }
+
+    hasSyncedBalancesRef.current = true;
+
+    // Scan approved submissions per worker
+    const workerNetPayouts = new Map<string, number>();
+
+    submissions.data.forEach((sub) => {
+      const st = (sub.status || "").toLowerCase();
+      const isApproved = st === "approved" || st === "available" || st === "sold" || st === "acc" || st === "terjual";
+      if (!isApproved) return;
+
+      const count = typeof sub.approvedItemCount === "number"
+        ? sub.approvedItemCount
+        : Array.isArray(sub.items) && sub.items.length > 0
+        ? sub.items.filter((it) => it.status === "approved").length
+        : getItemCountOfSubmission(sub);
+
+      const pricePerItem = sub.appliedPricePerItem ?? sub.currentPricePerItem ?? sub.pricePerEmail ?? 2000;
+      const payout = sub.totalAmount ?? (count * pricePerItem);
+
+      const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail || (sub as any).userEmail, sub.workerName);
+      if (workerObj && workerObj.uid) {
+        const prev = workerNetPayouts.get(workerObj.uid) || 0;
+        workerNetPayouts.set(workerObj.uid, prev + payout);
+      }
+    });
+
+    // Subtract completed withdrawals
+    withdrawals.data.forEach((w) => {
+      const st = (w.status || "").toLowerCase();
+      const isSuccess = st === "success" || st === "withdrawn";
+      if (!isSuccess) return;
+
+      const workerObj = getWorkerObj(w.workerId, (w as any).workerEmail, (w as any).accountHolderName);
+      if (workerObj && workerObj.uid) {
+        const prev = workerNetPayouts.get(workerObj.uid) || 0;
+        workerNetPayouts.set(workerObj.uid, Math.max(0, prev - w.amount));
+      }
+    });
+
+    // Sync workers whose balances were left at Rp 0 despite having approved submissions
+    workerNetPayouts.forEach((expectedBalance, workerUid) => {
+      if (expectedBalance <= 0) return;
+
+      const workerUser = users.data.find((u) => u.uid === workerUid);
+      if (!workerUser) return;
+
+      const currentBal = Number(workerUser.balance ?? workerUser.saldoUtama ?? 0) || 0;
+      if (currentBal < expectedBalance) {
+        console.log(`[Auto-Sync Balance] Updating worker ${workerUser.name} (${workerUid}) balance from Rp ${currentBal} to Rp ${expectedBalance}`);
+        updatePortalUser(workerUid, {
+          balance: expectedBalance,
+          saldoUtama: expectedBalance,
+        }).catch((err) => {
+          console.warn(`[Auto-Sync Balance] Failed to sync balance for ${workerUid}:`, err);
+        });
+      }
+    });
+  }, [users.loading, submissions.loading, withdrawals.loading, users.data, submissions.data, withdrawals.data, getWorkerObj]);
 
   // Map worker accumulated approved item counts
   const workerApprovedQtyMap = useMemo(() => {
     const map = new Map<string, number>();
     submissions.data.forEach((sub) => {
-      const isApprovedOrStock = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+      const st = (sub.status || "").toLowerCase();
+      const isApprovedOrStock = st === "approved" || st === "available" || st === "sold" || st === "acc" || st === "terjual";
       if (isApprovedOrStock) {
         const count = getItemCountOfSubmission(sub);
-        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail);
+        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail || (sub as any).userEmail, sub.workerName);
         const primaryKey = workerObj?.uid || sub.workerId;
         const current = map.get(primaryKey) ?? 0;
         map.set(primaryKey, current + count);
@@ -1346,7 +1425,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         const pricePerItem = sub.appliedPricePerItem ?? sub.currentPricePerItem ?? sub.pricePerEmail ?? 2000;
         const payout = sub.totalAmount ?? (count * pricePerItem);
 
-        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail);
+        const workerObj = getWorkerObj(sub.workerId, (sub as any).workerEmail || (sub as any).userEmail, sub.workerName);
         if (workerObj && workerObj.uid) {
           const prev = workerApprovedPayouts.get(workerObj.uid) || 0;
           workerApprovedPayouts.set(workerObj.uid, prev + payout);
@@ -1360,7 +1439,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       const st = (w.status || "").toLowerCase();
       const isSuccess = st === "success" || st === "withdrawn";
       if (isSuccess) {
-        const workerObj = getWorkerObj(w.workerId);
+        const workerObj = getWorkerObj(w.workerId, (w as any).workerEmail, (w as any).accountHolderName);
         if (workerObj && workerObj.uid) {
           const prev = workerCompletedWithdrawals.get(workerObj.uid) || 0;
           workerCompletedWithdrawals.set(workerObj.uid, prev + w.amount);
@@ -1507,9 +1586,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   const filteredSubmissions = useMemo(() => {
     return submissions.data.filter((item) => {
-      const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail);
-      const wName = (item.workerName || workerObj?.name || workerName(item.workerId)).toLowerCase();
-      const wEmail = ((item as any).workerEmail || workerObj?.email || "").toLowerCase();
+      const workerObj = getWorkerObj(item.workerId, (item as any).workerEmail || (item as any).userEmail, item.workerName);
+      const wName = (workerObj?.name || item.workerName || workerName(item.workerId, (item as any).workerEmail || (item as any).userEmail, item.workerName)).toLowerCase();
+      const wEmail = (workerObj?.email || (item as any).workerEmail || (item as any).userEmail || "").toLowerCase();
       const search = submissionSearch.toLowerCase().trim();
       const firstEmail = item.items?.[0]?.email ?? item.email ?? "";
       const matchesSearch =
@@ -1521,10 +1600,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       let matchesStatus = true;
       if (submissionStatusFilter !== "all") {
+        const itemStatusStr = (item.status as string || "").toLowerCase();
         if (submissionStatusFilter === "available") {
-          matchesStatus = item.status === "available" || item.status === "approved";
+          matchesStatus = itemStatusStr === "available" || itemStatusStr === "approved" || itemStatusStr === "sold" || itemStatusStr === "acc" || itemStatusStr === "terjual";
         } else {
-          matchesStatus = item.status === submissionStatusFilter;
+          matchesStatus = itemStatusStr === submissionStatusFilter.toLowerCase();
         }
       }
 
