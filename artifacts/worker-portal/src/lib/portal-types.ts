@@ -32,6 +32,7 @@ export type PortalUser = {
   status: UserStatus;
   tier: UserTier;
   balance: number;
+  saldoUtama?: number;
   referredBy?: string;
   referralCode?: string;
   hasUsedReferral?: boolean;

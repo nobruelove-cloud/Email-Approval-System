@@ -1165,8 +1165,27 @@ export async function reviewSubmission(
           ? (rulesData.tiers as TierConfig[])
           : DEFAULT_TIERS;
 
-      const userRef = doc(firestore, "users", submission.workerId);
-      const userSnap = await tx.get(userRef);
+      let userRef = doc(firestore, "users", submission.workerId);
+      let userSnap = await tx.get(userRef);
+
+      if (!userSnap.exists()) {
+        const usersSnap = await getDocs(collection(firestore, "users"));
+        const targetEmail = ((submission as any).workerEmail || (submission as any).userEmail || (submission.workerId?.includes("@") ? submission.workerId : "")).trim().toLowerCase();
+        const targetName = (submission.workerName || (!submission.workerId?.includes("@") ? submission.workerId : "")).trim().toLowerCase();
+
+        const foundDoc = usersSnap.docs.find((d) => {
+          const data = d.data();
+          const email = (data.email || "").trim().toLowerCase();
+          const name = (data.name || "").trim().toLowerCase();
+          return (targetEmail && email === targetEmail) || (targetName && name === targetName);
+        });
+
+        if (foundDoc) {
+          userRef = doc(firestore, "users", foundDoc.id);
+          userSnap = await tx.get(userRef);
+          workerIdToEvaluate = foundDoc.id;
+        }
+      }
 
       // Determine items & status counts
       const itemCount = getItemCountOfSubmission(submission);
@@ -1680,9 +1699,29 @@ export async function processEmailACC(submissionId: string) {
         throw new Error("Email ini sudah pernah di-ACC sebelumnya!");
       }
 
-      const workerId = submissionData.workerId;
-      const workerRef = doc(firestore, "users", workerId);
-      const workerDoc = await transaction.get(workerRef);
+      let workerId = submissionData.workerId;
+      let workerRef = doc(firestore, "users", workerId);
+      let workerDoc = await transaction.get(workerRef);
+
+      if (!workerDoc.exists()) {
+        const usersSnap = await getDocs(collection(firestore, "users"));
+        const targetEmail = ((submissionData as any).workerEmail || (submissionData as any).userEmail || (workerId?.includes("@") ? workerId : "")).trim().toLowerCase();
+        const targetName = (submissionData.workerName || (!workerId?.includes("@") ? workerId : "")).trim().toLowerCase();
+
+        const foundDoc = usersSnap.docs.find((d) => {
+          const data = d.data();
+          const email = (data.email || "").trim().toLowerCase();
+          const name = (data.name || "").trim().toLowerCase();
+          return (targetEmail && email === targetEmail) || (targetName && name === targetName);
+        });
+
+        if (foundDoc) {
+          workerRef = doc(firestore, "users", foundDoc.id);
+          workerDoc = await transaction.get(workerRef);
+          workerId = foundDoc.id;
+        }
+      }
+
       if (!workerDoc.exists()) throw new Error("Data worker tidak ditemukan!");
 
       const workerData = workerDoc.data() as PortalUser;
