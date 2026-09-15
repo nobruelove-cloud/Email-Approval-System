@@ -1666,20 +1666,20 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300">
       <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
-              <ShieldAlert className="w-5 h-5" />
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10 shrink-0">
+              <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-slate-100 text-lg tracking-tight">Obsidian Command Center</p>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase tracking-wider">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <p className="font-bold text-slate-100 text-sm sm:text-lg tracking-tight truncate">Command Center</p>
+                <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase tracking-wider shrink-0">
                   ADMIN
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
-                <span>
+              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-400 font-mono mt-0.5">
+                <span className="truncate max-w-[130px] sm:max-w-xs">
                   {isEmailVisible
                     ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
                     : "*".repeat((profile.email && profile.email.trim() ? profile.email.trim() : "-").length)}
@@ -1687,7 +1687,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <button
                   type="button"
                   onClick={() => setIsEmailVisible(!isEmailVisible)}
-                  className="text-slate-400 hover:text-emerald-400 transition-colors p-0.5 rounded focus:outline-none"
+                  className="text-slate-400 hover:text-emerald-400 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
                   title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                 >
                   {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1700,47 +1700,47 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             size="icon"
             onClick={onLogout}
             title="Keluar"
-            className="border-slate-800 bg-slate-950/60 text-slate-300 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="border-slate-800 bg-slate-950/60 text-slate-300 hover:text-slate-100 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
           >
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <Tabs defaultValue="overview">
-          <TabsList className="grid grid-cols-3 sm:grid-cols-9 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all">
+          <TabsList className="flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-9 w-full mb-4 sm:mb-6 bg-slate-900/80 border border-slate-800 p-1 sm:p-1.5 rounded-xl backdrop-blur-xl gap-1 shrink-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               Ringkasan
             </TabsTrigger>
-            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <SearchCheck className="w-3.5 h-3.5" /> Master Riset
             </TabsTrigger>
-            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Megaphone className="w-3.5 h-3.5" /> Pengumuman
             </TabsTrigger>
-            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <DollarSign className="w-3.5 h-3.5" /> Keuangan
             </TabsTrigger>
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <FileText className="w-3.5 h-3.5" /> Batch
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <Gift className="w-3.5 h-3.5" /> Hadiah
             </TabsTrigger>
-            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all">
+            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[40px] sm:min-h-[36px] px-3 shrink-0 whitespace-nowrap">
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
@@ -1869,7 +1869,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-slate-900/95 border-slate-800 text-slate-100">
+                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
                                   <AlertDialogHeader>
                                     <AlertDialogTitle className="text-slate-100">Hapus Pengumuman?</AlertDialogTitle>
                                     <AlertDialogDescription className="text-slate-400">
@@ -1903,7 +1903,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* DIALOG BUAT / EDIT PENGUMUMAN */}
             <Dialog open={annModalOpen} onOpenChange={setAnnModalOpen}>
-              <DialogContent className="max-w-md bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle className="text-slate-100">{editingAnn ? "Edit Pengumuman" : "Buat Pengumuman Baru"}</DialogTitle>
                   <DialogDescription className="text-slate-400">
@@ -2644,7 +2644,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-slate-900/95 border-slate-800 text-slate-100">
+                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
                                   <AlertDialogHeader>
                                     <AlertDialogTitle className="text-slate-100">Hapus Transaksi Keuangan?</AlertDialogTitle>
                                     <AlertDialogDescription className="text-slate-400">
@@ -2675,7 +2675,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* DIALOG TAMBAH / EDIT TRANSAKSI KEUANGAN */}
             <Dialog open={finModalOpen} onOpenChange={setFinModalOpen}>
-              <DialogContent className="max-w-md bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle className="text-slate-100">
                     {editingFinTx ? "Edit Transaksi Keuangan" : finType === "income" ? "Catat Pemasukan" : "Catat Pengeluaran"}
@@ -3030,7 +3030,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       <UserPlus className="w-4 h-4" /> Tambah Pekerja
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+                  <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
                     <DialogHeader>
                       <DialogTitle className="text-slate-100">Tambah Pekerja Baru</DialogTitle>
                       <DialogDescription className="text-slate-400">Akun akan langsung berstatus aktif.</DialogDescription>
@@ -3273,7 +3273,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-slate-900/95 border-slate-800 text-slate-100">
+                          <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
                             <AlertDialogHeader>
                               <AlertDialogTitle className="text-slate-100">Hapus data pekerja ini?</AlertDialogTitle>
                               <AlertDialogDescription className="text-slate-400">
@@ -3358,7 +3358,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             : "Cairkan Reward Klasemen Mingguan"}
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-slate-900/95 border-slate-800 text-slate-100">
+                      <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
                             <Trophy className="w-5 h-5 text-amber-500" />
@@ -3538,7 +3538,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   )}
                 </div>
 
-                {/* RIWAYAT PAYOUT LEADERBOARD HISTORICAL TABLE */}
+                {/* RIWAYAT PAYOUT LEADERBOARD HISTORICAL TABLE & MOBILE CARDS */}
                 <div className="pt-2 border-t border-slate-800">
                   <Label className="text-xs font-bold text-slate-200 mb-2 block">
                     Riwayat Pencairan Hadiah Leaderboard ({leaderboardPayouts?.data?.length || 0})
@@ -3548,34 +3548,61 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       Belum ada pencairan hadiah leaderboard sebelumnya.
                     </p>
                   ) : (
-                    <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80 max-h-60 overflow-y-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 font-semibold">
-                          <tr>
-                            <th className="px-3 py-2">Waktu Cair</th>
-                            <th className="px-3 py-2">Periode</th>
-                            <th className="px-3 py-2">Juara</th>
-                            <th className="px-3 py-2">Pekerja</th>
-                            <th className="px-3 py-2 text-right">Hadiah</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/60">
-                          {leaderboardPayouts.data.map((payout) => (
-                            <tr key={payout.id} className="hover:bg-slate-800/40 transition-colors">
-                              <td className="px-3 py-2 font-mono text-slate-400">{formatDateTime(payout.paidAt)}</td>
-                              <td className="px-3 py-2 font-bold text-slate-200">{payout.periodKey}</td>
-                              <td className="px-3 py-2">
-                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
-                                  Juara #{payout.rank}
-                                </Badge>
-                              </td>
-                              <td className="px-3 py-2 font-semibold text-slate-200">{payout.workerName || workerName(payout.workerId)}</td>
-                              <td className="px-3 py-2 font-black text-amber-400 text-right">{formatMoney(payout.rewardAmount)}</td>
+                    <>
+                      {/* Desktop Table */}
+                      <div className="hidden sm:block border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80 max-h-60 overflow-y-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 font-semibold sticky top-0 backdrop-blur-md">
+                            <tr>
+                              <th className="px-3 py-2">Waktu Cair</th>
+                              <th className="px-3 py-2">Periode</th>
+                              <th className="px-3 py-2">Juara</th>
+                              <th className="px-3 py-2">Pekerja</th>
+                              <th className="px-3 py-2 text-right">Hadiah</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60">
+                            {leaderboardPayouts.data.map((payout) => (
+                              <tr key={payout.id} className="hover:bg-slate-800/40 transition-colors">
+                                <td className="px-3 py-2 font-mono text-slate-400">{formatDateTime(payout.paidAt)}</td>
+                                <td className="px-3 py-2 font-bold text-slate-200">{payout.periodKey}</td>
+                                <td className="px-3 py-2">
+                                  <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
+                                    Juara #{payout.rank}
+                                  </Badge>
+                                </td>
+                                <td className="px-3 py-2 font-semibold text-slate-200">{payout.workerName || workerName(payout.workerId)}</td>
+                                <td className="px-3 py-2 font-black text-amber-400 text-right">{formatMoney(payout.rewardAmount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Cards */}
+                      <div className="sm:hidden space-y-2 max-h-64 overflow-y-auto">
+                        {leaderboardPayouts.data.map((payout) => (
+                          <div
+                            key={payout.id}
+                            className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-200">{payout.workerName || workerName(payout.workerId)}</span>
+                              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
+                                Juara #{payout.rank}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-400">
+                              <span>Periode: <strong className="text-slate-200">{payout.periodKey}</strong></span>
+                              <span className="font-black text-amber-400 text-sm">{formatMoney(payout.rewardAmount)}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-800/60">
+                              Cair: {formatDateTime(payout.paidAt)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -3923,7 +3950,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <Label className="text-sm font-bold text-slate-200 mb-2 block">
                       Daftar Metode Pembayaran & Struktur Biaya
                     </Label>
-                    <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80">
+
+                    {/* Desktop Table View */}
+                    <div className="hidden sm:block border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80">
                       <table className="w-full text-xs text-left">
                         <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 font-semibold">
                           <tr>
@@ -4023,6 +4052,106 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           ))}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="sm:hidden space-y-3">
+                      {currentMethods.map((m, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3.5 rounded-xl border space-y-3 ${
+                            m.enabled ? "bg-slate-950/80 border-slate-800" : "bg-slate-950/30 border-slate-900 opacity-60"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-100 text-sm">{m.method}</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleToggleMethodEnabled(idx, !m.enabled)}
+                                className={`text-[11px] h-7 px-2.5 font-bold border-slate-800 ${
+                                  m.enabled
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                    : "bg-slate-800 text-slate-400"
+                                }`}
+                              >
+                                {m.enabled ? "✓ Aktif" : "Nonaktif"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveMethod(idx)}
+                                className="h-7 w-7 p-0 text-rose-400 hover:bg-rose-500/10"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Kategori</Label>
+                              <Select
+                                value={m.category ?? "bank"}
+                                onValueChange={(val) => handleUpdateMethodFee(idx, "category", val)}
+                              >
+                                <SelectTrigger className="h-8 text-xs bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
+                                  <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
+                                  <SelectItem value="other" className="text-xs">Lainnya</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Jenis Biaya</Label>
+                              <Select
+                                value={m.feeType}
+                                onValueChange={(val) => handleUpdateMethodFee(idx, "feeType", val)}
+                              >
+                                <SelectTrigger className="h-8 text-xs bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectItem value="free" className="text-xs text-emerald-400 font-semibold">Gratis</SelectItem>
+                                  <SelectItem value="fixed" className="text-xs text-sky-400 font-semibold">Tetap (Rp)</SelectItem>
+                                  <SelectItem value="percentage" className="text-xs text-teal-300 font-semibold">Persentase (%)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {m.feeType !== "free" && (
+                            <div>
+                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Nilai Biaya</Label>
+                              {m.feeType === "fixed" ? (
+                                <FormattedNumberInput
+                                  value={m.feeValue}
+                                  onChange={(val) => handleUpdateMethodFee(idx, "feeValue", val)}
+                                  className="h-8 text-xs bg-slate-900 border-slate-800 font-bold text-sky-400"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={m.feeValue}
+                                    onChange={(e) => handleUpdateMethodFee(idx, "feeValue", parseFloat(e.target.value) || 0)}
+                                    className="h-8 text-xs bg-slate-900 border-slate-800 font-bold text-teal-300"
+                                  />
+                                  <span className="font-bold text-slate-400 text-xs">%</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -4371,7 +4500,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
         {/* DIALOG LIHAT & TINJAU DETAIL BATCH (PER EMAIL) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+          <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-slate-100">Tinjau Batch Setoran Email</DialogTitle>
               <DialogDescription className="text-slate-400">

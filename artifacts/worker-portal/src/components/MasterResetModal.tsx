@@ -39,8 +39,8 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-[#0f172a] border border-slate-800 w-full max-w-md rounded-2xl p-6 text-white shadow-2xl relative space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+      <div className="bg-[#0f172a] border border-slate-800 w-full max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 text-white shadow-2xl relative space-y-5">
 
         {/* Header Modal */}
         <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4">
