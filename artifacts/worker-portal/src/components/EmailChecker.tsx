@@ -229,21 +229,21 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
       {/* ADMIN RULE CONFIGURATOR CARD */}
       {isAdminView && (
         <Card className="bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl backdrop-blur-xl">
-          <CardHeader className="pb-3 border-b border-slate-800">
+          <CardHeader className="p-3.5 sm:p-6 pb-3 border-b border-slate-800">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base font-bold text-emerald-400 flex items-center gap-2">
+              <CardTitle className="text-sm sm:text-base font-bold text-emerald-400 flex items-center gap-2">
                 <Sliders className="w-4 h-4" />
                 Pengaturan Rules Screening Master Riset / Checker
               </CardTitle>
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] sm:text-xs">
                 Sync Real-time ke Worker
               </Badge>
             </div>
-            <CardDescription className="text-xs text-slate-400">
+            <CardDescription className="text-xs text-slate-400 mt-0.5">
               Konfigurasi parameter penyaringan otomatis email untuk seluruh worker di Worker Portal.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="p-3.5 sm:p-6 pt-3.5 sm:pt-4">
             <form onSubmit={handleSaveAdminRules} className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-955 border border-slate-800">
                 <div className="space-y-0.5">
@@ -331,23 +331,23 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
 
       {/* 2. BULK TEXTAREA INPUT & CHECKER PANEL */}
       <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-amber-100 shadow-xs"}>
-        <CardHeader className="pb-3">
+        <CardHeader className="p-3.5 sm:p-6 pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className={`text-base font-bold flex items-center gap-2 ${isAdminView ? "text-slate-100" : "text-gray-900"}`}>
+              <CardTitle className={`text-sm sm:text-base font-bold flex items-center gap-2 ${isAdminView ? "text-slate-100" : "text-gray-900"}`}>
                 <ShieldCheck className={`w-4 h-4 ${isAdminView ? "text-emerald-400" : "text-amber-600"}`} />
                 Input Massal Checker Status & Screening Format
               </CardTitle>
-              <CardDescription className={`text-xs ${isAdminView ? "text-slate-400" : "text-gray-600"}`}>
+              <CardDescription className={`text-xs mt-0.5 ${isAdminView ? "text-slate-400" : "text-gray-600"}`}>
                 Masukkan multi-line email. Dukungan format: <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email|password</code>, <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email:password</code>, atau pemisah spasi.
               </CardDescription>
             </div>
-            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-xs" : "bg-amber-50 text-amber-900 border-amber-300 font-bold text-xs"}>
+            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-[10px] sm:text-xs" : "bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px] sm:text-xs"}>
               Rules: {activeConfigToUse.minBirthYear}-{activeConfigToUse.maxBirthYear} · Digit ≤ {activeConfigToUse.maxUsernameDigits}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-3.5 sm:p-6 pt-0 space-y-3.5 sm:space-y-4">
           {/* DEDICATED MASTER PASSWORD INPUT FIELD */}
           <div className={`p-4 rounded-xl border space-y-2 ${
             isAdminView ? "bg-slate-955 border-slate-800" : "bg-amber-50/60 border-amber-200/80"
@@ -429,35 +429,35 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
 
           {/* SUMMARY STATS & ONE-CLICK COPY CTA */}
           {checkResult.total > 0 && (
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            <div className={`p-3 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 ${
               isAdminView ? "bg-slate-955 border-slate-800" : "bg-gradient-to-r from-amber-50 to-orange-50/60 border-amber-200/80"
             }`}>
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-3 sm:gap-4 text-xs">
                 <div>
                   <span className="text-gray-500 block text-[10px] uppercase font-bold">Total Parse</span>
-                  <span className="font-black text-sm text-gray-900 dark:text-slate-100">{checkResult.total} Item</span>
+                  <span className="font-black text-xs sm:text-sm text-gray-900 dark:text-slate-100">{checkResult.total} Item</span>
                 </div>
                 <div>
                   <span className="text-emerald-600 block text-[10px] uppercase font-bold">Active / Good</span>
-                  <span className="font-black text-sm text-emerald-600">{checkResult.goodCount} Item</span>
+                  <span className="font-black text-xs sm:text-sm text-emerald-600">{checkResult.goodCount} Item</span>
                 </div>
                 <div>
                   <span className="text-rose-600 block text-[10px] uppercase font-bold">Bad / Dead</span>
-                  <span className="font-black text-sm text-rose-600">{checkResult.badCount} Item</span>
+                  <span className="font-black text-xs sm:text-sm text-rose-600">{checkResult.badCount} Item</span>
                 </div>
               </div>
 
               <Button
                 onClick={handleCopyGoodEmails}
                 disabled={checkResult.goodCount === 0}
-                className={`font-bold text-xs h-10 px-4 rounded-xl shrink-0 gap-1.5 shadow-sm active:scale-95 transition-transform ${
+                className={`font-bold text-xs h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl shrink-0 gap-1.5 shadow-sm active:scale-95 transition-transform ${
                   isAdminView
                     ? "bg-emerald-500 hover:bg-emerald-600 text-slate-955"
                     : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? "Tersalin!" : `Copy Active / Good Emails (${checkResult.goodCount})`}
+                {copied ? "Tersalin!" : `Copy Active Emails (${checkResult.goodCount})`}
               </Button>
             </div>
           )}
