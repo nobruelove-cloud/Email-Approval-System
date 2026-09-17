@@ -14,6 +14,7 @@ import {
   where,
   addDoc,
   deleteDoc,
+  writeBatch,
   runTransaction,
   Timestamp,
   type QueryConstraint,
@@ -3157,7 +3158,8 @@ export function useWorkerChat(workerUid?: string) {
     const unsub = onSnapshot(
       convRef,
       (snap) => {
-        if (snap.exists()) {
+        const exists = typeof snap?.exists === "function" ? snap.exists() : false;
+        if (exists) {
           setConversation({ id: snap.id, ...snap.data() } as Conversation);
         } else {
           setConversation(null);
@@ -3196,9 +3198,11 @@ export function useAdminConversations() {
       q,
       (snap) => {
         const list: Conversation[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
-        });
+        if (typeof snap?.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        }
         setConversations(list);
         setLoading(false);
       },
@@ -3245,9 +3249,11 @@ export function useConversationMessages(conversationId: string | null) {
       q,
       (snap) => {
         const list: ChatMessage[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
-        });
+        if (typeof snap?.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        }
         setMessages(list);
         setLoading(false);
       },
@@ -3388,4 +3394,61 @@ export async function markConversationAsRead(
     // If document doesn't exist yet, ignore
     console.warn("markConversationAsRead error:", err);
   }
+}
+
+/**
+ * Clears chat view for the specified role (admin or worker) without deleting messages from Firestore.
+ */
+export async function clearConversationChat(
+  conversationId: string,
+  role: "admin" | "worker"
+) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const convRef = doc(db, "conversations", conversationId);
+  const fieldToUpdate = role === "admin" ? "adminClearedAt" : "workerClearedAt";
+
+  await updateDoc(convRef, {
+    [fieldToUpdate]: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Toggles pinned message for either admin or worker on conversation metadata.
+ */
+export async function togglePinMessage(
+  conversationId: string,
+  messageId: string,
+  role: "admin" | "worker",
+  currentlyPinnedId?: string | null
+) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const convRef = doc(db, "conversations", conversationId);
+  const pinField = role === "admin" ? "adminPinnedMessageId" : "workerPinnedMessageId";
+
+  const newPinnedId = currentlyPinnedId === messageId ? null : messageId;
+
+  await updateDoc(convRef, {
+    [pinField]: newPinnedId,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Permanently deletes conversation document and all subcollection messages (Admin only).
+ */
+export async function deleteConversation(conversationId: string) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const convRef = doc(db, "conversations", conversationId);
+  const messagesColRef = collection(db, "conversations", conversationId, "messages");
+
+  // Fetch all messages in subcollection and delete them
+  const messagesSnap = await getDocs(messagesColRef);
+  const batch = writeBatch(db);
+  messagesSnap.forEach((msgDoc) => {
+    batch.delete(msgDoc.ref);
+  });
+  batch.delete(convRef);
+
+  await batch.commit();
 }

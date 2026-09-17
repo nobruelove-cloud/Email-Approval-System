@@ -1173,6 +1173,76 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // --- ADDITIONAL CHAT FEATURE TESTS (Pin, Clear, Delete) ---
+  console.log('\n--- Additional Chat Feature Security Rules Tests (Pin, Clear, Delete) ---');
+
+  // Test 11: Worker CANNOT update adminPinnedMessageId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminPinnedMessageId: 'msg_123',
+      })
+    );
+    console.log('[PASS] 11. Worker cannot update adminPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 11. Worker update adminPinnedMessageId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 12: Worker CANNOT update adminClearedAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminClearedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 12. Worker cannot update adminClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 12. Worker update adminClearedAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 13: Worker CAN update workerPinnedMessageId
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: workerUid,
+        workerPinnedMessageId: 'msg_456',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 13. Worker can update workerPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 13. Worker update workerPinnedMessageId failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 14: Worker CAN update workerClearedAt
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: workerUid,
+        workerClearedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 14. Worker can update workerClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 14. Worker update workerClearedAt failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 15: Worker CANNOT delete conversation document
+  try {
+    await assertFails(
+      deleteDoc(doc(workerDb, 'conversations', workerUid))
+    );
+    console.log('[PASS] 15. Worker cannot delete conversation document.');
+  } catch (err) {
+    console.error('[FAIL] 15. Worker delete conversation document was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }

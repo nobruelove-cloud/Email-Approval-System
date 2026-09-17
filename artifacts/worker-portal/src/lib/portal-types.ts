@@ -32,6 +32,10 @@ export interface Conversation {
   lastMessageAt: any;
   workerUnread: number;
   adminUnread: number;
+  adminPinnedMessageId?: string | null;
+  workerPinnedMessageId?: string | null;
+  adminClearedAt?: any;
+  workerClearedAt?: any;
   createdAt: any;
   updatedAt?: any;
 }
