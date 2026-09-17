@@ -2853,28 +2853,3 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
     ).rejects.toThrow("Pesan tidak boleh kosong.");
   });
 });
-
-describe("Real-Time Chat Services & Hooks Unit Tests", () => {
-  it("useWorkerChat returns null when no workerUid is supplied", () => {
-    const { result } = renderHook(() => useWorkerChat(undefined));
-    expect(result.current.conversation).toBeNull();
-    expect(result.current.loading).toBe(false);
-  });
-
-  it("useConversationMessages returns empty array when conversationId is null", () => {
-    const { result } = renderHook(() => useConversationMessages(null));
-    expect(result.current.messages).toEqual([]);
-    expect(result.current.loading).toBe(false);
-  });
-
-  it("sendChatMessage rejects empty whitespace messages", async () => {
-    await expect(
-      sendChatMessage({
-        conversationId: "worker_123",
-        senderId: "worker_123",
-        senderRole: "worker",
-        text: "   ",
-      })
-    ).rejects.toThrow("Pesan tidak boleh kosong.");
-  });
-});

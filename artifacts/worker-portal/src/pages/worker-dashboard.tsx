@@ -37,6 +37,10 @@ import {
   Tag,
   SearchCheck,
   Menu,
+  Pin,
+  Trash2,
+  Eraser,
+  PinOff,
 } from "lucide-react";
 import { EmailChecker } from "@/components/EmailChecker";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -48,6 +52,7 @@ import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +60,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useWorkerData,
   useWorkerEngagementData,
@@ -71,6 +86,8 @@ import {
   useConversationMessages,
   sendChatMessage,
   markConversationAsRead,
+  clearConversationChat,
+  togglePinMessage,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
@@ -197,6 +214,75 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Pasif Income Simulation state
   const [simFriends, setSimFriends] = useState(10);
   const [simAccPerFriend, setSimAccPerFriend] = useState(10);
+
+  // Worker Chat States
+  const workerChatData = useWorkerChat(profile.uid);
+  const workerMessagesData = useConversationMessages(profile.uid);
+  const [workerChatText, setWorkerChatText] = useState("");
+  const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+  const [showClearChatDialog, setShowClearChatDialog] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
+  const workerChatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto scroll & mark as read when activeView is "chat" or messages update
+  useEffect(() => {
+    if (activeView === "chat") {
+      markConversationAsRead(profile.uid, "worker");
+      workerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeView, workerMessagesData.messages]);
+
+  async function handleSendWorkerChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workerChatText.trim() || sendingWorkerChat) return;
+
+    const textToSend = workerChatText.trim();
+    setWorkerChatText("");
+    setSendingWorkerChat(true);
+
+    try {
+      await sendChatMessage({
+        conversationId: profile.uid,
+        senderId: profile.uid,
+        senderRole: "worker",
+        senderName: profile.name || "Worker",
+        senderEmail: profile.email || "",
+        text: textToSend,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan");
+      setWorkerChatText(textToSend);
+    } finally {
+      setSendingWorkerChat(false);
+    }
+  }
+
+  async function handleConfirmClearChat() {
+    setClearingChat(true);
+    try {
+      await clearConversationChat(profile.uid, "worker");
+      toast.success("Riwayat chat berhasil dibersihkan dari tampilanmu.");
+      setShowClearChatDialog(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal membersihkan chat.");
+    } finally {
+      setClearingChat(false);
+    }
+  }
+
+  async function handleToggleWorkerPin(msgId: string) {
+    try {
+      await togglePinMessage(
+        profile.uid,
+        msgId,
+        "worker",
+        workerChatData.conversation?.workerPinnedMessageId
+      );
+      toast.success("Status sematan pesan diperbarui.");
+    } catch (err) {
+      toast.error("Gagal memperbarui sematan pesan.");
+    }
+  }
 
   const isAlreadyLinked = !!profile.referredBy || !!myReferral.data;
   const referrerDisplayName = myReferral.data?.referrerName || (profile.referredBy ? shortId(profile.referredBy) : "");
@@ -1713,6 +1799,231 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   )}
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
+          {activeView === "chat" && (
+            <div className="space-y-4">
+              <Card className="bg-white border-amber-200/80 shadow-xs overflow-hidden">
+                <CardHeader className="pb-3 border-b border-amber-100/80 bg-gradient-to-r from-amber-50/50 to-orange-50/30">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-500 text-white shadow-2xs">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                          Pesan Admin & Bantuan Privat
+                        </CardTitle>
+                        <CardDescription className="text-xs text-gray-500">
+                          Percakapan langsung dan aman antara kamu dan Admin.
+                        </CardDescription>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowClearChatDialog(true)}
+                        className="text-xs h-9 px-3 border-amber-200 text-amber-900 hover:bg-amber-100/80 gap-1.5 font-semibold min-h-[44px]"
+                      >
+                        <Eraser className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Bersihkan Chat</span>
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-3 sm:p-4 space-y-3 bg-slate-50/50">
+                  {/* PINNED MESSAGE BANNER */}
+                  {(() => {
+                    const pinnedId = workerChatData.conversation?.workerPinnedMessageId;
+                    if (!pinnedId) return null;
+                    const pinnedMsg = workerMessagesData.messages.find((m) => m.id === pinnedId);
+                    if (!pinnedMsg) return null;
+
+                    // Check if pinned message is hidden by workerClearedAt
+                    const clearedAt = workerChatData.conversation?.workerClearedAt;
+                    if (clearedAt && pinnedMsg.createdAt) {
+                      const msgTime = pinnedMsg.createdAt.toMillis ? pinnedMsg.createdAt.toMillis() : new Date(pinnedMsg.createdAt).getTime();
+                      const clearTime = clearedAt.toMillis ? clearedAt.toMillis() : new Date(clearedAt).getTime();
+                      if (msgTime <= clearTime) return null;
+                    }
+
+                    return (
+                      <div
+                        onClick={() => {
+                          const el = document.getElementById(`worker-msg-${pinnedMsg.id}`);
+                          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="p-2.5 bg-amber-50 border border-amber-300/80 rounded-xl flex items-center justify-between gap-2 shadow-2xs cursor-pointer hover:bg-amber-100/60 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Pin className="w-4 h-4 text-amber-700 shrink-0 fill-amber-500" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">
+                              Pesan Disematkan ({pinnedMsg.senderRole === "admin" ? "Admin" : "Kamu"})
+                            </p>
+                            <p className="text-xs text-amber-950 truncate font-medium">{pinnedMsg.text}</p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleWorkerPin(pinnedMsg.id);
+                          }}
+                          className="h-7 px-2 text-amber-800 hover:text-amber-950 hover:bg-amber-200/50 text-[10px] font-bold shrink-0 min-h-[32px]"
+                          title="Batalkan Sematan"
+                        >
+                          <PinOff className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* MESSAGES SCROLL AREA */}
+                  <div className="p-3 sm:p-4 bg-white border border-amber-100 rounded-2xl min-h-[340px] max-h-[450px] overflow-y-auto space-y-3 shadow-inner">
+                    {workerMessagesData.loading ? (
+                      <div className="flex items-center justify-center py-12 text-xs text-amber-800 gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                        Memuat pesan...
+                      </div>
+                    ) : (() => {
+                      const clearedAt = workerChatData.conversation?.workerClearedAt;
+                      const visibleMessages = workerMessagesData.messages.filter((msg) => {
+                        if (!clearedAt || !msg.createdAt) return true;
+                        const msgTime = msg.createdAt.toMillis ? msg.createdAt.toMillis() : new Date(msg.createdAt).getTime();
+                        const clearTime = clearedAt.toMillis ? clearedAt.toMillis() : new Date(clearedAt).getTime();
+                        return msgTime > clearTime;
+                      });
+
+                      if (visibleMessages.length === 0) {
+                        return (
+                          <div className="p-8 text-center border border-dashed border-amber-200 rounded-2xl bg-amber-50/30 space-y-2">
+                            <MessageSquare className="w-8 h-8 text-amber-500 mx-auto opacity-60" />
+                            <p className="text-xs font-bold text-amber-900">Belum ada pesan dalam percakapan ini.</p>
+                            <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+                              Jika ada pertanyaan terkait kendala akun, setoran email, atau penarikan komisi, tulis pesanmu di bawah.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      const pinnedId = workerChatData.conversation?.workerPinnedMessageId;
+
+                      return visibleMessages.map((msg) => {
+                        const isMe = msg.senderRole === "worker";
+                        const isPinned = pinnedId === msg.id;
+
+                        return (
+                          <div
+                            key={msg.id}
+                            id={`worker-msg-${msg.id}`}
+                            className={`flex flex-col group ${isMe ? "items-end" : "items-start"}`}
+                          >
+                            <div
+                              className={`relative max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs transition-all ${
+                                isMe
+                                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-br-none"
+                                  : "bg-amber-50/80 border border-amber-200 text-gray-900 rounded-bl-none"
+                              } ${isPinned ? "ring-2 ring-amber-400 ring-offset-1" : ""}`}
+                            >
+                              <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
+                                <span>{isMe ? "Kamu" : "Admin"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleWorkerPin(msg.id)}
+                                  className={`p-1 rounded hover:bg-black/10 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center ${
+                                    isPinned ? "text-amber-200" : "opacity-60 hover:opacity-100"
+                                  }`}
+                                  title={isPinned ? "Batalkan Sematan" : "Sematkan Pesan"}
+                                >
+                                  <Pin className={`w-3 h-3 ${isPinned ? "fill-amber-300 text-amber-300" : ""}`} />
+                                </button>
+                              </div>
+                              <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                              <div
+                                className={`text-[9px] font-mono text-right mt-1 ${
+                                  isMe ? "text-amber-100" : "text-gray-500"
+                                }`}
+                              >
+                                {formatDateTime(msg.createdAt)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                    <div ref={workerChatEndRef} />
+                  </div>
+
+                  {/* INPUT FORM BAR WITH EMOJI PICKER */}
+                  <form onSubmit={handleSendWorkerChat} className="p-2 bg-white border border-amber-200 rounded-2xl flex items-center gap-2 shadow-xs">
+                    <EmojiPicker
+                      onSelectEmoji={(emoji) => setWorkerChatText((prev) => prev + emoji)}
+                      disabled={sendingWorkerChat}
+                    />
+                    <Input
+                      placeholder="Tulis pesan untuk Admin..."
+                      value={workerChatText}
+                      onChange={(e) => setWorkerChatText(e.target.value)}
+                      disabled={sendingWorkerChat}
+                      className="text-xs h-10 bg-amber-50/40 border-amber-200 text-gray-900 focus:border-amber-500 flex-1 rounded-xl"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={sendingWorkerChat || !workerChatText.trim()}
+                      className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs gap-1.5 shadow-2xs shrink-0 rounded-xl min-h-[44px]"
+                    >
+                      {sendingWorkerChat ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">Kirim</span>
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* BERSIHKAN CHAT CONFIRMATION DIALOG */}
+              <AlertDialog open={showClearChatDialog} onOpenChange={setShowClearChatDialog}>
+                <AlertDialogContent className="bg-white border border-amber-200 rounded-2xl max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                      <Eraser className="w-5 h-5 text-amber-600" />
+                      Bersihkan Chat?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs text-gray-600">
+                      Apakah kamu yakin ingin membersihkan chat ini? Pesan lama akan disembunyikan dari tampilanmu.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="gap-2 pt-2">
+                    <AlertDialogCancel
+                      disabled={clearingChat}
+                      className="text-xs h-9 border-gray-200 text-gray-700 hover:bg-gray-100 min-h-[44px]"
+                    >
+                      Batal
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleConfirmClearChat();
+                      }}
+                      disabled={clearingChat}
+                      className="text-xs h-9 bg-amber-600 hover:bg-amber-700 text-white font-bold min-h-[44px]"
+                    >
+                      {clearingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ya, Bersihkan"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
 
