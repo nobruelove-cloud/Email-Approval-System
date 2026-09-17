@@ -237,9 +237,11 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isSignedIn() &&
         conversationId == request.auth.uid &&
-        (!('workerId' in request.resource.data) || request.resource.data.workerId == request.auth.uid) &&
-        (!('createdAt' in resource.data) || !('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
-        (!('adminId' in resource.data) || !('adminId' in request.resource.data) || request.resource.data.adminId == resource.data.adminId) &&
+        ('workerId' in request.resource.data) &&
+        request.resource.data.workerId == resource.data.workerId &&
+        request.resource.data.workerId == request.auth.uid &&
+        (!('adminId' in resource.data) || ('adminId' in request.resource.data && request.resource.data.adminId == resource.data.adminId)) &&
+        (!('createdAt' in resource.data) || ('createdAt' in request.resource.data && request.resource.data.createdAt == resource.data.createdAt)) &&
         (!('workerUnread' in request.resource.data) || request.resource.data.workerUnread == 0 || ('workerUnread' in resource.data && request.resource.data.workerUnread <= resource.data.workerUnread))
       );
 

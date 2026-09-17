@@ -53,6 +53,19 @@ async function main() {
       balance: 15000,
       createdAt: new Date(),
     });
+    // Existing conversation for workerUid
+    await setDoc(doc(db, 'conversations', workerUid), {
+      id: workerUid,
+      workerId: workerUid,
+      workerName: 'Worker User',
+      workerEmail: 'worker@example.com',
+      adminId: adminUid,
+      lastMessage: 'Pesan awal',
+      lastMessageAt: new Date(),
+      workerUnread: 2,
+      adminUnread: 0,
+      createdAt: new Date(),
+    });
   });
 
   console.log('\n--- Case A: Self profile read ---');
@@ -1015,33 +1028,148 @@ async function main() {
     process.exitCode = 1;
   }
 
-  // 8. Worker trying to alter workerId or adminId in conversation update (should fail)
+  // --- 10 DEDICATED CHAT SECURITY HARDENING TESTS ---
+  console.log('\n--- 10 Dedicated Chat Security Hardening Tests ---');
+
+  // Test 1: Worker cannot change workerId
   try {
     await assertFails(
       updateDoc(doc(workerDb, 'conversations', workerUid), {
         workerId: otherWorkerUid,
       })
     );
-    console.log('[PASS] Worker altering workerId in conversation metadata correctly denied.');
+    console.log('[PASS] 1. Worker cannot change workerId.');
   } catch (err) {
-    console.error('[FAIL] Worker altering workerId was not denied:', err);
+    console.error('[FAIL] 1. Worker change workerId was not denied:', err);
     process.exitCode = 1;
   }
 
-  // 9. Worker trying to spoof senderId as admin when sending a message (should fail)
+  // Test 2: Worker cannot delete workerId
+  try {
+    await assertFails(
+      setDoc(doc(workerDb, 'conversations', workerUid), {
+        lastMessage: 'Delete workerId attempt',
+      }, { merge: false })
+    );
+    console.log('[PASS] 2. Worker cannot delete workerId.');
+  } catch (err) {
+    console.error('[FAIL] 2. Worker delete workerId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 3: Worker cannot change adminId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminId: 'fake_admin_uid_999',
+      })
+    );
+    console.log('[PASS] 3. Worker cannot change adminId.');
+  } catch (err) {
+    console.error('[FAIL] 3. Worker change adminId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 4: Worker cannot delete adminId
+  try {
+    await assertFails(
+      setDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: workerUid,
+        lastMessage: 'Delete adminId attempt',
+      }, { merge: false })
+    );
+    console.log('[PASS] 4. Worker cannot delete adminId.');
+  } catch (err) {
+    console.error('[FAIL] 4. Worker delete adminId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 5: Worker cannot change or delete createdAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        createdAt: new Date('2020-01-01'),
+      })
+    );
+    console.log('[PASS] 5. Worker cannot change or delete createdAt.');
+  } catch (err) {
+    console.error('[FAIL] 5. Worker change/delete createdAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 6: Worker cannot increase workerUnread
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerUnread: 10,
+      })
+    );
+    console.log('[PASS] 6. Worker cannot increase workerUnread.');
+  } catch (err) {
+    console.error('[FAIL] 6. Worker increase workerUnread was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 7: Worker can reset workerUnread to 0
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: workerUid,
+        workerUnread: 0,
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 7. Worker can reset workerUnread to 0.');
+  } catch (err) {
+    console.error('[FAIL] 7. Worker reset workerUnread failed:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 8: Worker cannot spoof senderId in messages
   try {
     await assertFails(
       setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
-        senderId: adminUid,
-        senderRole: 'admin',
-        senderName: 'Fake Admin',
-        text: 'Mencoba pura-pura jadi admin.',
+        senderId: otherWorkerUid,
+        senderRole: 'worker',
+        text: 'Spoofed senderId',
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker spoofing admin senderId/role correctly denied.');
+    console.log('[PASS] 8. Worker cannot spoof senderId.');
   } catch (err) {
-    console.error('[FAIL] Worker spoofing admin senderId/role was not denied:', err);
+    console.error('[FAIL] 8. Worker spoof senderId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 9: Worker cannot spoof senderRole as admin
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
+        senderId: workerUid,
+        senderRole: 'admin',
+        text: 'Spoofed senderRole',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 9. Worker cannot spoof senderRole.');
+  } catch (err) {
+    console.error('[FAIL] 9. Worker spoof senderRole was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // Test 10: Worker cannot send message to another worker's conversation
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', otherWorkerUid, 'messages')), {
+        senderId: workerUid,
+        senderRole: 'worker',
+        text: 'Message to other worker conversation',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 10. Worker cannot send to another worker\'s conversation.');
+  } catch (err) {
+    console.error('[FAIL] 10. Worker send to another worker conversation was not denied:', err);
     process.exitCode = 1;
   }
 
