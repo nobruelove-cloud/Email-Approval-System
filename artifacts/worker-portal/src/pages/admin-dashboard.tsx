@@ -2004,7 +2004,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             size="icon"
             onClick={onLogout}
             title="Keluar"
-            className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
+            className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
           >
             <LogOut className="w-4 h-4" />
           </Button>
@@ -2097,7 +2097,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               <CardContent className="space-y-4 pt-4">
                 {announcements.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat pengumuman...</p>}
                 {announcements.error && (
-                  <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center rounded-lg">
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs text-center rounded-lg">
                     Gagal memuat pengumuman: {announcements.error}
                   </div>
                 )}
@@ -2114,7 +2114,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       const badgeUpper = item.badge?.toUpperCase().trim() || "";
                       let badgeStyle = "bg-sky-500/10 text-sky-400 border-sky-500/30";
                       if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
-                        badgeStyle = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+                        badgeStyle = "bg-rose-500/10 text-rose-600 border-rose-500/30";
                       } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
                         badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/30";
                       } else if (badgeUpper === "INFO") {
@@ -2142,7 +2142,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   className={`text-[11px] font-semibold ${
                                     isActive
                                       ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                                      : "bg-slate-800 text-slate-500 border-slate-200"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
                                   }`}
                                 >
                                   {isActive ? "Aktif (Tampil)" : "Nonaktif"}
@@ -2162,7 +2162,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 onClick={() => handleToggleAnnStatus(item.id, isActive)}
                                 className={`text-xs h-8 border-slate-200/80 ${
                                   isActive
-                                    ? "bg-white text-slate-700 hover:bg-slate-800"
+                                    ? "bg-white text-slate-700 hover:bg-slate-100"
                                     : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                                 }`}
                               >
@@ -2173,7 +2173,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 size="sm"
                                 variant="outline"
                                 onClick={() => openEditAnnModal(item)}
-                                className="text-xs h-8 text-indigo-600 border-slate-200/80 bg-white hover:bg-slate-800 gap-1"
+                                className="text-xs h-8 text-indigo-600 border-slate-200/80 bg-white hover:bg-slate-100 gap-1"
                               >
                                 <Edit3 className="w-3.5 h-3.5" /> Edit
                               </Button>
@@ -2186,7 +2186,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="text-xs h-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                    className="text-xs h-8 text-slate-500 hover:text-rose-600 hover:bg-rose-500/10"
                                     title="Hapus Pengumuman"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2200,7 +2200,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-slate-800 border-slate-200 text-slate-700 hover:bg-slate-700">Batal</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteAnnouncement(item.id)}
                                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold"
@@ -2299,7 +2299,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       type="button"
                       variant="outline"
                       onClick={() => setAnnModalOpen(false)}
-                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-800"
+                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100"
                     >
                       Batal
                     </Button>
@@ -2331,13 +2331,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <p className="text-xs sm:text-sm text-slate-500">
                   Pantau performa setoran email, tinjau penarikan worker, dan kelola operasional platform secara realtime.
                 </p>
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-400 pt-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 pt-1">
                   <Calendar className="w-3.5 h-3.5 text-indigo-600" />
                   <span>{new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
                 </div>
               </div>
               <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-4">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status Operasional</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status Operasional</p>
                 <div className="flex items-center gap-2 mt-0.5 sm:justify-end">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-xs font-extrabold text-emerald-600">Sistem Berjalan Normal</span>
@@ -2650,18 +2650,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* GLOBAL MAINTENANCE MODE CONTROL CARD */}
-            <Card className={`border transition-all shadow-2xs ${currentMaintEnabled ? "bg-amber-50/50 border-amber-300 ring-2 ring-amber-200" : "bg-white border-slate-200/80"}`}>
+            <Card className={`border transition-all backdrop-blur-xl ${currentMaintEnabled ? "bg-amber-50/50 border-amber-500/80 ring-2 ring-amber-500/20" : "bg-white border-slate-200/80"}`}>
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-xl text-white font-bold ${currentMaintEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-800 text-slate-700"}`}>
+                      <div className={`p-2 rounded-xl text-white font-bold ${currentMaintEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-100 text-slate-600"}`}>
                         <Wrench className="w-5 h-5" />
                       </div>
                       <div>
                         <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
                           Mode Maintenance / Perbaikan Sistem Global
-                          <Badge className={currentMaintEnabled ? "bg-amber-500 text-white font-bold" : "bg-slate-800 text-slate-500 border-slate-200"}>
+                          <Badge className={currentMaintEnabled ? "bg-amber-500 text-white font-bold" : "bg-slate-100 text-slate-600 border-slate-200"}>
                             {currentMaintEnabled ? "BERJALAN (AKTIF)" : "NONAKTIF"}
                           </Badge>
                         </CardTitle>
@@ -2932,7 +2932,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               onClick={() => setSimDailyAccVolume(preset)}
                               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                                 simDailyAccVolume === preset
-                                  ? "bg-slate-800 text-slate-900 border-slate-200 font-bold"
+                                  ? "bg-indigo-600 text-white border-slate-200 font-bold"
                                   : "bg-white text-slate-500 border-slate-200/80 hover:text-slate-800"
                               }`}
                             >
@@ -3003,7 +3003,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-slate-500 text-[11px]">Payout Worker:</span>
-                                <span className="font-semibold text-rose-300">{formatMoney(workerPayout)}</span>
+                                <span className="font-semibold text-rose-700">{formatMoney(workerPayout)}</span>
                               </div>
                             </div>
 
@@ -3048,23 +3048,23 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   {/* PENGELUARAN CARD */}
                   <div className="p-4 rounded-xl bg-rose-50 border border-rose-500/30 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-rose-400">Total Pengeluaran (Expense)</span>
-                      <TrendingDown className="w-4 h-4 text-rose-400" />
+                      <span className="text-xs font-semibold text-rose-600">Total Pengeluaran (Expense)</span>
+                      <TrendingDown className="w-4 h-4 text-rose-600" />
                     </div>
-                    <p className="text-2xl font-black text-rose-400">{formatMoney(automatedFinSummary.totalExpense)}</p>
+                    <p className="text-2xl font-black text-rose-600">{formatMoney(automatedFinSummary.totalExpense)}</p>
                     <div className="text-[11px] text-slate-500 space-y-0.5 pt-1 border-t border-rose-500/20">
                       <div className="flex justify-between">
                         <span>Komisi Worker ACC:</span>
-                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
+                        <strong className="text-rose-700">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Hadiah & Bonus (Leaderboard/Referral):</span>
-                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
+                        <strong className="text-rose-700">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
                       </div>
                       {automatedFinSummary.manualExpense > 0 && (
                         <div className="flex justify-between">
                           <span>Pengeluaran Manual:</span>
-                          <strong className="text-rose-300">{formatMoney(automatedFinSummary.manualExpense)}</strong>
+                          <strong className="text-rose-700">{formatMoney(automatedFinSummary.manualExpense)}</strong>
                         </div>
                       )}
                       <div className="flex justify-between pt-1 border-t border-rose-500/10 text-slate-500">
@@ -3075,7 +3075,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {/* SALDO BERSIH CARD */}
-                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-rose-50 border-rose-200 text-rose-700"}`}>
+                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-indigo-700" : "bg-rose-50 border-rose-500/40 text-rose-700"}`}>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-semibold">Saldo Bersih (Net Balance)</span>
@@ -3121,7 +3121,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 {/* DAFTAR TRANSAKSI KEUANGAN MANUAL */}
                 {finLoading && <p className="text-sm text-slate-500 text-center py-8">Memuat laporan keuangan...</p>}
                 {finError && (
-                  <div className="p-6 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center rounded-lg">
+                  <div className="p-6 bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs text-center rounded-lg">
                     Gagal memuat laporan keuangan. Silakan coba lagi.
                   </div>
                 )}
@@ -3148,7 +3148,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 className={`text-[11px] font-semibold ${
                                   isIncome
                                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                                    : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                    : "bg-rose-500/10 text-rose-600 border-rose-500/30"
                                 }`}
                               >
                                 {isIncome ? "Pemasukan" : "Pengeluaran"}
@@ -3161,7 +3161,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className={`text-base font-black ${isIncome ? "text-indigo-600" : "text-rose-400"}`}>
+                            <span className={`text-base font-black ${isIncome ? "text-indigo-600" : "text-rose-600"}`}>
                               {isIncome ? "+" : "-"} {formatMoney(tx.amount)}
                             </span>
 
@@ -3184,7 +3184,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-8 w-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                    className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-500/10"
                                     title="Hapus Transaksi"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -3199,7 +3199,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-slate-800 border-slate-200 text-slate-700 hover:bg-slate-700">Batal</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteFinTransaction(tx.id)}
                                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold"
@@ -3245,7 +3245,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <SelectItem value="income" className="text-xs font-semibold text-indigo-600">
                           Pemasukan (+)
                         </SelectItem>
-                        <SelectItem value="expense" className="text-xs font-semibold text-rose-400">
+                        <SelectItem value="expense" className="text-xs font-semibold text-rose-600">
                           Pengeluaran (-)
                         </SelectItem>
                       </SelectContent>
@@ -3307,7 +3307,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       type="button"
                       variant="outline"
                       onClick={() => setFinModalOpen(false)}
-                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-800"
+                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100"
                     >
                       Batal
                     </Button>
@@ -3398,7 +3398,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <div className="text-xs text-slate-700 font-medium flex flex-wrap items-center gap-1.5 sm:gap-2">
                           <span>Disetujui: <strong className="text-indigo-600">{approvedCount}</strong>/{count}</span>
                           <span>·</span>
-                          <span>Ditolak: <strong className="text-rose-400">{rejectedCount}</strong></span>
+                          <span>Ditolak: <strong className="text-rose-600">{rejectedCount}</strong></span>
                           <span>·</span>
                           <span>Payout: <strong className="text-indigo-700 font-bold">{formatMoney(totalVal)}</strong></span>
                         </div>
@@ -3463,7 +3463,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               variant="ghost"
                               disabled={busyId === item.id}
                               onClick={() => handleStockStatusChange(item.id, "rejected")}
-                              className="min-h-[44px] text-xs text-rose-400 hover:bg-rose-500/10"
+                              className="min-h-[44px] text-xs text-rose-600 hover:bg-rose-500/10"
                             >
                               Tolak Stok
                             </Button>
@@ -3564,7 +3564,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
           <TabsContent value="workers" className="space-y-3">
             {/* REALTIME REGISTERED WORKERS COUNTER CARD */}
-            <Card className="bg-white border border-slate-200/80 shadow-xl text-slate-900">
+            <Card className="bg-white border border-slate-200/80 shadow-2xs text-slate-900">
               <CardContent className="p-4 sm:p-5 flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
                   <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-lg shadow-emerald-500/10">
@@ -3818,19 +3818,19 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </>
                         )}
                         {(u.status === "approved" || u.status === "active") && (
-                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-800">
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100">
                             Nonaktifkan
                           </Button>
                         )}
                         {(u.status === "inactive" || u.status === "rejected") && (
-                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-800">
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100">
                             Aktifkan
                           </Button>
                         )}
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="h-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1 ml-auto">
+                            <Button size="sm" variant="ghost" className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 gap-1 ml-auto">
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </Button>
                           </AlertDialogTrigger>
@@ -3842,7 +3842,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel className="bg-slate-800 border-slate-200 text-slate-700 hover:bg-slate-700">Batal</AlertDialogCancel>
+                              <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(u.uid)} className="bg-rose-600 hover:bg-rose-500 text-white font-bold">
                                 Hapus
                               </AlertDialogAction>
@@ -3905,7 +3905,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           }
                           className={
                             isCurrentWeeklyPeriodActive
-                              ? "bg-slate-800 text-slate-500 border border-slate-200 font-bold text-xs h-9 gap-1.5 cursor-not-allowed opacity-60"
+                              ? "bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs h-9 gap-1.5 cursor-not-allowed opacity-60"
                               : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-amber-500/20"
                           }
                         >
@@ -3945,7 +3945,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 </div>
                                 <div className="text-right">
                                   {isAlreadyPaid ? (
-                                    <Badge className="bg-slate-800 text-slate-500 border-slate-200 text-[10px]">
+                                    <Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px]">
                                       Sudah Dicairkan
                                     </Badge>
                                   ) : isQualified ? (
@@ -3963,7 +3963,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           })}
                         </div>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-slate-800 border-slate-200 text-slate-700 hover:bg-slate-700">Batal</AlertDialogCancel>
+                          <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={handleDistributeLeaderboardRewards}
                             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold"
@@ -4006,7 +4006,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         const userProgress = getLeaderboardUserProgress(item.validAccCount, item.rank);
 
                         let badgeLabel = "Target Juara #3";
-                        let badgeStyle = "bg-slate-800 text-slate-700 border border-slate-200";
+                        let badgeStyle = "bg-slate-100 text-slate-600 border border-slate-200";
                         let targetAcc = userProgress.nextTarget;
 
                         if (item.validAccCount >= 200) {
@@ -4015,7 +4015,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           targetAcc = 200;
                         } else if (item.validAccCount >= 100) {
                           badgeLabel = "Juara #2";
-                          badgeStyle = "bg-slate-700 text-slate-800";
+                          badgeStyle = "bg-slate-100 text-slate-700";
                           targetAcc = 100;
                         } else if (item.validAccCount >= 50) {
                           badgeLabel = "Juara #3";
@@ -4051,8 +4051,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <div>
                                 <p className="font-bold text-slate-900 text-sm">{item.workerName}</p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-xs text-amber-600 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
-                                  <Badge className={isQualified ? "bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold" : "bg-slate-100 text-slate-600 border-slate-200 text-[10px]"}>
+                                  <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
+                                  <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-slate-100 text-amber-400/80 border-amber-800/60 text-[10px]"}>
                                     {isQualified ? "Terkualifikasi" : "Belum Terkualifikasi"}
                                   </Badge>
                                 </div>
@@ -4124,7 +4124,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </thead>
                           <tbody className="divide-y divide-slate-800/60">
                             {leaderboardPayouts.data.map((payout) => (
-                              <tr key={payout.id} className="hover:bg-slate-800/40 transition-colors">
+                              <tr key={payout.id} className="hover:bg-slate-100/40 transition-colors">
                                 <td className="px-3 py-2 font-mono text-slate-500">{formatDateTime(payout.paidAt)}</td>
                                 <td className="px-3 py-2 font-bold text-slate-800">{payout.periodKey}</td>
                                 <td className="px-3 py-2">
@@ -4299,7 +4299,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           statusBadgeClass = "bg-sky-500/10 text-sky-400 border-sky-500/30";
                           statusText = "QUALIFIED";
                         } else if (isRejected) {
-                          statusBadgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+                          statusBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/30";
                           statusText = "REJECTED";
                         }
 
@@ -4388,7 +4388,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         Atur rentang jumlah item dan harga per item untuk tiap tier. Sistem akan memberikan rekomendasi otomatis ke admin.
                       </CardDescription>
                     </div>
-                    <Button onClick={handleAddTierConfig} variant="outline" className="gap-1 text-xs border-slate-200/80 bg-slate-50 text-indigo-600 hover:bg-slate-800">
+                    <Button onClick={handleAddTierConfig} variant="outline" className="gap-1 text-xs border-slate-200/80 bg-slate-50 text-indigo-600 hover:bg-slate-100">
                       <Plus className="w-3.5 h-3.5" /> Tambah Tier
                     </Button>
                   </div>
@@ -4435,7 +4435,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveTierConfig(idx)}
-                          className="h-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+                          className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 text-xs"
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
                         </Button>
@@ -4527,7 +4527,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">
                           {currentMethods.map((m, idx) => (
-                            <tr key={idx} className={m.enabled ? "hover:bg-slate-800/40 transition-colors" : "bg-slate-50 opacity-50"}>
+                            <tr key={idx} className={m.enabled ? "hover:bg-slate-100/40 transition-colors" : "bg-slate-50 opacity-50"}>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 <Button
                                   type="button"
@@ -4537,7 +4537,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   className={`text-[11px] h-7 px-2 font-bold border-slate-200/80 ${
                                     m.enabled
                                       ? "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                      : "bg-slate-800 text-slate-500 hover:bg-slate-700"
+                                      : "bg-slate-100 text-slate-600 hover:bg-slate-700"
                                   }`}
                                 >
                                   {m.enabled ? "✓ Aktif" : "Nonaktif"}
@@ -4604,7 +4604,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRemoveMethod(idx)}
-                                  className="h-7 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                  className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -4635,7 +4635,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 className={`text-[11px] h-7 px-2.5 font-bold border-slate-200/80 ${
                                   m.enabled
                                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                                    : "bg-slate-800 text-slate-500"
+                                    : "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {m.enabled ? "✓ Aktif" : "Nonaktif"}
@@ -4645,7 +4645,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleRemoveMethod(idx)}
-                                className="h-7 w-7 p-0 text-rose-400 hover:bg-rose-500/10"
+                                className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-500/10"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -4807,7 +4807,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                         <SelectItem value="OPEN" className="text-xs font-bold text-indigo-600">🟢 Buka (Terbuka)</SelectItem>
-                        <SelectItem value="CLOSED" className="text-xs font-bold text-rose-400">🔴 Tutup (Kunci)</SelectItem>
+                        <SelectItem value="CLOSED" className="text-xs font-bold text-rose-600">🔴 Tutup (Kunci)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -5335,7 +5335,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
                     <div>
                       <span className="text-slate-500 text-[10px] sm:text-xs">Ditolak:</span>
-                      <p className="font-bold text-rose-400">{rejectedCount} item</p>
+                      <p className="font-bold text-rose-600">{rejectedCount} item</p>
                     </div>
                     <div>
                       <span className="text-slate-500 text-[10px] sm:text-xs">Tier:</span>
@@ -5359,7 +5359,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyAllEmails(baseItems)}
-                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-100 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "emails" ? (
                           <Check className="w-4 h-4 text-indigo-600 shrink-0" />
@@ -5373,7 +5373,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyEmailsWithPasswords(baseItems)}
-                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-100 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "passwords" ? (
                           <Check className="w-4 h-4 text-indigo-600 shrink-0" />
@@ -5411,7 +5411,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             baseItems.forEach((_, idx) => { newMap[idx] = "rejected"; });
                             setItemStatuses(newMap);
                           }}
-                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold"
+                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-rose-600 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold"
                         >
                           Tolak Semua (X)
                         </Button>
@@ -5465,8 +5465,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   currentSt === "approved"
                                     ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
                                     : currentSt === "rejected"
-                                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
-                                      : "bg-slate-800 text-slate-500"
+                                      ? "bg-rose-500/10 text-rose-600 border border-rose-500/30"
+                                      : "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {currentSt === "approved" ? "Terjual (✓)" : currentSt === "rejected" ? "Ditolak (X)" : "Menunggu"}
@@ -5492,7 +5492,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   className={`min-h-[44px] sm:min-h-0 sm:h-8 px-2.5 text-xs font-bold gap-1 ${
                                     currentSt === "rejected"
                                       ? "bg-rose-600 text-white"
-                                      : "bg-white text-slate-500 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-200/80"
+                                      : "bg-white text-slate-500 hover:bg-rose-500/20 hover:text-rose-600 border border-slate-200/80"
                                   }`}
                                 >
                                   X Tolak
@@ -5593,6 +5593,24 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </span>
               )}
               <span className="text-[10px] truncate max-w-full">Penarikan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("chat")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
+                activeTab === "chat"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <MessageSquare className="w-5 h-5 text-indigo-600" />
+              {adminChatData.totalAdminUnread > 0 && (
+                <span className="absolute top-1.5 right-3 text-[9px] bg-rose-500 text-white font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                  {adminChatData.totalAdminUnread}
+                </span>
+              )}
+              <span className="text-[10px] truncate max-w-full">Pesan</span>
             </button>
 
             <button
