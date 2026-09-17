@@ -1870,8 +1870,96 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border">
-      <header className="bg-white/90 border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md shadow-2xs w-full max-w-full box-border">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-indigo-500/20 selection:text-indigo-700 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border flex flex-col md:flex-row">
+      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 min-h-screen sticky top-0 shrink-0 z-30 shadow-xs">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shadow-indigo-500/20">
+              G
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-900 text-sm tracking-tight leading-tight">GMAIL JOB ID</h1>
+              <p className="text-[11px] text-slate-500 font-medium">Admin Portal v2.0</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <button type="button" onClick={() => setActiveTab("overview")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "overview" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span>Command Center</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("submissions")} className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "submissions" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <div className="flex items-center gap-3">
+              <FileText className="w-4 h-4 shrink-0" />
+              <span>Batch Review</span>
+            </div>
+            {stats.pendingSubmissions > 0 && <span className="text-[10px] bg-indigo-600 text-white font-extrabold rounded-full px-2 py-0.5 shadow-2xs">{stats.pendingSubmissions}</span>}
+          </button>
+          <button type="button" onClick={() => setActiveTab("withdrawals")} className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "withdrawals" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <div className="flex items-center gap-3">
+              <Wallet className="w-4 h-4 shrink-0" />
+              <span>Penarikan Saldo</span>
+            </div>
+            {stats.pendingWithdrawals > 0 && <span className="text-[10px] bg-amber-500 text-white font-extrabold rounded-full px-2 py-0.5 shadow-2xs">{stats.pendingWithdrawals}</span>}
+          </button>
+          <button type="button" onClick={() => setActiveTab("chat")} className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "chat" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-4 h-4 shrink-0 text-indigo-600" />
+              <span>Pesan Worker</span>
+            </div>
+            {adminChatData.totalAdminUnread > 0 && <span className="text-[10px] bg-rose-500 text-white font-extrabold rounded-full px-2 py-0.5 shadow-2xs">{adminChatData.totalAdminUnread}</span>}
+          </button>
+          <button type="button" onClick={() => setActiveTab("workers")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "workers" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <Users className="w-4 h-4 shrink-0" />
+            <span>Kelola Worker</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("checker")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "checker" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <SearchCheck className="w-4 h-4 shrink-0" />
+            <span>Screening Email</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("finance")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "finance" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <DollarSign className="w-4 h-4 shrink-0" />
+            <span>Keuangan Platform</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("rewards")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "rewards" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <Gift className="w-4 h-4 shrink-0" />
+            <span>Rewards & Referral</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("announcements")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "announcements" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <Megaphone className="w-4 h-4 shrink-0" />
+            <span>Kelola Pengumuman</span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("rules")} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all min-h-[44px] ${activeTab === "rules" ? "bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+            <SettingsIcon className="w-4 h-4 shrink-0" />
+            <span>Aturan & Settings</span>
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-800 truncate">{profile.name || profile.email || "Admin System"}</p>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+                <span className="truncate max-w-[110px]">
+                  {isEmailVisible
+                    ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
+                    : "*".repeat((profile.email && profile.email.trim() ? profile.email.trim() : "-").length)}
+                </span>
+                <button type="button" onClick={() => setIsEmailVisible(!isEmailVisible)} className="text-slate-500 hover:text-indigo-600 p-0.5 rounded" title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}>
+                  {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+            <Button variant="outline" size="icon" onClick={onLogout} title="Keluar" className="border-slate-200 bg-white text-slate-600 hover:text-rose-600 hover:bg-rose-50 h-8 w-8 shrink-0 rounded-lg">
+              <LogOut className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0 w-full">
+<header className="bg-white/90 border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md shadow-2xs w-full max-w-full box-border">
         <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 w-full max-w-full box-border">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-2xs shrink-0">
@@ -1903,7 +1991,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <button
                   type="button"
                   onClick={() => setIsEmailVisible(!isEmailVisible)}
-                  className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
+                  className="text-slate-500 hover:text-indigo-600 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
                   title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                 >
                   {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1916,7 +2004,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             size="icon"
             onClick={onLogout}
             title="Keluar"
-            className="border-slate-800 bg-slate-950/60 text-slate-300 hover:text-slate-100 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
+            className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
           >
             <LogOut className="w-4 h-4" />
           </Button>
@@ -1926,17 +2014,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 w-full max-w-full overflow-x-hidden box-border">
         {/* SUB-PAGE TOP NAVIGATION BAR (Shows on dedicated feature pages on mobile) */}
         {activeTab !== "overview" && (
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setActiveTab("overview")}
-              className="gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-3 h-9 rounded-xl border border-emerald-500/30"
+              className="gap-2 text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 h-9 rounded-xl border border-indigo-200"
             >
-              <ArrowLeft className="w-4 h-4 text-emerald-400" />
+              <ArrowLeft className="w-4 h-4 text-indigo-600" />
               <span>Kembali ke Command Center</span>
             </Button>
-            <Badge variant="outline" className="text-xs bg-slate-900/90 text-emerald-400 border-emerald-500/40 font-bold px-3 py-1 shadow-md">
+            <Badge variant="outline" className="text-xs bg-white text-indigo-600 border-indigo-200 font-bold px-3 py-1 shadow-md">
               {getTabTitle(activeTab)}
             </Badge>
           </div>
@@ -1960,13 +2048,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             <TabsTrigger value="submissions" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <FileText className="w-3.5 h-3.5" /> Batch
               {stats.pendingSubmissions > 0 && (
-                <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
+                <span className="ml-0.5 text-[10px] bg-emerald-500 text-white font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="withdrawals" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
-                <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
+                <span className="ml-0.5 text-[10px] bg-emerald-500 text-white font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="workers" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
@@ -1987,35 +2075,35 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* TAB KELOLA PENGUMUMAN ADMIN */}
           <TabsContent value="announcements" className="space-y-6">
-            <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
-              <CardHeader className="pb-4 border-b border-slate-800/80">
+            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
+              <CardHeader className="pb-4 border-b border-slate-100">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-100">
-                      <Megaphone className="w-5 h-5 text-emerald-400" /> Kelola Pengumuman
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
+                      <Megaphone className="w-5 h-5 text-indigo-600" /> Kelola Pengumuman
                     </CardTitle>
-                    <CardDescription className="text-xs text-slate-400 mt-0.5">
+                    <CardDescription className="text-xs text-slate-500 mt-0.5">
                       Buat, edit, dan kelola pengumuman atau informasi resmi untuk seluruh pekerja portal.
                     </CardDescription>
                   </div>
                   <Button
                     onClick={openAddAnnModal}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500 shrink-0"
+                    className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500 shrink-0"
                   >
                     <Plus className="w-4 h-4" /> Buat Pengumuman Baru
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
-                {announcements.loading && <p className="text-sm text-slate-400 text-center py-8">Memuat pengumuman...</p>}
+                {announcements.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat pengumuman...</p>}
                 {announcements.error && (
-                  <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center rounded-lg">
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs text-center rounded-lg">
                     Gagal memuat pengumuman: {announcements.error}
                   </div>
                 )}
                 {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
-                  <div className="p-10 border border-dashed border-slate-800 text-center rounded-xl bg-slate-950/40 space-y-1">
-                    <p className="text-sm font-semibold text-slate-300">Belum ada pengumuman.</p>
+                  <div className="p-10 border border-dashed border-slate-200/80 text-center rounded-xl bg-slate-50 space-y-1">
+                    <p className="text-sm font-semibold text-slate-700">Belum ada pengumuman.</p>
                     <p className="text-xs text-slate-500">Gunakan tombol "Buat Pengumuman Baru" di atas untuk menambah pengumuman pertama.</p>
                   </div>
                 )}
@@ -2026,24 +2114,24 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       const badgeUpper = item.badge?.toUpperCase().trim() || "";
                       let badgeStyle = "bg-sky-500/10 text-sky-400 border-sky-500/30";
                       if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
-                        badgeStyle = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+                        badgeStyle = "bg-rose-500/10 text-rose-600 border-rose-500/30";
                       } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
                         badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/30";
                       } else if (badgeUpper === "INFO") {
-                        badgeStyle = "bg-teal-500/10 text-teal-400 border-teal-500/30";
+                        badgeStyle = "bg-teal-500/10 text-indigo-600 border-teal-500/30";
                       }
 
                       return (
                         <div
                           key={item.id}
                           className={`p-4 rounded-xl border transition-all shadow-sm space-y-2 ${
-                            isActive ? "bg-slate-950/60 border-slate-800 hover:border-slate-700" : "bg-slate-950/30 border-slate-900 opacity-60"
+                            isActive ? "bg-slate-50 border-slate-200/80 hover:border-slate-200" : "bg-slate-50 border-slate-200 opacity-60"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="space-y-1 min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-base text-slate-100">{item.title}</span>
+                                <span className="font-bold text-base text-slate-900">{item.title}</span>
                                 {item.badge && (
                                   <Badge className={`text-xs font-bold border ${badgeStyle}`}>
                                     {item.badge}
@@ -2053,8 +2141,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   variant="outline"
                                   className={`text-[11px] font-semibold ${
                                     isActive
-                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                      : "bg-slate-800 text-slate-400 border-slate-700"
+                                      ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
                                   }`}
                                 >
                                   {isActive ? "Aktif (Tampil)" : "Nonaktif"}
@@ -2072,10 +2160,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 variant="outline"
                                 disabled={busyId === item.id}
                                 onClick={() => handleToggleAnnStatus(item.id, isActive)}
-                                className={`text-xs h-8 border-slate-800 ${
+                                className={`text-xs h-8 border-slate-200/80 ${
                                   isActive
-                                    ? "bg-slate-900 text-slate-300 hover:bg-slate-800"
-                                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                    ? "bg-white text-slate-700 hover:bg-slate-100"
+                                    : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                                 }`}
                               >
                                 {isActive ? "Sembunyikan" : "Aktifkan"}
@@ -2085,7 +2173,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 size="sm"
                                 variant="outline"
                                 onClick={() => openEditAnnModal(item)}
-                                className="text-xs h-8 text-emerald-400 border-slate-800 bg-slate-900 hover:bg-slate-800 gap-1"
+                                className="text-xs h-8 text-indigo-600 border-slate-200/80 bg-white hover:bg-slate-100 gap-1"
                               >
                                 <Edit3 className="w-3.5 h-3.5" /> Edit
                               </Button>
@@ -2098,21 +2186,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="text-xs h-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                    className="text-xs h-8 text-slate-500 hover:text-rose-600 hover:bg-rose-500/10"
                                     title="Hapus Pengumuman"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
+                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 p-4 sm:p-6">
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-slate-100">Hapus Pengumuman?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-slate-400">
+                                    <AlertDialogTitle className="text-slate-900">Hapus Pengumuman?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-slate-500">
                                       Apakah Anda yakin ingin menghapus pengumuman "{item.title}"? Tindakan ini tidak dapat dibatalkan.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Batal</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteAnnouncement(item.id)}
                                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold"
@@ -2125,7 +2213,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             </div>
                           </div>
 
-                          <p className="text-xs sm:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed pt-2 border-t border-slate-800/80">
+                          <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed pt-2 border-t border-slate-100">
                             {item.content}
                           </p>
                         </div>
@@ -2138,35 +2226,35 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* DIALOG BUAT / EDIT PENGUMUMAN */}
             <Dialog open={annModalOpen} onOpenChange={setAnnModalOpen}>
-              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
+              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 shadow-2xl p-4 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-slate-100">{editingAnn ? "Edit Pengumuman" : "Buat Pengumuman Baru"}</DialogTitle>
-                  <DialogDescription className="text-slate-400">
+                  <DialogTitle className="text-slate-900">{editingAnn ? "Edit Pengumuman" : "Buat Pengumuman Baru"}</DialogTitle>
+                  <DialogDescription className="text-slate-500">
                     {editingAnn ? "Perbarui isi atau status pengumuman resmi." : "Terbitkan pengumuman baru yang akan langsung muncul di dashboard pekerja."}
                   </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSaveAnnouncement} className="space-y-4 pt-2">
                   <div>
-                    <Label htmlFor="ann-title" className="text-xs text-slate-300">Judul Pengumuman *</Label>
+                    <Label htmlFor="ann-title" className="text-xs text-slate-700">Judul Pengumuman *</Label>
                     <Input
                       id="ann-title"
                       placeholder="Contoh: Perubahan Harga Tier & Jam Operasional"
                       value={annTitle}
                       onChange={(e) => setAnnTitle(e.target.value)}
-                      className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="ann-badge" className="text-xs text-slate-300">Label Badge (opsional)</Label>
+                    <Label htmlFor="ann-badge" className="text-xs text-slate-700">Label Badge (opsional)</Label>
                     <Input
                       id="ann-badge"
                       placeholder="Contoh: BARU, IMPORTANT, INFO, PENTING"
                       value={annBadge}
                       onChange={(e) => setAnnBadge(e.target.value)}
-                      className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       Badge tampil sebagai tag warna di samping judul pengumuman.
@@ -2174,32 +2262,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div>
-                    <Label htmlFor="ann-content" className="text-xs text-slate-300">Isi Pengumuman *</Label>
+                    <Label htmlFor="ann-content" className="text-xs text-slate-700">Isi Pengumuman *</Label>
                     <Textarea
                       id="ann-content"
                       rows={5}
                       placeholder="Tuliskan isi pengumuman secara lengkap di sini..."
                       value={annContent}
                       onChange={(e) => setAnnContent(e.target.value)}
-                      className="mt-1 text-xs leading-relaxed bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 text-xs leading-relaxed bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label className="text-xs text-slate-300">Status Publikasi</Label>
+                    <Label className="text-xs text-slate-700">Status Publikasi</Label>
                     <Select
                       value={annIsActive ? "ACTIVE" : "INACTIVE"}
                       onValueChange={(val) => setAnnIsActive(val === "ACTIVE")}
                     >
-                      <SelectTrigger className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                      <SelectTrigger className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="ACTIVE" className="text-xs font-semibold text-emerald-400">
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                        <SelectItem value="ACTIVE" className="text-xs font-semibold text-indigo-600">
                           Aktif (Langsung Tampil di Workers)
                         </SelectItem>
-                        <SelectItem value="INACTIVE" className="text-xs font-semibold text-slate-400">
+                        <SelectItem value="INACTIVE" className="text-xs font-semibold text-slate-500">
                           Draft / Nonaktif (Disembunyikan)
                         </SelectItem>
                       </SelectContent>
@@ -2211,14 +2299,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       type="button"
                       variant="outline"
                       onClick={() => setAnnModalOpen(false)}
-                      className="text-xs h-9 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100"
                     >
                       Batal
                     </Button>
                     <Button
                       type="submit"
                       disabled={annSaving}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500"
                     >
                       {annSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       {editingAnn ? "Simpan Perubahan" : "Terbitkan Pengumuman"}
@@ -2231,189 +2319,270 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* RINGKASAN / COMMAND CENTER */}
           <TabsContent value="overview" className="space-y-6">
-            {/* CORE OVERVIEW STATISTICS - Focused & Clean */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
-              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 shrink-0" /> Batch Review
+            {/* ADMIN HERO WELCOME BANNER */}
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Selamat Datang, Admin!</h2>
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">
+                    System Control
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Pantau performa setoran email, tinjau penarikan worker, dan kelola operasional platform secara realtime.
+                </p>
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 pt-1">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
+                </div>
+              </div>
+              <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-4">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status Operasional</p>
+                <div className="flex items-center gap-2 mt-0.5 sm:justify-end">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-extrabold text-emerald-600">Sistem Berjalan Normal</span>
+                </div>
+              </div>
+            </div>
+
+            {/* SUMMARY STATISTIC CARDS */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Batch Review
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.pendingSubmissions}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Menunggu verifikasi</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.pendingSubmissions}</p>
+                  <p className="text-[11px] text-amber-600 font-medium">Menunggu verifikasi</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <SearchCheck className="w-3.5 h-3.5 shrink-0" /> Stok Email
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <SearchCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Stok Email
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.availableStock}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Siap dijual ke vendor</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.availableStock}</p>
+                  <p className="text-[11px] text-indigo-600 font-medium">Siap dijual ke vendor</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 shrink-0" /> Pekerja Aktif
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Pekerja Aktif
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.activeWorkers}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Total: {stats.totalWorkers} pekerja</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.activeWorkers}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Total: {stats.totalWorkers} pekerja</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-emerald-500/10 border-emerald-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Wallet className="w-3.5 h-3.5 shrink-0" /> Penarikan Pending
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5 text-amber-600 shrink-0" /> Penarikan Pending
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-emerald-400">{stats.pendingWithdrawals}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.pendingWithdrawals}</p>
+                  <p className="text-[11px] text-amber-600 font-medium truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1 bg-teal-500/10 border-teal-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-teal-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5 shrink-0" /> Total Saldo Beredar
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow col-span-2 sm:col-span-1">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Total Saldo
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-teal-300 truncate">{formatMoney(stats.totalBalance)}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Dompet seluruh pekerja</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900 truncate">{formatMoney(stats.totalBalance)}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Dompet seluruh pekerja</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* LAYANAN CEPAT ADMIN (Quick Action Feature Shortcuts) */}
-            <Card className="bg-slate-900/90 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl overflow-hidden">
-              <CardHeader className="pb-3 border-b border-slate-800/80 p-3.5 sm:p-5">
-                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 text-slate-100">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  Layanan Cepat Admin
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-400 mt-0.5">
-                  Pilih fitur untuk membuka halaman manajemen khusus.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-3.5 sm:p-5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
-                  {[
-                    {
-                      id: "submissions" as AdminTab,
-                      label: "Batch Review",
-                      desc: "Tinjau setoran email",
-                      icon: <FileText className="w-5 h-5 text-emerald-400" />,
-                      badge: stats.pendingSubmissions > 0 ? `${stats.pendingSubmissions} Menunggu` : undefined,
-                      badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-                    },
-                    {
-                      id: "withdrawals" as AdminTab,
-                      label: "Penarikan",
-                      desc: "Proses penarikan saldo",
-                      icon: <Wallet className="w-5 h-5 text-emerald-400" />,
-                      badge: stats.pendingWithdrawals > 0 ? `${stats.pendingWithdrawals} Pending` : undefined,
-                      badgeStyle: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-                    },
-                    {
-                      id: "checker" as AdminTab,
-                      label: "Screening Email",
-                      desc: "Master Riset Bulk Email",
-                      icon: <SearchCheck className="w-5 h-5 text-emerald-400" />,
-                    },
-                    {
-                      id: "finance" as AdminTab,
-                      label: "Keuangan",
-                      desc: "Ledger & simulator profit",
-                      icon: <DollarSign className="w-5 h-5 text-teal-400" />,
-                    },
-                    {
-                      id: "workers" as AdminTab,
-                      label: "Workers",
-                      desc: "Kelola akun pekerja",
-                      icon: <Users className="w-5 h-5 text-emerald-400" />,
-                      badge: `${stats.activeWorkers} Aktif`,
-                      badgeStyle: "bg-slate-800 text-slate-300 border-slate-700",
-                    },
-                    {
-                      id: "rewards" as AdminTab,
-                      label: "Rewards / Klasemen",
-                      desc: "Cairkan bonus mingguan",
-                      icon: <Gift className="w-5 h-5 text-amber-400" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Rules & Setting",
-                      desc: "Rate, jam, & fee portal",
-                      icon: <SettingsIcon className="w-5 h-5 text-emerald-400" />,
-                    },
-                    {
-                      id: "announcements" as AdminTab,
-                      label: "Pengumuman",
-                      desc: "Buat info resmi pekerja",
-                      icon: <Megaphone className="w-5 h-5 text-emerald-400" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Jam Operasional",
-                      desc: "Kontrol saklar setoran",
-                      icon: <Clock className="w-5 h-5 text-emerald-400" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Support Config",
-                      desc: "Telegram & WhatsApp CS",
-                      icon: <HelpCircle className="w-5 h-5 text-emerald-400" />,
-                    },
-                  ].map((item, idx) => (
-                    <button
-                      key={`${item.id}-${idx}`}
-                      type="button"
-                      onClick={() => setActiveTab(item.id)}
-                      className="flex flex-col justify-between p-3.5 sm:p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all text-left group min-h-[90px] min-w-[44px] shadow-sm relative focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-1 mb-2">
-                          <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-colors">
-                            {item.icon}
-                          </div>
-                          {item.badge && (
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${item.badgeStyle || "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"}`}>
-                              {item.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p className="font-bold text-xs text-slate-100 group-hover:text-emerald-400 transition-colors line-clamp-1">
-                          {item.label}
-                        </p>
-                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
-                          {item.desc}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* QUICK SERVICES / ADMIN SHORTCUTS GRID */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" /> Layanan Cepat Admin
+                </h3>
+                <span className="text-xs text-slate-500">Pilih menu untuk verifikasi & pengelolaan</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {/* PROMINENT PESAN WORKER SHORTCUT CARD */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("chat")}
+                  className="p-4 rounded-xl bg-white border border-indigo-200 shadow-2xs hover:shadow-md hover:border-indigo-400 transition-all text-left flex flex-col justify-between group relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    {adminChatData.totalAdminUnread > 0 ? (
+                      <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-rose-500 text-white animate-bounce shadow-2xs">
+                        {adminChatData.totalAdminUnread} BARU
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                        Aktif
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1">
+                      Pesan Worker
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Chat langsung realtime dengan worker</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("submissions")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    {stats.pendingSubmissions > 0 && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">
+                        {stats.pendingSubmissions} Batch
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Batch Review
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Verifikasi setoran email masal</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("withdrawals")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    {stats.pendingWithdrawals > 0 && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                        {stats.pendingWithdrawals} Req
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-amber-600 transition-colors">
+                      Penarikan Saldo
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Persetujuan cashout DANA, OVO, dll</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("checker")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <SearchCheck className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Screening Email
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Master riset & email checker</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("finance")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Keuangan Platform
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Ledger profit vendor & komisi</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("workers")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Kelola Worker
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Daftar anggota & status online</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("rewards")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Rewards & Referral
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Bonus klasemen & komisi referral</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("rules")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <SettingsIcon className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Aturan & Operating
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Jam operasional & rate komisi</p>
+                  </div>
+                </button>
+              </div>
+            </div>
 
             {/* VISUAL ANALYTICS & TREND CHART CARD */}
-            <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
-              <CardHeader className="pb-3 border-b border-slate-800/80">
+            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
+              <CardHeader className="pb-3 border-b border-slate-100">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-100">
-                      <BarChart3 className="w-5 h-5 text-emerald-400" />
+                    <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+                      <BarChart3 className="w-5 h-5 text-indigo-600" />
                       Grafik Tren Setoran & Verifikasi Gmail ACC (14 Hari Terakhir)
                     </CardTitle>
-                    <CardDescription className="text-xs text-slate-400 mt-0.5">
+                    <CardDescription className="text-xs text-slate-500 mt-0.5">
                       Membandingkan jumlah email yang disetor vs email terverifikasi ACC per hari.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono shrink-0">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-md font-bold">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-md font-bold">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       Gmail ACC Valid
                     </span>
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 border border-slate-800 text-slate-400 rounded-md font-bold">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200/80 text-slate-500 rounded-md font-bold">
                       <span className="w-2 h-2 rounded-full bg-slate-500" />
                       Total Disetor
                     </span>
@@ -2481,22 +2650,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* GLOBAL MAINTENANCE MODE CONTROL CARD */}
-            <Card className={`border transition-all backdrop-blur-xl ${currentMaintEnabled ? "bg-amber-950/20 border-amber-500/80 ring-2 ring-amber-500/20" : "bg-slate-900/80 border-slate-800"}`}>
+            <Card className={`border transition-all backdrop-blur-xl ${currentMaintEnabled ? "bg-amber-50/50 border-amber-500/80 ring-2 ring-amber-500/20" : "bg-white border-slate-200/80"}`}>
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-xl text-slate-950 font-bold ${currentMaintEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-800 text-slate-300"}`}>
+                      <div className={`p-2 rounded-xl text-white font-bold ${currentMaintEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-100 text-slate-600"}`}>
                         <Wrench className="w-5 h-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                        <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
                           Mode Maintenance / Perbaikan Sistem Global
-                          <Badge className={currentMaintEnabled ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-800 text-slate-400 border-slate-700"}>
+                          <Badge className={currentMaintEnabled ? "bg-amber-500 text-white font-bold" : "bg-slate-100 text-slate-600 border-slate-200"}>
                             {currentMaintEnabled ? "BERJALAN (AKTIF)" : "NONAKTIF"}
                           </Badge>
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-400">
+                        <CardDescription className="text-xs text-slate-500">
                           Aktifkan untuk memblokir sementara dashboard pekerja dengan halaman maintenance resmi dan countdown timer real-time.
                         </CardDescription>
                       </div>
@@ -2507,7 +2676,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     <Button
                       type="button"
                       onClick={() => setMaintEnabled(!currentMaintEnabled)}
-                      className={currentMaintEnabled ? "bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs" : "bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"}
+                      className={currentMaintEnabled ? "bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs" : "bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500"}
                     >
                       {currentMaintEnabled ? "Matikan Mode Maintenance" : "Aktifkan Mode Maintenance"}
                     </Button>
@@ -2518,17 +2687,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* ESTIMATED COMPLETION TIMESTAMP INPUT & QUICK PRESETS */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-emerald-400" /> Estimasi Waktu Selesai (Target Completion)
+                    <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-indigo-600" /> Estimasi Waktu Selesai (Target Completion)
                     </Label>
                     <Input
                       type="datetime-local"
                       value={currentMaintTargetTime}
                       onChange={(e) => setMaintTargetTime(e.target.value)}
-                      className="text-xs h-9 font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="text-xs h-9 font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      <span className="text-[11px] text-slate-400 font-semibold self-center mr-1">Quick Select:</span>
+                      <span className="text-[11px] text-slate-500 font-semibold self-center mr-1">Quick Select:</span>
                       {[
                         { label: "+15 Menit", mins: 15 },
                         { label: "+30 Menit", mins: 30 },
@@ -2541,7 +2710,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuickSetDuration(preset.mins)}
-                          className="text-[11px] h-7 px-2.5 bg-slate-950 hover:bg-emerald-500/10 hover:text-emerald-400 border-slate-800 text-slate-300"
+                          className="text-[11px] h-7 px-2.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200/80 text-slate-700"
                         >
                           {preset.label}
                         </Button>
@@ -2551,7 +2720,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                   {/* CUSTOM MAINTENANCE MESSAGE */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-300">
+                    <Label className="text-xs font-bold text-slate-700">
                       Pesan Pengumuman Maintenance (Tampil untuk Worker)
                     </Label>
                     <Textarea
@@ -2559,7 +2728,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       value={currentMaintMessage}
                       onChange={(e) => setMaintNoteMessage(e.target.value)}
                       placeholder="Contoh: Pembaruan sistem & server rilis versi baru..."
-                      className="text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500 leading-relaxed"
+                      className="text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500 leading-relaxed"
                     />
                   </div>
                 </div>
@@ -2568,7 +2737,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <Button
                     onClick={handleSaveMaintenance}
                     disabled={savingMaint}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
+                    className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500"
                   >
                     {savingMaint && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Simpan Mode Maintenance
@@ -2578,7 +2747,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* MASTER RESET OPERASIONAL CARD */}
-            <Card className="bg-rose-950/20 border-rose-500/40 backdrop-blur-xl text-slate-100 shadow-xl">
+            <Card className="bg-rose-50/50 border-rose-500/40 backdrop-blur-xl text-slate-900 shadow-xl">
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -2587,10 +2756,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <AlertTriangle className="w-5 h-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                        <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
                           Master Reset Operasional Sistem
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-400">
+                        <CardDescription className="text-xs text-slate-500">
                           Menghapus seluruh riwayat setoran email, penarikan saldo, dan log referral, serta mereset saldo & hitungan ACC seluruh worker menjadi 0. Akun user & konfigurasi sistem TIDAK terhapus.
                         </CardDescription>
                       </div>
@@ -2617,27 +2786,27 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* TAB KEUANGAN ADMIN */}
           <TabsContent value="finance" className="space-y-6">
-            <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
-              <CardHeader className="pb-4 border-b border-slate-800/80">
+            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
+              <CardHeader className="pb-4 border-b border-slate-100">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-100">
-                      <DollarSign className="w-5 h-5 text-emerald-400" /> Keuangan
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
+                      <DollarSign className="w-5 h-5 text-indigo-600" /> Keuangan
                     </CardTitle>
-                    <CardDescription className="text-xs text-slate-400 mt-0.5">
+                    <CardDescription className="text-xs text-slate-500 mt-0.5">
                       Laporan pemasukan, pengeluaran, dan saldo bersih per periode bulanan ({formatMonthYear(selectedPeriod)}).
                     </CardDescription>
                   </div>
 
                   {/* FILTER PERIODE BULAN */}
-                  <div className="flex items-center gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800 shrink-0">
-                    <Calendar className="w-4 h-4 text-emerald-400 ml-1" />
-                    <Label className="text-xs font-semibold text-slate-300">Periode:</Label>
+                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200/80 shrink-0">
+                    <Calendar className="w-4 h-4 text-indigo-600 ml-1" />
+                    <Label className="text-xs font-semibold text-slate-700">Periode:</Label>
                     <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                      <SelectTrigger className="h-8 w-44 text-xs font-bold bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectTrigger className="h-8 w-44 text-xs font-bold bg-white border-slate-200/80 text-slate-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                         {periodOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value} className="text-xs">
                             {opt.label}
@@ -2650,51 +2819,51 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </CardHeader>
               <CardContent className="space-y-6 pt-4">
                 {/* VENDOR SALE PRICE CONTROL */}
-                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div className="space-y-0.5">
-                    <span className="font-bold text-slate-200">Harga Jual Vendor Per Email ACC:</span>
-                    <p className="text-slate-400 text-[11px]">Digunakan untuk menghitung otomatis total estimasi Pemasukan kotor dari vendor.</p>
+                    <span className="font-bold text-slate-800">Harga Jual Vendor Per Email ACC:</span>
+                    <p className="text-slate-500 text-[11px]">Digunakan untuk menghitung otomatis total estimasi Pemasukan kotor dari vendor.</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-400 font-bold">Rp</span>
+                    <span className="text-slate-500 font-bold">Rp</span>
                     <FormattedNumberInput
                       value={vendorSalePrice}
                       onChange={(val) => handleSimVendorRateChange(val)}
-                      className="w-28 h-8 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
+                      className="w-28 h-8 text-xs font-bold bg-white border-slate-200/80 text-indigo-600 focus:border-emerald-500"
                     />
                   </div>
                 </div>
 
                 {/* VENDOR PROFIT & PROJECTION SIMULATOR CARD */}
-                <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl border-emerald-500/20">
-                  <CardHeader className="pb-3 border-b border-slate-800/80">
+                <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl border-emerald-500/20">
+                  <CardHeader className="pb-3 border-b border-slate-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-100">
-                          <Sparkles className="w-5 h-5 text-emerald-400" />
+                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-900">
+                          <Sparkles className="w-5 h-5 text-indigo-600" />
                           Simulator Keuntungan & Proyeksi Profit Vendor
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-400 mt-0.5">
+                        <CardDescription className="text-xs text-slate-500 mt-0.5">
                           Hitung estimasi pemasukan vendor, komisi pekerja, dan net profit admin berdasarkan rate dan volume harian.
                         </CardDescription>
                       </div>
-                      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold self-start sm:self-center">
+                      <Badge className="bg-indigo-50 text-indigo-600 border border-indigo-200 text-xs font-bold self-start sm:self-center">
                         Simulasi Real-time
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-5 pt-4">
                     {/* INPUT CONTROL CONTROLS GRID */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-950/80 border border-slate-800 rounded-xl">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-xl">
                       {/* VENDOR RATE INPUT */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-200">
+                        <Label className="text-xs font-bold text-slate-800">
                           Vendor Rate per Email (Rp)
                         </Label>
                         <FormattedNumberInput
                           value={simVendorRate}
                           onChange={handleSimVendorRateChange}
-                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
+                          className="h-9 text-xs font-bold bg-white border-slate-200/80 text-indigo-600 focus:border-emerald-500"
                         />
                         <div className="flex gap-1 pt-0.5">
                           <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
@@ -2705,8 +2874,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               onClick={() => handleSimVendorRateChange(preset)}
                               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                                 simVendorRate === preset
-                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
-                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                                  ? "bg-indigo-50 text-indigo-600 border-indigo-200 font-bold"
+                                  : "bg-white text-slate-500 border-slate-200/80 hover:text-slate-800"
                               }`}
                             >
                               Rp {preset.toLocaleString("id-ID")}
@@ -2717,13 +2886,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                       {/* WORKER RATE INPUT */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-200">
+                        <Label className="text-xs font-bold text-slate-800">
                           Worker Rate Share per Email (Rp)
                         </Label>
                         <FormattedNumberInput
                           value={simWorkerRate}
                           onChange={(val) => setSimWorkerRate(val >= 0 ? val : 2800)}
-                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-teal-300 focus:border-emerald-500"
+                          className="h-9 text-xs font-bold bg-white border-slate-200/80 text-indigo-700 focus:border-emerald-500"
                         />
                         <div className="flex gap-1 pt-0.5">
                           <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
@@ -2734,8 +2903,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               onClick={() => setSimWorkerRate(preset)}
                               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                                 simWorkerRate === preset
-                                  ? "bg-teal-500/20 text-teal-300 border-teal-500/40 font-bold"
-                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                                  ? "bg-teal-500/20 text-indigo-700 border-teal-500/40 font-bold"
+                                  : "bg-white text-slate-500 border-slate-200/80 hover:text-slate-800"
                               }`}
                             >
                               Rp {preset.toLocaleString("id-ID")}
@@ -2746,13 +2915,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                       {/* DAILY VOLUME ACC INPUT */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-200">
+                        <Label className="text-xs font-bold text-slate-800">
                           Volume Setoran ACC / Hari (Email)
                         </Label>
                         <FormattedNumberInput
                           value={simDailyAccVolume}
                           onChange={(val) => setSimDailyAccVolume(val >= 0 ? val : 100)}
-                          className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="h-9 text-xs font-bold bg-white border-slate-200/80 text-slate-900 focus:border-emerald-500"
                         />
                         <div className="flex gap-1 pt-0.5">
                           <span className="text-[10px] text-slate-500 font-semibold self-center mr-1">Preset:</span>
@@ -2763,8 +2932,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               onClick={() => setSimDailyAccVolume(preset)}
                               className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                                 simDailyAccVolume === preset
-                                  ? "bg-slate-800 text-slate-100 border-slate-700 font-bold"
-                                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                                  ? "bg-indigo-600 text-white border-slate-200 font-bold"
+                                  : "bg-white text-slate-500 border-slate-200/80 hover:text-slate-800"
                               }`}
                             >
                               {preset} ACC
@@ -2775,26 +2944,26 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
 
                     {/* BREAKDOWN PER EMAIL ACC SUMMARY BANNER */}
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                       <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200">
                           <DollarSign className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="font-bold text-slate-200">Rincian Profit Margin Per Email ACC</span>
-                          <p className="text-[11px] text-slate-400">Rate Vendor ({formatMoney(simVendorRate)}) - Komisi Worker ({formatMoney(simWorkerRate)})</p>
+                          <span className="font-bold text-slate-800">Rincian Profit Margin Per Email ACC</span>
+                          <p className="text-[11px] text-slate-500">Rate Vendor ({formatMoney(simVendorRate)}) - Komisi Worker ({formatMoney(simWorkerRate)})</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
-                          <span className="text-[10px] text-slate-400 block font-medium">Worker Share</span>
-                          <strong className="text-teal-300 font-extrabold">{formatMoney(simWorkerRate)}</strong>
+                        <div className="text-center px-3 py-1 bg-white rounded-lg border border-slate-200/80">
+                          <span className="text-[10px] text-slate-500 block font-medium">Worker Share</span>
+                          <strong className="text-indigo-700 font-extrabold">{formatMoney(simWorkerRate)}</strong>
                         </div>
                         <span className="text-slate-600 font-mono text-sm">+</span>
-                        <div className="text-center px-3 py-1 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                          <span className="text-[10px] text-emerald-400 block font-medium">Admin Profit Share</span>
-                          <strong className="text-emerald-400 font-extrabold">{formatMoney(simVendorRate - simWorkerRate)}</strong>
+                        <div className="text-center px-3 py-1 bg-indigo-50 rounded-lg border border-indigo-200">
+                          <span className="text-[10px] text-indigo-600 block font-medium">Admin Profit Share</span>
+                          <strong className="text-indigo-600 font-extrabold">{formatMoney(simVendorRate - simWorkerRate)}</strong>
                         </div>
                       </div>
                     </div>
@@ -2815,34 +2984,34 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         return (
                           <div
                             key={tf.period}
-                            className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/90 hover:border-slate-700 transition-all space-y-3"
+                            className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80/90 hover:border-slate-200 transition-all space-y-3"
                           >
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
                               <div>
-                                <span className="font-bold text-xs text-slate-200">{tf.label}</span>
+                                <span className="font-bold text-xs text-slate-800">{tf.label}</span>
                                 <span className="text-[11px] text-slate-500 block font-mono">({tf.period})</span>
                               </div>
-                              <Badge variant="outline" className="text-[10px] bg-slate-900 text-slate-300 border-slate-800 font-mono">
+                              <Badge variant="outline" className="text-[10px] bg-white text-slate-700 border-slate-200/80 font-mono">
                                 {accVolume.toLocaleString("id-ID")} ACC
                               </Badge>
                             </div>
 
                             <div className="space-y-1 text-xs">
                               <div className="flex justify-between items-center">
-                                <span className="text-slate-400 text-[11px]">Pemasukan Vendor:</span>
-                                <span className="font-semibold text-slate-200">{formatMoney(vendorIncome)}</span>
+                                <span className="text-slate-500 text-[11px]">Pemasukan Vendor:</span>
+                                <span className="font-semibold text-slate-800">{formatMoney(vendorIncome)}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-slate-400 text-[11px]">Payout Worker:</span>
-                                <span className="font-semibold text-rose-300">{formatMoney(workerPayout)}</span>
+                                <span className="text-slate-500 text-[11px]">Payout Worker:</span>
+                                <span className="font-semibold text-rose-700">{formatMoney(workerPayout)}</span>
                               </div>
                             </div>
 
-                            <div className="pt-2 border-t border-slate-800/80">
-                              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block mb-0.5">
+                            <div className="pt-2 border-t border-slate-100">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 block mb-0.5">
                                 Admin Net Profit
                               </span>
-                              <span className="text-lg font-black text-emerald-400">
+                              <span className="text-lg font-black text-indigo-600">
                                 {formatMoney(netProfit)}
                               </span>
                             </div>
@@ -2856,46 +3025,46 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 {/* RINGKASAN AUTOMATED FINANCIAL LEDGER CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* PEMASUKAN CARD */}
-                  <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-2">
+                  <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-emerald-400">Total Pemasukan (Income)</span>
-                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-semibold text-indigo-600">Total Pemasukan (Income)</span>
+                      <TrendingUp className="w-4 h-4 text-indigo-600" />
                     </div>
-                    <p className="text-2xl font-black text-emerald-400">{formatMoney(automatedFinSummary.totalIncome)}</p>
-                    <div className="text-[11px] text-slate-400 space-y-0.5 pt-1 border-t border-emerald-500/20">
+                    <p className="text-2xl font-black text-indigo-600">{formatMoney(automatedFinSummary.totalIncome)}</p>
+                    <div className="text-[11px] text-slate-500 space-y-0.5 pt-1 border-t border-emerald-500/20">
                       <div className="flex justify-between">
                         <span>Vendor Email ({automatedFinSummary.periodApprovedAccs} ACC @ {formatMoney(vendorSalePrice)}):</span>
-                        <strong className="text-emerald-300">{formatMoney(automatedFinSummary.vendorEmailIncome)}</strong>
+                        <strong className="text-indigo-700">{formatMoney(automatedFinSummary.vendorEmailIncome)}</strong>
                       </div>
                       {automatedFinSummary.manualIncome > 0 && (
                         <div className="flex justify-between">
                           <span>Pemasukan Manual:</span>
-                          <strong className="text-emerald-300">{formatMoney(automatedFinSummary.manualIncome)}</strong>
+                          <strong className="text-indigo-700">{formatMoney(automatedFinSummary.manualIncome)}</strong>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* PENGELUARAN CARD */}
-                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-500/30 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-rose-400">Total Pengeluaran (Expense)</span>
-                      <TrendingDown className="w-4 h-4 text-rose-400" />
+                      <span className="text-xs font-semibold text-rose-600">Total Pengeluaran (Expense)</span>
+                      <TrendingDown className="w-4 h-4 text-rose-600" />
                     </div>
-                    <p className="text-2xl font-black text-rose-400">{formatMoney(automatedFinSummary.totalExpense)}</p>
-                    <div className="text-[11px] text-slate-400 space-y-0.5 pt-1 border-t border-rose-500/20">
+                    <p className="text-2xl font-black text-rose-600">{formatMoney(automatedFinSummary.totalExpense)}</p>
+                    <div className="text-[11px] text-slate-500 space-y-0.5 pt-1 border-t border-rose-500/20">
                       <div className="flex justify-between">
                         <span>Komisi Worker ACC:</span>
-                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
+                        <strong className="text-rose-700">{formatMoney(automatedFinSummary.periodWorkerCommissions)}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Hadiah & Bonus (Leaderboard/Referral):</span>
-                        <strong className="text-rose-300">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
+                        <strong className="text-rose-700">{formatMoney(automatedFinSummary.periodRewardsExpense)}</strong>
                       </div>
                       {automatedFinSummary.manualExpense > 0 && (
                         <div className="flex justify-between">
                           <span>Pengeluaran Manual:</span>
-                          <strong className="text-rose-300">{formatMoney(automatedFinSummary.manualExpense)}</strong>
+                          <strong className="text-rose-700">{formatMoney(automatedFinSummary.manualExpense)}</strong>
                         </div>
                       )}
                       <div className="flex justify-between pt-1 border-t border-rose-500/10 text-slate-500">
@@ -2906,37 +3075,37 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {/* SALDO BERSIH CARD */}
-                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-teal-300" : "bg-rose-950/40 border-rose-500/40 text-rose-300"}`}>
+                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-indigo-700" : "bg-rose-50 border-rose-500/40 text-rose-700"}`}>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-semibold">Saldo Bersih (Net Balance)</span>
-                        <Wallet className="w-4 h-4 text-teal-400" />
+                        <Wallet className="w-4 h-4 text-indigo-600" />
                       </div>
-                      <p className={`text-2xl font-black ${automatedFinSummary.netBalance >= 0 ? "text-teal-300" : "text-rose-400"}`}>
+                      <p className={`text-2xl font-black ${automatedFinSummary.netBalance >= 0 ? "text-indigo-700" : "text-rose-600"}`}>
                         {formatMoney(automatedFinSummary.netBalance)}
                       </p>
                     </div>
-                    <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+                    <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/80">
                       Auto-calculated: Pemasukan - Pengeluaran ({formatMonthYear(selectedPeriod)})
                     </p>
                   </div>
                 </div>
 
                 {/* SEARCH FILTER & ACTION BUTTONS: CATAT PEMASUKAN & PENGELUARAN */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-800">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-200/80">
                   <div className="flex items-center gap-2 flex-1 max-w-md">
                     <Input
                       placeholder="Cari transaksi manual..."
                       value={finSearch}
                       onChange={(e) => setFinSearch(e.target.value)}
-                      className="h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                   </div>
 
                   <div className="flex gap-2 shrink-0">
                     <Button
                       onClick={() => openAddFinModal("income")}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500"
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500"
                     >
                       <PlusCircle className="w-4 h-4" /> Catat Pemasukan
                     </Button>
@@ -2950,15 +3119,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </div>
 
                 {/* DAFTAR TRANSAKSI KEUANGAN MANUAL */}
-                {finLoading && <p className="text-sm text-slate-400 text-center py-8">Memuat laporan keuangan...</p>}
+                {finLoading && <p className="text-sm text-slate-500 text-center py-8">Memuat laporan keuangan...</p>}
                 {finError && (
-                  <div className="p-6 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center rounded-lg">
+                  <div className="p-6 bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs text-center rounded-lg">
                     Gagal memuat laporan keuangan. Silakan coba lagi.
                   </div>
                 )}
                 {!finLoading && !finError && filteredFinTransactions.length === 0 && (
-                  <div className="p-10 border border-dashed border-slate-800 text-center rounded-xl bg-slate-950/40 space-y-1">
-                    <p className="text-sm font-semibold text-slate-300">Belum ada transaksi manual pada periode ini.</p>
+                  <div className="p-10 border border-dashed border-slate-200/80 text-center rounded-xl bg-slate-50 space-y-1">
+                    <p className="text-sm font-semibold text-slate-700">Belum ada transaksi manual pada periode ini.</p>
                     <p className="text-xs text-slate-500">Gunakan tombol di atas untuk mencatat penyesuaian pemasukan atau pengeluaran manual.</p>
                   </div>
                 )}
@@ -2969,39 +3138,39 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       return (
                         <div
                           key={tx.id}
-                          className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-center justify-between gap-3 hover:border-slate-700 transition-colors shadow-sm"
+                          className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-3 hover:border-slate-200 transition-colors shadow-sm"
                         >
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-sm text-slate-100 break-words">{tx.description}</span>
+                              <span className="font-bold text-sm text-slate-900 break-words">{tx.description}</span>
                               <Badge
                                 variant="outline"
                                 className={`text-[11px] font-semibold ${
                                   isIncome
-                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                    : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                                    : "bg-rose-500/10 text-rose-600 border-rose-500/30"
                                 }`}
                               >
                                 {isIncome ? "Pemasukan" : "Pengeluaran"}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                            <div className="flex items-center gap-3 text-xs text-slate-500 font-mono">
                               <span>Tanggal: {formatDate(tx.transactionDate)}</span>
                               {tx.note && <span className="italic truncate max-w-xs font-sans text-slate-500">Catatan: {tx.note}</span>}
                             </div>
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className={`text-base font-black ${isIncome ? "text-emerald-400" : "text-rose-400"}`}>
+                            <span className={`text-base font-black ${isIncome ? "text-indigo-600" : "text-rose-600"}`}>
                               {isIncome ? "+" : "-"} {formatMoney(tx.amount)}
                             </span>
 
-                            <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+                            <div className="flex items-center gap-1 border-l border-slate-200/80 pl-2">
                               <Button
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => openEditFinModal(tx)}
-                                className="h-8 w-8 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                className="h-8 w-8 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
                                 title="Edit Transaksi"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -3015,22 +3184,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-8 w-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                    className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-500/10"
                                     title="Hapus Transaksi"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
+                                <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 p-4 sm:p-6">
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-slate-100">Hapus Transaksi Keuangan?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-slate-400">
+                                    <AlertDialogTitle className="text-slate-900">Hapus Transaksi Keuangan?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-slate-500">
                                       Apakah Anda yakin ingin menghapus transaksi "{tx.description}" ({formatMoney(tx.amount)})?
                                       Tindakan ini tidak dapat dibatalkan.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Batal</AlertDialogCancel>
+                                    <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteFinTransaction(tx.id)}
                                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold"
@@ -3052,31 +3221,31 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* DIALOG TAMBAH / EDIT TRANSAKSI KEUANGAN */}
             <Dialog open={finModalOpen} onOpenChange={setFinModalOpen}>
-              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
+              <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 shadow-2xl p-4 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-slate-100">
+                  <DialogTitle className="text-slate-900">
                     {editingFinTx ? "Edit Transaksi Keuangan" : finType === "income" ? "Catat Pemasukan" : "Catat Pengeluaran"}
                   </DialogTitle>
-                  <DialogDescription className="text-slate-400">
+                  <DialogDescription className="text-slate-500">
                     {editingFinTx ? "Perbarui detail transaksi keuangan." : "Masukkan detail transaksi keuangan untuk laporan bulanan."}
                   </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSaveFinTransaction} className="space-y-4 pt-2">
                   <div>
-                    <Label className="text-xs text-slate-300">Tipe Transaksi</Label>
+                    <Label className="text-xs text-slate-700">Tipe Transaksi</Label>
                     <Select
                       value={finType}
                       onValueChange={(val: FinancialTransactionType) => setFinType(val)}
                     >
-                      <SelectTrigger className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                      <SelectTrigger className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="income" className="text-xs font-semibold text-emerald-400">
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                        <SelectItem value="income" className="text-xs font-semibold text-indigo-600">
                           Pemasukan (+)
                         </SelectItem>
-                        <SelectItem value="expense" className="text-xs font-semibold text-rose-400">
+                        <SelectItem value="expense" className="text-xs font-semibold text-rose-600">
                           Pengeluaran (-)
                         </SelectItem>
                       </SelectContent>
@@ -3084,37 +3253,37 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div>
-                    <Label htmlFor="fin-desc" className="text-xs text-slate-300">Jenis / Keterangan Transaksi *</Label>
+                    <Label htmlFor="fin-desc" className="text-xs text-slate-700">Jenis / Keterangan Transaksi *</Label>
                     <Input
                       id="fin-desc"
                       placeholder={finType === "income" ? "Contoh: Penjualan Storage Gmail" : "Contoh: Pembayaran Worker / Biaya Operasional"}
                       value={finDescription}
                       onChange={(e) => setFinDescription(e.target.value)}
-                      className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="fin-amount" className="text-xs text-slate-300">Jumlah Nominal (Rp) *</Label>
+                    <Label htmlFor="fin-amount" className="text-xs text-slate-700">Jumlah Nominal (Rp) *</Label>
                     <FormattedNumberInput
                       id="fin-amount"
                       value={finAmount}
                       onChange={(val) => setFinAmount(val)}
                       placeholder="Contoh: 500.000"
-                      className="mt-1 h-9 text-xs font-bold bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs font-bold bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="fin-date" className="text-xs text-slate-300">Tanggal Transaksi *</Label>
+                    <Label htmlFor="fin-date" className="text-xs text-slate-700">Tanggal Transaksi *</Label>
                     <Input
                       id="fin-date"
                       type="date"
                       value={finDate}
                       onChange={(e) => setFinDate(e.target.value)}
-                      className="mt-1 h-9 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       required
                     />
                     <p className="text-[11px] text-slate-500 mt-1 font-mono">
@@ -3123,13 +3292,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div>
-                    <Label htmlFor="fin-note" className="text-xs text-slate-300">Catatan Tambahan (opsional)</Label>
+                    <Label htmlFor="fin-note" className="text-xs text-slate-700">Catatan Tambahan (opsional)</Label>
                     <Input
                       id="fin-note"
                       placeholder="Contoh: Pembayaran customer via DANA / Invoice #102"
                       value={finNote}
                       onChange={(e) => setFinNote(e.target.value)}
-                      className="mt-1 h-9 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1 h-9 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                   </div>
 
@@ -3138,14 +3307,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       type="button"
                       variant="outline"
                       onClick={() => setFinModalOpen(false)}
-                      className="text-xs h-9 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                      className="text-xs h-9 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100"
                     >
                       Batal
                     </Button>
                     <Button
                       type="submit"
                       disabled={finSaving}
-                      className={`${finType === "income" ? "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-emerald-500/20" : "bg-rose-600 hover:bg-rose-500 text-white"} font-bold text-xs h-9 gap-1.5 shadow-lg`}
+                      className={`${finType === "income" ? "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-indigo-500/20" : "bg-rose-600 hover:bg-rose-500 text-white"} font-bold text-xs h-9 gap-1.5 shadow-lg`}
                     >
                       {finSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       {editingFinTx ? "Simpan Perubahan" : "Simpan Transaksi"}
@@ -3163,13 +3332,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 placeholder="Cari email, ID pekerja, atau nama..."
                 value={submissionSearch}
                 onChange={(e) => setSubmissionSearch(e.target.value)}
-                className="text-xs min-h-[44px] flex-1 bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500 w-full"
+                className="text-xs min-h-[44px] flex-1 bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500 w-full"
               />
               <Select value={submissionStatusFilter} onValueChange={setSubmissionStatusFilter}>
-                <SelectTrigger className="min-h-[44px] w-full sm:w-44 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                <SelectTrigger className="min-h-[44px] w-full sm:w-44 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                   <SelectItem value="all">Semua Status</SelectItem>
                   <SelectItem value="pending">Menunggu (Pending)</SelectItem>
                   <SelectItem value="available">Stok Tersedia / Terjual</SelectItem>
@@ -3178,9 +3347,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Select>
             </div>
 
-            {submissions.loading && <p className="text-sm text-slate-400 text-center py-8">Memuat…</p>}
+            {submissions.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat…</p>}
             {!submissions.loading && filteredSubmissions.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">Tidak ada data setoran / batch email.</p>
+              <p className="text-sm text-slate-500 text-center py-8">Tidak ada data setoran / batch email.</p>
             )}
             {filteredSubmissions.map((item) => {
               const count = getItemCountOfSubmission(item);
@@ -3203,15 +3372,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               const totalVal = item.totalAmount ?? (approvedCount * pricePerItem);
 
               return (
-                <Card key={item.id} className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-md hover:border-slate-700 transition-all w-full max-w-full overflow-x-hidden box-border">
+                <Card key={item.id} className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-md hover:border-slate-200 transition-all w-full max-w-full overflow-x-hidden box-border">
                   <CardContent className="p-3 sm:p-5 space-y-3 w-full max-w-full overflow-x-hidden box-border">
                     {/* Top Row: Worker Name + Status Badge & ID/Date */}
                     <div className="flex items-start justify-between gap-2 w-full max-w-full">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold text-sm sm:text-base text-slate-100 truncate max-w-[180px] sm:max-w-xs">{displayWorkerName}</p>
+                          <p className="font-bold text-sm sm:text-base text-slate-900 truncate max-w-[180px] sm:max-w-xs">{displayWorkerName}</p>
                           {isFinalized && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shrink-0">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs bg-indigo-50 text-indigo-600 border-indigo-200 shrink-0">
                               {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                             </Badge>
                           )}
@@ -3224,31 +3393,31 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
 
                     {/* Middle Info & Tier Selector */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs w-full max-w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs w-full max-w-full">
                       {isFinalized ? (
-                        <div className="text-xs text-slate-300 font-medium flex flex-wrap items-center gap-1.5 sm:gap-2">
-                          <span>Disetujui: <strong className="text-emerald-400">{approvedCount}</strong>/{count}</span>
+                        <div className="text-xs text-slate-700 font-medium flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <span>Disetujui: <strong className="text-indigo-600">{approvedCount}</strong>/{count}</span>
                           <span>·</span>
-                          <span>Ditolak: <strong className="text-rose-400">{rejectedCount}</strong></span>
+                          <span>Ditolak: <strong className="text-rose-600">{rejectedCount}</strong></span>
                           <span>·</span>
-                          <span>Payout: <strong className="text-teal-300 font-bold">{formatMoney(totalVal)}</strong></span>
+                          <span>Payout: <strong className="text-indigo-700 font-bold">{formatMoney(totalVal)}</strong></span>
                         </div>
                       ) : (
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between w-full">
-                          <p className="text-xs text-slate-300 font-medium">
-                            <strong>{count} email disetorkan</strong> · Estimasi: <span className="text-emerald-400 font-bold">{formatMoney(item.totalAmount ?? (count * pricePerItem))}</span>
+                          <p className="text-xs text-slate-700 font-medium">
+                            <strong>{count} email disetorkan</strong> · Estimasi: <span className="text-indigo-600 font-bold">{formatMoney(item.totalAmount ?? (count * pricePerItem))}</span>
                           </p>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs text-slate-400 font-medium">Tier Batch:</span>
+                            <span className="text-xs text-slate-500 font-medium">Tier Batch:</span>
                             <Select
                               disabled={busyId === item.id}
                               value={String(tierNum)}
                               onValueChange={(val) => handleBatchTierChange(item.id, val)}
                             >
-                              <SelectTrigger className="min-h-[44px] text-xs bg-slate-950 border-emerald-500/40 text-emerald-400 font-bold w-full sm:w-[150px]">
+                              <SelectTrigger className="min-h-[44px] text-xs bg-slate-50 border-indigo-200 text-indigo-600 font-bold w-full sm:w-[150px]">
                                 <SelectValue placeholder="Pilih Tier" />
                               </SelectTrigger>
-                              <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                              <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                                 {activeTiersList.map((t) => (
                                   <SelectItem key={t.tier} value={String(t.tier)} className="text-xs font-medium">
                                     {t.name} ({formatMoney(t.pricePerItem)}/item)
@@ -3262,9 +3431,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     </div>
 
                     {/* Bottom Action Row */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80 w-full max-w-full">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 w-full max-w-full">
                       {item.status !== "pending" ? (
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                           <span className="shrink-0">Stok:</span>
                           {(item.status === "available" || item.status === "approved") && (
                             <Button
@@ -3272,7 +3441,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               variant="outline"
                               disabled={busyId === item.id}
                               onClick={() => handleStockStatusChange(item.id, "sold")}
-                              className="min-h-[44px] text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                              className="min-h-[44px] text-xs bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
                             >
                               Tandai Terjual
                             </Button>
@@ -3283,7 +3452,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               variant="outline"
                               disabled={busyId === item.id}
                               onClick={() => handleStockStatusChange(item.id, "available")}
-                              className="min-h-[44px] text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                              className="min-h-[44px] text-xs bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
                             >
                               Kembalikan ke Stok
                             </Button>
@@ -3294,7 +3463,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               variant="ghost"
                               disabled={busyId === item.id}
                               onClick={() => handleStockStatusChange(item.id, "rejected")}
-                              className="min-h-[44px] text-xs text-rose-400 hover:bg-rose-500/10"
+                              className="min-h-[44px] text-xs text-rose-600 hover:bg-rose-500/10"
                             >
                               Tolak Stok
                             </Button>
@@ -3306,14 +3475,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => openDetailModal(item)}
-                        className="min-h-[44px] text-xs font-bold gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 w-full sm:w-auto shrink-0"
+                        className="min-h-[44px] text-xs font-bold gap-1.5 border-indigo-200 bg-indigo-50 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 w-full sm:w-auto shrink-0"
                       >
-                        <Eye className="w-4 h-4 text-emerald-400" />
+                        <Eye className="w-4 h-4 text-indigo-600" />
                         {item.status === "pending" ? "Tinjau Per Email" : "Lihat Detail Batch"}
                       </Button>
                     </div>
 
-                    {item.reviewNote && <p className="text-xs text-slate-400 mt-1 italic">Catatan: {item.reviewNote}</p>}
+                    {item.reviewNote && <p className="text-xs text-slate-500 mt-1 italic">Catatan: {item.reviewNote}</p>}
                   </CardContent>
                 </Card>
               );
@@ -3322,23 +3491,23 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* KELOLA PENARIKAN */}
           <TabsContent value="withdrawals" className="space-y-3">
-            {withdrawals.loading && <p className="text-sm text-slate-400 text-center py-8">Memuat…</p>}
+            {withdrawals.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat…</p>}
             {!withdrawals.loading && withdrawals.data.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">Belum ada penarikan.</p>
+              <p className="text-sm text-slate-500 text-center py-8">Belum ada penarikan.</p>
             )}
             {withdrawals.data.map((item) => {
               const holderName = item.accountHolderName ?? item.accountName ?? "Belum tersedia";
               return (
-                <Card key={item.id} className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-md">
+                <Card key={item.id} className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-md">
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
-                        <p className="font-bold text-base text-slate-100">{item.method}</p>
-                        <div className="text-xs text-slate-300 mt-1 space-y-0.5">
-                          <p>Pekerja: <strong className="text-slate-100">{workerName(item.workerId)}</strong></p>
-                          <p>No. Rekening / Wallet: <strong className="text-slate-100 font-mono">{item.account}</strong></p>
-                          <p>Atas Nama: <strong className="text-slate-100">{holderName}</strong></p>
-                          <p>Jumlah: <strong className="text-emerald-400 font-bold">{formatMoney(item.amount)}</strong></p>
+                        <p className="font-bold text-base text-slate-900">{item.method}</p>
+                        <div className="text-xs text-slate-700 mt-1 space-y-0.5">
+                          <p>Pekerja: <strong className="text-slate-900">{workerName(item.workerId)}</strong></p>
+                          <p>No. Rekening / Wallet: <strong className="text-slate-900 font-mono">{item.account}</strong></p>
+                          <p>Atas Nama: <strong className="text-slate-900">{holderName}</strong></p>
+                          <p>Jumlah: <strong className="text-indigo-600 font-bold">{formatMoney(item.amount)}</strong></p>
                         </div>
                         <p className="text-[11px] text-slate-500 font-mono mt-1">
                           #{shortId(item.id)} · {formatDateTime(item.requestedAt)}
@@ -3352,7 +3521,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         placeholder="Catatan (opsional)"
                         value={notes[item.id] ?? ""}
                         onChange={(e) => setNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                        className="text-xs h-9 min-w-[140px] flex-1 bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        className="text-xs h-9 min-w-[140px] flex-1 bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       />
                       {item.status === "pending" && (
                         <Button
@@ -3369,7 +3538,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         disabled={busyId === item.id}
                         onClick={() => handleWithdrawalDecision(item.id, "success")}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-1 shrink-0 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                        className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-1 shrink-0 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                       >
                         {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                         Selesai
@@ -3385,7 +3554,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       </Button>
                     </div>
                   )}
-                  {item.note && <p className="text-xs text-slate-400 mt-2 italic">Catatan: {item.note}</p>}
+                  {item.note && <p className="text-xs text-slate-500 mt-2 italic">Catatan: {item.note}</p>}
                 </CardContent>
               </Card>
               );
@@ -3395,84 +3564,84 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
           <TabsContent value="workers" className="space-y-3">
             {/* REALTIME REGISTERED WORKERS COUNTER CARD */}
-            <Card className="bg-[#0f172a] border border-slate-800 shadow-xl text-slate-100">
+            <Card className="bg-white border border-slate-200/80 shadow-2xs text-slate-900">
               <CardContent className="p-4 sm:p-5 flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+                  <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-lg shadow-emerald-500/10">
                     <Users className="w-6 h-6" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered Workers</p>
-                      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold gap-1.5 px-2 py-0.5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Registered Workers</p>
+                      <Badge className="bg-indigo-50 text-indigo-600 border border-indigo-200 text-[10px] font-extrabold gap-1.5 px-2 py-0.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                         REALTIME LIVE
                       </Badge>
                     </div>
-                    <p className="text-2xl sm:text-3xl font-black text-slate-100 mt-0.5 tracking-tight">
+                    <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tracking-tight">
                       {users.data.filter((u) => u.role !== "admin").length}{" "}
-                      <span className="text-xs font-semibold text-slate-400 font-sans">Worker Terdaftar</span>
+                      <span className="text-xs font-semibold text-slate-500 font-sans">Worker Terdaftar</span>
                     </p>
                   </div>
                 </div>
 
                 <Dialog open={addOpen} onOpenChange={setAddOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500 text-xs h-9">
+                    <Button className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500 text-xs h-9">
                       <UserPlus className="w-4 h-4" /> Tambah Pekerja
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-4 sm:p-6">
+                  <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 shadow-2xl p-4 sm:p-6">
                     <DialogHeader>
-                      <DialogTitle className="text-slate-100">Tambah Pekerja Baru</DialogTitle>
-                      <DialogDescription className="text-slate-400">Akun akan langsung berstatus aktif.</DialogDescription>
+                      <DialogTitle className="text-slate-900">Tambah Pekerja Baru</DialogTitle>
+                      <DialogDescription className="text-slate-500">Akun akan langsung berstatus aktif.</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleAddWorker} className="space-y-3">
                       <div>
-                        <Label className="text-xs text-slate-300">Nama</Label>
+                        <Label className="text-xs text-slate-700">Nama</Label>
                         <Input
                           value={newWorker.name}
                           onChange={(e) => setNewWorker((p) => ({ ...p, name: e.target.value }))}
-                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                           required
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Email</Label>
+                        <Label className="text-xs text-slate-700">Email</Label>
                         <Input
                           type="email"
                           value={newWorker.email}
                           onChange={(e) => setNewWorker((p) => ({ ...p, email: e.target.value }))}
-                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                           required
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Nomor HP (opsional)</Label>
+                        <Label className="text-xs text-slate-700">Nomor HP (opsional)</Label>
                         <Input
                           value={newWorker.phone}
                           onChange={(e) => setNewWorker((p) => ({ ...p, phone: e.target.value }))}
-                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label className="text-xs text-slate-300">Kata Sandi</Label>
+                          <Label className="text-xs text-slate-700">Kata Sandi</Label>
                           <Input
                             type="password"
                             value={newWorker.password}
                             onChange={(e) => setNewWorker((p) => ({ ...p, password: e.target.value }))}
-                            className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                            className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                             required
                           />
                         </div>
                         <div>
-                          <Label className="text-xs text-slate-300">Tier Awal</Label>
+                          <Label className="text-xs text-slate-700">Tier Awal</Label>
                           <Select value={newWorker.tier} onValueChange={(v) => setNewWorker((p) => ({ ...p, tier: v }))}>
-                            <SelectTrigger className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                            <SelectTrigger className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                            <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                               {activeTiersList.map((t) => (
                                 <SelectItem key={t.tier} value={String(t.tier)}>
                                   {t.name} ({formatMoney(t.pricePerItem)}/item)
@@ -3483,7 +3652,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         </div>
                       </div>
                       <DialogFooter className="pt-2">
-                        <Button type="submit" disabled={addBusy} className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 w-full hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20">
+                        <Button type="submit" disabled={addBusy} className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 w-full hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20">
                           {addBusy && <Loader2 className="w-4 h-4 animate-spin" />}
                           Buat Akun
                         </Button>
@@ -3497,61 +3666,61 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             <div className="hidden">
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500">
+                  <Button className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500">
                     <UserPlus className="w-4 h-4" /> Tambah Pekerja
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl">
+                <DialogContent className="bg-white border-slate-200/80 text-slate-900 shadow-2xl">
                   <DialogHeader>
-                    <DialogTitle className="text-slate-100">Tambah Pekerja Baru</DialogTitle>
-                    <DialogDescription className="text-slate-400">Akun akan langsung berstatus aktif.</DialogDescription>
+                    <DialogTitle className="text-slate-900">Tambah Pekerja Baru</DialogTitle>
+                    <DialogDescription className="text-slate-500">Akun akan langsung berstatus aktif.</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAddWorker} className="space-y-3">
                     <div>
-                      <Label className="text-xs text-slate-300">Nama</Label>
+                      <Label className="text-xs text-slate-700">Nama</Label>
                       <Input
                         value={newWorker.name}
                         onChange={(e) => setNewWorker((p) => ({ ...p, name: e.target.value }))}
-                        className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                         required
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-slate-300">Email</Label>
+                      <Label className="text-xs text-slate-700">Email</Label>
                       <Input
                         type="email"
                         value={newWorker.email}
                         onChange={(e) => setNewWorker((p) => ({ ...p, email: e.target.value }))}
-                        className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                         required
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-slate-300">Nomor HP (opsional)</Label>
+                      <Label className="text-xs text-slate-700">Nomor HP (opsional)</Label>
                       <Input
                         value={newWorker.phone}
                         onChange={(e) => setNewWorker((p) => ({ ...p, phone: e.target.value }))}
-                        className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs text-slate-300">Kata Sandi</Label>
+                        <Label className="text-xs text-slate-700">Kata Sandi</Label>
                         <Input
                           type="password"
                           value={newWorker.password}
                           onChange={(e) => setNewWorker((p) => ({ ...p, password: e.target.value }))}
-                          className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                           required
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Tier Awal</Label>
+                        <Label className="text-xs text-slate-700">Tier Awal</Label>
                         <Select value={newWorker.tier} onValueChange={(v) => setNewWorker((p) => ({ ...p, tier: v }))}>
-                          <SelectTrigger className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500">
+                          <SelectTrigger className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                          <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                             {activeTiersList.map((t) => (
                               <SelectItem key={t.tier} value={String(t.tier)}>
                                 {t.name} ({formatMoney(t.pricePerItem)}/item)
@@ -3562,7 +3731,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       </div>
                     </div>
                     <DialogFooter className="pt-2">
-                      <Button type="submit" disabled={addBusy} className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 w-full hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20">
+                      <Button type="submit" disabled={addBusy} className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 w-full hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20">
                         {addBusy && <Loader2 className="w-4 h-4 animate-spin" />}
                         Buat Akun
                       </Button>
@@ -3572,7 +3741,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Dialog>
             </div>
 
-            {users.loading && <p className="text-sm text-slate-400 text-center py-8">Memuat…</p>}
+            {users.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat…</p>}
             {users.data
               .filter((u) => u.role !== "admin")
               .map((u) => {
@@ -3582,21 +3751,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 const needsTierChange = Number(recTierCfg.tier) !== Number(currentTierCfg.tier);
 
                 return (
-                  <Card key={u.uid} className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-md">
+                  <Card key={u.uid} className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-md">
                     <CardContent className="pt-4">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-sm text-slate-100">{u.name}</p>
-                            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                            <p className="font-bold text-sm text-slate-900">{u.name}</p>
+                            <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-600 border-indigo-200">
                               {currentTierCfg.name} ({formatMoney(currentTierCfg.pricePerItem)}/item)
                             </Badge>
                             <OnlineStatusBadge lastActiveAt={u.lastActiveAt} />
                           </div>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
-                          <div className="flex gap-3 text-xs text-slate-300 mt-1">
+                          <p className="text-xs text-slate-500 font-mono mt-0.5">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
+                          <div className="flex gap-3 text-xs text-slate-700 mt-1">
                             <span>Total Item Disetujui: <strong>{approvedCount} item</strong></span>
-                            <span>Saldo: <strong className="text-emerald-400">{formatMoney(u.balance ?? 0)}</strong></span>
+                            <span>Saldo: <strong className="text-indigo-600">{formatMoney(u.balance ?? 0)}</strong></span>
                           </div>
                         </div>
                         <StatusBadge status={u.status} />
@@ -3604,9 +3773,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                       {/* Tier Recommendation Notice */}
                       {needsTierChange && (
-                        <div className="mb-3 p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-emerald-300">
+                        <div className="mb-3 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between text-xs text-indigo-700">
                           <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
                             <span>
                               Rekomendasi Tier: <strong>{recTierCfg.name}</strong> ({formatMoney(recTierCfg.pricePerItem)}/item) berdasarkan {approvedCount} item disetujui.
                             </span>
@@ -3614,7 +3783,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           <Button
                             size="sm"
                             onClick={() => handleUserTier(u.uid, recTierCfg.tier)}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold h-7 text-[11px] shrink-0"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold h-7 text-[11px] shrink-0"
                           >
                             Terapkan {recTierCfg.name}
                           </Button>
@@ -3622,13 +3791,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       )}
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
                           <span>Set Tier Manual:</span>
                           <Select value={String(u.tier)} onValueChange={(v) => handleUserTier(u.uid, Number(v))}>
-                            <SelectTrigger className="h-8 w-36 text-xs bg-slate-950/80 border-slate-800 text-slate-100">
+                            <SelectTrigger className="h-8 w-36 text-xs bg-slate-50 border-slate-200/80 text-slate-900">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                            <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                               {activeTiersList.map((t) => (
                                 <SelectItem key={t.tier} value={String(t.tier)}>
                                   {t.name} ({formatMoney(t.pricePerItem)})
@@ -3640,7 +3809,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                         {u.status === "pending" && (
                           <>
-                            <Button size="sm" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold h-8">
+                            <Button size="sm" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold h-8">
                               Setujui
                             </Button>
                             <Button size="sm" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "rejected")} className="bg-rose-600 hover:bg-rose-500 text-white font-bold h-8">
@@ -3649,31 +3818,31 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </>
                         )}
                         {(u.status === "approved" || u.status === "active") && (
-                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800">
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "inactive")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100">
                             Nonaktifkan
                           </Button>
                         )}
                         {(u.status === "inactive" || u.status === "rejected") && (
-                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="h-8 border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800">
+                          <Button size="sm" variant="outline" disabled={busyId === u.uid} onClick={() => handleUserStatus(u.uid, "active")} className="h-8 border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100">
                             Aktifkan
                           </Button>
                         )}
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="h-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1 ml-auto">
+                            <Button size="sm" variant="ghost" className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 gap-1 ml-auto">
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
+                          <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 p-4 sm:p-6">
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="text-slate-100">Hapus data pekerja ini?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-slate-400">
+                              <AlertDialogTitle className="text-slate-900">Hapus data pekerja ini?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-slate-500">
                                 Ini menghapus profil "{u.name}" dari Firestore.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Batal</AlertDialogCancel>
+                              <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(u.uid)} className="bg-rose-600 hover:bg-rose-500 text-white font-bold">
                                 Hapus
                               </AlertDialogAction>
@@ -3690,28 +3859,28 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           {/* PENGATURAN HADIAH & ENGAGEMENT FEATURES */}
           <TabsContent value="rewards" className="space-y-6">
             {/* LEADERBOARD MANAGEMENT SECTION */}
-            <Card className="border-slate-800 bg-slate-900/80 backdrop-blur-xl text-slate-100 shadow-xl">
-              <CardHeader className="pb-4 border-b border-slate-800">
+            <Card className="border-slate-200/80 bg-white backdrop-blur-xl text-slate-900 shadow-xl">
+              <CardHeader className="pb-4 border-b border-slate-200/80">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-100">
+                    <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-900">
                       <Trophy className="w-5 h-5 text-amber-400" />
                       Manajemen Leaderboard & Otomatisasi Payout Reward
                     </CardTitle>
-                    <CardDescription className="text-xs text-slate-400 mt-0.5">
+                    <CardDescription className="text-xs text-slate-500 mt-0.5">
                       Hitung real-time top pekerja berdasarkan email ACC terverifikasi dan cairkan bonus Juara 1, 2, 3 langsung ke Wallet Balance pekerja.
                     </CardDescription>
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
                     {/* WEEKLY PERIOD SELECTOR */}
-                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/80">
                       <Calendar className="w-3.5 h-3.5 text-amber-400" />
                       <Select value={selectedWeeklyPeriod} onValueChange={setSelectedWeeklyPeriod}>
                         <SelectTrigger className="h-7 border-0 bg-transparent text-xs font-bold text-amber-300 focus:ring-0 w-44">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                           {weeklyPeriodOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value} className="text-xs">
                               {opt.label}
@@ -3736,8 +3905,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           }
                           className={
                             isCurrentWeeklyPeriodActive
-                              ? "bg-slate-800 text-slate-500 border border-slate-700 font-bold text-xs h-9 gap-1.5 cursor-not-allowed opacity-60"
-                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-amber-500/20"
+                              ? "bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs h-9 gap-1.5 cursor-not-allowed opacity-60"
+                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-amber-500/20"
                           }
                         >
                           {distributingLeaderboard ? (
@@ -3750,18 +3919,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             : "Cairkan Reward Klasemen Mingguan"}
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 p-4 sm:p-6">
+                      <AlertDialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 p-4 sm:p-6">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
                             <Trophy className="w-5 h-5 text-amber-500" />
                             Cairkan Reward Klasemen Mingguan ({selectedWeeklyTimeframe.value})?
                           </AlertDialogTitle>
-                          <AlertDialogDescription className="text-slate-300 text-xs leading-relaxed">
+                          <AlertDialogDescription className="text-slate-700 text-xs leading-relaxed">
                             Tindakan ini akan memverifikasi pengerjaan Top 3, mentransfer bonus secara otomatis ke Saldo Utama (balance) pemenang yang memenuhi syarat minimal ACC (Juara 1: 200, Juara 2: 100, Juara 3: 50 ACC), dan menandai status <strong className="text-amber-300">isPaid: true</strong>.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <div className="py-2 space-y-2 text-xs border-y border-slate-800 my-2">
-                          <p className="font-bold text-slate-200">Daftar Calon Penerima Reward Qualified:</p>
+                        <div className="py-2 space-y-2 text-xs border-y border-slate-200/80 my-2">
+                          <p className="font-bold text-slate-800">Daftar Calon Penerima Reward Qualified:</p>
                           {currentLeaderboardStandings.slice(0, 3).map((w) => {
                             const minReq = w.rank === 1 ? 200 : w.rank === 2 ? 100 : 50;
                             const isQualified = w.validAccCount >= minReq;
@@ -3769,14 +3938,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             const rewardAmt = w.rewardAmount || (w.rank === 1 ? 50000 : w.rank === 2 ? 30000 : 15000);
 
                             return (
-                              <div key={w.workerId} className="flex justify-between items-center bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                              <div key={w.workerId} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                                 <div>
-                                  <p className="font-bold text-slate-100">Juara #{w.rank}: {w.workerName}</p>
-                                  <p className="text-[11px] text-slate-400">Pengerjaan: {w.validAccCount} / {minReq} ACC</p>
+                                  <p className="font-bold text-slate-900">Juara #{w.rank}: {w.workerName}</p>
+                                  <p className="text-[11px] text-slate-500">Pengerjaan: {w.validAccCount} / {minReq} ACC</p>
                                 </div>
                                 <div className="text-right">
                                   {isAlreadyPaid ? (
-                                    <Badge className="bg-slate-800 text-slate-400 border-slate-700 text-[10px]">
+                                    <Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px]">
                                       Sudah Dicairkan
                                     </Badge>
                                   ) : isQualified ? (
@@ -3794,10 +3963,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           })}
                         </div>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Batal</AlertDialogCancel>
+                          <AlertDialogCancel className="bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200">Batal</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={handleDistributeLeaderboardRewards}
-                            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-extrabold"
+                            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold"
                           >
                             Cairkan Saldo Sekarang
                           </AlertDialogAction>
@@ -3811,7 +3980,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 {/* STANDINGS PREVIEW GRID */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs font-bold text-slate-200 block">
+                    <Label className="text-xs font-bold text-slate-800 block">
                       Klasemen Pemenang ({selectedWeeklyTimeframe.label}):
                     </Label>
                     {isCurrentWeeklyPeriodActive && (
@@ -3821,7 +3990,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                     )}
                   </div>
                   {currentLeaderboardStandings.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-6 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/40">
+                    <p className="text-xs text-slate-500 py-6 text-center border border-dashed border-slate-200/80 rounded-xl bg-slate-50">
                       Belum ada email ACC terverifikasi pada periode ini.
                     </p>
                   ) : (
@@ -3837,16 +4006,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         const userProgress = getLeaderboardUserProgress(item.validAccCount, item.rank);
 
                         let badgeLabel = "Target Juara #3";
-                        let badgeStyle = "bg-slate-800 text-slate-300 border border-slate-700";
+                        let badgeStyle = "bg-slate-100 text-slate-600 border border-slate-200";
                         let targetAcc = userProgress.nextTarget;
 
                         if (item.validAccCount >= 200) {
                           badgeLabel = "Juara #1";
-                          badgeStyle = "bg-amber-500 text-slate-950";
+                          badgeStyle = "bg-amber-500 text-white";
                           targetAcc = 200;
                         } else if (item.validAccCount >= 100) {
                           badgeLabel = "Juara #2";
-                          badgeStyle = "bg-slate-700 text-slate-200";
+                          badgeStyle = "bg-slate-100 text-slate-700";
                           targetAcc = 100;
                         } else if (item.validAccCount >= 50) {
                           badgeLabel = "Juara #3";
@@ -3866,8 +4035,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         return (
                           <div
                             key={item.workerId}
-                            className={`p-3.5 rounded-xl border text-left bg-slate-950/60 shadow-sm space-y-2 flex flex-col justify-between ${
-                              item.rank === 1 ? "border-amber-500/50 ring-1 ring-amber-500/20 bg-amber-500/5" : "border-slate-800"
+                            className={`p-3.5 rounded-xl border text-left bg-slate-50 shadow-sm space-y-2 flex flex-col justify-between ${
+                              item.rank === 1 ? "border-amber-500/50 ring-1 ring-amber-500/20 bg-amber-500/5" : "border-slate-200/80"
                             }`}
                           >
                             <div className="space-y-1.5">
@@ -3880,17 +4049,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 <span className="text-[11px] font-mono text-slate-500">{item.maskedName}</span>
                               </div>
                               <div>
-                                <p className="font-bold text-slate-100 text-sm">{item.workerName}</p>
+                                <p className="font-bold text-slate-900 text-sm">{item.workerName}</p>
                                 <div className="flex items-center justify-between mt-1">
                                   <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
-                                  <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-amber-950/60 text-amber-400/80 border-amber-800/60 text-[10px]"}>
+                                  <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-slate-100 text-amber-400/80 border-amber-800/60 text-[10px]"}>
                                     {isQualified ? "Terkualifikasi" : "Belum Terkualifikasi"}
                                   </Badge>
                                 </div>
                               </div>
-                              <div className="pt-1 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                                <span className="text-slate-400">Bonus Hadiah:</span>
-                                <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-400 text-[11px]"}>
+                              <div className="pt-1 border-t border-slate-100 flex justify-between items-center text-xs">
+                                <span className="text-slate-500">Bonus Hadiah:</span>
+                                <span className={isQualified ? "font-black text-amber-400" : "font-semibold text-slate-500 text-[11px]"}>
                                   {bonusText}
                                 </span>
                               </div>
@@ -3902,7 +4071,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   disabled
                                   size="sm"
                                   variant="outline"
-                                  className="w-full text-xs h-8 bg-slate-900 border-slate-800 text-amber-300 font-bold gap-1 opacity-80 cursor-not-allowed"
+                                  className="w-full text-xs h-8 bg-white border-slate-200/80 text-amber-300 font-bold gap-1 opacity-80 cursor-not-allowed"
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                   Sudah Dicairkan
@@ -3912,7 +4081,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   size="sm"
                                   disabled={isCurrentWeeklyPeriodActive || isPaying || !isQualified}
                                   onClick={() => handleCairkanIndividualReward(item)}
-                                  className="w-full text-xs h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold shadow-md shadow-amber-500/10 gap-1"
+                                  className="w-full text-xs h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-md shadow-amber-500/10 gap-1"
                                 >
                                   {isPaying ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3931,20 +4100,20 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </div>
 
                 {/* RIWAYAT PAYOUT LEADERBOARD HISTORICAL TABLE & MOBILE CARDS */}
-                <div className="pt-2 border-t border-slate-800">
-                  <Label className="text-xs font-bold text-slate-200 mb-2 block">
+                <div className="pt-2 border-t border-slate-200/80">
+                  <Label className="text-xs font-bold text-slate-800 mb-2 block">
                     Riwayat Pencairan Hadiah Leaderboard ({leaderboardPayouts?.data?.length || 0})
                   </Label>
                   {(!leaderboardPayouts?.data || leaderboardPayouts.data.length === 0) ? (
-                    <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-slate-800 rounded-lg">
+                    <p className="text-xs text-slate-500 py-4 text-center border border-dashed border-slate-200/80 rounded-lg">
                       Belum ada pencairan hadiah leaderboard sebelumnya.
                     </p>
                   ) : (
                     <>
                       {/* Desktop Table */}
-                      <div className="hidden sm:block border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80 max-h-60 overflow-y-auto">
+                      <div className="hidden sm:block border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 max-h-60 overflow-y-auto">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 font-semibold sticky top-0 backdrop-blur-md">
+                          <thead className="bg-white border-b border-slate-200/80 text-slate-500 font-semibold sticky top-0 backdrop-blur-md">
                             <tr>
                               <th className="px-3 py-2">Waktu Cair</th>
                               <th className="px-3 py-2">Periode</th>
@@ -3955,15 +4124,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           </thead>
                           <tbody className="divide-y divide-slate-800/60">
                             {leaderboardPayouts.data.map((payout) => (
-                              <tr key={payout.id} className="hover:bg-slate-800/40 transition-colors">
-                                <td className="px-3 py-2 font-mono text-slate-400">{formatDateTime(payout.paidAt)}</td>
-                                <td className="px-3 py-2 font-bold text-slate-200">{payout.periodKey}</td>
+                              <tr key={payout.id} className="hover:bg-slate-100/40 transition-colors">
+                                <td className="px-3 py-2 font-mono text-slate-500">{formatDateTime(payout.paidAt)}</td>
+                                <td className="px-3 py-2 font-bold text-slate-800">{payout.periodKey}</td>
                                 <td className="px-3 py-2">
                                   <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
                                     Juara #{payout.rank}
                                   </Badge>
                                 </td>
-                                <td className="px-3 py-2 font-semibold text-slate-200">{payout.workerName || workerName(payout.workerId)}</td>
+                                <td className="px-3 py-2 font-semibold text-slate-800">{payout.workerName || workerName(payout.workerId)}</td>
                                 <td className="px-3 py-2 font-black text-amber-400 text-right">{formatMoney(payout.rewardAmount)}</td>
                               </tr>
                             ))}
@@ -3976,19 +4145,19 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         {leaderboardPayouts.data.map((payout) => (
                           <div
                             key={payout.id}
-                            className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5 text-xs"
+                            className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 text-xs"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-200">{payout.workerName || workerName(payout.workerId)}</span>
+                              <span className="font-bold text-slate-800">{payout.workerName || workerName(payout.workerId)}</span>
                               <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-[10px]">
                                 Juara #{payout.rank}
                               </Badge>
                             </div>
-                            <div className="flex items-center justify-between text-slate-400">
-                              <span>Periode: <strong className="text-slate-200">{payout.periodKey}</strong></span>
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Periode: <strong className="text-slate-800">{payout.periodKey}</strong></span>
                               <span className="font-black text-amber-400 text-sm">{formatMoney(payout.rewardAmount)}</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-800/60">
+                            <p className="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-200/80/60">
                               Cair: {formatDateTime(payout.paidAt)}
                             </p>
                           </div>
@@ -4002,28 +4171,28 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* PENDING MISSION CLAIMS REVIEW */}
             {pendingMissionClaims.length > 0 && (
-              <Card className="border-emerald-500/30 bg-emerald-950/20 backdrop-blur-xl text-slate-100">
+              <Card className="border-indigo-200 bg-indigo-50/50 backdrop-blur-xl text-slate-900">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2 text-slate-100">
-                    <Target className="w-5 h-5 text-emerald-400" /> Klaim Misi Menunggu Review ({pendingMissionClaims.length})
+                  <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
+                    <Target className="w-5 h-5 text-indigo-600" /> Klaim Misi Menunggu Review ({pendingMissionClaims.length})
                   </CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardDescription className="text-slate-500">
                     Pekerja mengajukan klaim misi. Verifikasi dan setujui untuk mencairkan saldo.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {pendingMissionClaims.map((claim) => (
-                    <div key={claim.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-lg flex items-center justify-between text-xs">
+                    <div key={claim.id} className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center justify-between text-xs">
                       <div>
-                        <p className="font-bold text-slate-100">{claim.workerName || workerName(claim.workerId)}</p>
-                        <p className="text-slate-400 mt-0.5">Misi ID: {claim.missionId} · Periode: {claim.periodKey}</p>
+                        <p className="font-bold text-slate-900">{claim.workerName || workerName(claim.workerId)}</p>
+                        <p className="text-slate-500 mt-0.5">Misi ID: {claim.missionId} · Periode: {claim.periodKey}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           size="sm"
                           disabled={busyId === claim.id}
                           onClick={() => handleReviewMission(claim.id, "approved")}
-                          className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-8 gap-1 hover:from-emerald-400 hover:to-teal-500"
+                          className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-8 gap-1 hover:from-indigo-500 hover:to-blue-500"
                         >
                           {busyId === claim.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                           Setujui
@@ -4044,21 +4213,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             )}
 
             {/* REFERRAL DATA & CONTROL */}
-            <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg flex items-center gap-2 text-slate-100">
-                      <Users className="w-5 h-5 text-emerald-400" /> Pengaturan & Data Referral
+                    <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
+                      <Users className="w-5 h-5 text-indigo-600" /> Pengaturan & Data Referral
                     </CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardDescription className="text-slate-500">
                       Atur nominal komisi referral per email ACC dan lihat daftar hubungan tim referral.
                     </CardDescription>
                   </div>
                   <Button
                     onClick={handleEvaluateReferrals}
                     disabled={evaluatingRefs}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs gap-1.5 shrink-0 hover:from-emerald-400 hover:to-teal-500"
+                    className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs gap-1.5 shrink-0 hover:from-indigo-500 hover:to-blue-500"
                   >
                     {evaluatingRefs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                     Evaluasi Referral
@@ -4067,31 +4236,31 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* FLAT REFERRAL COMMISSION CONFIGURATION */}
-                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3">
                   <div>
-                    <Label className="text-sm font-bold text-slate-200">
+                    <Label className="text-sm font-bold text-slate-800">
                       Nominal Komisi Pasif Income Flat (Rp / Email ACC)
                     </Label>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Komisi otomatis per 1 email ACC yang diselesaikan oleh downline yang akan dikreditkan ke Saldo Utama pengundang.
                     </p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
                     <div className="flex items-center gap-2 flex-1 max-w-sm">
-                      <span className="text-xs font-bold text-slate-400">Rp</span>
+                      <span className="text-xs font-bold text-slate-500">Rp</span>
                       <FormattedNumberInput
                         value={currentRefCommission}
                         onChange={(val) => setRefCommission(val)}
                         placeholder="200"
-                        className="h-9 text-xs font-bold bg-slate-900 border-slate-800 text-emerald-400 focus:border-emerald-500"
+                        className="h-9 text-xs font-bold bg-white border-slate-200/80 text-indigo-600 focus:border-emerald-500"
                       />
                     </div>
                     <Button
                       type="button"
                       disabled={savingRefCommission}
                       onClick={handleSaveRefCommission}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-500 shrink-0"
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-blue-500 shrink-0"
                     >
                       {savingRefCommission && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Simpan Komisi Flat
@@ -4100,15 +4269,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 </div>
 
                 {/* TABLE DAFTAR REFERRAL DATA */}
-                <div className="pt-2 border-t border-slate-800">
+                <div className="pt-2 border-t border-slate-200/80">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-bold text-slate-200">
+                    <Label className="text-sm font-bold text-slate-800">
                       Daftar Hubungan Referral ({referrals.data.length})
                     </Label>
                   </div>
 
                   {referrals.data.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-6 border border-dashed border-slate-800 rounded-lg">
+                    <p className="text-xs text-slate-500 text-center py-6 border border-dashed border-slate-200/80 rounded-lg">
                       Belum ada data pendaftaran referral.
                     </p>
                   ) : (
@@ -4124,32 +4293,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         let statusText = "PENDING";
 
                         if (isPaid) {
-                          statusBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+                          statusBadgeClass = "bg-indigo-50 text-indigo-600 border-indigo-200";
                           statusText = "PAID";
                         } else if (isQualified) {
                           statusBadgeClass = "bg-sky-500/10 text-sky-400 border-sky-500/30";
                           statusText = "QUALIFIED";
                         } else if (isRejected) {
-                          statusBadgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+                          statusBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/30";
                           statusText = "REJECTED";
                         }
 
                         return (
-                          <div key={ref.id} className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <div key={ref.id} className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                             <div className="space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-bold text-slate-200">
-                                  Pengundang: <span className="text-emerald-400">{ref.referrerName || workerName(ref.referrerId)}</span> ({shortId(ref.referrerId)})
+                                <span className="font-bold text-slate-800">
+                                  Pengundang: <span className="text-indigo-600">{ref.referrerName || workerName(ref.referrerId)}</span> ({shortId(ref.referrerId)})
                                 </span>
                                 <span className="text-slate-500">→</span>
-                                <span className="font-bold text-slate-200">
-                                  Yang Diundang: <span className="text-teal-300">{ref.referredWorkerName || workerName(ref.referredWorkerId)}</span> ({shortId(ref.referredWorkerId)})
+                                <span className="font-bold text-slate-800">
+                                  Yang Diundang: <span className="text-indigo-700">{ref.referredWorkerName || workerName(ref.referredWorkerId)}</span> ({shortId(ref.referredWorkerId)})
                                 </span>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-3 text-slate-400 font-medium">
-                                <span>Total Email ACC: <strong className="text-slate-100">{currentAcc}</strong></span>
-                                <span>Total Komisi Dicairkan: <strong className="text-emerald-400">{formatMoney(ref.rewardAmount ?? (currentAcc * (rules.data.referralCommissionPerAcc || 100)))}</strong></span>
+                              <div className="flex flex-wrap items-center gap-3 text-slate-500 font-medium">
+                                <span>Total Email ACC: <strong className="text-slate-900">{currentAcc}</strong></span>
+                                <span>Total Komisi Dicairkan: <strong className="text-indigo-600">{formatMoney(ref.rewardAmount ?? (currentAcc * (rules.data.referralCommissionPerAcc || 100)))}</strong></span>
                               </div>
 
                               <div className="text-[11px] text-slate-500 font-mono flex flex-wrap gap-2">
@@ -4174,10 +4343,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* AUDIT LEDGER HADIAH */}
-            <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
               <CardHeader>
-                <CardTitle className="text-lg text-slate-100">Audit Ledger Payout Hadiah</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-lg text-slate-900">Audit Ledger Payout Hadiah</CardTitle>
+                <CardDescription className="text-slate-500">
                   Rekam jejak seluruh pencairan hadiah (referral, misi, klasemen) yang transparan dan dapat diaudit.
                 </CardDescription>
               </CardHeader>
@@ -4187,14 +4356,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 )}
                 <div className="space-y-2 max-h-72 overflow-y-auto">
                   {rewardLedger.data.map((log) => (
-                    <div key={log.id} className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg flex items-center justify-between text-xs">
+                    <div key={log.id} className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center justify-between text-xs">
                       <div>
-                        <p className="font-bold text-slate-100">{log.workerName || workerName(log.workerId)}</p>
-                        <p className="text-slate-400 mt-0.5">{log.description}</p>
+                        <p className="font-bold text-slate-900">{log.workerName || workerName(log.workerId)}</p>
+                        <p className="text-slate-500 mt-0.5">{log.description}</p>
                         <p className="text-[11px] text-slate-500 font-mono">{formatDateTime(log.createdAt)}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold">
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-200 font-bold">
                           +{formatMoney(log.amount)}
                         </Badge>
                         <p className="text-[10px] text-slate-500 uppercase font-mono mt-1">{log.rewardType}</p>
@@ -4210,55 +4379,55 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           <TabsContent value="rules">
             <div className="space-y-6">
               {/* TIER CONFIGURATION EDITOR */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-lg text-slate-100">Konfigurasi Tier Pekerja</CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardTitle className="text-lg text-slate-900">Konfigurasi Tier Pekerja</CardTitle>
+                      <CardDescription className="text-slate-500">
                         Atur rentang jumlah item dan harga per item untuk tiap tier. Sistem akan memberikan rekomendasi otomatis ke admin.
                       </CardDescription>
                     </div>
-                    <Button onClick={handleAddTierConfig} variant="outline" className="gap-1 text-xs border-slate-800 bg-slate-950 text-emerald-400 hover:bg-slate-800">
+                    <Button onClick={handleAddTierConfig} variant="outline" className="gap-1 text-xs border-slate-200/80 bg-slate-50 text-indigo-600 hover:bg-slate-100">
                       <Plus className="w-3.5 h-3.5" /> Tambah Tier
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {activeTiers.map((t, idx) => (
-                    <div key={idx} className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                    <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
                       <div>
-                        <Label className="text-xs text-slate-300">Nama Tier</Label>
+                        <Label className="text-xs text-slate-700">Nama Tier</Label>
                         <Input
                           value={t.name}
                           onChange={(e) => handleUpdateTierConfig(idx, "name", e.target.value)}
-                          className="mt-1 h-8 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                          className="mt-1 h-8 text-xs bg-white border-slate-200/80 text-slate-900"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Min. Qty</Label>
+                        <Label className="text-xs text-slate-700">Min. Qty</Label>
                         <Input
                           type="number"
                           value={t.minQty}
                           onChange={(e) => handleUpdateTierConfig(idx, "minQty", Number(e.target.value))}
-                          className="mt-1 h-8 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                          className="mt-1 h-8 text-xs bg-white border-slate-200/80 text-slate-900"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Max. Qty</Label>
+                        <Label className="text-xs text-slate-700">Max. Qty</Label>
                         <Input
                           type="number"
                           value={t.maxQty}
                           onChange={(e) => handleUpdateTierConfig(idx, "maxQty", Number(e.target.value))}
-                          className="mt-1 h-8 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                          className="mt-1 h-8 text-xs bg-white border-slate-200/80 text-slate-900"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-300">Harga / Item (Rp)</Label>
+                        <Label className="text-xs text-slate-700">Harga / Item (Rp)</Label>
                         <FormattedNumberInput
                           value={t.pricePerItem}
                           onChange={(val) => handleUpdateTierConfig(idx, "pricePerItem", val)}
-                          className="mt-1 h-8 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                          className="mt-1 h-8 text-xs bg-white border-slate-200/80 text-slate-900"
                         />
                       </div>
                       <div className="flex justify-end">
@@ -4266,7 +4435,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveTierConfig(idx)}
-                          className="h-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+                          className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 text-xs"
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
                         </Button>
@@ -4277,21 +4446,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
 
               {/* PER-METHOD WITHDRAWAL FEE CONFIGURATION */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <CardTitle className="text-lg flex items-center gap-2 text-slate-100">
-                        <Wallet className="w-5 h-5 text-emerald-400" /> Pengaturan Biaya Penarikan Per-Metode Pembayaran
+                      <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
+                        <Wallet className="w-5 h-5 text-indigo-600" /> Pengaturan Biaya Penarikan Per-Metode Pembayaran
                       </CardTitle>
-                      <CardDescription className="text-xs text-slate-400">
+                      <CardDescription className="text-xs text-slate-500">
                         Konfigurasi jenis dan nilai biaya admin/layanan secara spesifik untuk setiap Bank dan E-Wallet.
                       </CardDescription>
                     </div>
                     <Button
                       onClick={handleSaveWithdrawalSettings}
                       disabled={savingWithdrawalSettings}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs h-9 gap-1.5 shrink-0 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs h-9 gap-1.5 shrink-0 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                     >
                       {savingWithdrawalSettings && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Simpan Konfigurasi Penarikan
@@ -4299,9 +4468,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-950/80 border border-slate-800 rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
                     <div>
-                      <Label className="text-xs font-semibold text-slate-300">Minimal Penarikan (Rp)</Label>
+                      <Label className="text-xs font-semibold text-slate-700">Minimal Penarikan (Rp)</Label>
                       <FormattedNumberInput
                         value={activeMinWithdraw}
                         onChange={(val) =>
@@ -4315,11 +4484,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             tiers: activeTiers,
                           })
                         }
-                        className="mt-1 h-9 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                        className="mt-1 h-9 text-xs bg-white border-slate-200/80 text-slate-900"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-semibold text-slate-300">Maksimal Penarikan (Rp)</Label>
+                      <Label className="text-xs font-semibold text-slate-700">Maksimal Penarikan (Rp)</Label>
                       <FormattedNumberInput
                         value={activeMaxWithdraw}
                         onChange={(val) =>
@@ -4333,20 +4502,20 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             tiers: activeTiers,
                           })
                         }
-                        className="mt-1 h-9 text-xs bg-slate-900 border-slate-800 text-slate-100"
+                        className="mt-1 h-9 text-xs bg-white border-slate-200/80 text-slate-900"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <Label className="text-sm font-bold text-slate-200 mb-2 block">
+                    <Label className="text-sm font-bold text-slate-800 mb-2 block">
                       Daftar Metode Pembayaran & Struktur Biaya
                     </Label>
 
                     {/* Desktop Table View */}
-                    <div className="hidden sm:block border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80">
+                    <div className="hidden sm:block border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50">
                       <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 font-semibold">
+                        <thead className="bg-white border-b border-slate-200/80 text-slate-500 font-semibold">
                           <tr>
                             <th className="px-3 py-2.5">Status</th>
                             <th className="px-3 py-2.5">Metode Pembayaran</th>
@@ -4358,32 +4527,32 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">
                           {currentMethods.map((m, idx) => (
-                            <tr key={idx} className={m.enabled ? "hover:bg-slate-800/40 transition-colors" : "bg-slate-950/40 opacity-50"}>
+                            <tr key={idx} className={m.enabled ? "hover:bg-slate-100/40 transition-colors" : "bg-slate-50 opacity-50"}>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleToggleMethodEnabled(idx, !m.enabled)}
-                                  className={`text-[11px] h-7 px-2 font-bold border-slate-800 ${
+                                  className={`text-[11px] h-7 px-2 font-bold border-slate-200/80 ${
                                     m.enabled
-                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                                      : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                                      ? "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                      : "bg-slate-100 text-slate-600 hover:bg-slate-700"
                                   }`}
                                 >
                                   {m.enabled ? "✓ Aktif" : "Nonaktif"}
                                 </Button>
                               </td>
-                              <td className="px-3 py-2.5 font-bold text-slate-100 whitespace-nowrap">{m.method}</td>
+                              <td className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">{m.method}</td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 <Select
                                   value={m.category ?? "bank"}
                                   onValueChange={(val) => handleUpdateMethodFee(idx, "category", val)}
                                 >
-                                  <SelectTrigger className="h-7 text-[11px] w-28 bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectTrigger className="h-7 text-[11px] w-28 bg-white border-slate-200/80 text-slate-900">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                                     <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
                                     <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
                                     <SelectItem value="other" className="text-xs">Lainnya</SelectItem>
@@ -4395,25 +4564,25 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   value={m.feeType}
                                   onValueChange={(val) => handleUpdateMethodFee(idx, "feeType", val)}
                                 >
-                                  <SelectTrigger className="h-7 text-[11px] w-32 bg-slate-900 border-slate-800 text-slate-100">
+                                  <SelectTrigger className="h-7 text-[11px] w-32 bg-white border-slate-200/80 text-slate-900">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                    <SelectItem value="free" className="text-xs text-emerald-400 font-semibold">Bebas Biaya (Gratis)</SelectItem>
+                                  <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                                    <SelectItem value="free" className="text-xs text-indigo-600 font-semibold">Bebas Biaya (Gratis)</SelectItem>
                                     <SelectItem value="fixed" className="text-xs text-sky-400 font-semibold">Biaya Tetap (Rp)</SelectItem>
-                                    <SelectItem value="percentage" className="text-xs text-teal-300 font-semibold">Persentase (%)</SelectItem>
+                                    <SelectItem value="percentage" className="text-xs text-indigo-700 font-semibold">Persentase (%)</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 {m.feeType === "free" ? (
-                                  <span className="text-emerald-400 font-semibold">Rp 0 (Gratis)</span>
+                                  <span className="text-indigo-600 font-semibold">Rp 0 (Gratis)</span>
                                 ) : m.feeType === "fixed" ? (
                                   <div className="w-32">
                                     <FormattedNumberInput
                                       value={m.feeValue}
                                       onChange={(val) => handleUpdateMethodFee(idx, "feeValue", val)}
-                                      className="h-7 text-xs bg-slate-900 border-slate-800 font-bold text-sky-400"
+                                      className="h-7 text-xs bg-white border-slate-200/80 font-bold text-sky-400"
                                     />
                                   </div>
                                 ) : (
@@ -4423,9 +4592,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                       step="0.1"
                                       value={m.feeValue}
                                       onChange={(e) => handleUpdateMethodFee(idx, "feeValue", parseFloat(e.target.value) || 0)}
-                                      className="h-7 text-xs bg-slate-900 border-slate-800 font-bold text-teal-300"
+                                      className="h-7 text-xs bg-white border-slate-200/80 font-bold text-indigo-700"
                                     />
-                                    <span className="font-bold text-slate-400 text-xs">%</span>
+                                    <span className="font-bold text-slate-500 text-xs">%</span>
                                   </div>
                                 )}
                               </td>
@@ -4435,7 +4604,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRemoveMethod(idx)}
-                                  className="h-7 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                  className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -4452,21 +4621,21 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <div
                           key={idx}
                           className={`p-3.5 rounded-xl border space-y-3 ${
-                            m.enabled ? "bg-slate-950/80 border-slate-800" : "bg-slate-950/30 border-slate-900 opacity-60"
+                            m.enabled ? "bg-slate-50 border-slate-200/80" : "bg-slate-50 border-slate-200 opacity-60"
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-100 text-sm">{m.method}</span>
+                            <span className="font-bold text-slate-900 text-sm">{m.method}</span>
                             <div className="flex items-center gap-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleToggleMethodEnabled(idx, !m.enabled)}
-                                className={`text-[11px] h-7 px-2.5 font-bold border-slate-800 ${
+                                className={`text-[11px] h-7 px-2.5 font-bold border-slate-200/80 ${
                                   m.enabled
-                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                    : "bg-slate-800 text-slate-400"
+                                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                                    : "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {m.enabled ? "✓ Aktif" : "Nonaktif"}
@@ -4476,7 +4645,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleRemoveMethod(idx)}
-                                className="h-7 w-7 p-0 text-rose-400 hover:bg-rose-500/10"
+                                className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-500/10"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -4485,15 +4654,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Kategori</Label>
+                              <Label className="text-[10px] text-slate-500 font-semibold mb-1 block">Kategori</Label>
                               <Select
                                 value={m.category ?? "bank"}
                                 onValueChange={(val) => handleUpdateMethodFee(idx, "category", val)}
                               >
-                                <SelectTrigger className="h-8 text-xs bg-slate-900 border-slate-800 text-slate-100">
+                                <SelectTrigger className="h-8 text-xs bg-white border-slate-200/80 text-slate-900">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                                <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                                   <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
                                   <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
                                   <SelectItem value="other" className="text-xs">Lainnya</SelectItem>
@@ -4502,18 +4671,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             </div>
 
                             <div>
-                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Jenis Biaya</Label>
+                              <Label className="text-[10px] text-slate-500 font-semibold mb-1 block">Jenis Biaya</Label>
                               <Select
                                 value={m.feeType}
                                 onValueChange={(val) => handleUpdateMethodFee(idx, "feeType", val)}
                               >
-                                <SelectTrigger className="h-8 text-xs bg-slate-900 border-slate-800 text-slate-100">
+                                <SelectTrigger className="h-8 text-xs bg-white border-slate-200/80 text-slate-900">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                  <SelectItem value="free" className="text-xs text-emerald-400 font-semibold">Gratis</SelectItem>
+                                <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                                  <SelectItem value="free" className="text-xs text-indigo-600 font-semibold">Gratis</SelectItem>
                                   <SelectItem value="fixed" className="text-xs text-sky-400 font-semibold">Tetap (Rp)</SelectItem>
-                                  <SelectItem value="percentage" className="text-xs text-teal-300 font-semibold">Persentase (%)</SelectItem>
+                                  <SelectItem value="percentage" className="text-xs text-indigo-700 font-semibold">Persentase (%)</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -4521,12 +4690,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                           {m.feeType !== "free" && (
                             <div>
-                              <Label className="text-[10px] text-slate-400 font-semibold mb-1 block">Nilai Biaya</Label>
+                              <Label className="text-[10px] text-slate-500 font-semibold mb-1 block">Nilai Biaya</Label>
                               {m.feeType === "fixed" ? (
                                 <FormattedNumberInput
                                   value={m.feeValue}
                                   onChange={(val) => handleUpdateMethodFee(idx, "feeValue", val)}
-                                  className="h-8 text-xs bg-slate-900 border-slate-800 font-bold text-sky-400"
+                                  className="h-8 text-xs bg-white border-slate-200/80 font-bold text-sky-400"
                                 />
                               ) : (
                                 <div className="flex items-center gap-1.5">
@@ -4535,9 +4704,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                     step="0.1"
                                     value={m.feeValue}
                                     onChange={(e) => handleUpdateMethodFee(idx, "feeValue", parseFloat(e.target.value) || 0)}
-                                    className="h-8 text-xs bg-slate-900 border-slate-800 font-bold text-teal-300"
+                                    className="h-8 text-xs bg-white border-slate-200/80 font-bold text-indigo-700"
                                   />
-                                  <span className="font-bold text-slate-400 text-xs">%</span>
+                                  <span className="font-bold text-slate-500 text-xs">%</span>
                                 </div>
                               )}
                             </div>
@@ -4548,23 +4717,23 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {/* FORM TAMBAH METODE BARU */}
-                  <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg space-y-2">
-                    <p className="text-xs font-bold text-slate-200">Tambah Metode Pembayaran Baru</p>
+                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg space-y-2">
+                    <p className="text-xs font-bold text-slate-800">Tambah Metode Pembayaran Baru</p>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         placeholder="Nama Metode (contoh: Permata, LinkAja)"
                         value={newMethodName}
                         onChange={(e) => setNewMethodName(e.target.value)}
-                        className="h-8 text-xs flex-1 bg-slate-900 border-slate-800 text-slate-100 focus:border-emerald-500"
+                        className="h-8 text-xs flex-1 bg-white border-slate-200/80 text-slate-900 focus:border-emerald-500"
                       />
                       <Select
                         value={newMethodCategory}
                         onValueChange={(val: "bank" | "ewallet") => setNewMethodCategory(val)}
                       >
-                        <SelectTrigger className="h-8 text-xs w-full sm:w-36 bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectTrigger className="h-8 text-xs w-full sm:w-36 bg-white border-slate-200/80 text-slate-900">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                           <SelectItem value="bank" className="text-xs">Bank Transfer</SelectItem>
                           <SelectItem value="ewallet" className="text-xs">E-Wallet</SelectItem>
                         </SelectContent>
@@ -4572,7 +4741,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       <Button
                         type="button"
                         onClick={handleAddMethod}
-                        className="h-8 text-xs bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-1 shrink-0 hover:from-emerald-400 hover:to-teal-500 shadow-md"
+                        className="h-8 text-xs bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-1 shrink-0 hover:from-indigo-500 hover:to-blue-500 shadow-md"
                       >
                         <Plus className="w-3.5 h-3.5" /> Tambah Metode
                       </Button>
@@ -4582,13 +4751,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
 
               {/* GENERAL RULES & NOTES */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100">Aturan Setor Email & Instruksi Kata Sandi</CardTitle>
+                  <CardTitle className="text-lg text-slate-900">Aturan Setor Email & Instruksi Kata Sandi</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-xs text-slate-300">Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
+                    <Label className="text-xs text-slate-700">Aturan Setor Email & Kata Sandi (Instruksi Multiline)</Label>
                     <Textarea
                       rows={6}
                       value={activeSubmissionNotesText}
@@ -4604,10 +4773,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         })
                       }
                       placeholder="Tuliskan aturan setoran di sini..."
-                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500 leading-relaxed"
+                      className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500 leading-relaxed"
                     />
                   </div>
-                  <Button onClick={handleSaveRules} disabled={savingRules} className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20">
+                  <Button onClick={handleSaveRules} disabled={savingRules} className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20">
                     {savingRules && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan Pengaturan Aturan & Tier
                   </Button>
@@ -4615,47 +4784,47 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
 
               {/* JAM OPERASIONAL & SUBMISSION LOCK */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100">Jam Operasional & Control Form Setoran</CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardTitle className="text-lg text-slate-900">Jam Operasional & Control Form Setoran</CardTitle>
+                  <CardDescription className="text-slate-500">
                     Atur jadwal operasional harian, saklar kunci setoran manual admin, dan zona waktu platform.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* MANUAL SUBMISSION LOCK TOGGLE */}
-                  <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl">
+                  <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
                     <div>
-                      <Label className="font-bold text-sm text-slate-200">Kunci Formulir Setoran Email (Manual Override)</Label>
-                      <p className="text-xs text-slate-400 mt-0.5">Buka atau tutup akses formulir setoran email worker secara manual kapan saja.</p>
+                      <Label className="font-bold text-sm text-slate-800">Kunci Formulir Setoran Email (Manual Override)</Label>
+                      <p className="text-xs text-slate-500 mt-0.5">Buka atau tutup akses formulir setoran email worker secara manual kapan saja.</p>
                     </div>
                     <Select
                       value={currentSubmissionOpen ? "OPEN" : "CLOSED"}
                       onValueChange={(val) => setSubmissionOpenState(val === "OPEN")}
                     >
-                      <SelectTrigger className="w-36 text-xs h-8 font-bold bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectTrigger className="w-36 text-xs h-8 font-bold bg-white border-slate-200/80 text-slate-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="OPEN" className="text-xs font-bold text-emerald-400">🟢 Buka (Terbuka)</SelectItem>
-                        <SelectItem value="CLOSED" className="text-xs font-bold text-rose-400">🔴 Tutup (Kunci)</SelectItem>
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                        <SelectItem value="OPEN" className="text-xs font-bold text-indigo-600">🟢 Buka (Terbuka)</SelectItem>
+                        <SelectItem value="CLOSED" className="text-xs font-bold text-rose-600">🔴 Tutup (Kunci)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-slate-950/80 border border-slate-800 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
                     <div>
-                      <Label className="font-bold text-sm text-slate-200">Status Jam Operasional Global</Label>
-                      <p className="text-xs text-slate-400">Aktifkan atau nonaktifkan fitur jam operasional secara menyeluruh.</p>
+                      <Label className="font-bold text-sm text-slate-800">Status Jam Operasional Global</Label>
+                      <p className="text-xs text-slate-500">Aktifkan atau nonaktifkan fitur jam operasional secara menyeluruh.</p>
                     </div>
                     <Select
                       value={currentOperatingHours.enabled ? "ON" : "OFF"}
                       onValueChange={(val) => handleUpdateGlobalOperatingHours(val === "ON")}
                     >
-                      <SelectTrigger className="w-28 text-xs h-8 bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectTrigger className="w-28 text-xs h-8 bg-white border-slate-200/80 text-slate-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                         <SelectItem value="ON">ON</SelectItem>
                         <SelectItem value="OFF">OFF</SelectItem>
                       </SelectContent>
@@ -4677,11 +4846,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         <div
                           key={d.key}
                           className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
-                            dayConfig.enabled ? "bg-slate-950/60 border-slate-800" : "bg-slate-950/30 border-slate-900 text-slate-500 opacity-60"
+                            dayConfig.enabled ? "bg-slate-50 border-slate-200/80" : "bg-slate-50 border-slate-200 text-slate-500 opacity-60"
                           }`}
                         >
                           <div className="flex items-center gap-3 w-32">
-                            <span className="font-bold text-sm text-slate-100">{d.label}</span>
+                            <span className="font-bold text-sm text-slate-900">{d.label}</span>
                           </div>
 
                           <div className="flex items-center gap-3 flex-1 flex-wrap">
@@ -4689,34 +4858,34 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               value={dayConfig.enabled ? "ON" : "OFF"}
                               onValueChange={(val) => handleUpdateDayOperatingHours(d.key, "enabled", val === "ON")}
                             >
-                              <SelectTrigger className="w-24 text-xs h-8 bg-slate-900 border-slate-800 text-slate-100">
+                              <SelectTrigger className="w-24 text-xs h-8 bg-white border-slate-200/80 text-slate-900">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                              <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                                 <SelectItem value="ON">ON</SelectItem>
                                 <SelectItem value="OFF">OFF</SelectItem>
                               </SelectContent>
                             </Select>
 
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-400">Buka:</span>
+                              <span className="text-slate-500">Buka:</span>
                               <Input
                                 value={dayConfig.open}
                                 disabled={!dayConfig.enabled}
                                 onChange={(e) => handleUpdateDayOperatingHours(d.key, "open", e.target.value)}
                                 placeholder="08:00"
-                                className="w-24 h-8 text-xs font-mono bg-slate-900 border-slate-800 text-slate-100"
+                                className="w-24 h-8 text-xs font-mono bg-white border-slate-200/80 text-slate-900"
                               />
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-400">Tutup:</span>
+                              <span className="text-slate-500">Tutup:</span>
                               <Input
                                 value={dayConfig.close}
                                 disabled={!dayConfig.enabled}
                                 onChange={(e) => handleUpdateDayOperatingHours(d.key, "close", e.target.value)}
                                 placeholder="18:00"
-                                className="w-24 h-8 text-xs font-mono bg-slate-900 border-slate-800 text-slate-100"
+                                className="w-24 h-8 text-xs font-mono bg-white border-slate-200/80 text-slate-900"
                               />
                             </div>
                           </div>
@@ -4728,7 +4897,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <Button
                     onClick={handleSaveOperatingHours}
                     disabled={savingOperatingHours}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 text-xs hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                    className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 text-xs hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                   >
                     {savingOperatingHours && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan Jam Operasional
@@ -4737,24 +4906,24 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
 
               {/* TELEGRAM BOT NOTIFICATION SERVICE CONFIGURATION */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
-                    <Megaphone className="w-5 h-5 text-emerald-400" /> Telegram Bot Notification Service
+                  <CardTitle className="text-lg text-slate-900 flex items-center gap-2">
+                    <Megaphone className="w-5 h-5 text-indigo-600" /> Telegram Bot Notification Service
                   </CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardDescription className="text-slate-500">
                     Konfigurasi Telegram Bot untuk menerima notifikasi otomatis secara real-time saat ada Storan Email Masuk dan Request Penarikan Saldo Worker.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-xs text-slate-300 font-semibold">Telegram Bot Token (botToken)</Label>
+                    <Label className="text-xs text-slate-700 font-semibold">Telegram Bot Token (botToken)</Label>
                     <Input
                       type="password"
                       value={currentTelegramBotToken}
                       onChange={(e) => setTelegramBotToken(e.target.value)}
                       placeholder="Contoh: 1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1.5 text-xs font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       Token resmi dari BotFather di Telegram.
@@ -4762,12 +4931,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div>
-                    <Label className="text-xs text-slate-300 font-semibold">Telegram Admin Chat ID / Group ID (adminChatId)</Label>
+                    <Label className="text-xs text-slate-700 font-semibold">Telegram Admin Chat ID / Group ID (adminChatId)</Label>
                     <Input
                       value={currentTelegramAdminChatId}
                       onChange={(e) => setTelegramAdminChatId(e.target.value)}
                       placeholder="Contoh: 123456789 atau -100123456789"
-                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                      className="mt-1.5 text-xs font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       ID User Admin atau ID Group Telegram tujuan pengiriman notifikasi.
@@ -4775,17 +4944,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   <div>
-                    <Label className="text-xs text-slate-300 font-semibold">Status Layanan Notifikasi</Label>
+                    <Label className="text-xs text-slate-700 font-semibold">Status Layanan Notifikasi</Label>
                     <Select
                       value={currentTelegramEnabled ? "ON" : "OFF"}
                       onValueChange={(val) => setTelegramEnabled(val === "ON")}
                     >
-                      <SelectTrigger className="mt-1.5 w-36 text-xs bg-slate-950/80 border-slate-800 text-slate-100">
+                      <SelectTrigger className="mt-1.5 w-36 text-xs bg-slate-50 border-slate-200/80 text-slate-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                        <SelectItem value="ON" className="text-xs font-semibold text-emerald-400">Aktif (ON)</SelectItem>
-                        <SelectItem value="OFF" className="text-xs font-semibold text-slate-400">Nonaktif (OFF)</SelectItem>
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
+                        <SelectItem value="ON" className="text-xs font-semibold text-indigo-600">Aktif (ON)</SelectItem>
+                        <SelectItem value="OFF" className="text-xs font-semibold text-slate-500">Nonaktif (OFF)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -4796,7 +4965,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       variant="outline"
                       onClick={handleTestTelegramNotification}
                       disabled={testingTelegram || !currentTelegramBotToken.trim() || !currentTelegramAdminChatId.trim()}
-                      className="bg-slate-950 border-slate-800 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold gap-2 text-xs h-9"
+                      className="bg-slate-50 border-slate-200/80 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 font-bold gap-2 text-xs h-9"
                     >
                       {testingTelegram ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
                       Test Kirim Notifikasi
@@ -4806,7 +4975,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                       type="button"
                       onClick={handleSaveTelegramConfig}
                       disabled={savingTelegram}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 text-xs h-9 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 text-xs h-9 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                     >
                       {savingTelegram && <Loader2 className="w-4 h-4 animate-spin" />}
                       Simpan Pengaturan Telegram
@@ -4816,61 +4985,61 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
 
               {/* PUSAT BANTUAN / CUSTOMER SERVICE */}
-              <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl text-slate-100 shadow-xl">
+              <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-100">Pusat Bantuan & Komunitas</CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardTitle className="text-lg text-slate-900">Pusat Bantuan & Komunitas</CardTitle>
+                  <CardDescription className="text-slate-500">
                     Atur tautan CS Telegram dan Saluran / Grup WhatsApp yang tampil di Worker Dashboard.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-xs text-slate-300">Nama layanan</Label>
+                    <Label className="text-xs text-slate-700">Nama layanan</Label>
                     <Input
                       value={currentSupportTitle}
                       onChange={(e) => setSupportTitle(e.target.value)}
                       placeholder="Customer Service"
-                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
+                      className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Link CS Telegram (supportTelegramLink)</Label>
+                    <Label className="text-xs text-slate-700">Link CS Telegram (supportTelegramLink)</Label>
                     <Input
                       value={currentSupportTelegramUrl}
                       onChange={(e) => setSupportTelegramUrl(e.target.value)}
                       placeholder="https://t.me/username"
-                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
+                      className="mt-1.5 text-xs font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Link Saluran / Grup WhatsApp (communityWaLink)</Label>
+                    <Label className="text-xs text-slate-700">Link Saluran / Grup WhatsApp (communityWaLink)</Label>
                     <Input
                       value={currentCommunityWaLink}
                       onChange={(e) => setCommunityWaLink(e.target.value)}
                       placeholder="https://chat.whatsapp.com/..."
-                      className="mt-1.5 text-xs font-mono bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
+                      className="mt-1.5 text-xs font-mono bg-slate-50 border-slate-200/80 text-slate-900 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Deskripsi Ringkas</Label>
+                    <Label className="text-xs text-slate-700">Deskripsi Ringkas</Label>
                     <Textarea
                       rows={3}
                       value={currentSupportDescription}
                       onChange={(e) => setSupportDescription(e.target.value)}
                       placeholder="Ada kendala? Hubungi Customer Service kami melalui Telegram atau gabung Komunitas WA."
-                      className="mt-1.5 text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-amber-500"
+                      className="mt-1.5 text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-300">Status</Label>
+                    <Label className="text-xs text-slate-700">Status</Label>
                     <Select
                       value={currentSupportEnabled ? "ON" : "OFF"}
                       onValueChange={(val) => setSupportEnabled(val === "ON")}
                     >
-                      <SelectTrigger className="mt-1.5 w-36 text-xs bg-slate-950/80 border-slate-800 text-slate-100">
+                      <SelectTrigger className="mt-1.5 w-36 text-xs bg-slate-50 border-slate-200/80 text-slate-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectContent className="bg-white border-slate-200/80 text-slate-900">
                         <SelectItem value="ON">ON</SelectItem>
                         <SelectItem value="OFF">OFF</SelectItem>
                       </SelectContent>
@@ -4879,7 +5048,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <Button
                     onClick={handleSaveSupportConfig}
                     disabled={savingSupport}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold gap-2 text-xs hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                    className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold gap-2 text-xs hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                   >
                     {savingSupport && <Loader2 className="w-4 h-4 animate-spin" />}
                     Simpan
@@ -4917,7 +5086,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <div className={`md:col-span-5 lg:col-span-4 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col ${selectedWorkerUid ? "hidden md:flex" : "flex"}`}>
                     <div className="p-3 border-b border-slate-100 space-y-2 bg-slate-50/50">
                       <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                         <Input
                           placeholder="Cari worker (nama / ID)..."
                           value={chatSearchQuery}
@@ -4932,7 +5101,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                     <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[440px]">
                       {users.data.filter(u => u.role !== "admin").length === 0 ? (
-                        <p className="text-xs text-slate-400 text-center py-10">Belum ada worker terdaftar.</p>
+                        <p className="text-xs text-slate-500 text-center py-10">Belum ada worker terdaftar.</p>
                       ) : (
                         users.data
                           .filter(u => u.role !== "admin")
@@ -4968,7 +5137,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                       {worker.name || "Pekerja " + shortId(worker.uid)}
                                     </p>
                                     {conv?.lastMessageAt && (
-                                      <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                      <span className="text-[10px] text-slate-500 font-mono shrink-0">
                                         {formatDateTime(conv.lastMessageAt).split(" ")[1] || ""}
                                       </span>
                                     )}
@@ -4992,8 +5161,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   {/* ACTIVE CHAT ROOM COLUMN */}
                   <div className={`md:col-span-7 lg:col-span-8 bg-slate-50/30 flex flex-col ${selectedWorkerUid ? "flex" : "hidden md:flex"}`}>
                     {!selectedWorkerUid ? (
-                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
-                        <MessageSquare className="w-10 h-10 text-slate-300" />
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-2">
+                        <MessageSquare className="w-10 h-10 text-slate-700" />
                         <p className="font-bold text-slate-700 text-sm">Pilih Pekerja untuk Memulai Chat</p>
                         <p className="text-xs text-slate-500 max-w-sm">
                           Pilih pekerja dari daftar di sebelah kiri untuk melihat pesan atau memberikan arahan langsung.
@@ -5037,7 +5206,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         {/* MESSAGES SCROLL AREA */}
                         <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-[340px] max-h-[420px]">
                           {selectedWorkerMessages.loading ? (
-                            <div className="flex items-center justify-center py-10 text-xs text-slate-400 gap-2">
+                            <div className="flex items-center justify-center py-10 text-xs text-slate-500 gap-2">
                               <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
                               Memuat percakapan...
                             </div>
@@ -5067,7 +5236,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                       <span>{isAdmin ? "Admin" : msg.senderName || "Worker"}</span>
                                     </div>
                                     <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
-                                    <div className={`text-[9px] font-mono text-right mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-400"}`}>
+                                    <div className={`text-[9px] font-mono text-right mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-500"}`}>
                                       {formatDateTime(msg.createdAt)}
                                     </div>
                                   </div>
@@ -5112,11 +5281,11 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
         {/* DIALOG LIHAT & TINJAU DETAIL BATCH (PER EMAIL) */}
         <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-slate-800 text-slate-100 shadow-2xl p-3 sm:p-6 w-full box-border">
+          <DialogContent className="max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto bg-white border-slate-200/80 text-slate-900 shadow-2xl p-3 sm:p-6 w-full box-border">
             <DialogHeader>
-              <DialogTitle className="text-slate-100 text-base sm:text-lg">Tinjau Batch Setoran Email</DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs truncate">
-                Pekerja: <strong className="text-slate-200">{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong> · <span className="font-mono">#{shortId(detailSubmission?.id ?? "")}</span>
+              <DialogTitle className="text-slate-900 text-base sm:text-lg">Tinjau Batch Setoran Email</DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs truncate">
+                Pekerja: <strong className="text-slate-800">{detailSubmission?.workerName || workerName(detailSubmission?.workerId ?? "")}</strong> · <span className="font-mono">#{shortId(detailSubmission?.id ?? "")}</span>
               </DialogDescription>
             </DialogHeader>
             {detailSubmission && (() => {
@@ -5155,33 +5324,33 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
               return (
                 <div className="space-y-3 sm:space-y-4 pt-1 w-full max-w-full overflow-x-hidden box-border">
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 sm:p-3 bg-slate-950/80 border border-slate-800 rounded-lg text-xs w-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 sm:p-3 bg-slate-50 border border-slate-200/80 rounded-lg text-xs w-full">
                     <div>
-                      <span className="text-slate-400 text-[10px] sm:text-xs">Total Item:</span>
-                      <p className="font-bold text-slate-100">{baseItems.length} item</p>
+                      <span className="text-slate-500 text-[10px] sm:text-xs">Total Item:</span>
+                      <p className="font-bold text-slate-900">{baseItems.length} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] sm:text-xs">ACC:</span>
-                      <p className="font-bold text-emerald-400">{approvedCount} item</p>
+                      <span className="text-slate-500 text-[10px] sm:text-xs">ACC:</span>
+                      <p className="font-bold text-indigo-600">{approvedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] sm:text-xs">Ditolak:</span>
-                      <p className="font-bold text-rose-400">{rejectedCount} item</p>
+                      <span className="text-slate-500 text-[10px] sm:text-xs">Ditolak:</span>
+                      <p className="font-bold text-rose-600">{rejectedCount} item</p>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] sm:text-xs">Tier:</span>
-                      <p className="font-bold text-teal-300 truncate">{recTierCfg.name}</p>
+                      <span className="text-slate-500 text-[10px] sm:text-xs">Tier:</span>
+                      <p className="font-bold text-indigo-700 truncate">{recTierCfg.name}</p>
                     </div>
                     <div className="col-span-2 sm:col-span-1">
-                      <span className="text-slate-400 text-[10px] sm:text-xs">Total Saldo:</span>
-                      <p className="font-bold text-emerald-400">{formatMoney(calcTotal)}</p>
+                      <span className="text-slate-500 text-[10px] sm:text-xs">Total Saldo:</span>
+                      <p className="font-bold text-indigo-600">{formatMoney(calcTotal)}</p>
                     </div>
                   </div>
 
                   {/* BULK COPY TOOLBAR */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 text-xs w-full">
-                    <span className="text-slate-300 font-semibold flex items-center gap-1.5 shrink-0">
-                      <Copy className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-xs w-full">
+                    <span className="text-slate-700 font-semibold flex items-center gap-1.5 shrink-0">
+                      <Copy className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                       Salin Rekap Email:
                     </span>
                     <div className="flex flex-col sm:flex-row gap-1.5 w-full sm:w-auto">
@@ -5190,12 +5359,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyAllEmails(baseItems)}
-                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-100 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "emails" ? (
-                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <Check className="w-4 h-4 text-indigo-600 shrink-0" />
                         ) : (
-                          <Copy className="w-4 h-4 text-slate-400 shrink-0" />
+                          <Copy className="w-4 h-4 text-slate-500 shrink-0" />
                         )}
                         Salin Semua Email
                       </Button>
@@ -5204,12 +5373,12 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                         size="sm"
                         variant="outline"
                         onClick={() => handleCopyEmailsWithPasswords(baseItems)}
-                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-slate-900 text-slate-200 border-slate-800 hover:bg-slate-800 gap-1.5 font-medium w-full sm:w-auto"
+                        className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs bg-white text-slate-800 border-slate-200/80 hover:bg-slate-100 gap-1.5 font-medium w-full sm:w-auto"
                       >
                         {copiedBulkType === "passwords" ? (
-                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <Check className="w-4 h-4 text-indigo-600 shrink-0" />
                         ) : (
-                          <Copy className="w-4 h-4 text-slate-400 shrink-0" />
+                          <Copy className="w-4 h-4 text-slate-500 shrink-0" />
                         )}
                         Salin Email | Sandi
                       </Button>
@@ -5217,8 +5386,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {!isReadOnly && (
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-xs w-full">
-                      <span className="text-slate-300 font-medium">Setujui / Tolak Semua:</span>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 text-xs w-full">
+                      <span className="text-slate-700 font-medium">Setujui / Tolak Semua:</span>
                       <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
                         <Button
                           type="button"
@@ -5229,7 +5398,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             baseItems.forEach((_, idx) => { newMap[idx] = "approved"; });
                             setItemStatuses(newMap);
                           }}
-                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 font-bold"
+                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-50 font-bold"
                         >
                           Setujui Semua (✓)
                         </Button>
@@ -5242,7 +5411,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             baseItems.forEach((_, idx) => { newMap[idx] = "rejected"; });
                             setItemStatuses(newMap);
                           }}
-                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-rose-400 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold"
+                          className="min-h-[44px] sm:min-h-0 sm:h-8 text-xs text-rose-600 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold"
                         >
                           Tolak Semua (X)
                         </Button>
@@ -5251,10 +5420,10 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   )}
 
                   <div className="w-full">
-                    <Label className="text-xs text-slate-400 mb-1.5 block">
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
                       Tinjau Item Email Individu ({baseItems.length} item):
                     </Label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-800 rounded-lg p-2 bg-slate-950/80 w-full max-w-full overflow-x-hidden box-border">
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200/80 rounded-lg p-2 bg-slate-50 w-full max-w-full overflow-x-hidden box-border">
                       {baseItems.map((it, idx) => {
                         const currentSt = itemStatuses[idx] ?? "pending";
                         const isCopied = copiedSingleIndex === idx;
@@ -5263,55 +5432,55 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             key={idx}
                             className={`p-2.5 rounded-md border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors w-full ${
                               currentSt === "approved"
-                                ? "bg-emerald-950/30 border-emerald-500/30"
+                                ? "bg-indigo-50 border-indigo-200"
                                 : currentSt === "rejected"
-                                  ? "bg-rose-950/30 border-rose-500/30"
-                                  : "bg-slate-900 border-slate-800"
+                                  ? "bg-rose-50 border-rose-500/30"
+                                  : "bg-white border-slate-200/80"
                             }`}
                           >
                             <div className="min-w-0 flex-1 font-mono">
-                              <div className="flex items-center gap-1.5 font-semibold text-slate-100 min-w-0">
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-900 min-w-0">
                                 <span className="truncate flex-1">{idx + 1}. {it.email}</span>
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="min-h-[36px] min-w-[36px] sm:h-6 sm:w-6 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 shrink-0"
+                                  className="min-h-[36px] min-w-[36px] sm:h-6 sm:w-6 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 shrink-0"
                                   title="Salin Email"
                                   onClick={() => handleCopySingleEmail(it.email, idx)}
                                 >
                                   {isCopied ? (
-                                    <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-400" />
+                                    <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-indigo-600" />
                                   ) : (
                                     <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                   )}
                                 </Button>
                               </div>
-                              {it.password && <p className="text-[11px] text-slate-400 truncate">Sandi: {it.password}</p>}
+                              {it.password && <p className="text-[11px] text-slate-500 truncate">Sandi: {it.password}</p>}
                             </div>
 
                             {isReadOnly ? (
                               <Badge
                                 className={`self-start sm:self-center shrink-0 ${
                                   currentSt === "approved"
-                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                    ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
                                     : currentSt === "rejected"
-                                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
-                                      : "bg-slate-800 text-slate-400"
+                                      ? "bg-rose-500/10 text-rose-600 border border-rose-500/30"
+                                      : "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {currentSt === "approved" ? "Terjual (✓)" : currentSt === "rejected" ? "Ditolak (X)" : "Menunggu"}
                               </Badge>
                             ) : (
-                              <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-slate-800">
+                              <div className="grid grid-cols-2 gap-1.5 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-slate-200/80">
                                 <Button
                                   type="button"
                                   size="sm"
                                   onClick={() => setItemStatuses((prev) => ({ ...prev, [idx]: "approved" }))}
                                   className={`min-h-[44px] sm:min-h-0 sm:h-8 px-2.5 text-xs font-bold gap-1 ${
                                     currentSt === "approved"
-                                      ? "bg-emerald-500 text-slate-950"
-                                      : "bg-slate-900 text-slate-400 hover:bg-emerald-500/20 hover:text-emerald-400 border border-slate-800"
+                                      ? "bg-emerald-500 text-white"
+                                      : "bg-white text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/80"
                                   }`}
                                 >
                                   ✓ ACC
@@ -5323,7 +5492,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   className={`min-h-[44px] sm:min-h-0 sm:h-8 px-2.5 text-xs font-bold gap-1 ${
                                     currentSt === "rejected"
                                       ? "bg-rose-600 text-white"
-                                      : "bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-800"
+                                      : "bg-white text-slate-500 hover:bg-rose-500/20 hover:text-rose-600 border border-slate-200/80"
                                   }`}
                                 >
                                   X Tolak
@@ -5337,22 +5506,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {!isReadOnly && (
-                    <div className="space-y-3 pt-2 border-t border-slate-800 w-full">
+                    <div className="space-y-3 pt-2 border-t border-slate-200/80 w-full">
                       <div>
-                        <Label htmlFor="batch-note" className="text-xs text-slate-300">Catatan Review Admin (opsional)</Label>
+                        <Label htmlFor="batch-note" className="text-xs text-slate-700">Catatan Review Admin (opsional)</Label>
                         <Input
                           id="batch-note"
                           placeholder="Contoh: 3 email valid, 2 email tidak bisa login"
                           value={notes[detailSubmission.id] ?? ""}
                           onChange={(e) => setNotes((prev) => ({ ...prev, [detailSubmission.id]: e.target.value }))}
-                          className="mt-1 min-h-[44px] text-xs bg-slate-950/80 border-slate-800 text-slate-100 focus:border-emerald-500"
+                          className="mt-1 min-h-[44px] text-xs bg-slate-50 border-slate-200/80 text-slate-900 focus:border-emerald-500"
                         />
                       </div>
                       <Button
                         type="button"
                         disabled={busyId === detailSubmission.id || pendingCount > 0}
                         onClick={() => handleFinalizeBatchReview(detailSubmission)}
-                        className="w-full min-h-[44px] bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-extrabold text-xs gap-2 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/20"
+                        className="w-full min-h-[44px] bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-extrabold text-xs gap-2 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-500/20"
                       >
                         {busyId === detailSubmission.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -5375,15 +5544,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         </Dialog>
 
         {/* MOBILE STICKY BOTTOM NAVIGATION BAR */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl sm:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200/80 backdrop-blur-xl sm:hidden">
           <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
             <button
               type="button"
               onClick={() => setActiveTab("overview")}
               className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
                 activeTab === "overview"
-                  ? "text-emerald-400 font-bold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <Home className="w-5 h-5" />
@@ -5395,13 +5564,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               onClick={() => setActiveTab("submissions")}
               className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
                 activeTab === "submissions"
-                  ? "text-emerald-400 font-bold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <FileText className="w-5 h-5" />
               {stats.pendingSubmissions > 0 && (
-                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-slate-950 font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-white font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
                   {stats.pendingSubmissions}
                 </span>
               )}
@@ -5413,13 +5582,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               onClick={() => setActiveTab("withdrawals")}
               className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
                 activeTab === "withdrawals"
-                  ? "text-emerald-400 font-bold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <Wallet className="w-5 h-5" />
               {stats.pendingWithdrawals > 0 && (
-                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-slate-950 font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute top-1.5 right-3 text-[9px] bg-emerald-500 text-white font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
                   {stats.pendingWithdrawals}
                 </span>
               )}
@@ -5428,11 +5597,29 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             <button
               type="button"
+              onClick={() => setActiveTab("chat")}
+              className={`flex flex-col items-center justify-center gap-1 transition-colors relative min-h-[44px] ${
+                activeTab === "chat"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <MessageSquare className="w-5 h-5 text-indigo-600" />
+              {adminChatData.totalAdminUnread > 0 && (
+                <span className="absolute top-1.5 right-3 text-[9px] bg-rose-500 text-white font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+                  {adminChatData.totalAdminUnread}
+                </span>
+              )}
+              <span className="text-[10px] truncate max-w-full">Pesan</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("finance")}
               className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
                 activeTab === "finance"
-                  ? "text-emerald-400 font-bold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <DollarSign className="w-5 h-5" />
@@ -5444,8 +5631,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               onClick={() => setActiveTab("rules")}
               className={`flex flex-col items-center justify-center gap-1 transition-colors min-h-[44px] ${
                 activeTab === "rules"
-                  ? "text-emerald-400 font-bold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-indigo-600 font-bold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <SettingsIcon className="w-5 h-5" />
@@ -5454,6 +5641,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           </div>
         </nav>
       </main>
+      </div>
     </div>
   );
 }
