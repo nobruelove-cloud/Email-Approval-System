@@ -2319,169 +2319,250 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* RINGKASAN / COMMAND CENTER */}
           <TabsContent value="overview" className="space-y-6">
-            {/* CORE OVERVIEW STATISTICS - Focused & Clean */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
-              <Card className="bg-indigo-50 border-indigo-200 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 shrink-0" /> Batch Review
+            {/* ADMIN HERO WELCOME BANNER */}
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Selamat Datang, Admin!</h2>
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">
+                    System Control
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Pantau performa setoran email, tinjau penarikan worker, dan kelola operasional platform secara realtime.
+                </p>
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-400 pt-1">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
+                </div>
+              </div>
+              <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-4">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status Operasional</p>
+                <div className="flex items-center gap-2 mt-0.5 sm:justify-end">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-extrabold text-emerald-600">Sistem Berjalan Normal</span>
+                </div>
+              </div>
+            </div>
+
+            {/* SUMMARY STATISTIC CARDS */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Batch Review
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-indigo-600">{stats.pendingSubmissions}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Menunggu verifikasi</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.pendingSubmissions}</p>
+                  <p className="text-[11px] text-amber-600 font-medium">Menunggu verifikasi</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-indigo-50 border-indigo-200 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <SearchCheck className="w-3.5 h-3.5 shrink-0" /> Stok Email
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <SearchCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Stok Email
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-indigo-600">{stats.availableStock}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Siap dijual ke vendor</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.availableStock}</p>
+                  <p className="text-[11px] text-indigo-600 font-medium">Siap dijual ke vendor</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-indigo-50 border-indigo-200 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 shrink-0" /> Pekerja Aktif
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Pekerja Aktif
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-indigo-600">{stats.activeWorkers}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Total: {stats.totalWorkers} pekerja</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.activeWorkers}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Total: {stats.totalWorkers} pekerja</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-indigo-50 border-indigo-200 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Wallet className="w-3.5 h-3.5 shrink-0" /> Penarikan Pending
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5 text-amber-600 shrink-0" /> Penarikan Pending
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-indigo-600">{stats.pendingWithdrawals}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{stats.pendingWithdrawals}</p>
+                  <p className="text-[11px] text-amber-600 font-medium truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1 bg-teal-500/10 border-teal-500/30 border backdrop-blur-xl shadow-md p-3 sm:p-4">
-                <CardContent className="p-0">
-                  <p className="text-[11px] sm:text-xs text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5 shrink-0" /> Total Saldo Beredar
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow col-span-2 sm:col-span-1">
+                <CardContent className="p-0 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Total Saldo
                   </p>
-                  <p className="text-xl sm:text-2xl font-black mt-1 text-indigo-700 truncate">{formatMoney(stats.totalBalance)}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Dompet seluruh pekerja</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900 truncate">{formatMoney(stats.totalBalance)}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Dompet seluruh pekerja</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* LAYANAN CEPAT ADMIN (Quick Action Feature Shortcuts) */}
-            <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl overflow-hidden">
-              <CardHeader className="pb-3 border-b border-slate-100 p-3.5 sm:p-5">
-                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 text-slate-900">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  Layanan Cepat Admin
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500 mt-0.5">
-                  Pilih fitur untuk membuka halaman manajemen khusus.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-3.5 sm:p-5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-3">
-                  {[
-                    {
-                      id: "submissions" as AdminTab,
-                      label: "Batch Review",
-                      desc: "Tinjau setoran email",
-                      icon: <FileText className="w-5 h-5 text-indigo-600" />,
-                      badge: stats.pendingSubmissions > 0 ? `${stats.pendingSubmissions} Menunggu` : undefined,
-                      badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-                    },
-                    {
-                      id: "withdrawals" as AdminTab,
-                      label: "Penarikan",
-                      desc: "Proses penarikan saldo",
-                      icon: <Wallet className="w-5 h-5 text-indigo-600" />,
-                      badge: stats.pendingWithdrawals > 0 ? `${stats.pendingWithdrawals} Pending` : undefined,
-                      badgeStyle: "bg-indigo-50 text-indigo-700 border-indigo-200",
-                    },
-                    {
-                      id: "checker" as AdminTab,
-                      label: "Screening Email",
-                      desc: "Master Riset Bulk Email",
-                      icon: <SearchCheck className="w-5 h-5 text-indigo-600" />,
-                    },
-                    {
-                      id: "finance" as AdminTab,
-                      label: "Keuangan",
-                      desc: "Ledger & simulator profit",
-                      icon: <DollarSign className="w-5 h-5 text-indigo-600" />,
-                    },
-                    {
-                      id: "workers" as AdminTab,
-                      label: "Workers",
-                      desc: "Kelola akun pekerja",
-                      icon: <Users className="w-5 h-5 text-indigo-600" />,
-                      badge: `${stats.activeWorkers} Aktif`,
-                      badgeStyle: "bg-slate-800 text-slate-700 border-slate-200",
-                    },
-                    {
-                      id: "rewards" as AdminTab,
-                      label: "Rewards / Klasemen",
-                      desc: "Cairkan bonus mingguan",
-                      icon: <Gift className="w-5 h-5 text-amber-400" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Rules & Setting",
-                      desc: "Rate, jam, & fee portal",
-                      icon: <SettingsIcon className="w-5 h-5 text-indigo-600" />,
-                    },
-                    {
-                      id: "announcements" as AdminTab,
-                      label: "Pengumuman",
-                      desc: "Buat info resmi pekerja",
-                      icon: <Megaphone className="w-5 h-5 text-indigo-600" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Jam Operasional",
-                      desc: "Kontrol saklar setoran",
-                      icon: <Clock className="w-5 h-5 text-indigo-600" />,
-                    },
-                    {
-                      id: "rules" as AdminTab,
-                      label: "Support Config",
-                      desc: "Telegram & WhatsApp CS",
-                      icon: <HelpCircle className="w-5 h-5 text-indigo-600" />,
-                    },
-                  ].map((item, idx) => (
-                    <button
-                      key={`${item.id}-${idx}`}
-                      type="button"
-                      onClick={() => setActiveTab(item.id)}
-                      className="flex flex-col justify-between p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-indigo-300 hover:bg-white transition-all text-left group min-h-[90px] min-w-[44px] shadow-sm relative focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-1 mb-2">
-                          <div className="p-2 rounded-lg bg-white border border-slate-200/80 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors">
-                            {item.icon}
-                          </div>
-                          {item.badge && (
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${item.badgeStyle || "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
-                              {item.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p className="font-bold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                          {item.label}
-                        </p>
-                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
-                          {item.desc}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* QUICK SERVICES / ADMIN SHORTCUTS GRID */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" /> Layanan Cepat Admin
+                </h3>
+                <span className="text-xs text-slate-500">Pilih menu untuk verifikasi & pengelolaan</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {/* PROMINENT PESAN WORKER SHORTCUT CARD */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("chat")}
+                  className="p-4 rounded-xl bg-white border border-indigo-200 shadow-2xs hover:shadow-md hover:border-indigo-400 transition-all text-left flex flex-col justify-between group relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    {adminChatData.totalAdminUnread > 0 ? (
+                      <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-rose-500 text-white animate-bounce shadow-2xs">
+                        {adminChatData.totalAdminUnread} BARU
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                        Aktif
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1">
+                      Pesan Worker
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Chat langsung realtime dengan worker</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("submissions")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    {stats.pendingSubmissions > 0 && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">
+                        {stats.pendingSubmissions} Batch
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Batch Review
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Verifikasi setoran email masal</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("withdrawals")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between w-full">
+                    <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    {stats.pendingWithdrawals > 0 && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                        {stats.pendingWithdrawals} Req
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-amber-600 transition-colors">
+                      Penarikan Saldo
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Persetujuan cashout DANA, OVO, dll</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("checker")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <SearchCheck className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Screening Email
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Master riset & email checker</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("finance")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Keuangan Platform
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Ledger profit vendor & komisi</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("workers")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Kelola Worker
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Daftar anggota & status online</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("rewards")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Rewards & Referral
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Bonus klasemen & komisi referral</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("rules")}
+                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                >
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
+                    <SettingsIcon className="w-5 h-5" />
+                  </div>
+                  <div className="mt-3">
+                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                      Aturan & Operating
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Jam operasional & rate komisi</p>
+                  </div>
+                </button>
+              </div>
+            </div>
 
             {/* VISUAL ANALYTICS & TREND CHART CARD */}
             <Card className="bg-white border-slate-200/80 backdrop-blur-xl text-slate-900 shadow-xl">
@@ -2569,7 +2650,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* GLOBAL MAINTENANCE MODE CONTROL CARD */}
-            <Card className={`border transition-all backdrop-blur-xl ${currentMaintEnabled ? "bg-amber-950/20 border-amber-500/80 ring-2 ring-amber-500/20" : "bg-white border-slate-200/80"}`}>
+            <Card className={`border transition-all shadow-2xs ${currentMaintEnabled ? "bg-amber-50/50 border-amber-300 ring-2 ring-amber-200" : "bg-white border-slate-200/80"}`}>
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -2666,7 +2747,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </Card>
 
             {/* MASTER RESET OPERASIONAL CARD */}
-            <Card className="bg-rose-950/20 border-rose-500/40 backdrop-blur-xl text-slate-900 shadow-xl">
+            <Card className="bg-rose-50/50 border-rose-500/40 backdrop-blur-xl text-slate-900 shadow-xl">
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -2944,7 +3025,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 {/* RINGKASAN AUTOMATED FINANCIAL LEDGER CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* PEMASUKAN CARD */}
-                  <div className="p-4 rounded-xl bg-emerald-950/30 border border-indigo-200 space-y-2">
+                  <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-indigo-600">Total Pemasukan (Income)</span>
                       <TrendingUp className="w-4 h-4 text-indigo-600" />
@@ -2965,7 +3046,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {/* PENGELUARAN CARD */}
-                  <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-500/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-rose-400">Total Pengeluaran (Expense)</span>
                       <TrendingDown className="w-4 h-4 text-rose-400" />
@@ -2994,13 +3075,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   </div>
 
                   {/* SALDO BERSIH CARD */}
-                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-teal-950/30 border-teal-500/30 text-indigo-700" : "bg-rose-950/40 border-rose-500/40 text-rose-300"}`}>
+                  <div className={`p-4 rounded-xl border space-y-2 flex flex-col justify-between ${automatedFinSummary.netBalance >= 0 ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-rose-50 border-rose-200 text-rose-700"}`}>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-semibold">Saldo Bersih (Net Balance)</span>
                         <Wallet className="w-4 h-4 text-indigo-600" />
                       </div>
-                      <p className={`text-2xl font-black ${automatedFinSummary.netBalance >= 0 ? "text-indigo-700" : "text-rose-400"}`}>
+                      <p className={`text-2xl font-black ${automatedFinSummary.netBalance >= 0 ? "text-indigo-700" : "text-rose-600"}`}>
                         {formatMoney(automatedFinSummary.netBalance)}
                       </p>
                     </div>
@@ -3483,7 +3564,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           {/* KELOLA PEKERJA (WITH TIER & RECOMMENDATIONS) */}
           <TabsContent value="workers" className="space-y-3">
             {/* REALTIME REGISTERED WORKERS COUNTER CARD */}
-            <Card className="bg-[#0f172a] border border-slate-200/80 shadow-xl text-slate-900">
+            <Card className="bg-white border border-slate-200/80 shadow-xl text-slate-900">
               <CardContent className="p-4 sm:p-5 flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
                   <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-lg shadow-emerald-500/10">
@@ -3970,8 +4051,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               <div>
                                 <p className="font-bold text-slate-900 text-sm">{item.workerName}</p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-xs text-amber-400 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
-                                  <Badge className={isQualified ? "bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold" : "bg-amber-950/60 text-amber-400/80 border-amber-800/60 text-[10px]"}>
+                                  <p className="text-xs text-amber-600 font-bold">{item.validAccCount} / {targetAcc} ACC Valid</p>
+                                  <Badge className={isQualified ? "bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold" : "bg-slate-100 text-slate-600 border-slate-200 text-[10px]"}>
                                     {isQualified ? "Terkualifikasi" : "Belum Terkualifikasi"}
                                   </Badge>
                                 </div>
@@ -4090,7 +4171,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
             {/* PENDING MISSION CLAIMS REVIEW */}
             {pendingMissionClaims.length > 0 && (
-              <Card className="border-indigo-200 bg-emerald-950/20 backdrop-blur-xl text-slate-900">
+              <Card className="border-indigo-200 bg-indigo-50/50 backdrop-blur-xl text-slate-900">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
                     <Target className="w-5 h-5 text-indigo-600" /> Klaim Misi Menunggu Review ({pendingMissionClaims.length})
@@ -5351,9 +5432,9 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             key={idx}
                             className={`p-2.5 rounded-md border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors w-full ${
                               currentSt === "approved"
-                                ? "bg-emerald-950/30 border-indigo-200"
+                                ? "bg-indigo-50 border-indigo-200"
                                 : currentSt === "rejected"
-                                  ? "bg-rose-950/30 border-rose-500/30"
+                                  ? "bg-rose-50 border-rose-500/30"
                                   : "bg-white border-slate-200/80"
                             }`}
                           >
