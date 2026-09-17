@@ -1015,6 +1015,36 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // 8. Worker trying to alter workerId or adminId in conversation update (should fail)
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: otherWorkerUid,
+      })
+    );
+    console.log('[PASS] Worker altering workerId in conversation metadata correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker altering workerId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 9. Worker trying to spoof senderId as admin when sending a message (should fail)
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
+        senderId: adminUid,
+        senderRole: 'admin',
+        senderName: 'Fake Admin',
+        text: 'Mencoba pura-pura jadi admin.',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker spoofing admin senderId/role correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker spoofing admin senderId/role was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }
