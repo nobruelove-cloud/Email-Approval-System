@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import {
   Send,
@@ -19,6 +19,7 @@ import {
   Check,
   HelpCircle,
   MessageCircle,
+  MessageSquare,
   User,
   Megaphone,
   Building2,
@@ -66,6 +67,10 @@ import {
   claimReferralReward,
   createSubmission,
   createWithdrawal,
+  useWorkerChat,
+  useConversationMessages,
+  sendChatMessage,
+  markConversationAsRead,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
@@ -544,6 +549,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         return "Bantuan CS & Komunitas";
       case "announcements":
         return "Informasi Resmi Admin";
+      case "chat":
+        return "Pesan Admin / Live Chat";
       default:
         return "Dashboard Worker";
     }

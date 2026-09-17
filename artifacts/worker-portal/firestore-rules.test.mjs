@@ -923,6 +923,98 @@ async function main() {
     process.exitCode = 1;
   }
 
+  console.log('\n--- Chat Feature Security Rules Tests ---');
+  // 1. Worker accessing own conversation
+  const workerConvRef = doc(workerDb, 'conversations', workerUid);
+  try {
+    await assertSucceeds(getDoc(workerConvRef));
+    console.log('[PASS] Worker reading own conversation succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading own conversation failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 2. Worker attempting to read another worker's conversation (should fail)
+  const otherConvRef = doc(workerDb, 'conversations', otherWorkerUid);
+  try {
+    await assertFails(getDoc(otherConvRef));
+    console.log('[PASS] Worker reading another worker\'s conversation correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker reading another worker\'s conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 3. Worker attempting to list all conversations (should fail)
+  try {
+    await assertFails(getDocs(collection(workerDb, 'conversations')));
+    console.log('[PASS] Worker listing all conversations correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker listing all conversations was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 4. Admin reading any worker's conversation
+  try {
+    await assertSucceeds(getDoc(doc(regAdminDb, 'conversations', workerUid)));
+    await assertSucceeds(getDocs(collection(regAdminDb, 'conversations')));
+    console.log('[PASS] Admin reading worker conversations and listing conversations succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin reading worker conversations failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 5. Admin initiating a conversation for worker
+  try {
+    await assertSucceeds(
+      setDoc(doc(regAdminDb, 'conversations', otherWorkerUid), {
+        workerId: otherWorkerUid,
+        lastMessage: 'Halo, ada info batch.',
+        lastMessageAt: serverTimestamp(),
+        workerUnread: 1,
+        adminUnread: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Admin initiating conversation succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Admin initiating conversation failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 6. Worker sending message in own conversation
+  try {
+    await assertSucceeds(
+      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
+        senderId: workerUid,
+        senderRole: 'worker',
+        senderName: 'Worker User',
+        text: 'Halo admin, butuh bantuan.',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker sending message in own conversation succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker sending message in own conversation failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 7. Worker trying to send message in another worker's conversation (should fail)
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', otherWorkerUid, 'messages')), {
+        senderId: workerUid,
+        senderRole: 'worker',
+        senderName: 'Worker User',
+        text: 'Mencoba kirim ke conversation orang lain.',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker sending message in another worker\'s conversation correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Worker sending message in another worker\'s conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll regression tests completed successfully!');
 }

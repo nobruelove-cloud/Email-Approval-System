@@ -9,6 +9,33 @@ export interface Announcement {
   isActive: boolean;
 }
 
+export type ChatSenderRole = "admin" | "worker";
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderRole: ChatSenderRole;
+  senderName?: string;
+  senderEmail?: string;
+  text: string;
+  createdAt: any;
+  readAt?: any;
+}
+
+export interface Conversation {
+  id: string; // workerId
+  workerId: string;
+  workerName?: string;
+  workerEmail?: string;
+  adminId?: string;
+  lastMessage: string;
+  lastMessageAt: any;
+  workerUnread: number;
+  adminUnread: number;
+  createdAt: any;
+  updatedAt?: any;
+}
+
 export type Role = "admin" | "worker";
 export type UserStatus = "pending" | "approved" | "active" | "rejected" | "inactive";
 export type UserTier = number;
