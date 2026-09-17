@@ -5,6 +5,12 @@ import { renderHook, render, screen, act, cleanup } from "@testing-library/react
 import { StatusBadge } from "../pages/worker-dashboard";
 import { PortalGate } from "../App";
 import {
+  useWorkerChat,
+  useAdminConversations,
+  useConversationMessages,
+  sendChatMessage,
+} from "./use-portal";
+import {
   getItemCountOfSubmission,
   getTierConfig,
   getRecommendedTier,
@@ -2820,5 +2826,55 @@ describe("Unified Worker Lookup & Auto-Credit Approved Payouts Unit Tests", () =
     // Sum total circulating balance across all 3 approved Sept 14 submissions
     const totalCirculatingBalance = Array.from(workerApprovedPayouts.values()).reduce((a, b) => a + b, 0);
     expect(totalCirculatingBalance).toBe(9000);
+  });
+});
+
+describe("Real-Time Chat Services & Hooks Unit Tests", () => {
+  it("useWorkerChat returns null when no workerUid is supplied", () => {
+    const { result } = renderHook(() => useWorkerChat(undefined));
+    expect(result.current.conversation).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("useConversationMessages returns empty array when conversationId is null", () => {
+    const { result } = renderHook(() => useConversationMessages(null));
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("sendChatMessage rejects empty whitespace messages", async () => {
+    await expect(
+      sendChatMessage({
+        conversationId: "worker_123",
+        senderId: "worker_123",
+        senderRole: "worker",
+        text: "   ",
+      })
+    ).rejects.toThrow("Pesan tidak boleh kosong.");
+  });
+});
+
+describe("Real-Time Chat Services & Hooks Unit Tests", () => {
+  it("useWorkerChat returns null when no workerUid is supplied", () => {
+    const { result } = renderHook(() => useWorkerChat(undefined));
+    expect(result.current.conversation).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("useConversationMessages returns empty array when conversationId is null", () => {
+    const { result } = renderHook(() => useConversationMessages(null));
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("sendChatMessage rejects empty whitespace messages", async () => {
+    await expect(
+      sendChatMessage({
+        conversationId: "worker_123",
+        senderId: "worker_123",
+        senderRole: "worker",
+        text: "   ",
+      })
+    ).rejects.toThrow("Pesan tidak boleh kosong.");
   });
 });

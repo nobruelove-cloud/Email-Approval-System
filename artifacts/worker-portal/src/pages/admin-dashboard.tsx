@@ -39,6 +39,9 @@ import {
   ArrowLeft,
   Home,
   HelpCircle,
+  MessageSquare,
+  Send,
+  Search,
 } from "lucide-react";
 
 export type AdminTab =
@@ -50,7 +53,8 @@ export type AdminTab =
   | "withdrawals"
   | "workers"
   | "rewards"
-  | "rules";
+  | "rules"
+  | "chat";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -123,6 +127,11 @@ import {
   deleteAnnouncement,
   toggleAnnouncementStatus,
   masterResetOperasional,
+  useAdminConversations,
+  useConversationMessages,
+  sendChatMessage,
+  markConversationAsRead,
+  initiateWorkerConversation,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
@@ -181,14 +190,14 @@ function fallbackCopy(text: string): boolean {
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
-    pending: "bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold",
-    processing: "bg-sky-500/10 text-sky-400 border border-sky-500/30 font-semibold",
-    approved: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold",
-    available: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold",
-    sold: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold",
-    success: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold",
-    rejected: "bg-rose-500/10 text-rose-400 border border-rose-500/30 font-semibold",
-    inactive: "bg-slate-800 text-slate-400 border border-slate-700 font-semibold",
+    pending: "bg-amber-50 text-amber-800 border border-amber-200 font-semibold",
+    processing: "bg-sky-50 text-sky-800 border border-sky-200 font-semibold",
+    approved: "bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold",
+    available: "bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold",
+    sold: "bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold",
+    success: "bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold",
+    rejected: "bg-rose-50 text-rose-800 border border-rose-200 font-semibold",
+    inactive: "bg-slate-100 text-slate-600 border border-slate-200 font-semibold",
   };
   const labels: Record<string, string> = {
     pending: "Menunggu",
@@ -210,7 +219,7 @@ function StatusBadge({ status }: { status: string }) {
 function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
   if (!lastActiveAt) {
     return (
-      <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+      <Badge className="bg-slate-100 text-slate-500 border border-slate-200 font-semibold gap-1.5 text-xs py-0.5">
         <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
         Offline - Belum pernah
       </Badge>
@@ -230,7 +239,7 @@ function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
 
   if (!ms || isNaN(ms)) {
     return (
-      <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+      <Badge className="bg-slate-100 text-slate-500 border border-slate-200 font-semibold gap-1.5 text-xs py-0.5">
         <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
         Offline
       </Badge>
@@ -242,7 +251,7 @@ function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
 
   if (isOnline) {
     return (
-      <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold gap-1.5 text-xs py-0.5">
+      <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold gap-1.5 text-xs py-0.5">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
         ONLINE
       </Badge>
@@ -262,7 +271,7 @@ function OnlineStatusBadge({ lastActiveAt }: { lastActiveAt?: unknown }) {
   }
 
   return (
-    <Badge className="bg-slate-800/80 text-slate-400 border border-slate-700/80 font-semibold gap-1.5 text-xs py-0.5">
+    <Badge className="bg-slate-100 text-slate-500 border border-slate-200 font-semibold gap-1.5 text-xs py-0.5">
       <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
       Offline - {timeStr}
     </Badge>
@@ -273,6 +282,61 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts } = useAdminData();
   const announcements = useAnnouncements({ includeInactive: true });
+
+  // Admin Chat States
+  const adminChatData = useAdminConversations();
+  const [selectedWorkerUid, setSelectedWorkerUid] = useState<string | null>(null);
+  const selectedWorkerMessages = useConversationMessages(selectedWorkerUid);
+  const [adminChatText, setAdminChatText] = useState("");
+  const [sendingAdminChat, setSendingAdminChat] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const adminChatMessagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to bottom of admin chat & mark read on select or update
+  useEffect(() => {
+    if (selectedWorkerUid) {
+      markConversationAsRead(selectedWorkerUid, "admin");
+      adminChatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [selectedWorkerUid, selectedWorkerMessages.messages]);
+
+  async function handleSendAdminChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedWorkerUid || !adminChatText.trim() || sendingAdminChat) return;
+
+    const textToSend = adminChatText.trim();
+    setAdminChatText("");
+    setSendingAdminChat(true);
+
+    try {
+      await sendChatMessage({
+        conversationId: selectedWorkerUid,
+        senderId: profile.uid,
+        senderRole: "admin",
+        senderName: "Admin",
+        senderEmail: profile.email,
+        text: textToSend,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan chat.");
+      setAdminChatText(textToSend);
+    } finally {
+      setSendingAdminChat(false);
+    }
+  }
+
+  function handleStartChatWithWorker(workerUid: string) {
+    const workerObj = users.data.find((u) => u.uid === workerUid);
+    if (workerObj) {
+      initiateWorkerConversation({
+        uid: workerObj.uid,
+        name: workerObj.name,
+        email: workerObj.email,
+      });
+    }
+    setSelectedWorkerUid(workerUid);
+    setActiveTab("chat");
+  }
 
   useEffect(() => {
     const currentUser = auth?.currentUser;
@@ -1807,20 +1871,30 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border">
-      <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl w-full max-w-full box-border">
+      <header className="bg-white/90 border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md shadow-2xs w-full max-w-full box-border">
         <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 w-full max-w-full box-border">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10 shrink-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-2xs shrink-0">
               <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <p className="font-bold text-slate-100 text-sm sm:text-lg tracking-tight truncate">Command Center</p>
-                <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase tracking-wider shrink-0">
+                <p className="font-bold text-slate-900 text-sm sm:text-lg tracking-tight truncate">Command Center</p>
+                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 uppercase tracking-wider shrink-0">
                   ADMIN
                 </span>
+                {adminChatData.totalAdminUnread > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("chat")}
+                    className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px] sm:text-xs rounded-full flex items-center gap-1 shadow-2xs hover:bg-amber-100 transition-colors shrink-0"
+                  >
+                    <MessageSquare className="w-3 h-3 text-amber-600" />
+                    <span>{adminChatData.totalAdminUnread} Pesan</span>
+                  </button>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-400 font-mono mt-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-mono mt-0.5">
                 <span className="truncate max-w-[130px] sm:max-w-xs">
                   {isEmailVisible
                     ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
@@ -1829,7 +1903,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <button
                   type="button"
                   onClick={() => setIsEmailVisible(!isEmailVisible)}
-                  className="text-slate-400 hover:text-emerald-400 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
+                  className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
                   title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                 >
                   {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1870,38 +1944,38 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as AdminTab)} className="w-full">
           {/* DESKTOP TOP TAB NAVIGATION (Hidden on mobile to avoid crowded tab bars) */}
-          <TabsList className="hidden sm:grid sm:grid-cols-9 w-full mb-6 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl backdrop-blur-xl gap-1 shrink-0">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+          <TabsList className="hidden sm:grid sm:grid-cols-10 w-full mb-6 bg-slate-100/90 border border-slate-200/80 p-1.5 rounded-2xl backdrop-blur-md gap-1 shrink-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               Ringkasan
             </TabsTrigger>
-            <TabsTrigger value="checker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="checker" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <SearchCheck className="w-3.5 h-3.5" /> Master Riset
             </TabsTrigger>
-            <TabsTrigger value="announcements" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="announcements" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Megaphone className="w-3.5 h-3.5" /> Pengumuman
             </TabsTrigger>
-            <TabsTrigger value="finance" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="finance" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <DollarSign className="w-3.5 h-3.5" /> Keuangan
             </TabsTrigger>
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="submissions" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <FileText className="w-3.5 h-3.5" /> Batch
               {stats.pendingSubmissions > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingSubmissions}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="withdrawals" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Wallet className="w-3.5 h-3.5" /> Penarikan
               {stats.pendingWithdrawals > 0 && (
                 <span className="ml-0.5 text-[10px] bg-emerald-500 text-slate-950 font-extrabold rounded-full px-1.5">{stats.pendingWithdrawals}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workers" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="workers" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Users className="w-3.5 h-3.5" /> Pekerja
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rewards" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <Gift className="w-3.5 h-3.5" /> Hadiah
             </TabsTrigger>
-            <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500/20 data-[state=active]:to-teal-500/20 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/40 border border-transparent text-slate-400 hover:text-slate-200 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
+            <TabsTrigger value="rules" className="data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:border-slate-200/80 data-[state=active]:shadow-2xs border border-transparent text-slate-600 hover:text-slate-900 gap-1 text-xs font-semibold rounded-lg transition-all min-h-[44px] px-3 shrink-0 whitespace-nowrap">
               <SettingsIcon className="w-3.5 h-3.5" /> Aturan
             </TabsTrigger>
           </TabsList>
@@ -4814,6 +4888,226 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </Card>
             </div>
           </TabsContent>
+
+          {/* TAB PESAN WORKER / LIVE CHAT ADMIN */}
+          <TabsContent value="chat" className="space-y-4">
+            <Card className="bg-white border-slate-200 text-slate-900 shadow-2xs rounded-2xl overflow-hidden">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+                      <MessageSquare className="w-5 h-5 text-indigo-600" />
+                      Pesan Worker / Live Chat
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500 mt-0.5">
+                      Komunikasi privat 1-on-1 dengan pekerja terdaftar secara real-time.
+                    </CardDescription>
+                  </div>
+                  {adminChatData.totalAdminUnread > 0 && (
+                    <Badge className="bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs gap-1 px-3 py-1 self-start sm:self-center">
+                      {adminChatData.totalAdminUnread} Pesan Belum Dibaca
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4">
+                {/* TWO-PANEL CHAT CONTAINER (Desktop: 2 Columns, Mobile: Step-by-Step Flow) */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 border border-slate-200 rounded-2xl bg-slate-50/50 min-h-[500px] overflow-hidden">
+                  {/* WORKER LIST COLUMN */}
+                  <div className={`md:col-span-5 lg:col-span-4 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col ${selectedWorkerUid ? "hidden md:flex" : "flex"}`}>
+                    <div className="p-3 border-b border-slate-100 space-y-2 bg-slate-50/50">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <Input
+                          placeholder="Cari worker (nama / ID)..."
+                          value={chatSearchQuery}
+                          onChange={(e) => setChatSearchQuery(e.target.value)}
+                          className="pl-9 text-xs h-9 bg-white border-slate-200 text-slate-900 focus:border-indigo-500"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        Total {users.data.filter(u => u.role !== "admin").length} Pekerja Terdaftar
+                      </p>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[440px]">
+                      {users.data.filter(u => u.role !== "admin").length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-10">Belum ada worker terdaftar.</p>
+                      ) : (
+                        users.data
+                          .filter(u => u.role !== "admin")
+                          .filter(u => {
+                            const q = chatSearchQuery.toLowerCase().trim();
+                            if (!q) return true;
+                            return (
+                              (u.name && u.name.toLowerCase().includes(q)) ||
+                              (u.email && u.email.toLowerCase().includes(q)) ||
+                              u.uid.toLowerCase().includes(q)
+                            );
+                          })
+                          .map((worker) => {
+                            const conv = adminChatData.conversations.find((c: any) => c.workerId === worker.uid);
+                            const unreadCount = conv?.adminUnread || 0;
+                            const isSelected = selectedWorkerUid === worker.uid;
+
+                            return (
+                              <button
+                                key={worker.uid}
+                                type="button"
+                                onClick={() => handleStartChatWithWorker(worker.uid)}
+                                className={`w-full p-3 text-left transition-colors flex items-start gap-3 min-h-[60px] hover:bg-slate-50 ${
+                                  isSelected ? "bg-indigo-50/80 border-l-4 border-indigo-600" : ""
+                                }`}
+                              >
+                                <div className="w-9 h-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs shrink-0">
+                                  {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <p className="font-bold text-xs text-slate-900 truncate">
+                                      {worker.name || "Pekerja " + shortId(worker.uid)}
+                                    </p>
+                                    {conv?.lastMessageAt && (
+                                      <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                        {formatDateTime(conv.lastMessageAt).split(" ")[1] || ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">
+                                    {conv?.lastMessage || (worker.email ? worker.email : "Klik untuk mulai percakapan")}
+                                  </p>
+                                </div>
+                                {unreadCount > 0 && (
+                                  <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-extrabold rounded-full shrink-0 shadow-2xs">
+                                    {unreadCount}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ACTIVE CHAT ROOM COLUMN */}
+                  <div className={`md:col-span-7 lg:col-span-8 bg-slate-50/30 flex flex-col ${selectedWorkerUid ? "flex" : "hidden md:flex"}`}>
+                    {!selectedWorkerUid ? (
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
+                        <MessageSquare className="w-10 h-10 text-slate-300" />
+                        <p className="font-bold text-slate-700 text-sm">Pilih Pekerja untuk Memulai Chat</p>
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          Pilih pekerja dari daftar di sebelah kiri untuk melihat pesan atau memberikan arahan langsung.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* CHAT HEADER WITH BACK BUTTON FOR MOBILE */}
+                        {(() => {
+                          const activeWorkerObj = users.data.find(u => u.uid === selectedWorkerUid);
+                          return (
+                            <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setSelectedWorkerUid(null)}
+                                  className="md:hidden p-1.5 h-8 w-8 text-slate-600 hover:text-slate-900"
+                                >
+                                  <ArrowLeft className="w-4 h-4" />
+                                </Button>
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                  {activeWorkerObj?.name ? activeWorkerObj.name.charAt(0).toUpperCase() : "W"}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-xs text-slate-900 truncate">
+                                    {activeWorkerObj?.name || "Pekerja " + shortId(selectedWorkerUid)}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 font-mono truncate">
+                                    {activeWorkerObj?.email || "ID: " + selectedWorkerUid}
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold shrink-0">
+                                Privat Admin ↔ Worker
+                              </Badge>
+                            </div>
+                          );
+                        })()}
+
+                        {/* MESSAGES SCROLL AREA */}
+                        <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-[340px] max-h-[420px]">
+                          {selectedWorkerMessages.loading ? (
+                            <div className="flex items-center justify-center py-10 text-xs text-slate-400 gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                              Memuat percakapan...
+                            </div>
+                          ) : selectedWorkerMessages.messages.length === 0 ? (
+                            <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl bg-white space-y-1">
+                              <p className="text-xs font-semibold text-slate-700">Belum ada pesan dalam percakapan ini.</p>
+                              <p className="text-[11px] text-slate-500">
+                                Kirim pesan pertama ke pekerja untuk menginformasikan terkait setoran, rules, atau kendala akun.
+                              </p>
+                            </div>
+                          ) : (
+                            selectedWorkerMessages.messages.map((msg: any) => {
+                              const isAdmin = msg.senderRole === "admin";
+                              return (
+                                <div
+                                  key={msg.id}
+                                  className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
+                                >
+                                  <div
+                                    className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs ${
+                                      isAdmin
+                                        ? "bg-indigo-600 text-white rounded-br-none"
+                                        : "bg-white border border-slate-200 text-slate-900 rounded-bl-none"
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2 text-[10px] opacity-80 font-semibold mb-0.5">
+                                      <span>{isAdmin ? "Admin" : msg.senderName || "Worker"}</span>
+                                    </div>
+                                    <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                                    <div className={`text-[9px] font-mono text-right mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-400"}`}>
+                                      {formatDateTime(msg.createdAt)}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                          <div ref={adminChatMessagesEndRef} />
+                        </div>
+
+                        {/* INPUT FORM BAR */}
+                        <form onSubmit={handleSendAdminChat} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+                          <Input
+                            placeholder="Tulis pesan untuk worker..."
+                            value={adminChatText}
+                            onChange={(e) => setAdminChatText(e.target.value)}
+                            disabled={sendingAdminChat}
+                            className="text-xs h-10 bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500 flex-1"
+                          />
+                          <Button
+                            type="submit"
+                            disabled={sendingAdminChat || !adminChatText.trim()}
+                            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs shrink-0"
+                          >
+                            {sendingAdminChat ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4" />
+                            )}
+                            <span className="hidden sm:inline">Kirim</span>
+                          </Button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
 
         {/* DIALOG LIHAT & TINJAU DETAIL BATCH (PER EMAIL) */}

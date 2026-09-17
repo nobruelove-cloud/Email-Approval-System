@@ -17,6 +17,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,11 +33,13 @@ export type DashboardView =
   | "withdraw"
   | "history"
   | "cs"
-  | "announcements";
+  | "announcements"
+  | "chat";
 
 interface SidebarNavigationProps {
   activeView: DashboardView;
   onSelectView: (view: DashboardView) => void;
+  unreadChatCount?: number;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   isCollapsedDesktop: boolean;
@@ -57,6 +60,7 @@ export function SidebarNavigation({
   onToggleCollapseDesktop,
   profile,
   ratePerItem = 3000,
+  unreadChatCount = 0,
   isEmailVisible,
   onToggleEmailVisible,
   onLogout,
@@ -134,6 +138,12 @@ export function SidebarNavigation({
       id: "cs",
       label: "Bantuan CS",
       icon: <HelpCircle className="w-5 h-5 shrink-0" />,
+    },
+    {
+      id: "chat",
+      label: "Pesan Admin",
+      icon: <MessageSquare className="w-5 h-5 shrink-0" />,
+      badge: unreadChatCount > 0 ? `${unreadChatCount} Baru` : undefined,
     },
     {
       id: "announcements",

@@ -7,6 +7,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  orderBy,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -3125,4 +3126,266 @@ export function usePortal() {
     currentUser: portalAuth.profile,
     bindReferralCode,
   };
+}
+
+// ---------------------------------------------------------------------------
+// REAL-TIME PRIVATE CHAT SERVICES & HOOKS (Worker ↔ Admin)
+// ---------------------------------------------------------------------------
+
+import { type ChatMessage, type Conversation } from "@/lib/portal-types";
+
+/**
+ * Real-time hook for a Worker to listen to their single private conversation metadata with Admin.
+ */
+export function useWorkerChat(workerUid?: string) {
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!workerUid) {
+      setConversation(null);
+      setLoading(false);
+      return;
+    }
+
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const convRef = doc(db, "conversations", workerUid);
+    const unsub = onSnapshot(
+      convRef,
+      (snap) => {
+        if (snap.exists()) {
+          setConversation({ id: snap.id, ...snap.data() } as Conversation);
+        } else {
+          setConversation(null);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useWorkerChat snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [workerUid]);
+
+  return { conversation, loading };
+}
+
+/**
+ * Real-time hook for Admin to listen to all active worker conversations.
+ */
+export function useAdminConversations() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const colRef = collection(db, "conversations");
+    const q = query(colRef, orderBy("lastMessageAt", "desc"));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Conversation[] = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+        });
+        setConversations(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useAdminConversations snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  const totalAdminUnread = useMemo(
+    () => conversations.reduce((sum, c) => sum + (c.adminUnread || 0), 0),
+    [conversations]
+  );
+
+  return { conversations, totalAdminUnread, loading };
+}
+
+/**
+ * Real-time hook to listen to messages in a specific worker conversation subcollection.
+ */
+export function useConversationMessages(conversationId: string | null) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const messagesRef = collection(db, "conversations", conversationId, "messages");
+    const q = query(messagesRef, orderBy("createdAt", "asc"));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: ChatMessage[] = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+        });
+        setMessages(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useConversationMessages snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [conversationId]);
+
+  return { messages, loading };
+}
+
+/**
+ * Initiates or updates a worker conversation doc (used when Admin starts a conversation directly).
+ */
+export async function initiateWorkerConversation(worker: {
+  uid: string;
+  name?: string;
+  email?: string;
+}) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const convRef = doc(db, "conversations", worker.uid);
+
+  const existing = await getDoc(convRef);
+  if (!existing.exists()) {
+    await setDoc(
+      convRef,
+      {
+        workerId: worker.uid,
+        workerName: worker.name || "Worker " + worker.uid.slice(0, 6),
+        workerEmail: worker.email || "",
+        lastMessage: "",
+        lastMessageAt: serverTimestamp(),
+        workerUnread: 0,
+        adminUnread: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+}
+
+/**
+ * Sends a chat message in conversations/{conversationId}/messages and updates conversation metadata atomically.
+ */
+export async function sendChatMessage(params: {
+  conversationId: string; // workerId
+  senderId: string;
+  senderRole: "admin" | "worker";
+  senderName?: string;
+  senderEmail?: string;
+  text: string;
+}) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const trimmed = params.text.trim();
+  if (!trimmed) throw new Error("Pesan tidak boleh kosong.");
+
+  const convRef = doc(db, "conversations", params.conversationId);
+  const messagesColRef = collection(db, "conversations", params.conversationId, "messages");
+
+  await runTransaction(db, async (tx) => {
+    const convSnap = await tx.get(convRef);
+    let currentWorkerUnread = 0;
+    let currentAdminUnread = 0;
+
+    if (convSnap.exists()) {
+      const data = convSnap.data();
+      currentWorkerUnread = data.workerUnread || 0;
+      currentAdminUnread = data.adminUnread || 0;
+    }
+
+    const isWorker = params.senderRole === "worker";
+
+    // Create message doc inside subcollection
+    const msgRef = doc(messagesColRef);
+    tx.set(msgRef, {
+      senderId: params.senderId,
+      senderRole: params.senderRole,
+      senderName: params.senderName || (isWorker ? "Worker" : "Admin"),
+      senderEmail: params.senderEmail || "",
+      text: trimmed,
+      createdAt: serverTimestamp(),
+    });
+
+    // Update conversation metadata & unread counters
+    const updatePayload: Record<string, any> = {
+      workerId: params.conversationId,
+      lastMessage: trimmed,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (isWorker) {
+      updatePayload.adminUnread = currentAdminUnread + 1;
+      if (params.senderName) updatePayload.workerName = params.senderName;
+      if (params.senderEmail) updatePayload.workerEmail = params.senderEmail;
+    } else {
+      updatePayload.workerUnread = currentWorkerUnread + 1;
+      updatePayload.adminId = params.senderId;
+    }
+
+    if (!convSnap.exists()) {
+      updatePayload.createdAt = serverTimestamp();
+      if (!isWorker) {
+        updatePayload.workerUnread = 1;
+        updatePayload.adminUnread = 0;
+      } else {
+        updatePayload.workerUnread = 0;
+        updatePayload.adminUnread = 1;
+      }
+    }
+
+    tx.set(convRef, updatePayload, { merge: true });
+  });
+}
+
+/**
+ * Marks conversation unread count as read for either "worker" or "admin".
+ */
+export async function markConversationAsRead(
+  conversationId: string,
+  readerRole: "admin" | "worker"
+) {
+  if (!db) return;
+  const convRef = doc(db, "conversations", conversationId);
+
+  try {
+    const fieldToReset = readerRole === "admin" ? "adminUnread" : "workerUnread";
+    await updateDoc(convRef, {
+      [fieldToReset]: 0,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    // If document doesn't exist yet, ignore
+    console.warn("markConversationAsRead error:", err);
+  }
 }
