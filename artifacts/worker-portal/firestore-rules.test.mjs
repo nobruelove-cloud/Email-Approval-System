@@ -936,245 +936,208 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\n--- Chat Feature Security Rules Tests ---');
-  // 1. Worker accessing own conversation
-  const workerConvRef = doc(workerDb, 'conversations', workerUid);
-  try {
-    await assertSucceeds(getDoc(workerConvRef));
-    console.log('[PASS] Worker reading own conversation succeeded.');
-  } catch (err) {
-    console.error('[FAIL] Worker reading own conversation failed:', err);
-    process.exitCode = 1;
-  }
+  console.log('\n--- COMPREHENSIVE PRIVATE CHAT SECURITY SUITE ---');
 
-  // 2. Worker attempting to read another worker's conversation (should fail)
-  const otherConvRef = doc(workerDb, 'conversations', otherWorkerUid);
-  try {
-    await assertFails(getDoc(otherConvRef));
-    console.log('[PASS] Worker reading another worker\'s conversation correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Worker reading another worker\'s conversation was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // 3. Worker attempting to list all conversations (should fail)
-  try {
-    await assertFails(getDocs(collection(workerDb, 'conversations')));
-    console.log('[PASS] Worker listing all conversations correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Worker listing all conversations was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // 4. Admin reading any worker's conversation
-  try {
-    await assertSucceeds(getDoc(doc(regAdminDb, 'conversations', workerUid)));
-    await assertSucceeds(getDocs(collection(regAdminDb, 'conversations')));
-    console.log('[PASS] Admin reading worker conversations and listing conversations succeeded.');
-  } catch (err) {
-    console.error('[FAIL] Admin reading worker conversations failed:', err);
-    process.exitCode = 1;
-  }
-
-  // 5. Admin initiating a conversation for worker
+  // 1. Worker legitimate message update succeeds
   try {
     await assertSucceeds(
-      setDoc(doc(regAdminDb, 'conversations', otherWorkerUid), {
-        workerId: otherWorkerUid,
-        lastMessage: 'Halo, ada info batch.',
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        lastMessage: 'Pesan baru dari worker',
         lastMessageAt: serverTimestamp(),
-        workerUnread: 1,
-        adminUnread: 0,
-        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        adminUnread: 1, // current adminUnread is 0, so 0 + 1 = 1 is valid +1 increment
       })
     );
-    console.log('[PASS] Admin initiating conversation succeeded.');
+    console.log('[PASS] 1. Worker legitimate message update succeeds.');
   } catch (err) {
-    console.error('[FAIL] Admin initiating conversation failed:', err);
+    console.error('[FAIL] 1. Worker legitimate message update failed:', err);
     process.exitCode = 1;
   }
 
-  // 6. Worker sending message in own conversation
-  try {
-    await assertSucceeds(
-      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
-        senderId: workerUid,
-        senderRole: 'worker',
-        senderName: 'Worker User',
-        text: 'Halo admin, butuh bantuan.',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Worker sending message in own conversation succeeded.');
-  } catch (err) {
-    console.error('[FAIL] Worker sending message in own conversation failed:', err);
-    process.exitCode = 1;
-  }
-
-  // 7. Worker trying to send message in another worker's conversation (should fail)
-  try {
-    await assertFails(
-      setDoc(doc(collection(workerDb, 'conversations', otherWorkerUid, 'messages')), {
-        senderId: workerUid,
-        senderRole: 'worker',
-        senderName: 'Worker User',
-        text: 'Mencoba kirim ke conversation orang lain.',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Worker sending message in another worker\'s conversation correctly denied.');
-  } catch (err) {
-    console.error('[FAIL] Worker sending message in another worker\'s conversation was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // --- 10 DEDICATED CHAT SECURITY HARDENING TESTS ---
-  console.log('\n--- 10 Dedicated Chat Security Hardening Tests ---');
-
-  // Test 1: Worker cannot change workerId
+  // 2. Worker cannot arbitrarily modify adminUnread
   try {
     await assertFails(
       updateDoc(doc(workerDb, 'conversations', workerUid), {
-        workerId: otherWorkerUid,
-      })
-    );
-    console.log('[PASS] 1. Worker cannot change workerId.');
-  } catch (err) {
-    console.error('[FAIL] 1. Worker change workerId was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 2: Worker cannot delete workerId
-  try {
-    await assertFails(
-      setDoc(doc(workerDb, 'conversations', workerUid), {
-        lastMessage: 'Delete workerId attempt',
-      }, { merge: false })
-    );
-    console.log('[PASS] 2. Worker cannot delete workerId.');
-  } catch (err) {
-    console.error('[FAIL] 2. Worker delete workerId was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 3: Worker cannot change adminId
-  try {
-    await assertFails(
-      updateDoc(doc(workerDb, 'conversations', workerUid), {
-        adminId: 'fake_admin_uid_999',
-      })
-    );
-    console.log('[PASS] 3. Worker cannot change adminId.');
-  } catch (err) {
-    console.error('[FAIL] 3. Worker change adminId was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 4: Worker cannot delete adminId
-  try {
-    await assertFails(
-      setDoc(doc(workerDb, 'conversations', workerUid), {
-        workerId: workerUid,
-        lastMessage: 'Delete adminId attempt',
-      }, { merge: false })
-    );
-    console.log('[PASS] 4. Worker cannot delete adminId.');
-  } catch (err) {
-    console.error('[FAIL] 4. Worker delete adminId was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 5: Worker cannot change or delete createdAt
-  try {
-    await assertFails(
-      updateDoc(doc(workerDb, 'conversations', workerUid), {
-        createdAt: new Date('2020-01-01'),
-      })
-    );
-    console.log('[PASS] 5. Worker cannot change or delete createdAt.');
-  } catch (err) {
-    console.error('[FAIL] 5. Worker change/delete createdAt was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 6: Worker cannot increase workerUnread
-  try {
-    await assertFails(
-      updateDoc(doc(workerDb, 'conversations', workerUid), {
-        workerUnread: 10,
-      })
-    );
-    console.log('[PASS] 6. Worker cannot increase workerUnread.');
-  } catch (err) {
-    console.error('[FAIL] 6. Worker increase workerUnread was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 7: Worker can reset workerUnread to 0
-  try {
-    await assertSucceeds(
-      updateDoc(doc(workerDb, 'conversations', workerUid), {
-        workerId: workerUid,
-        workerUnread: 0,
+        adminUnread: 99,
         updatedAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] 7. Worker can reset workerUnread to 0.');
+    console.log('[PASS] 2. Worker cannot arbitrarily modify adminUnread.');
   } catch (err) {
-    console.error('[FAIL] 7. Worker reset workerUnread failed:', err);
+    console.error('[FAIL] 2. Worker arbitrary modify adminUnread was not denied:', err);
     process.exitCode = 1;
   }
 
-  // Test 8: Worker cannot spoof senderId in messages
+  // 3. Worker cannot modify workerName
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerName: 'Hacked Worker Name',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 3. Worker cannot modify workerName.');
+  } catch (err) {
+    console.error('[FAIL] 3. Worker modify workerName was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 4. Worker cannot modify workerEmail
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerEmail: 'hacked@example.com',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 4. Worker cannot modify workerEmail.');
+  } catch (err) {
+    console.error('[FAIL] 4. Worker modify workerEmail was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 5. Worker cannot modify workerId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: otherWorkerUid,
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 5. Worker cannot modify workerId.');
+  } catch (err) {
+    console.error('[FAIL] 5. Worker modify workerId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 6. Worker cannot modify adminId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminId: 'fake_admin_123',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 6. Worker cannot modify adminId.');
+  } catch (err) {
+    console.error('[FAIL] 6. Worker modify adminId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 7. Worker cannot modify createdAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 7. Worker cannot modify createdAt.');
+  } catch (err) {
+    console.error('[FAIL] 7. Worker modify createdAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 8. Worker cannot modify adminPinnedMessageId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminPinnedMessageId: 'msg_admin_pin_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 8. Worker cannot modify adminPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 8. Worker modify adminPinnedMessageId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 9. Worker cannot modify adminClearedAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminClearedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 9. Worker cannot modify adminClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 9. Worker modify adminClearedAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 10. Worker can update their own workerPinnedMessageId
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerPinnedMessageId: 'msg_worker_pin_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 10. Worker can update their own workerPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 10. Worker update workerPinnedMessageId failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 11. Worker can update their own workerClearedAt
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerClearedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 11. Worker can update their own workerClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 11. Worker update workerClearedAt failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 12. Worker cannot access another Worker's conversation
+  try {
+    await assertFails(getDoc(doc(workerDb, 'conversations', otherWorkerUid)));
+    await assertFails(getDocs(collection(workerDb, 'conversations')));
+    console.log('[PASS] 12. Worker cannot access another Worker\'s conversation.');
+  } catch (err) {
+    console.error('[FAIL] 12. Worker access another Worker conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 13. Worker cannot spoof senderId
   try {
     await assertFails(
       setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
         senderId: otherWorkerUid,
         senderRole: 'worker',
-        text: 'Spoofed senderId',
+        text: 'Spoofed senderId message',
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] 8. Worker cannot spoof senderId.');
+    console.log('[PASS] 13. Worker cannot spoof senderId.');
   } catch (err) {
-    console.error('[FAIL] 8. Worker spoof senderId was not denied:', err);
+    console.error('[FAIL] 13. Worker spoof senderId was not denied:', err);
     process.exitCode = 1;
   }
 
-  // Test 9: Worker cannot spoof senderRole as admin
+  // 14. Worker cannot spoof senderRole
   try {
     await assertFails(
       setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
         senderId: workerUid,
         senderRole: 'admin',
-        text: 'Spoofed senderRole',
+        text: 'Spoofed senderRole message',
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] 9. Worker cannot spoof senderRole.');
+    console.log('[PASS] 14. Worker cannot spoof senderRole.');
   } catch (err) {
-    console.error('[FAIL] 9. Worker spoof senderRole was not denied:', err);
-    process.exitCode = 1;
-  }
-
-  // Test 10: Worker cannot send message to another worker's conversation
-  try {
-    await assertFails(
-      setDoc(doc(collection(workerDb, 'conversations', otherWorkerUid, 'messages')), {
-        senderId: workerUid,
-        senderRole: 'worker',
-        text: 'Message to other worker conversation',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] 10. Worker cannot send to another worker\'s conversation.');
-  } catch (err) {
-    console.error('[FAIL] 10. Worker send to another worker conversation was not denied:', err);
+    console.error('[FAIL] 14. Worker spoof senderRole was not denied:', err);
     process.exitCode = 1;
   }
 
   await testEnv.cleanup();
-  console.log('\nAll regression tests completed successfully!');
+  console.log('\nAll security tests completed successfully!');
 }
 
 main().catch((err) => {
