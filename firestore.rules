@@ -203,6 +203,16 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ---- reconciliation_markers/{markerId} ----
+    match /reconciliation_markers/{markerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---- reconciliation_logs/{logId} ----
+    match /reconciliation_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
     // ---- announcements/{id} ----
     match /announcements/{id} {
       allow read: if isSignedIn();
