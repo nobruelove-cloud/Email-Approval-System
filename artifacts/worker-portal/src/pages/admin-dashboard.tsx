@@ -42,7 +42,12 @@ import {
   MessageSquare,
   Send,
   Search,
+  Pin,
+  CheckCheck,
+  CheckSquare,
+  Square,
 } from "lucide-react";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 export type AdminTab =
   | "overview"
@@ -132,6 +137,11 @@ import {
   sendChatMessage,
   markConversationAsRead,
   initiateWorkerConversation,
+  markMessagesAsDelivered,
+  markMessagesAsRead,
+  togglePinMessage,
+  deleteChatMessages,
+  clearConversationChat,
 } from "@/hooks/use-portal";
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
@@ -292,13 +302,88 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const adminChatMessagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to bottom of admin chat & mark read on select or update
+  // Admin Chat selection, pin & soft delete states
+  const [isAdminChatSelectionMode, setIsAdminChatSelectionMode] = useState(false);
+  const [selectedAdminChatMsgIds, setSelectedAdminChatMsgIds] = useState<string[]>([]);
+  const [showAdminDeleteConfirmDialog, setShowAdminDeleteConfirmDialog] = useState(false);
+  const [deletingAdminChatMsgs, setDeletingAdminChatMsgs] = useState(false);
+
+  // Active selected conversation object
+  const activeAdminConversation = useMemo(() => {
+    if (!selectedWorkerUid) return null;
+    return adminChatData.conversations.find((c) => c.workerId === selectedWorkerUid) || null;
+  }, [adminChatData.conversations, selectedWorkerUid]);
+
+  // Auto-mark incoming Worker messages as delivered & read when Admin views chat
+  useEffect(() => {
+    if (selectedWorkerUid && selectedWorkerMessages.messages.length > 0) {
+      // Find un-delivered worker messages
+      const undeliveredIds = selectedWorkerMessages.messages
+        .filter((m) => m.senderRole === "worker" && !m.deliveredAt)
+        .map((m) => m.id);
+      if (undeliveredIds.length > 0) {
+        markMessagesAsDelivered(selectedWorkerUid, "admin", undeliveredIds);
+      }
+
+      // Find un-read worker messages
+      const unreadIds = selectedWorkerMessages.messages
+        .filter((m) => m.senderRole === "worker" && !m.readAt)
+        .map((m) => m.id);
+      if (unreadIds.length > 0 || (activeAdminConversation && activeAdminConversation.adminUnread > 0)) {
+        markMessagesAsRead(selectedWorkerUid, "admin", unreadIds);
+      }
+    }
+  }, [selectedWorkerUid, selectedWorkerMessages.messages, activeAdminConversation]);
+
+  // Auto-scroll to bottom of admin chat
   useEffect(() => {
     if (selectedWorkerUid) {
-      markConversationAsRead(selectedWorkerUid, "admin");
       adminChatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [selectedWorkerUid, selectedWorkerMessages.messages]);
+
+  function handleToggleAdminPinMsg(msgId: string) {
+    if (!selectedWorkerUid) return;
+    const isCurrentlyPinned = activeAdminConversation?.adminPinnedMessageId === msgId;
+    const targetId = isCurrentlyPinned ? null : msgId;
+    togglePinMessage(selectedWorkerUid, targetId, "admin")
+      .then(() => {
+        toast.success(isCurrentlyPinned ? "Sematan pesan dilepas." : "Pesan berhasil disematkan.");
+      })
+      .catch(() => {
+        toast.error("Gagal memperbarui sematan pesan.");
+      });
+  }
+
+  function handleToggleSelectAdminMsg(msgId: string) {
+    setSelectedAdminChatMsgIds((prev) =>
+      prev.includes(msgId) ? prev.filter((id) => id !== msgId) : [...prev, msgId]
+    );
+  }
+
+  function handleSelectAllAdminMsgs() {
+    if (selectedAdminChatMsgIds.length === selectedWorkerMessages.messages.length) {
+      setSelectedAdminChatMsgIds([]);
+    } else {
+      setSelectedAdminChatMsgIds(selectedWorkerMessages.messages.map((m) => m.id));
+    }
+  }
+
+  async function handleConfirmDeleteSelectedAdminMsgs() {
+    if (selectedAdminChatMsgIds.length === 0 || !selectedWorkerUid) return;
+    setDeletingAdminChatMsgs(true);
+    try {
+      await deleteChatMessages(selectedWorkerUid, selectedAdminChatMsgIds, profile.uid);
+      toast.success(`${selectedAdminChatMsgIds.length} pesan berhasil dihapus.`);
+      setSelectedAdminChatMsgIds([]);
+      setIsAdminChatSelectionMode(false);
+      setShowAdminDeleteConfirmDialog(false);
+    } catch (err) {
+      toast.error("Gagal menghapus pesan yang dipilih.");
+    } finally {
+      setDeletingAdminChatMsgs(false);
+    }
+  }
 
   async function handleSendAdminChat(e: React.FormEvent) {
     e.preventDefault();
@@ -5180,7 +5265,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => setSelectedWorkerUid(null)}
-                                  className="md:hidden p-1.5 h-8 w-8 text-slate-600 hover:text-slate-900"
+                                  className="md:hidden p-1.5 h-8 w-8 text-slate-600 hover:text-slate-900 min-h-[44px] min-w-[44px]"
                                 >
                                   <ArrowLeft className="w-4 h-4" />
                                 </Button>
@@ -5196,9 +5281,90 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   </p>
                                 </div>
                               </div>
-                              <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold shrink-0">
-                                Privat Admin ↔ Worker
-                              </Badge>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {!isAdminChatSelectionMode ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsAdminChatSelectionMode(true)}
+                                    className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50 h-8 px-2.5 rounded-lg gap-1 min-h-[44px]"
+                                  >
+                                    <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span className="hidden sm:inline">Pilih Pesan</span>
+                                  </Button>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleSelectAllAdminMsgs}
+                                      className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50 h-8 px-2 rounded-lg gap-1 min-h-[44px]"
+                                    >
+                                      <CheckSquare className="w-3.5 h-3.5" />
+                                      <span>Select All</span>
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      disabled={selectedAdminChatMsgIds.length === 0}
+                                      onClick={() => setShowAdminDeleteConfirmDialog(true)}
+                                      className="text-xs bg-rose-600 hover:bg-rose-700 text-white h-8 px-2.5 rounded-lg gap-1 min-h-[44px]"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Hapus ({selectedAdminChatMsgIds.length})</span>
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setIsAdminChatSelectionMode(false);
+                                        setSelectedAdminChatMsgIds([]);
+                                      }}
+                                      className="text-xs text-slate-500 hover:bg-slate-100 h-8 px-2 rounded-lg min-h-[44px]"
+                                    >
+                                      Batal
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* PINNED MESSAGE BANNER */}
+                        {(() => {
+                          const pinnedMsgId = activeAdminConversation?.adminPinnedMessageId;
+                          const pinnedMsg = selectedWorkerMessages.messages.find((m) => m.id === pinnedMsgId);
+                          if (!pinnedMsg) return null;
+
+                          return (
+                            <div className="bg-indigo-50/80 border-b border-indigo-100 px-3.5 py-2 flex items-center justify-between gap-2">
+                              <div
+                                onClick={() => {
+                                  document.getElementById(`admin-msg-${pinnedMsg.id}`)?.scrollIntoView({ behavior: "smooth" });
+                                }}
+                                className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                              >
+                                <Pin className="w-4 h-4 text-indigo-600 shrink-0 fill-indigo-500" />
+                                <div className="min-w-0 text-xs">
+                                  <span className="font-bold text-indigo-900">Pesan Disematkan: </span>
+                                  <span className="text-indigo-800 line-clamp-1">{pinnedMsg.deletedAt ? "Pesan telah dihapus" : pinnedMsg.text}</span>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleAdminPinMsg(pinnedMsg.id)}
+                                className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 h-7 px-2 rounded-lg shrink-0 min-h-[44px]"
+                              >
+                                Lepas sematan
+                              </Button>
                             </div>
                           );
                         })()}
@@ -5220,25 +5386,95 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           ) : (
                             selectedWorkerMessages.messages.map((msg: any) => {
                               const isAdmin = msg.senderRole === "admin";
+                              const isSelected = selectedAdminChatMsgIds.includes(msg.id);
+                              const isPinned = activeAdminConversation?.adminPinnedMessageId === msg.id;
+
                               return (
                                 <div
+                                  id={`admin-msg-${msg.id}`}
                                   key={msg.id}
-                                  className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
+                                  className={`flex items-start gap-2 group ${isAdmin ? "flex-row-reverse" : "flex-row"}`}
                                 >
+                                  {/* SELECTION CHECKBOX IN SELECTION MODE */}
+                                  {isAdminChatSelectionMode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSelectAdminMsg(msg.id)}
+                                      className="mt-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-indigo-600 focus:outline-none shrink-0"
+                                    >
+                                      {isSelected ? (
+                                        <CheckSquare className="w-5 h-5 fill-indigo-600 text-white" />
+                                      ) : (
+                                        <Square className="w-5 h-5 text-slate-300 hover:text-indigo-600" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {/* MESSAGE BUBBLE */}
                                   <div
-                                    className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs ${
+                                    className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 relative shadow-2xs transition-all ${
+                                      isSelected ? "ring-2 ring-indigo-500 ring-offset-1" : ""
+                                    } ${
                                       isAdmin
                                         ? "bg-indigo-600 text-white rounded-br-none"
                                         : "bg-white border border-slate-200 text-slate-900 rounded-bl-none"
                                     }`}
                                   >
-                                    <div className="flex items-center justify-between gap-2 text-[10px] opacity-80 font-semibold mb-0.5">
+                                    {/* PINNED INDICATOR BADGE */}
+                                    {isPinned && (
+                                      <div className={`flex items-center gap-1 text-[10px] font-bold mb-1 ${isAdmin ? "text-indigo-200" : "text-indigo-700"}`}>
+                                        <Pin className="w-3 h-3 fill-current" />
+                                        <span>Disematkan</span>
+                                      </div>
+                                    )}
+
+                                    {/* SENDER NAME */}
+                                    <div className={`flex items-center justify-between gap-2 text-[10px] font-semibold mb-0.5 ${isAdmin ? "text-indigo-100" : "text-slate-500"}`}>
                                       <span>{isAdmin ? "Admin" : msg.senderName || "Worker"}</span>
                                     </div>
-                                    <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
-                                    <div className={`text-[9px] font-mono text-right mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-500"}`}>
-                                      {formatDateTime(msg.createdAt)}
+
+                                    {/* MESSAGE TEXT OR SOFT DELETED PLACEHOLDER */}
+                                    {msg.deletedAt ? (
+                                      <p className={`italic text-xs font-medium ${isAdmin ? "text-indigo-200" : "text-slate-400"}`}>
+                                        Pesan telah dihapus
+                                      </p>
+                                    ) : (
+                                      <p className="whitespace-pre-wrap leading-relaxed break-words font-sans">{msg.text}</p>
+                                    )}
+
+                                    {/* FOOTER: TIMESTAMP & DELIVERY STATUS CHECKS FOR ADMIN */}
+                                    <div className="flex items-center justify-end gap-1.5 text-[9px] font-mono mt-1 pt-0.5">
+                                      <span className={isAdmin ? "text-indigo-200" : "text-slate-500"}>
+                                        {formatDateTime(msg.createdAt)}
+                                      </span>
+
+                                      {/* STATUS INDICATOR FOR SENDER (ADMIN) */}
+                                      {isAdmin && !msg.deletedAt && (
+                                        <span title={msg.readAt ? "Telah dibaca" : msg.deliveredAt ? "Terkirim" : "Terkirim ke server"}>
+                                          {msg.readAt ? (
+                                            <CheckCheck className="w-3.5 h-3.5 text-sky-200 stroke-[2.5]" />
+                                          ) : msg.deliveredAt ? (
+                                            <CheckCheck className="w-3.5 h-3.5 text-indigo-200" />
+                                          ) : (
+                                            <Check className="w-3.5 h-3.5 text-indigo-200" />
+                                          )}
+                                        </span>
+                                      )}
                                     </div>
+
+                                    {/* QUICK ACTION BUTTONS ON HOVER */}
+                                    {!isAdminChatSelectionMode && !msg.deletedAt && (
+                                      <div className={`absolute top-1 ${isAdmin ? "-left-8" : "-right-8"} opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1`}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleAdminPinMsg(msg.id)}
+                                          className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs text-xs min-h-[32px] min-w-[32px] flex items-center justify-center"
+                                          title={isPinned ? "Lepas sematan" : "Sematkan pesan"}
+                                        >
+                                          <Pin className={`w-3.5 h-3.5 ${isPinned ? "fill-indigo-600 text-indigo-600" : ""}`} />
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -5249,17 +5485,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
                         {/* INPUT FORM BAR */}
                         <form onSubmit={handleSendAdminChat} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+                          <EmojiPicker onSelectEmoji={(emoji) => setAdminChatText((prev) => prev + emoji)} disabled={sendingAdminChat} />
                           <Input
                             placeholder="Tulis pesan untuk worker..."
                             value={adminChatText}
                             onChange={(e) => setAdminChatText(e.target.value)}
                             disabled={sendingAdminChat}
-                            className="text-xs h-10 bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500 flex-1"
+                            className="text-xs h-10 min-h-[44px] bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500 flex-1 rounded-xl"
                           />
                           <Button
                             type="submit"
                             disabled={sendingAdminChat || !adminChatText.trim()}
-                            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs shrink-0"
+                            className="h-10 min-h-[44px] min-w-[44px] px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs rounded-xl shrink-0"
                           >
                             {sendingAdminChat ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -5269,6 +5506,44 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             <span className="hidden sm:inline">Kirim</span>
                           </Button>
                         </form>
+
+                        {/* DELETE CONFIRMATION DIALOG */}
+                        <Dialog open={showAdminDeleteConfirmDialog} onOpenChange={setShowAdminDeleteConfirmDialog}>
+                          <DialogContent className="sm:max-w-md bg-white border-slate-200 rounded-2xl">
+                            <DialogHeader>
+                              <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-indigo-600" />
+                                Konfirmasi Hapus Pesan
+                              </DialogTitle>
+                              <DialogDescription className="text-xs text-slate-600 pt-1">
+                                Yakin ingin menghapus pesan yang dipilih? ({selectedAdminChatMsgIds.length} pesan dipilih)
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="flex items-center justify-end gap-2 pt-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowAdminDeleteConfirmDialog(false)}
+                                disabled={deletingAdminChatMsgs}
+                                className="text-xs rounded-xl h-9 min-h-[44px]"
+                              >
+                                Batal
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleConfirmDeleteSelectedAdminMsgs}
+                                disabled={deletingAdminChatMsgs}
+                                className="text-xs rounded-xl h-9 min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold gap-1.5"
+                              >
+                                {deletingAdminChatMsgs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                <span>Hapus Pesan</span>
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </>
                     )}
                   </div>

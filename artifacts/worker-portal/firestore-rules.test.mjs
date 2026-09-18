@@ -1136,6 +1136,145 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // 15. Admin sends message -> Worker receives/reads it
+  const adminMsgRef = doc(collection(regAdminDb, 'conversations', workerUid, 'messages'), 'admin_msg_1');
+  try {
+    await assertSucceeds(
+      setDoc(adminMsgRef, {
+        senderId: adminUid,
+        senderRole: 'admin',
+        senderName: 'Admin',
+        text: 'Hello Worker, testing admin to worker delivery',
+        createdAt: serverTimestamp(),
+      })
+    );
+    const workerReadSnap = await getDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'admin_msg_1'));
+    if (workerReadSnap.exists() && workerReadSnap.data().text.includes('testing admin to worker delivery')) {
+      console.log('[PASS] 15. Admin sends message -> Worker receives and reads it.');
+    } else {
+      throw new Error('Worker could not read Admin message document');
+    }
+  } catch (err) {
+    console.error('[FAIL] 15. Admin sends message -> Worker receives/reads failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 16. Worker replies -> Admin receives it
+  const workerMsgRef = doc(collection(workerDb, 'conversations', workerUid, 'messages'), 'worker_reply_1');
+  try {
+    await assertSucceeds(
+      setDoc(workerMsgRef, {
+        senderId: workerUid,
+        senderRole: 'worker',
+        senderName: 'Worker',
+        text: 'Hello Admin, reply from worker',
+        createdAt: serverTimestamp(),
+      })
+    );
+    const adminReadSnap = await getDoc(doc(regAdminDb, 'conversations', workerUid, 'messages', 'worker_reply_1'));
+    if (adminReadSnap.exists() && adminReadSnap.data().text.includes('reply from worker')) {
+      console.log('[PASS] 16. Worker replies -> Admin receives it.');
+    } else {
+      throw new Error('Admin could not read Worker reply document');
+    }
+  } catch (err) {
+    console.error('[FAIL] 16. Worker replies -> Admin receives failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 17. Worker marks deliveredAt/readAt on Admin message succeeds
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'admin_msg_1'), {
+        deliveredAt: serverTimestamp(),
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 17. Worker marks deliveredAt/readAt on Admin message succeeds.');
+  } catch (err) {
+    console.error('[FAIL] 17. Worker mark deliveredAt/readAt on Admin message failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 18. Worker CANNOT mark deliveredAt/readAt on own message
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        deliveredAt: serverTimestamp(),
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 18. Worker cannot mark deliveredAt/readAt on own message.');
+  } catch (err) {
+    console.error('[FAIL] 18. Worker mark deliveredAt/readAt on own message was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 19. Worker CANNOT soft delete Admin message
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'admin_msg_1'), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+      })
+    );
+    console.log('[PASS] 19. Worker cannot soft delete Admin message.');
+  } catch (err) {
+    console.error('[FAIL] 19. Worker soft delete Admin message was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 20. Worker CANNOT modify text, senderId, senderRole, or createdAt on existing message
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        text: 'Tampered message text',
+      })
+    );
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        senderId: otherWorkerUid,
+      })
+    );
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        senderRole: 'admin',
+      })
+    );
+    console.log('[PASS] 20. Worker cannot modify text, senderId, or senderRole on existing message.');
+  } catch (err) {
+    console.error('[FAIL] 20. Worker modify immutable message fields was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 21. Worker soft deletes own message in own conversation with valid deletedBy
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+      })
+    );
+    console.log('[PASS] 21. Worker soft deletes own message in own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 21. Worker soft delete own message failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 22. Worker CANNOT spoof deletedBy to another user
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', 'worker_reply_1'), {
+        deletedAt: serverTimestamp(),
+        deletedBy: otherWorkerUid,
+      })
+    );
+    console.log('[PASS] 22. Worker cannot spoof deletedBy.');
+  } catch (err) {
+    console.error('[FAIL] 22. Worker spoof deletedBy was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll security tests completed successfully!');
 }
