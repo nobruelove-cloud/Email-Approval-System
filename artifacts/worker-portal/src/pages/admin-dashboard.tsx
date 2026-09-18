@@ -127,6 +127,7 @@ import {
   deleteAnnouncement,
   toggleAnnouncementStatus,
   masterResetOperasional,
+  reconcileHistoricalNabilWithdrawal,
   useAdminConversations,
   useConversationMessages,
   sendChatMessage,
@@ -361,6 +362,25 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const [evaluatingRefs, setEvaluatingRefs] = useState(false);
+
+  // Reconciliation state for Nabil Alfiansyah
+  const [reconcilingNabil, setReconcilingNabil] = useState(false);
+
+  async function handleReconcileNabil() {
+    setReconcilingNabil(true);
+    try {
+      const res = await reconcileHistoricalNabilWithdrawal();
+      if (res.status === "already_reconciled") {
+        toast.info(res.message);
+      } else {
+        toast.success(res.message);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal melakukan rekonsiliasi.");
+    } finally {
+      setReconcilingNabil(false);
+    }
+  }
 
   // Master Reset state
   const [masterResetModalOpen, setMasterResetModalOpen] = useState(false);
@@ -3507,6 +3527,31 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
           {/* KELOLA PENARIKAN */}
           <TabsContent value="withdrawals" className="space-y-3">
+            {/* ONE-TIME HISTORICAL RECONCILIATION FOR NABIL ALFIANSYAH */}
+            <Card className="bg-amber-50/50 border-amber-500/40 backdrop-blur-xl text-slate-900 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+                      <Wrench className="w-4 h-4 text-amber-600" />
+                      Rekonsiliasi Penarikan Terdahulu (Nabil Alfiansyah)
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-600">
+                      Penarikan Rp3.000 (18 Sep 2026) yang sudah diproses 'Berhasil' tetapi belum terpotong saldonya pada sistem lama.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={reconcilingNabil}
+                    onClick={handleReconcileNabil}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-9 gap-1.5 shadow-md shrink-0"
+                  >
+                    {reconcilingNabil && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Jalankan Rekonsiliasi Nabil (Rp3.000)
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
             {withdrawals.loading && <p className="text-sm text-slate-500 text-center py-8">Memuat…</p>}
             {!withdrawals.loading && withdrawals.data.length === 0 && (
               <p className="text-sm text-slate-500 text-center py-8">Belum ada penarikan.</p>

@@ -132,6 +132,7 @@ import {
   bindReferral,
   processEmailACC,
   executeMasterReset,
+  reconcileHistoricalNabilWithdrawal,
   masterResetOperasional,
   logFirestoreDiagnostic,
   formatQueryConstraint,
@@ -2826,6 +2827,205 @@ describe("Unified Worker Lookup & Auto-Credit Approved Payouts Unit Tests", () =
     // Sum total circulating balance across all 3 approved Sept 14 submissions
     const totalCirculatingBalance = Array.from(workerApprovedPayouts.values()).reduce((a, b) => a + b, 0);
     expect(totalCirculatingBalance).toBe(9000);
+  });
+});
+
+describe("Nabil Historical Withdrawal Reconciliation Unit Tests (reconcileHistoricalNabilWithdrawal)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. historical approved withdrawal that was not deducted -> reconciled exactly once", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+        accCount: 1,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+        requestedAt: "2026-09-18T14:03:00.000Z",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(res.status).toBe("success");
+    expect(res.reconciled).toBe(true);
+
+    // Balance and saldoUtama adjusted from 3000 -> 0
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(0);
+
+    // accCount remains completely untouched!
+    expect(store["users/nabil_uid_1"].accCount).toBe(1);
+
+    // Marker document created
+    expect(store["reconciliation_markers/historical_nabil_wd_3000"].reconciled).toBe(true);
+  });
+
+  it("2. reconciliation run twice -> second run makes no additional deduction (idempotent)", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx1 = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx1));
+
+    // First run
+    const res1 = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res1.status).toBe("success");
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+
+    // Second run
+    const tx2 = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx2));
+
+    const res2 = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res2.status).toBe("already_reconciled");
+    // Balance remains 0, not negative -3000!
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(0);
+  });
+
+  it("3. already reconciled withdrawal -> no change", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 5000,
+        saldoUtama: 5000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+      "reconciliation_markers/historical_nabil_wd_3000": {
+        id: "historical_nabil_wd_3000",
+        workerId: "nabil_uid_1",
+        reconciled: true,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res.status).toBe("already_reconciled");
+    expect(store["users/nabil_uid_1"].balance).toBe(5000);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(5000);
+  });
+
+  it("4. withdrawal belonging to another worker (e.g. Batroy) -> untouched", async () => {
+    const store: Record<string, any> = {
+      "users/batroy_uid_99": {
+        uid: "batroy_uid_99",
+        name: "Batroy Worker",
+        balance: 15000,
+        saldoUtama: 15000,
+      },
+      "withdrawals/wd_batroy_5000": {
+        id: "wd_batroy_5000",
+        workerId: "batroy_uid_99",
+        amount: 5000,
+        status: "success",
+      },
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    // Target Nabil explicitly
+    await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    // Batroy's balance and withdrawal remain 100% untouched!
+    expect(store["users/batroy_uid_99"].balance).toBe(15000);
+    expect(store["users/batroy_uid_99"].saldoUtama).toBe(15000);
+    expect(store["withdrawals/wd_batroy_5000"].status).toBe("success");
+  });
+
+  it("5. worker with additional legitimate balance after historical withdrawal -> deducts exactly Rp3.000 without blindly zeroing balance", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 8000, // Earned additional 5000 later (3000 + 5000 = 8000)
+        saldoUtama: 8000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(res.status).toBe("success");
+    // Deducts exactly 3000: 8000 - 3000 = 5000, NOT blindly zeroed to 0!
+    expect(store["users/nabil_uid_1"].balance).toBe(5000);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(5000);
+  });
+
+  it("6. balance and saldoUtama remain synchronized", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(store["users/nabil_uid_1"].balance).toBe(store["users/nabil_uid_1"].saldoUtama);
   });
 });
 
