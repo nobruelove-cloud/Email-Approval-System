@@ -2903,6 +2903,203 @@ export {
   toggleAnnouncementStatus,
 } from "./useAnnouncements";
 
+/**
+ * Safe one-time atomic reconciliation for Nabil Alfiansyah's historical approved withdrawal (Rp3.000).
+ *
+ * Checks:
+ * 1. Marker `reconciliation_markers/historical_nabil_wd_3000` to prevent duplicate reconciliation (idempotency).
+ * 2. Locates Nabil Alfiansyah's user document and his approved Rp3.000 withdrawal document.
+ * 3. Verifies withdrawal status is "success" and amount is 3000.
+ * 4. Deducts exactly Rp3.000 from Nabil's balance and saldoUtama while keeping them synchronized.
+ * 5. Writes the reconciliation marker in the same atomic transaction.
+ * 6. Does NOT touch accCount, does NOT alter withdrawal status/amount, does NOT affect any other worker.
+ */
+export async function reconcileHistoricalNabilWithdrawal(
+  targetWorkerId?: string,
+  targetWithdrawalId?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  // 1. Locate Nabil Alfiansyah's worker UID if not provided
+  let nabilUid = targetWorkerId || "";
+  let nabilName = "Nabil Alfiansyah";
+
+  if (!nabilUid) {
+    const usersSnap = await getDocs(collection(firestore, "users"));
+    const nabilDoc = usersSnap.docs.find((d) => {
+      const data = d.data();
+      const name = (data.name || "").trim().toLowerCase();
+      return name.includes("nabil alfiansyah") || name.includes("nabil");
+    });
+    if (nabilDoc) {
+      nabilUid = nabilDoc.id;
+      nabilName = nabilDoc.data().name || nabilName;
+    }
+  }
+
+  if (!nabilUid) {
+    throw new Error("Profil Nabil Alfiansyah tidak ditemukan.");
+  }
+
+  // 2. Locate Nabil's Rp3.000 successful withdrawal if not provided
+  let nabilWdId = targetWithdrawalId || "";
+  if (!nabilWdId) {
+    const wdQuery = query(
+      collection(firestore, "withdrawals"),
+      where("workerId", "==", nabilUid),
+      where("status", "==", "success"),
+      where("amount", "==", 3000),
+    );
+    const wdSnaps = await getDocs(wdQuery);
+    if (!wdSnaps.empty) {
+      nabilWdId = wdSnaps.docs[0].id;
+    } else {
+      const allWdQuery = query(
+        collection(firestore, "withdrawals"),
+        where("workerId", "==", nabilUid),
+      );
+      const allWdSnaps = await getDocs(allWdQuery);
+      const match = allWdSnaps.docs.find((d) => {
+        const data = d.data();
+        return Number(data.amount) === 3000 && (data.status === "success" || data.status === "approved");
+      });
+      if (match) {
+        nabilWdId = match.id;
+      }
+    }
+  }
+
+  if (!nabilWdId) {
+    throw new Error("Dokumen penarikan Rp3.000 Nabil Alfiansyah yang berstatus 'success' tidak ditemukan.");
+  }
+
+  const markerDocId = `historical_nabil_wd_3000`;
+  const markerRef = doc(firestore, "reconciliation_markers", markerDocId);
+
+  return await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // --- ALL READS FIRST ---
+
+      // Read 1: reconciliation marker
+      const markerSnap = await tx.get(markerRef);
+      if (markerSnap.exists() && markerSnap.data()?.reconciled === true) {
+        return {
+          status: "already_reconciled",
+          message: "Penarikan Rp3.000 Nabil Alfiansyah sudah pernah direkonsiliasi sebelumnya.",
+          reconciled: true,
+          reconciledAt: markerSnap.data()?.reconciledAt,
+        };
+      }
+
+      // Read 2: Nabil's user profile
+      const userRef = doc(firestore, "users", nabilUid);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) {
+        throw new Error(`Profil worker (${nabilUid}) tidak ditemukan.`);
+      }
+
+      const userData = userSnap.data() as PortalUser;
+
+      // Verify worker name/identity is indeed Nabil Alfiansyah (unless explicit ID override was supplied)
+      const uName = (userData.name || "").trim().toLowerCase();
+      if (!targetWorkerId && !uName.includes("nabil")) {
+        throw new Error("Worker ID tidak cocok dengan profil Nabil Alfiansyah.");
+      }
+
+      // Read 3: Nabil's withdrawal document
+      const wdRef = doc(firestore, "withdrawals", nabilWdId);
+      const wdSnap = await tx.get(wdRef);
+      if (!wdSnap.exists()) {
+        throw new Error(`Dokumen penarikan (${nabilWdId}) tidak ditemukan.`);
+      }
+
+      const wdData = wdSnap.data() as Withdrawal;
+      if (wdData.workerId !== nabilUid) {
+        throw new Error("Dokumen penarikan tidak cocok dengan ID worker Nabil Alfiansyah.");
+      }
+
+      if (wdData.status !== "success") {
+        throw new Error(`Penarikan ini berstatus '${wdData.status}', hanya penarikan berstatus 'success' yang direkonsiliasi.`);
+      }
+
+      if (Number(wdData.amount) !== 3000) {
+        throw new Error(`Nominal penarikan adalah Rp${wdData.amount}, bukan Rp3.000.`);
+      }
+
+      // Read 4: Check if there's any ledger/marker doc for this specific withdrawal
+      const ledgerCheckRef = doc(firestore, "reconciliation_logs", `reconcile_${nabilWdId}`);
+      const ledgerCheckSnap = await tx.get(ledgerCheckRef);
+      if (ledgerCheckSnap.exists()) {
+        return {
+          status: "already_reconciled",
+          message: "Penarikan ini sudah memiliki catatan rekonsiliasi terdahulu.",
+          reconciled: true,
+        };
+      }
+
+      const currentBalance = Number(userData.balance ?? userData.saldoUtama ?? 0);
+      const deductionAmount = 3000;
+
+      // Calculate new balance atomically
+      const newBalance = Math.max(0, currentBalance - deductionAmount);
+
+      // --- ALL WRITES AFTER READS ---
+
+      // Write 1: Update Nabil's user balance and saldoUtama (keep synchronized)
+      tx.update(userRef, {
+        balance: newBalance,
+        saldoUtama: newBalance,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Write 2: Record audit reconciliation marker doc
+      const timestamp = serverTimestamp();
+      const currentUserUid = auth?.currentUser?.uid || "admin";
+
+      tx.set(markerRef, {
+        id: markerDocId,
+        workerId: nabilUid,
+        workerName: userData.name || nabilName,
+        withdrawalId: nabilWdId,
+        amount: deductionAmount,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+        reconciled: true,
+        reconciledAt: timestamp,
+        reconciledBy: currentUserUid,
+        note: "Safe one-time historical withdrawal reconciliation for Nabil Alfiansyah (Rp3.000 undeducted withdrawal on 18 Sep 2026)",
+      });
+
+      // Write 3: Record audit log in reconciliation_logs
+      tx.set(ledgerCheckRef, {
+        id: `reconcile_${nabilWdId}`,
+        workerId: nabilUid,
+        workerName: userData.name || nabilName,
+        withdrawalId: nabilWdId,
+        deductedAmount: deductionAmount,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+        executedAt: timestamp,
+        executedBy: currentUserUid,
+      });
+
+      return {
+        status: "success",
+        message: `Berhasil merekonsiliasi penarikan Rp3.000 Nabil Alfiansyah. Saldo disesuaikan dari ${formatMoney(currentBalance)} menjadi ${formatMoney(newBalance)}.`,
+        reconciled: true,
+        workerId: nabilUid,
+        withdrawalId: nabilWdId,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+      };
+    },
+    "reconcileHistoricalNabilWithdrawal",
+    `reconciliation_markers/${markerDocId}`,
+  );
+}
+
 export function useFinancialData(selectedPeriod?: string) {
   const constraints: QueryConstraint[] = selectedPeriod
     ? [where("period", "==", selectedPeriod)]
