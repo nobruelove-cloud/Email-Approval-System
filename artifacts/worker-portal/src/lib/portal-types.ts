@@ -19,7 +19,10 @@ export interface ChatMessage {
   senderEmail?: string;
   text: string;
   createdAt: any;
+  deliveredAt?: any;
   readAt?: any;
+  deletedAt?: any;
+  deletedBy?: string;
 }
 
 export interface Conversation {
@@ -34,6 +37,10 @@ export interface Conversation {
   adminUnread: number;
   createdAt: any;
   updatedAt?: any;
+  adminPinnedMessageId?: string | null;
+  workerPinnedMessageId?: string | null;
+  adminClearedAt?: any;
+  workerClearedAt?: any;
 }
 
 export type Role = "admin" | "worker";

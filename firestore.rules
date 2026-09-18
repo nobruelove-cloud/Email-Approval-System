@@ -277,7 +277,20 @@ service cloud.firestore {
           request.resource.data.senderRole == 'worker'
         );
 
-        allow update, delete: if isAdmin();
+        allow update: if isAdmin() || (
+          isSignedIn() &&
+          conversationId == request.auth.uid &&
+          (!('senderId' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.senderId == resource.data.senderId) &&
+          (!('senderRole' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.senderRole == resource.data.senderRole) &&
+          (!('text' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.text == resource.data.text) &&
+          (!('createdAt' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.createdAt == resource.data.createdAt) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredAt', 'readAt', 'deletedAt', 'deletedBy']) &&
+          (!('readAt' in request.resource.data.diff(resource.data).affectedKeys()) || resource.data.senderRole == 'admin') &&
+          (!('deliveredAt' in request.resource.data.diff(resource.data).affectedKeys()) || resource.data.senderRole == 'admin') &&
+          (!('deletedBy' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.deletedBy == request.auth.uid)
+        );
+
+        allow delete: if isAdmin();
       }
     }
   }

@@ -37,10 +37,17 @@ import {
   Tag,
   SearchCheck,
   Menu,
+  Pin,
+  Trash2,
+  CheckCheck,
+  CheckSquare,
+  Square,
+  AlertTriangle,
 } from "lucide-react";
 import { EmailChecker } from "@/components/EmailChecker";
 import { Leaderboard } from "@/components/Leaderboard";
 import { SidebarNavigation, type DashboardView } from "@/components/SidebarNavigation";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,6 +78,11 @@ import {
   useConversationMessages,
   sendChatMessage,
   markConversationAsRead,
+  markMessagesAsDelivered,
+  markMessagesAsRead,
+  togglePinMessage,
+  deleteChatMessages,
+  clearConversationChat,
 } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
@@ -187,6 +199,114 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Sidebar States (Mobile Drawer & Desktop Collapsed)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+
+  // Worker Chat hooks and states
+  const { conversation: workerChatConv } = useWorkerChat(profile.uid);
+  const { messages: workerChatMessages, loading: workerChatMsgsLoading } = useConversationMessages(profile.uid);
+  const [workerChatText, setWorkerChatText] = useState("");
+  const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+  const workerChatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Chat Selection Mode & Soft Delete States
+  const [isChatSelectionMode, setIsChatSelectionMode] = useState(false);
+  const [selectedChatMsgIds, setSelectedChatMsgIds] = useState<string[]>([]);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [deletingChatMsgs, setDeletingChatMsgs] = useState(false);
+
+  // Auto-mark incoming Admin messages as delivered & read when chat view is active
+  useEffect(() => {
+    if (activeView === "chat" && profile.uid && workerChatMessages.length > 0) {
+      // Find un-delivered admin messages
+      const undeliveredIds = workerChatMessages
+        .filter((m) => m.senderRole === "admin" && !m.deliveredAt)
+        .map((m) => m.id);
+      if (undeliveredIds.length > 0) {
+        markMessagesAsDelivered(profile.uid, "worker", undeliveredIds);
+      }
+
+      // Find un-read admin messages
+      const unreadIds = workerChatMessages
+        .filter((m) => m.senderRole === "admin" && !m.readAt)
+        .map((m) => m.id);
+      if (unreadIds.length > 0 || (workerChatConv && workerChatConv.workerUnread > 0)) {
+        markMessagesAsRead(profile.uid, "worker", unreadIds);
+      }
+    }
+  }, [activeView, profile.uid, workerChatMessages, workerChatConv]);
+
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    if (activeView === "chat") {
+      workerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeView, workerChatMessages]);
+
+  async function handleSendWorkerChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workerChatText.trim() || sendingWorkerChat) return;
+
+    const textToSend = workerChatText.trim();
+    setWorkerChatText("");
+    setSendingWorkerChat(true);
+
+    try {
+      await sendChatMessage({
+        conversationId: profile.uid,
+        senderId: profile.uid,
+        senderRole: "worker",
+        senderName: profile.name || "Worker",
+        senderEmail: profile.email,
+        text: textToSend,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan.");
+    } finally {
+      setSendingWorkerChat(false);
+    }
+  }
+
+  function handleTogglePinMsg(msgId: string) {
+    if (!profile.uid) return;
+    const isCurrentlyPinned = workerChatConv?.workerPinnedMessageId === msgId;
+    const targetId = isCurrentlyPinned ? null : msgId;
+    togglePinMessage(profile.uid, targetId, "worker")
+      .then(() => {
+        toast.success(isCurrentlyPinned ? "Sematan pesan dilepas." : "Pesan berhasil disematkan.");
+      })
+      .catch(() => {
+        toast.error("Gagal memperbarui sematan pesan.");
+      });
+  }
+
+  function handleToggleSelectMsg(msgId: string) {
+    setSelectedChatMsgIds((prev) =>
+      prev.includes(msgId) ? prev.filter((id) => id !== msgId) : [...prev, msgId]
+    );
+  }
+
+  function handleSelectAllMsgs() {
+    if (selectedChatMsgIds.length === workerChatMessages.length) {
+      setSelectedChatMsgIds([]);
+    } else {
+      setSelectedChatMsgIds(workerChatMessages.map((m) => m.id));
+    }
+  }
+
+  async function handleConfirmDeleteSelectedMsgs() {
+    if (selectedChatMsgIds.length === 0 || !profile.uid) return;
+    setDeletingChatMsgs(true);
+    try {
+      await deleteChatMessages(profile.uid, selectedChatMsgIds, profile.uid);
+      toast.success(`${selectedChatMsgIds.length} pesan berhasil dihapus.`);
+      setSelectedChatMsgIds([]);
+      setIsChatSelectionMode(false);
+      setShowDeleteConfirmDialog(false);
+    } catch (err) {
+      toast.error("Gagal menghapus pesan yang dipilih.");
+    } finally {
+      setDeletingChatMsgs(false);
+    }
+  }
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
@@ -562,6 +682,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       <SidebarNavigation
         activeView={activeView}
         onSelectView={(v) => setActiveView(v)}
+        unreadChatCount={workerChatConv?.workerUnread || 0}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         isCollapsedDesktop={isDesktopSidebarCollapsed}
@@ -1713,6 +1834,294 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   )}
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
+          {activeView === "chat" && (
+            <div className="space-y-4">
+              <Card className="bg-white border-amber-200/80 shadow-xs rounded-2xl overflow-hidden">
+                {/* CHAT HEADER */}
+                <CardHeader className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-600/10 border-b border-amber-200/80 p-3 sm:p-4 pb-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-bold flex items-center justify-center text-sm shadow-xs shrink-0">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm sm:text-base font-bold text-gray-900 truncate flex items-center gap-2">
+                          <span>Pesan Admin / CS Portal</span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Online" />
+                        </CardTitle>
+                        <CardDescription className="text-xs text-amber-800/80 font-medium truncate">
+                          Obrolan langsung dan bantuan privat dengan Tim Admin
+                        </CardDescription>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!isChatSelectionMode ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsChatSelectionMode(true)}
+                          className="text-xs border-amber-300 text-amber-900 hover:bg-amber-100/80 h-9 px-3 rounded-xl gap-1.5 min-h-[44px]"
+                        >
+                          <CheckSquare className="w-3.5 h-3.5 text-amber-700" />
+                          <span className="hidden sm:inline">Pilih Pesan</span>
+                        </Button>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAllMsgs}
+                            className="text-xs border-amber-300 text-amber-900 hover:bg-amber-100 h-9 px-2.5 rounded-xl gap-1 min-h-[44px]"
+                          >
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            <span>Select All</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={selectedChatMsgIds.length === 0}
+                            onClick={() => setShowDeleteConfirmDialog(true)}
+                            className="text-xs bg-rose-600 hover:bg-rose-700 text-white h-9 px-3 rounded-xl gap-1 min-h-[44px]"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus ({selectedChatMsgIds.length})</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsChatSelectionMode(false);
+                              setSelectedChatMsgIds([]);
+                            }}
+                            className="text-xs text-gray-600 hover:bg-gray-100 h-9 px-2.5 rounded-xl min-h-[44px]"
+                          >
+                            Batal
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+
+                {/* PINNED MESSAGE BANNER */}
+                {(() => {
+                  const pinnedMsgId = workerChatConv?.workerPinnedMessageId;
+                  const pinnedMsg = workerChatMessages.find((m) => m.id === pinnedMsgId);
+                  if (!pinnedMsg) return null;
+
+                  return (
+                    <div className="bg-amber-50/90 border-b border-amber-200/80 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <div
+                        onClick={() => {
+                          document.getElementById(`msg-${pinnedMsg.id}`)?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <Pin className="w-4 h-4 text-amber-600 shrink-0 fill-amber-500" />
+                        <div className="min-w-0 text-xs">
+                          <span className="font-bold text-amber-900">Pesan Disematkan: </span>
+                          <span className="text-amber-800 line-clamp-1">{pinnedMsg.deletedAt ? "Pesan telah dihapus" : pinnedMsg.text}</span>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTogglePinMsg(pinnedMsg.id)}
+                        className="text-[11px] font-bold text-amber-800 hover:text-amber-950 hover:bg-amber-200/60 h-7 px-2 rounded-lg shrink-0 min-h-[44px]"
+                      >
+                        Lepas sematan
+                      </Button>
+                    </div>
+                  );
+                })()}
+
+                {/* MESSAGES LIST AREA */}
+                <CardContent className="p-3 sm:p-4 bg-amber-50/20 space-y-3 min-h-[350px] max-h-[480px] overflow-y-auto">
+                  {workerChatMsgsLoading ? (
+                    <div className="flex items-center justify-center py-12 text-xs text-gray-500 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                      Memuat pesan percakapan...
+                    </div>
+                  ) : workerChatMessages.length === 0 ? (
+                    <div className="p-8 text-center border border-dashed border-amber-200 rounded-2xl bg-white/80 space-y-2">
+                      <MessageSquare className="w-8 h-8 text-amber-500/60 mx-auto" />
+                      <p className="text-xs font-bold text-gray-800">Belum Ada Pesan</p>
+                      <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+                        Kirim pesan ke Admin untuk bertanya seputar setoran email ACC, pendaftaran referral, atau proses penarikan saldo.
+                      </p>
+                    </div>
+                  ) : (
+                    workerChatMessages.map((msg) => {
+                      const isWorker = msg.senderRole === "worker";
+                      const isSelected = selectedChatMsgIds.includes(msg.id);
+                      const isPinned = workerChatConv?.workerPinnedMessageId === msg.id;
+
+                      return (
+                        <div
+                          id={`msg-${msg.id}`}
+                          key={msg.id}
+                          className={`flex items-start gap-2 group ${isWorker ? "flex-row-reverse" : "flex-row"}`}
+                        >
+                          {/* SELECTION CHECKBOX IN SELECTION MODE */}
+                          {isChatSelectionMode && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSelectMsg(msg.id)}
+                              className="mt-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-amber-600 focus:outline-none shrink-0"
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-5 h-5 fill-amber-500 text-white" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 hover:text-amber-500" />
+                              )}
+                            </button>
+                          )}
+
+                          {/* MESSAGE BUBBLE CONTAINER */}
+                          <div
+                            className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 relative shadow-2xs transition-all ${
+                              isSelected ? "ring-2 ring-amber-500 ring-offset-1" : ""
+                            } ${
+                              isWorker
+                                ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-br-none"
+                                : "bg-white border border-amber-200/80 text-gray-900 rounded-bl-none"
+                            }`}
+                          >
+                            {/* PINNED INDICATOR BADGE */}
+                            {isPinned && (
+                              <div className={`flex items-center gap-1 text-[10px] font-bold mb-1 ${isWorker ? "text-amber-100" : "text-amber-700"}`}>
+                                <Pin className="w-3 h-3 fill-current" />
+                                <span>Disematkan</span>
+                              </div>
+                            )}
+
+                            {/* SENDER NAME */}
+                            <div className={`flex items-center justify-between gap-2 text-[10px] font-bold mb-0.5 ${isWorker ? "text-amber-100" : "text-amber-800"}`}>
+                              <span>{isWorker ? profile.name || "Saya" : "Admin CS"}</span>
+                            </div>
+
+                            {/* MESSAGE TEXT OR SOFT-DELETED PLACEHOLDER */}
+                            {msg.deletedAt ? (
+                              <p className={`italic text-xs font-medium ${isWorker ? "text-amber-200" : "text-gray-400"}`}>
+                                Pesan telah dihapus
+                              </p>
+                            ) : (
+                              <p className="whitespace-pre-wrap leading-relaxed break-words font-sans">{msg.text}</p>
+                            )}
+
+                            {/* FOOTER: TIMESTAMP & DELIVERY STATUS CHECKS */}
+                            <div className="flex items-center justify-end gap-1.5 text-[9px] font-mono mt-1 pt-0.5">
+                              <span className={isWorker ? "text-amber-100/90" : "text-gray-500"}>
+                                {formatDateTime(msg.createdAt)}
+                              </span>
+
+                              {/* STATUS INDICATOR FOR SENDER (WORKER) */}
+                              {isWorker && !msg.deletedAt && (
+                                <span title={msg.readAt ? "Telah dibaca" : msg.deliveredAt ? "Terkirim" : "Terkirim ke server"}>
+                                  {msg.readAt ? (
+                                    <CheckCheck className="w-3.5 h-3.5 text-sky-200 stroke-[2.5]" />
+                                  ) : msg.deliveredAt ? (
+                                    <CheckCheck className="w-3.5 h-3.5 text-amber-200" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5 text-amber-200" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* QUICK ACTION BUTTONS ON HOVER / DESKTOP */}
+                            {!isChatSelectionMode && !msg.deletedAt && (
+                              <div className={`absolute top-1 ${isWorker ? "-left-8" : "-right-8"} opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1`}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePinMsg(msg.id)}
+                                  className="p-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 hover:bg-amber-100 shadow-xs text-xs min-h-[32px] min-w-[32px] flex items-center justify-center"
+                                  title={isPinned ? "Lepas sematan" : "Sematkan pesan"}
+                                >
+                                  <Pin className={`w-3.5 h-3.5 ${isPinned ? "fill-amber-600 text-amber-600" : ""}`} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={workerChatEndRef} />
+                </CardContent>
+
+                {/* CHAT INPUT FORM */}
+                <form onSubmit={handleSendWorkerChat} className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2">
+                  <EmojiPicker onSelectEmoji={(emoji) => setWorkerChatText((prev) => prev + emoji)} disabled={sendingWorkerChat} />
+                  <Input
+                    placeholder="Tulis pesan untuk Admin..."
+                    value={workerChatText}
+                    onChange={(e) => setWorkerChatText(e.target.value)}
+                    disabled={sendingWorkerChat}
+                    className="text-xs sm:text-sm h-10 min-h-[44px] bg-amber-50/30 border-amber-200/80 text-gray-900 focus:border-amber-500 focus:ring-amber-500/20 flex-1 rounded-xl"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={sendingWorkerChat || !workerChatText.trim()}
+                    className="h-10 min-h-[44px] min-w-[44px] px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs sm:text-sm gap-1.5 shadow-xs rounded-xl shrink-0"
+                  >
+                    {sendingWorkerChat ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Kirim</span>
+                  </Button>
+                </form>
+              </Card>
+
+              {/* DELETE CONFIRMATION DIALOG */}
+              <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+                <DialogContent className="sm:max-w-md bg-white border-amber-200 rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      Konfirmasi Hapus Pesan
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-gray-600 pt-1">
+                      Yakin ingin menghapus pesan yang dipilih? ({selectedChatMsgIds.length} pesan dipilih)
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center justify-end gap-2 pt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDeleteConfirmDialog(false)}
+                      disabled={deletingChatMsgs}
+                      className="text-xs rounded-xl h-9 min-h-[44px]"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleConfirmDeleteSelectedMsgs}
+                      disabled={deletingChatMsgs}
+                      className="text-xs rounded-xl h-9 min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold gap-1.5"
+                    >
+                      {deletingChatMsgs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      <span>Hapus Pesan</span>
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 

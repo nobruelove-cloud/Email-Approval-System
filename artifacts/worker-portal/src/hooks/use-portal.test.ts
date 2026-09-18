@@ -9,6 +9,11 @@ import {
   useAdminConversations,
   useConversationMessages,
   sendChatMessage,
+  markMessagesAsDelivered,
+  markMessagesAsRead,
+  togglePinMessage,
+  deleteChatMessages,
+  clearConversationChat,
 } from "./use-portal";
 import {
   getItemCountOfSubmission,
@@ -2851,6 +2856,24 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
         text: "   ",
       })
     ).rejects.toThrow("Pesan tidak boleh kosong.");
+  });
+
+  it("markMessagesAsDelivered gracefully handles empty messageIds or uninitialized db", async () => {
+    await expect(
+      markMessagesAsDelivered("worker_123", "worker", [])
+    ).resolves.not.toThrow();
+  });
+
+  it("markMessagesAsRead gracefully handles empty messageIds or uninitialized db", async () => {
+    await expect(
+      markMessagesAsRead("worker_123", "worker", [])
+    ).resolves.not.toThrow();
+  });
+
+  it("deleteChatMessages gracefully handles empty messageIds", async () => {
+    await expect(
+      deleteChatMessages("worker_123", [], "worker_123")
+    ).resolves.not.toThrow();
   });
 });
 

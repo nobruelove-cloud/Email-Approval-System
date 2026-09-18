@@ -15,6 +15,7 @@ import {
   addDoc,
   deleteDoc,
   runTransaction,
+  writeBatch,
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
@@ -3157,7 +3158,8 @@ export function useWorkerChat(workerUid?: string) {
     const unsub = onSnapshot(
       convRef,
       (snap) => {
-        if (snap.exists()) {
+        const exists = typeof snap?.exists === "function" ? snap.exists() : Boolean(snap?.exists);
+        if (exists) {
           setConversation({ id: snap.id, ...snap.data() } as Conversation);
         } else {
           setConversation(null);
@@ -3196,9 +3198,15 @@ export function useAdminConversations() {
       q,
       (snap) => {
         const list: Conversation[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        } else if (Array.isArray(snap)) {
+          (snap as any[]).forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        }
         setConversations(list);
         setLoading(false);
       },
@@ -3245,9 +3253,15 @@ export function useConversationMessages(conversationId: string | null) {
       q,
       (snap) => {
         const list: ChatMessage[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        } else if (Array.isArray(snap)) {
+          (snap as any[]).forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        }
         setMessages(list);
         setLoading(false);
       },
@@ -3388,4 +3402,123 @@ export async function markConversationAsRead(
     // If document doesn't exist yet, ignore
     console.warn("markConversationAsRead error:", err);
   }
+}
+
+/**
+ * Marks specific message IDs as delivered when received by recipient.
+ */
+export async function markMessagesAsDelivered(
+  conversationId: string,
+  recipientRole: "admin" | "worker",
+  messageIds: string[]
+) {
+  if (!db || !conversationId || messageIds.length === 0) return;
+
+  try {
+    const batch = writeBatch(db);
+    let count = 0;
+    for (const msgId of messageIds) {
+      if (!msgId) continue;
+      const msgRef = doc(db, "conversations", conversationId, "messages", msgId);
+      batch.update(msgRef, {
+        deliveredAt: serverTimestamp(),
+      });
+      count++;
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn("markMessagesAsDelivered error:", err);
+  }
+}
+
+/**
+ * Marks specific message IDs as read when recipient opens conversation.
+ */
+export async function markMessagesAsRead(
+  conversationId: string,
+  readerRole: "admin" | "worker",
+  messageIds: string[]
+) {
+  if (!db || !conversationId) return;
+
+  try {
+    if (messageIds.length > 0) {
+      const batch = writeBatch(db);
+      let count = 0;
+      for (const msgId of messageIds) {
+        if (!msgId) continue;
+        const msgRef = doc(db, "conversations", conversationId, "messages", msgId);
+        batch.update(msgRef, {
+          readAt: serverTimestamp(),
+          deliveredAt: serverTimestamp(),
+        });
+        count++;
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+    await markConversationAsRead(conversationId, readerRole);
+  } catch (err) {
+    console.warn("markMessagesAsRead error:", err);
+  }
+}
+
+/**
+ * Toggles or updates pinned message ID for either admin or worker on conversation metadata doc.
+ */
+export async function togglePinMessage(
+  conversationId: string,
+  messageId: string | null,
+  role: "admin" | "worker"
+) {
+  if (!db || !conversationId) return;
+  const convRef = doc(db, "conversations", conversationId);
+
+  const fieldToUpdate = role === "admin" ? "adminPinnedMessageId" : "workerPinnedMessageId";
+  await updateDoc(convRef, {
+    [fieldToUpdate]: messageId,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Soft deletes messages in a conversation subcollection by setting deletedAt and deletedBy.
+ */
+export async function deleteChatMessages(
+  conversationId: string,
+  messageIds: string[],
+  deletedByUid: string
+) {
+  if (!db || !conversationId || messageIds.length === 0) return;
+
+  const batch = writeBatch(db);
+  for (const msgId of messageIds) {
+    if (!msgId) continue;
+    const msgRef = doc(db, "conversations", conversationId, "messages", msgId);
+    batch.update(msgRef, {
+      deletedAt: serverTimestamp(),
+      deletedBy: deletedByUid,
+    });
+  }
+  await batch.commit();
+}
+
+/**
+ * Clears conversation chat history view for either admin or worker by updating cleared timestamp.
+ */
+export async function clearConversationChat(
+  conversationId: string,
+  role: "admin" | "worker"
+) {
+  if (!db || !conversationId) return;
+  const convRef = doc(db, "conversations", conversationId);
+  const fieldToUpdate = role === "admin" ? "adminClearedAt" : "workerClearedAt";
+
+  await updateDoc(convRef, {
+    [fieldToUpdate]: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
