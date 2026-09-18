@@ -1428,6 +1428,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     });
 
     // Sync workers whose balances were left at Rp 0 despite having approved submissions
+    // Strictly preserve Firestore transaction balances as the source of truth.
     workerNetPayouts.forEach((expectedBalance, workerUid) => {
       if (expectedBalance <= 0) return;
 
@@ -1435,7 +1436,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
       if (!workerUser) return;
 
       const currentBal = Number(workerUser.balance ?? workerUser.saldoUtama ?? 0) || 0;
-      if (currentBal < expectedBalance) {
+      // Only attempt sync if current balance is strictly 0 and expectedBalance > 0
+      if (currentBal === 0 && expectedBalance > 0) {
+        // Do not overwrite if worker has any processed or completed withdrawals that validly reduced balance to 0
+        const hasProcessedWd = withdrawals.data.some((w) => {
+          const st = (w.status || "").toLowerCase();
+          return (
+            (w.workerId === workerUid || (w as any).workerEmail === workerUser.email) &&
+            (st === "success" || st === "approved" || st === "processing" || st === "withdrawn")
+          );
+        });
+
+        if (hasProcessedWd) {
+          console.log(`[Auto-Sync Balance] Skipping auto-sync for ${workerUser.name} (${workerUid}) because worker has processed withdrawals.`);
+          return;
+        }
+
         console.log(`[Auto-Sync Balance] Updating worker ${workerUser.name} (${workerUid}) balance from Rp ${currentBal} to Rp ${expectedBalance}`);
         updatePortalUser(workerUid, {
           balance: expectedBalance,

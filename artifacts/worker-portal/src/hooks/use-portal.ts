@@ -1366,10 +1366,9 @@ export async function updateEmailStockStatus(
 }
 
 /**
- * Requesting a withdrawal deducts the balance immediately (inside the same
- * transaction as the balance check), so a worker can never request more
- * than they have, and can never fire two requests that both pass the
- * balance check against the same starting balance.
+ * Requesting a withdrawal validates available balance taking into account existing
+ * pending withdrawals, and creates a pending withdrawal record without deducting upfront.
+ * Balance is deducted atomically upon admin approval in reviewWithdrawal.
  */
 export async function createWithdrawal(payload: {
   workerId: string;
@@ -1386,6 +1385,20 @@ export async function createWithdrawal(payload: {
   if (!trimmedHolderName) {
     throw new Error("Nama pemilik rekening/wallet wajib diisi.");
   }
+  if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
+
+  // Query pending withdrawals for this worker to calculate reserved pending balance
+  const pendingWdQuery = query(
+    collection(firestore, "withdrawals"),
+    where("workerId", "==", payload.workerId),
+    where("status", "==", "pending")
+  );
+  const pendingSnaps = await getDocs(pendingWdQuery);
+  let totalPending = 0;
+  pendingSnaps.forEach((docSnap) => {
+    const data = docSnap.data();
+    totalPending += Number(data.amount) || 0;
+  });
 
   await runTransactionWithDiagnostic(
     firestore,
@@ -1394,11 +1407,18 @@ export async function createWithdrawal(payload: {
       const userSnap = await tx.get(userRef);
       if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
       const user = userSnap.data() as PortalUser;
-      const balance = user.balance ?? 0;
-      if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
-      if (balance < payload.amount) throw new Error("Saldo tidak mencukupi.");
+      const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+      const availableBalance = currentBalance - totalPending;
 
-      tx.update(userRef, { balance: balance - payload.amount });
+      if (availableBalance < payload.amount) {
+        if (totalPending > 0) {
+          throw new Error(
+            `Saldo tidak mencukupi. Saldo tersedia: ${formatMoney(availableBalance)} (Terdapat penarikan pending: ${formatMoney(totalPending)}).`
+          );
+        }
+        throw new Error("Saldo tidak mencukupi.");
+      }
+
       const withdrawalRef = doc(collection(firestore, "withdrawals"));
       const docData: Record<string, unknown> = {
         workerId: payload.workerId,
@@ -1443,9 +1463,9 @@ export async function createWithdrawal(payload: {
 }
 
 /**
- * Admin resolves a withdrawal. Rejecting refunds the balance atomically;
- * approving to "processing"/"success" just updates status (the balance was
- * already deducted when the request was made).
+ * Admin resolves a withdrawal atomically inside a Firestore transaction.
+ * Approving deducts balance once (updating balance and saldoUtama), verifying pending status
+ * and sufficient available balance. Double processing is prevented.
  */
 export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalStatus, note: string) {
   if (!db) throw new Error("Firebase is not configured.");
@@ -1457,19 +1477,50 @@ export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalS
       const withdrawalSnap = await tx.get(withdrawalRef);
       if (!withdrawalSnap.exists()) throw new Error("Penarikan tidak ditemukan.");
       const withdrawal = withdrawalSnap.data() as Withdrawal;
-      if (withdrawal.status !== "pending" && withdrawal.status !== "processing") {
+
+      const currentStatus = withdrawal.status;
+
+      if (currentStatus === "success" || currentStatus === "rejected") {
         throw new Error("Penarikan ini sudah selesai diproses.");
       }
 
-      const isRejected = status === "rejected";
-      const userRef = isRejected ? doc(firestore, "users", withdrawal.workerId) : null;
-      const userSnap = userRef ? await tx.get(userRef) : null;
+      const userRef = doc(firestore, "users", withdrawal.workerId);
+      const userSnap = await tx.get(userRef);
 
-      tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
-
-      if (isRejected && userRef && userSnap && userSnap.exists()) {
-        const current = (userSnap.data() as PortalUser).balance ?? 0;
-        tx.update(userRef, { balance: current + withdrawal.amount });
+      if (currentStatus === "pending") {
+        if (status === "success" || status === "processing") {
+          if (!userSnap || !userSnap.exists()) {
+            throw new Error("Profil pekerja tidak ditemukan.");
+          }
+          const user = userSnap.data() as PortalUser;
+          const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+          if (currentBalance < withdrawal.amount) {
+            throw new Error("Saldo pekerja tidak mencukupi.");
+          }
+          const newBalance = currentBalance - withdrawal.amount;
+          tx.update(userRef, {
+            balance: newBalance,
+            saldoUtama: newBalance,
+          });
+          tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
+        } else if (status === "rejected") {
+          tx.update(withdrawalRef, { status: "rejected", note, processedAt: serverTimestamp() });
+        }
+      } else if (currentStatus === "processing") {
+        if (status === "success") {
+          tx.update(withdrawalRef, { status: "success", note, processedAt: serverTimestamp() });
+        } else if (status === "rejected") {
+          if (userSnap && userSnap.exists()) {
+            const user = userSnap.data() as PortalUser;
+            const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+            const newBalance = currentBalance + withdrawal.amount;
+            tx.update(userRef, {
+              balance: newBalance,
+              saldoUtama: newBalance,
+            });
+          }
+          tx.update(withdrawalRef, { status: "rejected", note, processedAt: serverTimestamp() });
+        }
       }
     },
     "reviewWithdrawal",

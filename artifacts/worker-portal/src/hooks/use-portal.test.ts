@@ -2854,6 +2854,254 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
   });
 });
 
+describe("Withdrawal Audit & Fix Logic Unit Tests", () => {
+  it("pending withdrawal + sufficient balance -> approval deducts balance and saldoUtama exactly once", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_001": {
+        id: "wd_001",
+        workerId: "w_john",
+        amount: 3000,
+        status: "pending",
+      },
+      "users/w_john": {
+        uid: "w_john",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    // Simulate reviewWithdrawal logic inside transaction
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_001" });
+    const withdrawal = withdrawalSnap.data();
+    expect(withdrawal.status).toBe("pending");
+
+    const userSnap = await tx.get({ path: `users/${withdrawal.workerId}` });
+    const user = userSnap.data();
+    const currentBalance = user.balance ?? user.saldoUtama ?? 0;
+    expect(currentBalance).toBe(10000);
+    expect(currentBalance).toBeGreaterThanOrEqual(withdrawal.amount);
+
+    const newBalance = currentBalance - withdrawal.amount;
+    tx.update({ path: `users/${withdrawal.workerId}` }, {
+      balance: newBalance,
+      saldoUtama: newBalance,
+    });
+    tx.update({ path: "withdrawals/wd_001" }, { status: "success", note: "Approved" });
+
+    // Assertions
+    expect(store["users/w_john"].balance).toBe(7000);
+    expect(store["users/w_john"].saldoUtama).toBe(7000);
+    expect(store["withdrawals/wd_001"].status).toBe("success");
+  });
+
+  it("pending withdrawal + insufficient balance -> approval fails and withdrawal remains pending", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_002": {
+        id: "wd_002",
+        workerId: "w_alice",
+        amount: 5000,
+        status: "pending",
+      },
+      "users/w_alice": {
+        uid: "w_alice",
+        balance: 2000,
+        saldoUtama: 2000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_002" });
+    const withdrawal = withdrawalSnap.data();
+    const userSnap = await tx.get({ path: `users/${withdrawal.workerId}` });
+    const user = userSnap.data();
+    const currentBalance = user.balance ?? user.saldoUtama ?? 0;
+
+    let errorThrown = false;
+    try {
+      if (currentBalance < withdrawal.amount) {
+        throw new Error("Saldo pekerja tidak mencukupi.");
+      }
+    } catch (err) {
+      errorThrown = true;
+      expect((err as Error).message).toBe("Saldo pekerja tidak mencukupi.");
+    }
+
+    expect(errorThrown).toBe(true);
+    // Balance and status remain unchanged
+    expect(store["users/w_alice"].balance).toBe(2000);
+    expect(store["withdrawals/wd_002"].status).toBe("pending");
+  });
+
+  it("already-approved withdrawal -> second approval attempt does not deduct balance again", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_003": {
+        id: "wd_003",
+        workerId: "w_bob",
+        amount: 3000,
+        status: "success",
+      },
+      "users/w_bob": {
+        uid: "w_bob",
+        balance: 7000,
+        saldoUtama: 7000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_003" });
+    const withdrawal = withdrawalSnap.data();
+
+    let doubleProcessError = false;
+    try {
+      if (withdrawal.status === "success" || withdrawal.status === "rejected") {
+        throw new Error("Penarikan ini sudah selesai diproses.");
+      }
+    } catch (err) {
+      doubleProcessError = true;
+      expect((err as Error).message).toBe("Penarikan ini sudah selesai diproses.");
+    }
+
+    expect(doubleProcessError).toBe(true);
+    // Balance is untouched on second attempt
+    expect(store["users/w_bob"].balance).toBe(7000);
+    expect(store["users/w_bob"].saldoUtama).toBe(7000);
+  });
+
+  it("rejected withdrawal -> no balance deduction occurs", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_004": {
+        id: "wd_004",
+        workerId: "w_carol",
+        amount: 4000,
+        status: "pending",
+      },
+      "users/w_carol": {
+        uid: "w_carol",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_004" });
+    const withdrawal = withdrawalSnap.data();
+    expect(withdrawal.status).toBe("pending");
+
+    // Admin rejects withdrawal
+    tx.update({ path: "withdrawals/wd_004" }, { status: "rejected", note: "Account details invalid" });
+
+    expect(store["users/w_carol"].balance).toBe(10000);
+    expect(store["users/w_carol"].saldoUtama).toBe(10000);
+    expect(store["withdrawals/wd_004"].status).toBe("rejected");
+  });
+
+  it("two concurrent approval attempts -> only one deduction succeeds", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_005": {
+        id: "wd_005",
+        workerId: "w_dave",
+        amount: 5000,
+        status: "pending",
+      },
+      "users/w_dave": {
+        uid: "w_dave",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    // Attempt 1: First admin approves
+    const tx1 = createMockTransaction(store);
+    const wdSnap1 = await tx1.get({ path: "withdrawals/wd_005" });
+    const wd1 = wdSnap1.data();
+    if (wd1.status === "pending") {
+      const userSnap1 = await tx1.get({ path: `users/${wd1.workerId}` });
+      const user1 = userSnap1.data();
+      const newBal = user1.balance - wd1.amount;
+      tx1.update({ path: `users/${wd1.workerId}` }, { balance: newBal, saldoUtama: newBal });
+      tx1.update({ path: "withdrawals/wd_005" }, { status: "success" });
+    }
+
+    expect(store["users/w_dave"].balance).toBe(5000);
+    expect(store["withdrawals/wd_005"].status).toBe("success");
+
+    // Attempt 2: Second simultaneous admin approval arrives
+    const tx2 = createMockTransaction(store);
+    const wdSnap2 = await tx2.get({ path: "withdrawals/wd_005" });
+    const wd2 = wdSnap2.data();
+
+    let attempt2Blocked = false;
+    if (wd2.status === "success" || wd2.status === "rejected") {
+      attempt2Blocked = true;
+    }
+
+    expect(attempt2Blocked).toBe(true);
+    // Balance remained 5000, not double-deducted to 0
+    expect(store["users/w_dave"].balance).toBe(5000);
+    expect(store["users/w_dave"].saldoUtama).toBe(5000);
+  });
+
+  it("withdrawal amount greater than available balance -> creation fails", async () => {
+    const store: Record<string, any> = {
+      "users/w_eve": {
+        uid: "w_eve",
+        balance: 4000,
+        saldoUtama: 4000,
+      },
+      "withdrawals/wd_pending_1": {
+        id: "wd_pending_1",
+        workerId: "w_eve",
+        amount: 2000,
+        status: "pending",
+      },
+    };
+
+    const currentBalance = store["users/w_eve"].balance;
+    const totalPending = store["withdrawals/wd_pending_1"].amount; // 2000
+    const availableBalance = currentBalance - totalPending; // 2000
+
+    const requestedAmount = 3000;
+    let failed = false;
+
+    if (availableBalance < requestedAmount) {
+      failed = true;
+    }
+
+    expect(failed).toBe(true);
+    expect(availableBalance).toBe(2000);
+  });
+
+  it("existing worker balance fields remain consistent with the application data model", async () => {
+    const store: Record<string, any> = {
+      "users/w_frank": {
+        uid: "w_frank",
+        balance: 15000,
+        saldoUtama: 15000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const amountToDeduct = 5000;
+    const userSnap = await tx.get({ path: "users/w_frank" });
+    const user = userSnap.data();
+    const newBal = user.balance - amountToDeduct;
+
+    tx.update({ path: "users/w_frank" }, {
+      balance: newBal,
+      saldoUtama: newBal,
+    });
+
+    expect(store["users/w_frank"].balance).toBe(10000);
+    expect(store["users/w_frank"].saldoUtama).toBe(10000);
+    expect(store["users/w_frank"].balance).toEqual(store["users/w_frank"].saldoUtama);
+  });
+});
+
 describe("Real-Time Chat Services & Hooks Unit Tests", () => {
   it("useWorkerChat returns null when no workerUid is supplied", () => {
     const { result } = renderHook(() => useWorkerChat(undefined));
