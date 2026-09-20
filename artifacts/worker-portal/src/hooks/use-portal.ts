@@ -15,6 +15,7 @@ import {
   addDoc,
   deleteDoc,
   runTransaction,
+  writeBatch,
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
@@ -3632,6 +3633,35 @@ export async function markConversationAsRead(
       [fieldToReset]: 0,
       updatedAt: serverTimestamp(),
     });
+
+    // Mark unread messages sent by opposite role in subcollection as read
+    const targetSenderRole = readerRole === "admin" ? "worker" : "admin";
+    const messagesColRef = collection(db, "conversations", conversationId, "messages");
+    const unreadMsgsQuery = query(
+      messagesColRef,
+      where("senderRole", "==", targetSenderRole)
+    );
+
+    const snap = await getDocsWithDiagnostic(
+      unreadMsgsQuery,
+      [where("senderRole", "==", targetSenderRole)],
+      "markConversationAsRead",
+      `conversations/${conversationId}/messages`
+    );
+    if (snap && !snap.empty) {
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.forEach((msgDoc) => {
+        const data = msgDoc.data() as Record<string, any>;
+        if (!data.readAt) {
+          batch.update(msgDoc.ref, { readAt: serverTimestamp() });
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
   } catch (err) {
     // If document doesn't exist yet, ignore
     console.warn("markConversationAsRead error:", err);
