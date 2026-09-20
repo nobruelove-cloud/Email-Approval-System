@@ -128,60 +128,60 @@ export function Leaderboard({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* HEADER CARD */}
-      <Card className="bg-gradient-to-br from-blue-950 via-orange-950 to-blue-900 text-white border-blue-800/80 shadow-lg overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <CardContent className="p-6 sm:p-8 space-y-6 relative z-10">
+      <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-blue-500/30 shadow-md rounded-2xl overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <CardContent className="p-5 sm:p-6 space-y-4 relative z-10">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5 max-w-xl">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider">
-                  <Trophy className="w-3.5 h-3.5 text-blue-300" />
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-white text-xs font-bold uppercase tracking-wider">
+                  <Trophy className="w-3.5 h-3.5 text-blue-200" />
                   Klasemen Global Real-Time
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowRulesModal(true)}
-                  className="bg-white/10 hover:bg-white/20 text-blue-100 border-blue-400/30 text-[11px] font-bold h-7 px-2.5 rounded-full gap-1"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-[11px] font-bold h-7 px-2.5 rounded-full gap-1"
                 >
-                  <HelpCircle className="w-3.5 h-3.5 text-blue-300" />
+                  <HelpCircle className="w-3.5 h-3.5 text-blue-200" />
                   Aturan & S&K
                 </Button>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
                 Pahlawan Email ACC Terbanyak
               </h2>
-              <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed">
+              <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
                 Peringkat global tersinkronisasi real-time murni berdasarkan email ACC. Dapatkan bonus tunai mingguan dengan memenuhi target minimal ACC!
               </p>
             </div>
 
             {/* COUNTDOWN TIMER BADGE */}
-            <div className="shrink-0 bg-[#1e293b] px-4 py-3 rounded-2xl border border-blue-700/80 backdrop-blur-md space-y-1 text-center sm:text-right">
-              <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center justify-center sm:justify-end gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+            <div className="shrink-0 bg-white/15 px-4 py-3 rounded-2xl border border-white/20 backdrop-blur-md space-y-1 text-center sm:text-right">
+              <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wider flex items-center justify-center sm:justify-end gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
                 Sisa Waktu Kompetisi
               </span>
-              <p className="font-mono text-sm sm:text-base font-black text-[#FFB74D] tracking-tight">
+              <p className="font-mono text-sm sm:text-base font-black text-white tracking-tight">
                 {weeklyCountdown.days}h {weeklyCountdown.hours}j {weeklyCountdown.minutes}m {weeklyCountdown.seconds}d
               </p>
             </div>
           </div>
 
           {/* ACTIVE TIMEFRAME & MY POSITION BANNER */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-blue-800/80 text-xs">
-            <div className="flex items-center gap-2 text-blue-200 font-semibold">
-              <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/20 text-xs">
+            <div className="flex items-center gap-2 text-blue-100 font-semibold">
+              <Sparkles className="w-4 h-4 text-blue-200 shrink-0" />
               <span>Periode Aktif: <strong className="text-white">{timeFrame.label}</strong></span>
             </div>
 
             {currentUserId ? (
-              <div className="inline-flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-xl border border-blue-400/30 text-blue-100 font-bold">
-                <Crown className="w-4 h-4 text-blue-300" />
+              <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-xl border border-white/20 text-white font-bold">
+                <Crown className="w-4 h-4 text-blue-200" />
                 <span>Posisi Anda: <strong className="text-white">{userProgressInfo.positionText}</strong> ({userProgressInfo.acc} Email ACC)</span>
               </div>
             ) : (
-              <span className="text-blue-300/80 italic">Setor email ACC sekarang untuk masuk ke papan klasemen global!</span>
+              <span className="text-blue-200 italic">Setor email ACC sekarang untuk masuk ke papan klasemen global!</span>
             )}
           </div>
         </CardContent>
@@ -189,7 +189,7 @@ export function Leaderboard({
 
       {/* STICKY "PERINGKAT ANDA" CARD */}
       {currentUserId && (
-        <Card className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 border-blue-500/40 shadow-md text-white sticky top-20 z-10 backdrop-blur-xl">
+        <Card className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 border-blue-500/30 shadow-md text-white rounded-2xl sticky top-20 z-10 backdrop-blur-xl">
           <CardContent className="p-4 sm:p-5 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">

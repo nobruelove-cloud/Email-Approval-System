@@ -649,7 +649,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#f0f4f9] flex flex-col md:flex-row">
       {/* REUSABLE SIDEBAR NAVIGATION */}
       <SidebarNavigation
         activeView={activeView}
@@ -746,19 +746,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 1. HOME VIEW ==================== */}
           {activeView === "home" && (
             <div className="space-y-4">
-              {/* SALDO UTAMA HIGHLIGHT CARD */}
-              <Card className="bg-gradient-to-r from-blue-500 via-orange-500 to-blue-600 text-white border-blue-400/50 shadow-md overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              {/* 2. GREETING SECTION */}
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    Halo, {displayName} 👋
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">Selamat datang kembali di Gmail Job ID</p>
+                </div>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-bold px-2.5 py-1 rounded-xl shadow-2xs">
+                  Rate {formatMoney(currentTierConfig.pricePerItem)} / ACC
+                </Badge>
+              </div>
+
+              {/* 3. CLEAN COMPACT BALANCE CARD */}
+              <Card className="bg-gradient-to-r from-blue-600 via-blue-600 to-blue-700 text-white border-blue-500/30 shadow-md rounded-2xl overflow-hidden relative">
+                <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                     <div className="space-y-0.5">
-                      <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Saldo Utamaku
-                      </p>
-                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
+                      <div className="flex items-center gap-1.5 text-blue-100 text-[11px] font-semibold">
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" />
+                        <span>Saldo Utama</span>
+                      </div>
+                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                         {formatMoney(profile.balance)}
                       </p>
-                      <p className="text-[11px] text-blue-100/90 font-medium">
+                      <p className="text-[11px] text-blue-100/90 font-medium pt-0.5">
                         Total Setoran ACC: <strong className="text-white font-bold">{profile.accCount ?? 0} Email</strong>
                       </p>
                     </div>
@@ -767,7 +781,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       <Button
                         type="button"
                         onClick={() => setActiveView("withdraw")}
-                        className="flex-1 sm:flex-initial bg-white text-blue-900 hover:bg-blue-50 font-extrabold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5 transition-transform active:scale-95"
+                        className="flex-1 sm:flex-initial bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 transition-all active:scale-95"
                       >
                         <Wallet className="w-3.5 h-3.5 text-blue-600" />
                         Tarik Saldo
@@ -775,9 +789,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       <Button
                         type="button"
                         onClick={() => setActiveView("submit")}
-                        className="flex-1 sm:flex-initial bg-blue-950/40 hover:bg-blue-950/60 backdrop-blur-md text-blue-100 font-extrabold text-xs h-9 px-3.5 rounded-xl border border-blue-300/30 gap-1.5 transition-transform active:scale-95"
+                        className="flex-1 sm:flex-initial bg-blue-800/80 hover:bg-blue-800 text-white font-bold text-xs h-9 px-4 rounded-xl border border-blue-400/30 gap-1.5 transition-all active:scale-95"
                       >
-                        <PlusCircle className="w-3.5 h-3.5 text-blue-300" />
+                        <PlusCircle className="w-3.5 h-3.5 text-blue-200" />
                         Setor Email
                       </Button>
                     </div>
@@ -788,11 +802,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               {/* COMPACT LAYANAN CEPAT GRID (8 ITEMS / 4 COLUMNS) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                     Layanan Cepat
                   </h3>
-                  <span className="text-[10px] text-gray-500 font-medium">Pilih Menu</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Menu Utama</span>
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
@@ -802,72 +816,72 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       label: "Job Gmail",
                       subtext: "Setor Email",
                       icon: <Send className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      badgeBg: "bg-blue-50 border-blue-100",
                     },
                     {
                       id: "checker" as DashboardView,
-                      label: "Status ACC",
+                      label: "Screening Email",
                       subtext: "Checker",
-                      icon: <SearchCheck className="w-4 h-4 text-orange-600" />,
-                      badgeBg: "bg-orange-50 border-orange-200/80",
+                      icon: <SearchCheck className="w-4 h-4 text-indigo-600" />,
+                      badgeBg: "bg-indigo-50 border-indigo-100",
                     },
                     {
                       id: "leaderboard" as DashboardView,
                       label: "Klasemen",
                       subtext: "Top Worker",
-                      icon: <Trophy className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <Trophy className="w-4 h-4 text-amber-600" />,
+                      badgeBg: "bg-amber-50 border-amber-100",
                     },
                     {
                       id: "referral" as DashboardView,
                       label: "Referral",
                       subtext: "Pasif Income",
-                      icon: <Users className="w-4 h-4 text-blue-700" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <Users className="w-4 h-4 text-purple-600" />,
+                      badgeBg: "bg-purple-50 border-purple-100",
                     },
                     {
                       id: "withdraw" as DashboardView,
                       label: "Tarik Saldo",
                       subtext: "Pencairan",
                       icon: <Wallet className="w-4 h-4 text-emerald-600" />,
-                      badgeBg: "bg-emerald-50 border-emerald-200/80",
+                      badgeBg: "bg-emerald-50 border-emerald-100",
                     },
                     {
                       id: "history" as DashboardView,
                       label: "Riwayat Job",
                       subtext: "Log Setoran",
-                      icon: <History className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <History className="w-4 h-4 text-sky-600" />,
+                      badgeBg: "bg-sky-50 border-sky-100",
                     },
                     {
                       id: "cs" as DashboardView,
                       label: "Bantuan CS",
                       subtext: "Pusat Bantuan",
-                      icon: <HelpCircle className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <HelpCircle className="w-4 h-4 text-teal-600" />,
+                      badgeBg: "bg-teal-50 border-teal-100",
                     },
                     {
                       id: "announcements" as DashboardView,
                       label: "Info Resmi",
                       subtext: "Pengumuman",
                       icon: <Megaphone className="w-4 h-4 text-rose-600" />,
-                      badgeBg: "bg-rose-50 border-rose-200/80",
+                      badgeBg: "bg-rose-50 border-rose-100",
                     },
                   ].map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => setActiveView(item.id)}
-                      className="p-2 sm:p-2.5 bg-white border border-blue-100/80 rounded-2xl shadow-2xs hover:border-blue-300 hover:bg-blue-50/40 text-center flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 group cursor-pointer"
+                      className="p-2 sm:p-2.5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs hover:border-blue-300 hover:bg-blue-50/30 text-center flex flex-col items-center justify-center space-y-1.5 transition-all active:scale-95 group cursor-pointer"
                     >
                       <div className={`p-2 rounded-xl border ${item.badgeBg} group-hover:scale-105 transition-transform shadow-2xs`}>
                         {item.icon}
                       </div>
                       <div className="w-full">
-                        <p className="text-[11px] font-bold text-gray-800 leading-tight truncate w-full group-hover:text-blue-900">
+                        <p className="text-[11px] font-bold text-slate-800 leading-tight truncate w-full group-hover:text-blue-600">
                           {item.label}
                         </p>
-                        <p className="text-[9px] text-gray-400 font-medium truncate w-full hidden sm:block">
+                        <p className="text-[9px] text-slate-400 font-medium truncate w-full hidden sm:block">
                           {item.subtext}
                         </p>
                       </div>
@@ -877,25 +891,25 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </div>
 
               {/* JAM OPERASIONAL COMPACT CARD */}
-              <Card className="bg-gradient-to-br from-blue-50/90 via-orange-50/40 to-blue-100/30 border-blue-200/80 shadow-xs relative overflow-hidden">
+              <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
                 <CardHeader className="p-3.5 pb-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                    <CardTitle className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-600" />
                       <span>Jam Operasional Layanan</span>
                     </CardTitle>
                     <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-2xs border ${
                       operatingStatus.isOpen
-                        ? "bg-emerald-500 text-white border-emerald-400"
-                        : "bg-rose-500 text-white border-rose-400"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${operatingStatus.isOpen ? "bg-emerald-200" : "bg-rose-200"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${operatingStatus.isOpen ? "bg-emerald-500" : "bg-rose-500"}`} />
                       {operatingStatus.statusText}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-3.5 pt-0">
-                  <p className="text-[11px] text-gray-600">
+                  <p className="text-[11px] text-slate-500">
                     Layanan setoran & verifikasi diproses sesuai jadwal operasional WIB (Asia/Jakarta).
                   </p>
                 </CardContent>
@@ -1071,48 +1085,48 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* ==================== 5. REFERRAL VIEW ==================== */}
           {activeView === "referral" && (
-            <div className="space-y-5">
-              {/* BANNER REFERRAL */}
-              <Card className="bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[#1e1b4b] text-white border-blue-900/80 shadow-lg overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="space-y-4">
+              {/* BANNER REFERRAL - CLEAN BLUE ACCENT */}
+              <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-blue-500/30 shadow-md rounded-2xl overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
                 <CardContent className="p-5 sm:p-6 space-y-2 relative z-10">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] font-bold uppercase tracking-wider">
-                    <Sparkles className="w-3 h-3 text-blue-300" />
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3 text-blue-200" />
                     Program Pasif Income Kerja
                   </div>
                   <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
                     Pasif Income Tanpa Batas
                   </h2>
-                  <p className="text-xs text-blue-100/90 leading-relaxed max-w-2xl">
+                  <p className="text-xs text-blue-100 leading-relaxed max-w-2xl">
                     Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC) oleh admin, komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda!
                   </p>
                 </CardContent>
               </Card>
 
-              {/* WIDGET SIMULASI PASIF INCOME */}
-              <Card className="bg-gradient-to-br from-[#0f172a] via-[#321D00] to-[#0f172a] text-[#e2e8f0] border-blue-900/60 shadow-lg overflow-hidden relative">
-                <CardHeader className="p-3 sm:p-4 pb-2 border-b border-blue-900/50">
+              {/* WIDGET SIMULASI PASIF INCOME - CLEAN LIGHT THEME */}
+              <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
+                <CardHeader className="p-3.5 sm:p-4 pb-2 border-b border-slate-100">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle className="text-xs sm:text-sm font-black text-[#FFB74D] flex items-center gap-1.5">
-                      <div className="p-1 rounded-md bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
+                    <CardTitle className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <div className="p-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
                         <Coins className="w-3.5 h-3.5" />
                       </div>
                       Kalkulator Simulasi Pasif Income
                     </CardTitle>
-                    <Badge variant="outline" className="bg-blue-500/10 text-[#FFB74D] border-blue-500/30 font-bold text-[10px] px-2 py-0.5">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px] px-2 py-0.5">
                       Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
                     </Badge>
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-3 sm:p-4 space-y-3">
+                <CardContent className="p-3.5 sm:p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
+                    <div className="space-y-1.5 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
+                        <Label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                           Jumlah Downline
                         </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
+                        <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200/60">
                           {simFriends} Orang
                         </span>
                       </div>
@@ -1122,16 +1136,16 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         max={50}
                         value={simFriends}
                         onChange={(e) => setSimFriends(Number(e.target.value))}
-                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                       />
                     </div>
 
-                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
+                    <div className="space-y-1.5 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
+                        <Label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                           Email ACC / Downline / Hari
                         </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
+                        <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200/60">
                           {simAccPerFriend} Email
                         </span>
                       </div>
@@ -1141,27 +1155,27 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         max={50}
                         value={simAccPerFriend}
                         onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
-                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                       />
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-[#1A0E00] border border-blue-800/50 space-y-2">
-                    <div className="text-[11px] text-blue-200/80 flex items-center justify-between border-b border-blue-900/60 pb-1.5">
+                  <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 space-y-2">
+                    <div className="text-[11px] text-slate-600 flex items-center justify-between border-b border-blue-100 pb-2">
                       <span>Total Volume Email ACC Tim / Hari:</span>
-                      <strong className="text-[#FFB74D] font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
+                      <strong className="text-blue-700 font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 pt-0.5">
-                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Hari</p>
-                        <p className="text-base font-black text-[#FFB74D] tracking-tight">
+                      <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-0.5">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estimasi / Hari</p>
+                        <p className="text-base font-black text-blue-600 tracking-tight">
                           {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
                         </p>
                       </div>
-                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Bulan</p>
-                        <p className="text-base font-black text-[#FFB74D] tracking-tight">
+                      <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-0.5">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estimasi / Bulan</p>
+                        <p className="text-base font-black text-blue-600 tracking-tight">
                           {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
                         </p>
                       </div>
@@ -1172,38 +1186,44 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
               {/* 3 STATS CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
+                <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl">
+                  <CardContent className="p-3.5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL BONUS DIDAPAT</p>
-                      <Wallet className="w-4 h-4 text-[#2563eb]" />
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TOTAL BONUS DIDAPAT</p>
+                      <div className="p-1 rounded-md bg-emerald-50 text-emerald-600">
+                        <Wallet className="w-4 h-4" />
+                      </div>
                     </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
+                    <p className="text-xl font-black text-emerald-600 tracking-tight">
                       {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
+                <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl">
+                  <CardContent className="p-3.5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL DOWNLINE</p>
-                      <Users className="w-4 h-4 text-[#2563eb]" />
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TOTAL DOWNLINE</p>
+                      <div className="p-1 rounded-md bg-purple-50 text-purple-600">
+                        <Users className="w-4 h-4" />
+                      </div>
                     </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
-                      {downlines.data.length || refStats.total} <span className="text-xs font-medium text-blue-900/70">Worker</span>
+                    <p className="text-xl font-black text-purple-600 tracking-tight">
+                      {downlines.data.length || refStats.total} <span className="text-xs font-medium text-slate-500">Worker</span>
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
+                <Card className="bg-white border-slate-200/80 shadow-xs rounded-2xl">
+                  <CardContent className="p-3.5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL EMAIL ACC TIM</p>
-                      <Award className="w-4 h-4 text-[#2563eb]" />
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">TOTAL EMAIL ACC TIM</p>
+                      <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                        <Award className="w-4 h-4" />
+                      </div>
                     </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
-                      {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-blue-900/70">Email</span>
+                    <p className="text-xl font-black text-blue-600 tracking-tight">
+                      {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-slate-500">Email</span>
                     </p>
                   </CardContent>
                 </Card>
@@ -1386,19 +1406,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* ==================== 6. WITHDRAW / TARIK SALDO VIEW ==================== */}
           {activeView === "withdraw" && (
-            <div className="space-y-5">
-              {/* SALDO HIGHLIGHT BANNER */}
-              <Card className="bg-gradient-to-r from-blue-500 via-orange-500 to-blue-600 text-white border-blue-400/50 shadow-md overflow-hidden relative">
+            <div className="space-y-4">
+              {/* SALDO HIGHLIGHT BANNER - CLEAN BLUE */}
+              <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-blue-500/30 shadow-md rounded-2xl overflow-hidden relative">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                     <div className="space-y-0.5">
                       <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Salso Siap Ditarik
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Saldo Siap Ditarik
                       </p>
-                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
+                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                         {formatMoney(profile.balance)}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-blue-100/90 pt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-blue-100/90 pt-0.5 font-medium">
                         <span>Min: <strong className="text-white">{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong></span>
                         <span>•</span>
                         <span>Max: <strong className="text-white">{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong></span>
@@ -1408,7 +1428,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <Button
                       type="button"
                       onClick={() => setActiveView("referral")}
-                      className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold text-xs h-8 px-3 rounded-xl border border-white/30 shadow-2xs gap-1 shrink-0"
+                      className="bg-white/15 hover:bg-white/25 text-white font-bold text-xs h-8 px-3.5 rounded-xl border border-white/20 shadow-2xs gap-1 shrink-0"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-blue-200" />
                       Bonus Referral
@@ -1661,22 +1681,22 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
-                      <div className="space-y-1">
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-800 shadow-2xs flex flex-col justify-between space-y-3">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
+                          <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
                             <TelegramIcon className="w-4 h-4" />
                           </div>
-                          <span className="font-extrabold text-sm text-[#FFB74D]">CS Telegram</span>
+                          <span className="font-bold text-sm text-slate-900">CS Telegram</span>
                         </div>
-                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
+                        <p className="text-xs text-slate-500 leading-relaxed">
                           Layanan cepat penanganan kendala akun, email setoran, dan status payout saldo.
                         </p>
                       </div>
                       {supportConfig.telegramUrl ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9 rounded-xl shadow-2xs"
                         >
                           <a
                             href={supportConfig.telegramUrl}
@@ -1689,28 +1709,28 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </a>
                         </Button>
                       ) : (
-                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-900/80 text-slate-500 border-slate-800">
+                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-50 text-slate-400 border-slate-200">
                           Belum Diatur
                         </Button>
                       )}
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
-                      <div className="space-y-1">
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-800 shadow-2xs flex flex-col justify-between space-y-3">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
+                          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
                             <MessageCircle className="w-4 h-4" />
                           </div>
-                          <span className="font-extrabold text-sm text-[#FFB74D]">Komunitas WhatsApp</span>
+                          <span className="font-bold text-sm text-slate-900">Komunitas WhatsApp</span>
                         </div>
-                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
+                        <p className="text-xs text-slate-500 leading-relaxed">
                           Saluran resmi informasi worker, update jam operasional, dan diskusi komunitas.
                         </p>
                       </div>
                       {supportConfig.communityWaLink ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 rounded-xl shadow-2xs"
                         >
                           <a
                             href={supportConfig.communityWaLink}
@@ -1723,7 +1743,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </a>
                         </Button>
                       ) : (
-                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-900/80 text-slate-500 border-slate-800">
+                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-50 text-slate-400 border-slate-200">
                           Belum Diatur
                         </Button>
                       )}
@@ -2032,20 +2052,20 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </div>
           )}
 
-          {/* FIXED BOTTOM NAVIGATION BAR FOR MOBILE QUICK ACCESS */}
-          <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-200 shadow-2xl px-2 py-1.5 flex items-center justify-around">
+          {/* FIXED BOTTOM NAVIGATION BAR FOR MOBILE QUICK ACCESS - LIGHT NATIVE APP THEME */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/80 text-slate-600 shadow-lg px-2 py-1.5 flex items-center justify-around">
             {/* 1. HOME */}
             <button
               type="button"
               onClick={() => setActiveView("home")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "home"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold scale-105"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
               {activeView === "home" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-blue-600 rounded-full shadow-xs" />
               )}
               <Home className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">Home</span>
@@ -2057,11 +2077,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("submit")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "submit"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold scale-105"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <div className="p-1 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-slate-950 shadow-md shadow-blue-500/20 mb-0.5">
+              <div className="p-1 rounded-full bg-blue-600 text-white shadow-xs mb-0.5">
                 <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               </div>
               <span className="text-[10px] tracking-tight font-semibold">Setor</span>
@@ -2073,12 +2093,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("withdraw")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "withdraw"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold scale-105"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
               {activeView === "withdraw" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-blue-600 rounded-full shadow-xs" />
               )}
               <Wallet className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">Withdraw</span>
@@ -2090,24 +2110,24 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("cs")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "cs"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold scale-105"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
               {activeView === "cs" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-blue-600 rounded-full shadow-xs" />
               )}
               <HelpCircle className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">CS</span>
             </button>
 
-            {/* 5. SIDEBAR TRIGGER / AKUN */}
+            {/* 5. SIDEBAR TRIGGER / MENU */}
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] text-slate-400 hover:text-slate-200"
+              className="relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] text-slate-400 hover:text-slate-600"
             >
-              <Menu className="w-5 h-5 mb-0.5 text-blue-400" />
+              <Menu className="w-5 h-5 mb-0.5 text-blue-600" />
               <span className="text-[10px] tracking-tight font-semibold">Menu</span>
             </button>
           </nav>
