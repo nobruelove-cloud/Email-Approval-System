@@ -9,6 +9,10 @@ import {
   useAdminConversations,
   useConversationMessages,
   sendChatMessage,
+  uploadChatImage,
+  calculateExpirationTimestamp,
+  deleteMessageForMe,
+  deleteMessageForAll,
 } from "./use-portal";
 import {
   getItemCountOfSubmission,
@@ -3372,5 +3376,69 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
         text: "   ",
       })
     ).rejects.toThrow("Pesan tidak boleh kosong.");
+  });
+
+  describe("PR #212 Chat Enhancements: Media, Timers, and Deletion Unit Tests", () => {
+    it("uploadChatImage rejects file exceeding 5MB max size", async () => {
+      const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "oversized.png", { type: "image/png" });
+      await expect(
+        uploadChatImage("worker_123", "msg_1", largeFile)
+      ).rejects.toThrow('Ukuran file "oversized.png" melebihi batas maksimal 5MB.');
+    });
+
+    it("uploadChatImage rejects unsupported file MIME types", async () => {
+      const pdfFile = new File(["dummy pdf content"], "document.pdf", { type: "application/pdf" });
+      await expect(
+        uploadChatImage("worker_123", "msg_1", pdfFile)
+      ).rejects.toThrow('Format file "document.pdf" tidak didukung.');
+    });
+
+    it("uploadChatImage succeeds for valid image file", async () => {
+      const validImage = new File(["dummy png"], "transfer_proof.png", { type: "image/png" });
+      const att = await uploadChatImage("worker_123", "msg_1", validImage);
+      expect(att.fileName).toBe("transfer_proof.png");
+      expect(att.fileSize).toBe(validImage.size);
+      expect(att.storagePath).toContain("chatMedia/worker_123/msg_1/");
+    });
+
+    it("calculateExpirationTimestamp calculates correct future timestamp for timer options", () => {
+      expect(calculateExpirationTimestamp("off")).toBeNull();
+      expect(calculateExpirationTimestamp(undefined)).toBeNull();
+
+      const now = Date.now();
+      const ts24h = calculateExpirationTimestamp("24h");
+      expect(ts24h).not.toBeNull();
+      expect(ts24h!.getTime() - now).toBeGreaterThanOrEqual(23 * 60 * 60 * 1000);
+
+      const ts7d = calculateExpirationTimestamp("7d");
+      expect(ts7d).not.toBeNull();
+      expect(ts7d!.getTime() - now).toBeGreaterThanOrEqual(6 * 24 * 60 * 60 * 1000);
+
+      const ts30d = calculateExpirationTimestamp("30d");
+      expect(ts30d).not.toBeNull();
+      expect(ts30d!.getTime() - now).toBeGreaterThanOrEqual(29 * 24 * 60 * 60 * 1000);
+    });
+
+    it("sendChatMessage allows empty text when attachments are present (photo / album messages)", async () => {
+      // Should not throw 'Pesan tidak boleh kosong' when attachments exist
+      const mockAttachment = {
+        storagePath: "chatMedia/worker_123/msg_1/proof.png",
+        downloadUrl: "https://example.com/proof.png",
+        fileName: "proof.png",
+        fileSize: 1024,
+      };
+
+      // Mock Firestore
+      await expect(
+        sendChatMessage({
+          conversationId: "worker_123",
+          senderId: "worker_123",
+          senderRole: "worker",
+          text: "",
+          type: "image",
+          attachments: [mockAttachment],
+        })
+      ).rejects.toThrow();
+    });
   });
 });

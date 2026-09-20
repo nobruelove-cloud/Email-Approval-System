@@ -11,6 +11,18 @@ export interface Announcement {
 
 export type ChatSenderRole = "admin" | "worker";
 
+export type ChatMessageType = "text" | "image" | "album";
+export type DisappearingTimer = "off" | "24h" | "7d" | "30d";
+
+export interface ChatAttachment {
+  storagePath: string;
+  downloadUrl: string;
+  fileName: string;
+  fileSize: number;
+  width?: number;
+  height?: number;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
@@ -20,6 +32,13 @@ export interface ChatMessage {
   text: string;
   createdAt: any;
   readAt?: any;
+  type?: ChatMessageType;
+  attachments?: ChatAttachment[];
+  expiresAt?: any;
+  disappearingTimer?: DisappearingTimer;
+  deletedAt?: any;
+  deletedBy?: string;
+  deletedFor?: string[];
 }
 
 export interface Conversation {

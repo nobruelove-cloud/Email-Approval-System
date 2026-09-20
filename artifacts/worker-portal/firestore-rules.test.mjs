@@ -1193,6 +1193,56 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // 18. Worker can update deletedAt and deletedBy on message in own conversation (Hapus untuk semua)
+  const ownMsgRef = doc(collection(regAdminDb, 'conversations', workerUid, 'messages'));
+  await setDoc(ownMsgRef, {
+    senderId: workerUid,
+    senderRole: 'worker',
+    text: 'Pesan yang akan dihapus worker',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+      })
+    );
+    console.log('[PASS] 18. Worker can update deletion metadata (deletedAt, deletedBy) in own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 18. Worker update deletion metadata failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 19. Worker can update deletedFor on message in own conversation (Hapus untuk saya)
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedFor: [workerUid],
+      })
+    );
+    console.log('[PASS] 19. Worker can update deletion metadata (deletedFor) in own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 19. Worker update deletedFor failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 20. Worker cannot modify immutable fields (e.g. text) during deletion update
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+        text: 'Tampered text content during delete',
+      })
+    );
+    console.log('[PASS] 20. Worker cannot modify text content during deletion update.');
+  } catch (err) {
+    console.error('[FAIL] 20. Worker text tampering during delete was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll security tests completed successfully!');
 }

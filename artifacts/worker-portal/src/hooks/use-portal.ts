@@ -19,7 +19,8 @@ import {
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
-import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
+import { auth, createWorkerAuthAccount, db, storage, firebaseConfigured } from "@/lib/firebase";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -3381,7 +3382,13 @@ export function usePortal() {
 // REAL-TIME PRIVATE CHAT SERVICES & HOOKS (Worker ↔ Admin)
 // ---------------------------------------------------------------------------
 
-import { type ChatMessage, type Conversation } from "@/lib/portal-types";
+import {
+  type ChatMessage,
+  type ChatMessageType,
+  type ChatAttachment,
+  type DisappearingTimer,
+  type Conversation,
+} from "@/lib/portal-types";
 
 /**
  * Real-time hook for a Worker to listen to their single private conversation metadata with Admin.
@@ -3549,7 +3556,83 @@ export async function initiateWorkerConversation(worker: {
 }
 
 /**
+ * Uploads an image file for chat media to Firebase Storage under `chatMedia/{workerUid}/{messageId}/{fileName}`.
+ * Validates file size (max 5MB) and mime type (`image/*`).
+ */
+export async function uploadChatImage(
+  workerUid: string,
+  messageId: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<ChatAttachment> {
+  const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+  if (file.size > MAX_SIZE) {
+    throw new Error(`Ukuran file "${file.name}" melebihi batas maksimal 5MB.`);
+  }
+
+  const validMimes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"];
+  if (!file.type || !validMimes.some((m) => file.type.toLowerCase().startsWith(m))) {
+    throw new Error(`Format file "${file.name}" tidak didukung. Harap pilih gambar (JPG, PNG, WEBP, GIF).`);
+  }
+
+  const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const path = `chatMedia/${workerUid}/${messageId}/${Date.now()}_${sanitizedFileName}`;
+
+  if (!storage) {
+    // Demo fallback / unconfigured storage fallback
+    return {
+      storagePath: path,
+      downloadUrl: URL.createObjectURL(file),
+      fileName: file.name,
+      fileSize: file.size,
+    };
+  }
+
+  const stRef = storageRef(storage, path);
+  const uploadTask = uploadBytesResumable(stRef, file, { contentType: file.type });
+
+  return new Promise((resolve, reject) => {
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        if (onProgress) onProgress(progress);
+      },
+      (error) => {
+        reject(new Error(`Gagal mengunggah gambar "${file.name}": ${error.message}`));
+      },
+      async () => {
+        try {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({
+            storagePath: path,
+            downloadUrl,
+            fileName: file.name,
+            fileSize: file.size,
+          });
+        } catch (err) {
+          reject(err);
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Calculates server expiration timestamp based on DisappearingTimer setting.
+ */
+export function calculateExpirationTimestamp(timer?: DisappearingTimer): Date | null {
+  if (!timer || timer === "off") return null;
+  const now = Date.now();
+  if (timer === "24h") return new Date(now + 24 * 60 * 60 * 1000);
+  if (timer === "7d") return new Date(now + 7 * 24 * 60 * 60 * 1000);
+  if (timer === "30d") return new Date(now + 30 * 24 * 60 * 60 * 1000);
+  return null;
+}
+
+/**
  * Sends a chat message in conversations/{conversationId}/messages and updates conversation metadata atomically.
+ * Supports text, single image, album attachments, and expiring timer.
  */
 export async function sendChatMessage(params: {
   conversationId: string; // workerId
@@ -3558,13 +3641,24 @@ export async function sendChatMessage(params: {
   senderName?: string;
   senderEmail?: string;
   text: string;
+  type?: ChatMessageType;
+  attachments?: ChatAttachment[];
+  disappearingTimer?: DisappearingTimer;
 }) {
   if (!db) throw new Error("Firestore DB instance not initialized");
   const trimmed = params.text.trim();
-  if (!trimmed) throw new Error("Pesan tidak boleh kosong.");
+  const hasAttachments = params.attachments && params.attachments.length > 0;
 
+  if (!trimmed && !hasAttachments) {
+    throw new Error("Pesan tidak boleh kosong.");
+  }
+
+  const msgType: ChatMessageType = params.type || (hasAttachments ? (params.attachments!.length > 1 ? "album" : "image") : "text");
   const convRef = doc(db, "conversations", params.conversationId);
   const messagesColRef = collection(db, "conversations", params.conversationId, "messages");
+
+  // Calculate expiration date if disappearing timer active
+  const expiresAtDate = calculateExpirationTimestamp(params.disappearingTimer);
 
   await runTransaction(db, async (tx) => {
     const convSnap = await tx.get(convRef);
@@ -3579,21 +3673,41 @@ export async function sendChatMessage(params: {
 
     const isWorker = params.senderRole === "worker";
 
+    // Summary text for lastMessage in conversation metadata
+    let lastMsgText = trimmed;
+    if (!lastMsgText && hasAttachments) {
+      lastMsgText = msgType === "album" ? `[Foto Album: ${params.attachments!.length} foto]` : `[Foto]`;
+    }
+
     // Create message doc inside subcollection
     const msgRef = doc(messagesColRef);
-    tx.set(msgRef, {
+    const msgPayload: Record<string, any> = {
       senderId: params.senderId,
       senderRole: params.senderRole,
       senderName: params.senderName || (isWorker ? "Worker" : "Admin"),
       senderEmail: params.senderEmail || "",
       text: trimmed,
+      type: msgType,
       createdAt: serverTimestamp(),
-    });
+    };
+
+    if (hasAttachments) {
+      msgPayload.attachments = params.attachments;
+    }
+
+    if (params.disappearingTimer && params.disappearingTimer !== "off") {
+      msgPayload.disappearingTimer = params.disappearingTimer;
+      if (expiresAtDate) {
+        msgPayload.expiresAt = Timestamp.fromDate(expiresAtDate);
+      }
+    }
+
+    tx.set(msgRef, msgPayload);
 
     // Update conversation metadata & unread counters
     const updatePayload: Record<string, any> = {
       workerId: params.conversationId,
-      lastMessage: trimmed,
+      lastMessage: lastMsgText,
       lastMessageAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -3619,6 +3733,42 @@ export async function sendChatMessage(params: {
     }
 
     tx.set(convRef, updatePayload, { merge: true });
+  });
+}
+
+/**
+ * Hapus pesan untuk saya ("Hapus untuk saya").
+ * Adds user's UID to deletedFor array.
+ */
+export async function deleteMessageForMe(conversationId: string, messageId: string, currentUid: string) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const msgRef = doc(db, "conversations", conversationId, "messages", messageId);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(msgRef);
+    if (!snap.exists()) throw new Error("Pesan tidak ditemukan.");
+    const data = snap.data();
+    const existingDeletedFor: string[] = Array.isArray(data.deletedFor) ? data.deletedFor : [];
+
+    if (!existingDeletedFor.includes(currentUid)) {
+      tx.update(msgRef, {
+        deletedFor: [...existingDeletedFor, currentUid],
+      });
+    }
+  });
+}
+
+/**
+ * Hapus pesan untuk semua ("Hapus untuk semua").
+ * Sets deletedAt timestamp and deletedBy user UID.
+ */
+export async function deleteMessageForAll(conversationId: string, messageId: string, currentUid: string) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const msgRef = doc(db, "conversations", conversationId, "messages", messageId);
+
+  await updateDoc(msgRef, {
+    deletedAt: serverTimestamp(),
+    deletedBy: currentUid,
   });
 }
 

@@ -291,7 +291,7 @@ service cloud.firestore {
           isSignedIn() &&
           conversationId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'readAt', 'deliveredAt', 'deletedAt', 'deletedBy'
+            'readAt', 'deliveredAt', 'deletedAt', 'deletedBy', 'deletedFor'
           ]) &&
           request.resource.data.senderId == resource.data.senderId &&
           request.resource.data.senderRole == resource.data.senderRole &&

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, deleteApp, type FirebaseApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || (import.meta.env.FIREBASE_API_KEY as string | undefined),
@@ -26,12 +27,14 @@ export const firebaseConfigured = Boolean(
 let app: FirebaseApp | undefined;
 export let auth: Auth | undefined;
 export let db: Firestore | undefined;
+export let storage: FirebaseStorage | undefined;
 
 if (firebaseConfigured) {
   const defaultApp = getApps().find((a) => a.name === "[DEFAULT]");
   app = defaultApp ?? initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 }
 
 /**
