@@ -37,7 +37,9 @@ import {
   Tag,
   SearchCheck,
   Menu,
+  CheckCheck,
 } from "lucide-react";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { EmailChecker } from "@/components/EmailChecker";
 import { Leaderboard } from "@/components/Leaderboard";
 import { SidebarNavigation, type DashboardView } from "@/components/SidebarNavigation";
@@ -350,6 +352,50 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // Detail Dialog state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
+
+  // Worker Chat State
+  const [workerChatText, setWorkerChatText] = useState("");
+  const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+  const workerChatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const workerChatData = useWorkerChat(profile.uid);
+  const workerMessagesData = useConversationMessages(profile.uid);
+
+  // Automatically mark conversation as read when activeView === 'chat'
+  useEffect(() => {
+    if (activeView === "chat" && profile?.uid) {
+      markConversationAsRead(profile.uid, "worker");
+    }
+  }, [activeView, profile?.uid, workerMessagesData.messages]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (activeView === "chat") {
+      workerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeView, workerMessagesData.messages]);
+
+  const handleSendWorkerChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workerChatText.trim() || sendingWorkerChat) return;
+
+    setSendingWorkerChat(true);
+    try {
+      await sendChatMessage({
+        conversationId: profile.uid,
+        senderId: profile.uid,
+        senderRole: "worker",
+        senderName: profile.name,
+        senderEmail: profile.email,
+        text: workerChatText,
+      });
+      setWorkerChatText("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan.");
+    } finally {
+      setSendingWorkerChat(false);
+    }
+  };
 
   const emailList = useMemo(
     () =>
@@ -1638,6 +1684,119 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     </div>
                   </div>
                 </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
+          {activeView === "chat" && (
+            <div className="space-y-4">
+              <Card className="bg-white border-amber-200/80 shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
+                {/* CHAT HEADER */}
+                <CardHeader className="p-3 sm:p-4 bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-500/10 border-b border-amber-200/80 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-700 border border-amber-400/30 shrink-0">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5">
+                          <span>Chat Resmi Admin / CS</span>
+                        </CardTitle>
+                        <CardDescription className="text-[11px] text-amber-900/80 font-medium">
+                          Saluran percakapan privat 1-on-1 langsung dengan Admin.
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-900 border-amber-300 font-bold hidden sm:inline-flex">
+                      Privat & Aman
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                {/* MESSAGES BODY */}
+                <CardContent className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 bg-slate-50/50">
+                  {workerMessagesData.loading ? (
+                    <div className="flex items-center justify-center py-12 text-xs text-gray-500 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                      Memuat pesan chat...
+                    </div>
+                  ) : workerMessagesData.messages.length === 0 ? (
+                    <div className="p-8 text-center border border-dashed border-amber-200/80 rounded-2xl bg-white space-y-2">
+                      <div className="p-3 rounded-full bg-amber-50 text-amber-600 w-fit mx-auto border border-amber-200/60">
+                        <MessageCircle className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-gray-900">Belum Ada Pesan</p>
+                      <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+                        Tanyakan seputar akun, setoran email, kendala verifikasi, atau bantuan pencairan saldo di sini.
+                      </p>
+                    </div>
+                  ) : (
+                    workerMessagesData.messages.map((msg) => {
+                      const isMe = msg.senderRole === "worker";
+                      const isRead = !!msg.readAt;
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                        >
+                          <div
+                            className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs ${
+                              isMe
+                                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-br-none"
+                                : "bg-white border border-amber-200/80 text-gray-900 rounded-bl-none"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
+                              <span>{isMe ? "Saya" : "Admin / CS"}</span>
+                            </div>
+                            <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                            <div className="flex items-center justify-end gap-1 text-[9px] font-mono mt-1 opacity-80">
+                              <span>{formatDateTime(msg.createdAt)}</span>
+                              {isMe && (
+                                <span title={isRead ? "Telah dibaca Admin (2 check)" : "Terkirim (1 check)"}>
+                                  {isRead ? (
+                                    <CheckCheck className="w-3.5 h-3.5 text-sky-200" />
+                                  ) : (
+                                    <Check className="w-3 h-3 text-amber-100" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={workerChatEndRef} />
+                </CardContent>
+
+                {/* CHAT INPUT FORM */}
+                <form
+                  onSubmit={handleSendWorkerChat}
+                  className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2 shrink-0"
+                >
+                  <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
+                  <Input
+                    placeholder="Tulis pesan untuk Admin..."
+                    value={workerChatText}
+                    onChange={(e) => setWorkerChatText(e.target.value)}
+                    disabled={sendingWorkerChat}
+                    className="text-xs h-10 bg-amber-50/30 border-amber-200/80 text-gray-900 focus:border-amber-500 flex-1 rounded-xl"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={sendingWorkerChat || !workerChatText.trim()}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-amber-400/20 shrink-0"
+                  >
+                    {sendingWorkerChat ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </form>
               </Card>
             </div>
           )}

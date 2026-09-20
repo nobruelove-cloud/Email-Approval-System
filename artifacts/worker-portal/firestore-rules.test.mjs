@@ -1136,6 +1136,63 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // 15. Worker can update readAt on admin message in their own conversation
+  const testMsgRef = doc(collection(regAdminDb, 'conversations', workerUid, 'messages'));
+  await setDoc(testMsgRef, {
+    senderId: 'admin_1',
+    senderRole: 'admin',
+    text: 'Admin message for readAt test',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', testMsgRef.id), {
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 15. Worker can update readAt on message in their own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 15. Worker failed to update readAt in their own conversation:', err);
+    process.exitCode = 1;
+  }
+
+  // 16. Worker cannot tamper with text content during readAt update
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', testMsgRef.id), {
+        readAt: serverTimestamp(),
+        text: 'Tampered text content',
+      })
+    );
+    console.log('[PASS] 16. Worker cannot tamper with text content during readAt update.');
+  } catch (err) {
+    console.error('[FAIL] 16. Worker text tampering was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 17. Worker cannot update readAt in another worker's conversation
+  const unauthWorkerUid = 'worker_other_999';
+  const otherMsgRef = doc(collection(regAdminDb, 'conversations', unauthWorkerUid, 'messages'));
+  await setDoc(otherMsgRef, {
+    senderId: 'admin_1',
+    senderRole: 'admin',
+    text: 'Message in another worker conv',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', unauthWorkerUid, 'messages', otherMsgRef.id), {
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 17. Worker cannot update readAt in another worker conversation.');
+  } catch (err) {
+    console.error('[FAIL] 17. Worker unauthorized update in another conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
   await testEnv.cleanup();
   console.log('\nAll security tests completed successfully!');
 }

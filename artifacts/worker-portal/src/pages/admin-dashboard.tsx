@@ -31,6 +31,7 @@ import {
   Megaphone,
   Copy,
   Check,
+  CheckCheck,
   Wrench,
   ShieldAlert,
   BarChart3,
@@ -5281,6 +5282,8 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                           ) : (
                             selectedWorkerMessages.messages.map((msg: any) => {
                               const isAdmin = msg.senderRole === "admin";
+                              const isRead = !!msg.readAt;
+
                               return (
                                 <div
                                   key={msg.id}
@@ -5297,8 +5300,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                       <span>{isAdmin ? "Admin" : msg.senderName || "Worker"}</span>
                                     </div>
                                     <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
-                                    <div className={`text-[9px] font-mono text-right mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-500"}`}>
-                                      {formatDateTime(msg.createdAt)}
+                                    <div className={`flex items-center justify-end gap-1 text-[9px] font-mono mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-500"}`}>
+                                      <span>{formatDateTime(msg.createdAt)}</span>
+                                      {isAdmin && (
+                                        <span title={isRead ? "Telah dibaca Worker (2 check)" : "Terkirim (1 check)"}>
+                                          {isRead ? (
+                                            <CheckCheck className="w-3.5 h-3.5 text-indigo-100" />
+                                          ) : (
+                                            <Check className="w-3 h-3 text-indigo-300" />
+                                          )}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

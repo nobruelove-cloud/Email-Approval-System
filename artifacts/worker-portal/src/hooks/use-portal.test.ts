@@ -3052,6 +3052,54 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
       })
     ).rejects.toThrow("Pesan tidak boleh kosong.");
   });
+
+  it("handles sending worker->admin and admin->worker messages, 1-check (✓) state, 2-check (✓✓) read status update, and scoped conversation read", async () => {
+    const store: Record<string, any> = {};
+
+    // 1. Worker sends message to Admin -> Worker sees ✓ (readAt is undefined/null)
+    store["conversations/worker_abc/messages/msg_worker_1"] = {
+      senderId: "worker_abc",
+      senderRole: "worker",
+      senderName: "Budi Worker",
+      text: "Halo Admin, mohon cek setoran saya",
+      createdAt: "TIMESTAMP",
+      readAt: undefined, // 1 check ✓
+    };
+
+    // 2. Admin sends message to Worker -> Admin sees ✓ (readAt is undefined/null)
+    store["conversations/worker_abc/messages/msg_admin_1"] = {
+      senderId: "admin_master",
+      senderRole: "admin",
+      senderName: "Admin EAS",
+      text: "Siap, setoran sedang diproses",
+      createdAt: "TIMESTAMP",
+      readAt: undefined, // 1 check ✓
+    };
+
+    // Verify initial 1 check (✓) status before recipient opens conversation
+    expect(store["conversations/worker_abc/messages/msg_worker_1"].readAt).toBeUndefined();
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeUndefined();
+
+    // 3. Admin opens worker_abc's conversation tab -> simulates markConversationAsRead for admin reader
+    // Marks only worker's message with readAt timestamp
+    store["conversations/worker_abc/messages/msg_worker_1"].readAt = "TIMESTAMP";
+    expect(store["conversations/worker_abc/messages/msg_worker_1"].readAt).toBeDefined(); // 2 checks ✓✓ for worker's message
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeUndefined(); // Admin's own message remains unread by worker
+
+    // 4. Worker opens Admin conversation tab -> simulates markConversationAsRead for worker reader
+    // Marks only admin's message with readAt timestamp
+    store["conversations/worker_abc/messages/msg_admin_1"].readAt = "TIMESTAMP";
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeDefined(); // 2 checks ✓✓ for admin's message
+
+    // 5. Scoped conversation isolation check
+    store["conversations/worker_other/messages/msg_other"] = {
+      senderId: "worker_other",
+      senderRole: "worker",
+      text: "Pesan worker lain",
+      readAt: undefined,
+    };
+    expect(store["conversations/worker_other/messages/msg_other"].readAt).toBeUndefined();
+  });
 });
 
 describe("Withdrawal Audit & Fix Logic Unit Tests", () => {

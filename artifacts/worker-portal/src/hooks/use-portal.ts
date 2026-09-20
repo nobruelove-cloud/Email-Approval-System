@@ -15,6 +15,7 @@ import {
   addDoc,
   deleteDoc,
   runTransaction,
+  writeBatch,
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
@@ -3405,7 +3406,8 @@ export function useWorkerChat(workerUid?: string) {
     const unsub = onSnapshot(
       convRef,
       (snap) => {
-        if (snap.exists()) {
+        const exists = snap && typeof snap.exists === "function" ? snap.exists() : false;
+        if (exists) {
           setConversation({ id: snap.id, ...snap.data() } as Conversation);
         } else {
           setConversation(null);
@@ -3444,9 +3446,11 @@ export function useAdminConversations() {
       q,
       (snap) => {
         const list: Conversation[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        }
         setConversations(list);
         setLoading(false);
       },
@@ -3493,9 +3497,11 @@ export function useConversationMessages(conversationId: string | null) {
       q,
       (snap) => {
         const list: ChatMessage[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        }
         setMessages(list);
         setLoading(false);
       },
@@ -3632,6 +3638,35 @@ export async function markConversationAsRead(
       [fieldToReset]: 0,
       updatedAt: serverTimestamp(),
     });
+
+    // Mark unread messages sent by opposite role in subcollection as read
+    const targetSenderRole = readerRole === "admin" ? "worker" : "admin";
+    const messagesColRef = collection(db, "conversations", conversationId, "messages");
+    const unreadMsgsQuery = query(
+      messagesColRef,
+      where("senderRole", "==", targetSenderRole)
+    );
+
+    const snap = await getDocsWithDiagnostic(
+      unreadMsgsQuery,
+      [where("senderRole", "==", targetSenderRole)],
+      "markConversationAsRead",
+      `conversations/${conversationId}/messages`
+    );
+    if (snap && !snap.empty) {
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.forEach((msgDoc) => {
+        const data = msgDoc.data() as Record<string, any>;
+        if (!data.readAt) {
+          batch.update(msgDoc.ref, { readAt: serverTimestamp() });
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
   } catch (err) {
     // If document doesn't exist yet, ignore
     console.warn("markConversationAsRead error:", err);
