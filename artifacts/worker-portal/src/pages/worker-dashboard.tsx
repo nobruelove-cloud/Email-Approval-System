@@ -110,7 +110,7 @@ function TelegramIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 export function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string; icon: React.JSX.Element }> = {
-    pending: { label: "Menunggu", className: "bg-amber-100 text-amber-800 hover:bg-amber-100", icon: <Clock className="w-3 h-3" /> },
+    pending: { label: "Menunggu", className: "bg-blue-100 text-blue-800 hover:bg-blue-100", icon: <Clock className="w-3 h-3" /> },
     processing: { label: "Diproses", className: "bg-blue-100 text-blue-800 hover:bg-blue-100", icon: <Loader2 className="w-3 h-3" /> },
     approved: { label: "Terjual", className: "bg-green-100 text-green-800 hover:bg-green-100", icon: <CheckCircle2 className="w-3 h-3" /> },
     available: { label: "Terjual", className: "bg-green-100 text-green-800 hover:bg-green-100", icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -668,27 +668,27 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       {/* MAIN LAYOUT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* GLOBAL TOP BAR HEADER WITH HAMBURGER BUTTON */}
-        <header className="bg-white/95 backdrop-blur-md border-b border-amber-100 sticky top-0 z-30 shadow-xs">
+        <header className="bg-white/95 backdrop-blur-md border-b border-blue-100 sticky top-0 z-30 shadow-xs">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               {/* HAMBURGER TOGGLE BUTTON FOR SIDEBAR */}
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 transition-colors focus:outline-none flex items-center justify-center min-h-[44px] min-w-[44px]"
+                className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 hover:bg-blue-100 transition-colors focus:outline-none flex items-center justify-center min-h-[44px] min-w-[44px]"
                 title="Buka Menu Sidebar"
               >
-                <Menu className="w-5 h-5 text-amber-800" />
+                <Menu className="w-5 h-5 text-blue-800" />
               </button>
 
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-extrabold flex items-center justify-center text-xs shadow-2xs">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-extrabold flex items-center justify-center text-xs shadow-2xs">
                   {profile.name?.charAt(0).toUpperCase() || "W"}
                 </div>
                 <div className="hidden sm:block">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="font-bold text-gray-900 text-xs leading-tight">{displayName}</p>
-                    <Badge variant="outline" className="text-[10px] bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-300 font-bold px-1.5 py-0">
+                    <Badge variant="outline" className="text-[10px] bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border-blue-300 font-bold px-1.5 py-0">
                       Rate: {formatMoney(currentTierConfig.pricePerItem)}
                     </Badge>
                   </div>
@@ -699,7 +699,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <button
                       type="button"
                       onClick={() => setIsEmailVisible(!isEmailVisible)}
-                      className="text-gray-400 hover:text-amber-600 transition-colors p-0.5 rounded focus:outline-none"
+                      className="text-gray-400 hover:text-blue-600 transition-colors p-0.5 rounded focus:outline-none"
                       title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                     >
                       {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -712,12 +712,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             <div className="flex items-center gap-2">
               <div
                 onClick={() => setActiveView("withdraw")}
-                className="text-right bg-gradient-to-r from-amber-500/10 to-orange-500/10 px-2.5 py-1 rounded-xl border border-amber-200/80 cursor-pointer hover:border-amber-300 transition-colors"
+                className="text-right bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-2.5 py-1 rounded-xl border border-blue-200/80 cursor-pointer hover:border-blue-300 transition-colors"
               >
-                <p className="text-[9px] text-amber-800 font-bold uppercase tracking-wider">Saldo</p>
-                <p className="font-black text-amber-700 text-xs sm:text-sm">{formatMoney(profile.balance)}</p>
+                <p className="text-[9px] text-blue-800 font-bold uppercase tracking-wider">Saldo</p>
+                <p className="font-black text-blue-700 text-xs sm:text-sm">{formatMoney(profile.balance)}</p>
               </div>
-              <Button variant="outline" size="icon" onClick={onLogout} title="Keluar" className="w-8 h-8 border-gray-200 hover:border-amber-300 hover:bg-amber-50 text-gray-700">
+              <Button variant="outline" size="icon" onClick={onLogout} title="Keluar" className="w-8 h-8 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700">
                 <LogOut className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -727,17 +727,17 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-4 pb-24 md:pb-8 space-y-4">
           {/* SUB-PAGE TOP NAVIGATION BAR (Show on dedicated views) */}
           {activeView !== "home" && (
-            <div className="flex items-center justify-between pb-2 border-b border-amber-200/60 mb-2">
+            <div className="flex items-center justify-between pb-2 border-b border-blue-200/60 mb-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setActiveView("home")}
-                className="gap-1.5 text-xs font-bold text-amber-900 hover:text-amber-950 hover:bg-amber-100/80 px-2.5 h-8 rounded-xl"
+                className="gap-1.5 text-xs font-bold text-blue-900 hover:text-blue-950 hover:bg-blue-100/80 px-2.5 h-8 rounded-xl"
               >
-                <ArrowLeft className="w-4 h-4 text-amber-600" />
+                <ArrowLeft className="w-4 h-4 text-blue-600" />
                 <span>Kembali ke Home</span>
               </Button>
-              <Badge variant="outline" className="text-[11px] bg-amber-50/90 text-amber-950 border-amber-300/80 font-bold px-2.5 py-0.5 shadow-2xs">
+              <Badge variant="outline" className="text-[11px] bg-blue-50/90 text-blue-950 border-blue-300/80 font-bold px-2.5 py-0.5 shadow-2xs">
                 {getViewTitle(activeView)}
               </Badge>
             </div>
@@ -747,18 +747,18 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "home" && (
             <div className="space-y-4">
               {/* SALDO UTAMA HIGHLIGHT CARD */}
-              <Card className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-amber-400/50 shadow-md overflow-hidden relative">
+              <Card className="bg-gradient-to-r from-blue-500 via-orange-500 to-blue-600 text-white border-blue-400/50 shadow-md overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                     <div className="space-y-0.5">
-                      <p className="text-[10px] text-amber-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5 text-amber-200" /> Saldo Utamaku
+                      <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Saldo Utamaku
                       </p>
                       <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
                         {formatMoney(profile.balance)}
                       </p>
-                      <p className="text-[11px] text-amber-100/90 font-medium">
+                      <p className="text-[11px] text-blue-100/90 font-medium">
                         Total Setoran ACC: <strong className="text-white font-bold">{profile.accCount ?? 0} Email</strong>
                       </p>
                     </div>
@@ -767,17 +767,17 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       <Button
                         type="button"
                         onClick={() => setActiveView("withdraw")}
-                        className="flex-1 sm:flex-initial bg-white text-amber-900 hover:bg-amber-50 font-extrabold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5 transition-transform active:scale-95"
+                        className="flex-1 sm:flex-initial bg-white text-blue-900 hover:bg-blue-50 font-extrabold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5 transition-transform active:scale-95"
                       >
-                        <Wallet className="w-3.5 h-3.5 text-amber-600" />
+                        <Wallet className="w-3.5 h-3.5 text-blue-600" />
                         Tarik Saldo
                       </Button>
                       <Button
                         type="button"
                         onClick={() => setActiveView("submit")}
-                        className="flex-1 sm:flex-initial bg-amber-950/40 hover:bg-amber-950/60 backdrop-blur-md text-amber-100 font-extrabold text-xs h-9 px-3.5 rounded-xl border border-amber-300/30 gap-1.5 transition-transform active:scale-95"
+                        className="flex-1 sm:flex-initial bg-blue-950/40 hover:bg-blue-950/60 backdrop-blur-md text-blue-100 font-extrabold text-xs h-9 px-3.5 rounded-xl border border-blue-300/30 gap-1.5 transition-transform active:scale-95"
                       >
-                        <PlusCircle className="w-3.5 h-3.5 text-amber-300" />
+                        <PlusCircle className="w-3.5 h-3.5 text-blue-300" />
                         Setor Email
                       </Button>
                     </div>
@@ -788,8 +788,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               {/* COMPACT LAYANAN CEPAT GRID (8 ITEMS / 4 COLUMNS) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                     Layanan Cepat
                   </h3>
                   <span className="text-[10px] text-gray-500 font-medium">Pilih Menu</span>
@@ -801,8 +801,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       id: "submit" as DashboardView,
                       label: "Job Gmail",
                       subtext: "Setor Email",
-                      icon: <Send className="w-4 h-4 text-amber-600" />,
-                      badgeBg: "bg-amber-50 border-amber-200/80",
+                      icon: <Send className="w-4 h-4 text-blue-600" />,
+                      badgeBg: "bg-blue-50 border-blue-200/80",
                     },
                     {
                       id: "checker" as DashboardView,
@@ -815,15 +815,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       id: "leaderboard" as DashboardView,
                       label: "Klasemen",
                       subtext: "Top Worker",
-                      icon: <Trophy className="w-4 h-4 text-amber-600" />,
-                      badgeBg: "bg-amber-50 border-amber-200/80",
+                      icon: <Trophy className="w-4 h-4 text-blue-600" />,
+                      badgeBg: "bg-blue-50 border-blue-200/80",
                     },
                     {
                       id: "referral" as DashboardView,
                       label: "Referral",
                       subtext: "Pasif Income",
-                      icon: <Users className="w-4 h-4 text-amber-700" />,
-                      badgeBg: "bg-amber-50 border-amber-200/80",
+                      icon: <Users className="w-4 h-4 text-blue-700" />,
+                      badgeBg: "bg-blue-50 border-blue-200/80",
                     },
                     {
                       id: "withdraw" as DashboardView,
@@ -843,8 +843,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       id: "cs" as DashboardView,
                       label: "Bantuan CS",
                       subtext: "Pusat Bantuan",
-                      icon: <HelpCircle className="w-4 h-4 text-amber-600" />,
-                      badgeBg: "bg-amber-50 border-amber-200/80",
+                      icon: <HelpCircle className="w-4 h-4 text-blue-600" />,
+                      badgeBg: "bg-blue-50 border-blue-200/80",
                     },
                     {
                       id: "announcements" as DashboardView,
@@ -858,13 +858,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       key={item.id}
                       type="button"
                       onClick={() => setActiveView(item.id)}
-                      className="p-2 sm:p-2.5 bg-white border border-amber-100/80 rounded-2xl shadow-2xs hover:border-amber-300 hover:bg-amber-50/40 text-center flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 group cursor-pointer"
+                      className="p-2 sm:p-2.5 bg-white border border-blue-100/80 rounded-2xl shadow-2xs hover:border-blue-300 hover:bg-blue-50/40 text-center flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 group cursor-pointer"
                     >
                       <div className={`p-2 rounded-xl border ${item.badgeBg} group-hover:scale-105 transition-transform shadow-2xs`}>
                         {item.icon}
                       </div>
                       <div className="w-full">
-                        <p className="text-[11px] font-bold text-gray-800 leading-tight truncate w-full group-hover:text-amber-900">
+                        <p className="text-[11px] font-bold text-gray-800 leading-tight truncate w-full group-hover:text-blue-900">
                           {item.label}
                         </p>
                         <p className="text-[9px] text-gray-400 font-medium truncate w-full hidden sm:block">
@@ -877,11 +877,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </div>
 
               {/* JAM OPERASIONAL COMPACT CARD */}
-              <Card className="bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-100/30 border-amber-200/80 shadow-xs relative overflow-hidden">
+              <Card className="bg-gradient-to-br from-blue-50/90 via-orange-50/40 to-blue-100/30 border-blue-200/80 shadow-xs relative overflow-hidden">
                 <CardHeader className="p-3.5 pb-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <CardTitle className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
                       <span>Jam Operasional Layanan</span>
                     </CardTitle>
                     <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-2xs border ${
@@ -905,14 +905,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               {announcements.data.length > 0 && (
                 <Card
                   onClick={() => setActiveView("announcements")}
-                  className="bg-white border-amber-200/80 shadow-2xs hover:border-amber-300 transition-colors cursor-pointer p-3.5 flex items-center justify-between gap-3"
+                  className="bg-white border-blue-200/80 shadow-2xs hover:border-blue-300 transition-colors cursor-pointer p-3.5 flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-200/60 shrink-0">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-200/60 shrink-0">
                       <Megaphone className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Info Resmi Terbaru</p>
+                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Info Resmi Terbaru</p>
                       <p className="text-xs font-bold text-gray-900 truncate">{announcements.data[0].title}</p>
                       <p className="text-[10px] text-gray-500 truncate">{announcements.data[0].content}</p>
                     </div>
@@ -927,14 +927,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "submit" && (
             <div className="space-y-4">
               {/* CURRENT RATE DISPLAY CARD */}
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-amber-600" />
+                      <Tag className="w-4 h-4 text-blue-600" />
                       Informasi Rate Harga Setor
                     </CardTitle>
-                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-900 border-amber-300 font-bold">
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-900 border-blue-300 font-bold">
                       RATE AKTIF
                     </Badge>
                   </div>
@@ -943,37 +943,37 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-500/10 via-amber-50/80 to-orange-500/10 text-center shadow-xs">
-                    <div className="flex items-center justify-center gap-1.5 mb-1 text-amber-900 font-medium text-xs">
-                      <Tag className="w-3.5 h-3.5 text-amber-600" />
+                  <div className="p-4 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-500/10 via-amber-50/80 to-indigo-500/10 text-center shadow-xs">
+                    <div className="flex items-center justify-center gap-1.5 mb-1 text-blue-900 font-medium text-xs">
+                      <Tag className="w-3.5 h-3.5 text-blue-600" />
                       <span>Rate Akun Valid</span>
                     </div>
-                    <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight my-1">
-                      {formatMoney(currentTierConfig.pricePerItem)} <span className="text-xs sm:text-sm font-semibold text-amber-900/80">/ akun valid</span>
+                    <p className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight my-1">
+                      {formatMoney(currentTierConfig.pricePerItem)} <span className="text-xs sm:text-sm font-semibold text-blue-900/80">/ akun valid</span>
                     </p>
-                    <p className="text-[11px] text-amber-900/80 mt-1.5 font-medium">
+                    <p className="text-[11px] text-blue-900/80 mt-1.5 font-medium">
                       Komisi langsung masuk ke saldo utama setiap email selesai diverifikasi ACC.
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-100/40 border-amber-200/90 shadow-2xs">
+              <Card className="bg-gradient-to-r from-blue-50 via-orange-50/60 to-blue-100/40 border-blue-200/90 shadow-2xs">
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs">
-                      <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-blue-950 font-bold text-xs">
+                      <ShieldAlert className="w-4 h-4 text-blue-600 shrink-0" />
                       Aturan Setor Email
                     </div>
-                    <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-[10px] border-0 shadow-2xs">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-[10px] border-0 shadow-2xs">
                       Rate: {formatMoney(currentTierConfig.pricePerItem)} / akun
                     </Badge>
                   </div>
-                  <ul className="space-y-1 text-xs text-amber-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
+                  <ul className="space-y-1 text-xs text-blue-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
                     {rules.data.submissionNotes.map((note, idx) => (
                       <li key={idx} className="whitespace-pre-wrap">{note}</li>
                     ))}
-                    <li>Harga komisi aktif saat ini: <strong className="text-amber-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
+                    <li>Harga komisi aktif saat ini: <strong className="text-blue-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -995,7 +995,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </Card>
               )}
 
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader>
                   <CardTitle className="text-base font-bold text-gray-900">Detail Batch Setoran</CardTitle>
                   <CardDescription className="text-xs text-gray-600">Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.</CardDescription>
@@ -1013,7 +1013,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           value={emailsText}
                           onChange={(e) => setEmailsText(e.target.value)}
                           placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
-                          className="mt-1.5 font-mono text-sm border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
+                          className="mt-1.5 font-mono text-sm border-gray-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl"
                           required
                         />
                         <p className="text-[11px] text-gray-400 mt-1">
@@ -1028,21 +1028,21 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Kata sandi untuk seluruh email di atas"
-                          className="mt-1.5 border-gray-200 focus-visible:ring-amber-500 focus-visible:border-amber-500 rounded-xl"
+                          className="mt-1.5 border-gray-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl"
                           required
                         />
                       </div>
 
-                      <div className="p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs">
+                      <div className="p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-200/80 flex items-center justify-between text-xs">
                         <div>
                           <span className="text-gray-600 font-medium">Estimasi Total Setoran: </span>
                           <strong className="text-gray-900 font-bold">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
                         </div>
-                        <span className="font-black text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
+                        <span className="font-black text-blue-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
                       </div>
                     </fieldset>
 
-                    <Button type="submit" disabled={submitting || isSubmissionClosed} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 gap-2 rounded-xl shadow-sm border border-amber-400/20 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Button type="submit" disabled={submitting || isSubmissionClosed} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold h-10 gap-2 rounded-xl shadow-sm border border-blue-400/20 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
                       {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       {isSubmissionClosed ? "Setoran Sedang Ditutup" : `Kirim Batch (${emailList.length} Item)`}
                     </Button>
@@ -1073,33 +1073,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "referral" && (
             <div className="space-y-5">
               {/* BANNER REFERRAL */}
-              <Card className="bg-gradient-to-r from-[#2D1B00] via-[#4A2800] to-[#5C3A00] text-white border-amber-900/80 shadow-lg overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+              <Card className="bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[#1e1b4b] text-white border-blue-900/80 shadow-lg overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
                 <CardContent className="p-5 sm:p-6 space-y-2 relative z-10">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
-                    <Sparkles className="w-3 h-3 text-amber-300" />
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] font-bold uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3 text-blue-300" />
                     Program Pasif Income Kerja
                   </div>
                   <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
                     Pasif Income Tanpa Batas
                   </h2>
-                  <p className="text-xs text-amber-100/90 leading-relaxed max-w-2xl">
+                  <p className="text-xs text-blue-100/90 leading-relaxed max-w-2xl">
                     Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC) oleh admin, komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda!
                   </p>
                 </CardContent>
               </Card>
 
               {/* WIDGET SIMULASI PASIF INCOME */}
-              <Card className="bg-gradient-to-br from-[#211300] via-[#321D00] to-[#211300] text-[#FFE0B2] border-amber-900/60 shadow-lg overflow-hidden relative">
-                <CardHeader className="p-3 sm:p-4 pb-2 border-b border-amber-900/50">
+              <Card className="bg-gradient-to-br from-[#0f172a] via-[#321D00] to-[#0f172a] text-[#e2e8f0] border-blue-900/60 shadow-lg overflow-hidden relative">
+                <CardHeader className="p-3 sm:p-4 pb-2 border-b border-blue-900/50">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <CardTitle className="text-xs sm:text-sm font-black text-[#FFB74D] flex items-center gap-1.5">
-                      <div className="p-1 rounded-md bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                      <div className="p-1 rounded-md bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
                         <Coins className="w-3.5 h-3.5" />
                       </div>
                       Kalkulator Simulasi Pasif Income
                     </CardTitle>
-                    <Badge variant="outline" className="bg-amber-500/10 text-[#FFB74D] border-amber-500/30 font-bold text-[10px] px-2 py-0.5">
+                    <Badge variant="outline" className="bg-blue-500/10 text-[#FFB74D] border-blue-500/30 font-bold text-[10px] px-2 py-0.5">
                       Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
                     </Badge>
                   </div>
@@ -1107,12 +1107,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
                 <CardContent className="p-3 sm:p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5 p-2.5 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
+                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#FFE0B2] uppercase tracking-wider">
+                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
                           Jumlah Downline
                         </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-2 py-0.5 rounded border border-amber-800/60">
+                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
                           {simFriends} Orang
                         </span>
                       </div>
@@ -1122,16 +1122,16 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         max={50}
                         value={simFriends}
                         onChange={(e) => setSimFriends(Number(e.target.value))}
-                        className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
                       />
                     </div>
 
-                    <div className="space-y-1.5 p-2.5 bg-[#2D1B00]/80 rounded-xl border border-amber-900/40">
+                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#FFE0B2] uppercase tracking-wider">
+                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
                           Email ACC / Downline / Hari
                         </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-amber-950 px-2 py-0.5 rounded border border-amber-800/60">
+                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
                           {simAccPerFriend} Email
                         </span>
                       </div>
@@ -1141,26 +1141,26 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         max={50}
                         value={simAccPerFriend}
                         onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
-                        className="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
+                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
                       />
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-[#1A0E00] border border-amber-800/50 space-y-2">
-                    <div className="text-[11px] text-amber-200/80 flex items-center justify-between border-b border-amber-900/60 pb-1.5">
+                  <div className="p-2.5 rounded-xl bg-[#1A0E00] border border-blue-800/50 space-y-2">
+                    <div className="text-[11px] text-blue-200/80 flex items-center justify-between border-b border-blue-900/60 pb-1.5">
                       <span>Total Volume Email ACC Tim / Hari:</span>
                       <strong className="text-[#FFB74D] font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 pt-0.5">
-                      <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider">Estimasi / Hari</p>
+                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
+                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Hari</p>
                         <p className="text-base font-black text-[#FFB74D] tracking-tight">
                           {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
                         </p>
                       </div>
-                      <div className="p-2 rounded-lg bg-[#281500] border border-amber-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider">Estimasi / Bulan</p>
+                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
+                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Bulan</p>
                         <p className="text-base font-black text-[#FFB74D] tracking-tight">
                           {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
                         </p>
@@ -1172,48 +1172,48 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
               {/* 3 STATS CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs">
+                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
                   <CardContent className="p-4 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-amber-900/70 uppercase tracking-wider">TOTAL BONUS DIDAPAT</p>
-                      <Wallet className="w-4 h-4 text-[#E65100]" />
+                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL BONUS DIDAPAT</p>
+                      <Wallet className="w-4 h-4 text-[#2563eb]" />
                     </div>
-                    <p className="text-xl font-black text-[#E65100] tracking-tight">
+                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
                       {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs">
+                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
                   <CardContent className="p-4 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-amber-900/70 uppercase tracking-wider">TOTAL DOWNLINE</p>
-                      <Users className="w-4 h-4 text-[#E65100]" />
+                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL DOWNLINE</p>
+                      <Users className="w-4 h-4 text-[#2563eb]" />
                     </div>
-                    <p className="text-xl font-black text-[#E65100] tracking-tight">
-                      {downlines.data.length || refStats.total} <span className="text-xs font-medium text-amber-900/70">Worker</span>
+                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
+                      {downlines.data.length || refStats.total} <span className="text-xs font-medium text-blue-900/70">Worker</span>
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-[#FFF8F0] border-[#FFE0B2] shadow-xs">
+                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
                   <CardContent className="p-4 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-amber-900/70 uppercase tracking-wider">TOTAL EMAIL ACC TIM</p>
-                      <Award className="w-4 h-4 text-[#E65100]" />
+                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL EMAIL ACC TIM</p>
+                      <Award className="w-4 h-4 text-[#2563eb]" />
                     </div>
-                    <p className="text-xl font-black text-[#E65100] tracking-tight">
-                      {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-amber-900/70">Email</span>
+                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
+                      {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-blue-900/70">Email</span>
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* TAUTAN REFERRAL */}
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Share2 className="w-4 h-4 text-amber-600" />
+                    <Share2 className="w-4 h-4 text-blue-600" />
                     Tautan Referral Saya
                   </CardTitle>
                 </CardHeader>
@@ -1222,41 +1222,41 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <Input
                       readOnly
                       value={referralLink}
-                      className="font-mono text-xs bg-amber-50/40 border-amber-200 text-amber-950 rounded-xl"
+                      className="font-mono text-xs bg-blue-50/40 border-blue-200 text-blue-950 rounded-xl"
                     />
                     <Button
                       onClick={handleCopyReferralLink}
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 font-bold text-xs h-10 px-3.5 rounded-xl border border-amber-400/20"
+                      className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white shrink-0 font-bold text-xs h-10 px-3.5 rounded-xl border border-blue-400/20"
                     >
                       {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                       {copiedLink ? "Tersalin!" : "Salin Link"}
                     </Button>
                   </div>
 
-                  <div className="p-3 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-1.5 text-xs text-amber-950">
+                  <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-1.5 text-xs text-blue-950">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <span className="font-bold">Kode Referral Anda:</span>
-                      <Badge variant="outline" className="font-mono bg-white text-amber-950 border-amber-300 font-bold text-xs">
+                      <Badge variant="outline" className="font-mono bg-white text-blue-950 border-blue-300 font-bold text-xs">
                         {profile.uid}
                       </Badge>
                     </div>
                     {isAlreadyLinked ? (
-                      <p className="text-[11px] text-amber-900">
+                      <p className="text-[11px] text-blue-900">
                         ✓ Terhubung Upline: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
                       </p>
                     ) : (
-                      <form onSubmit={handleClaimInvitationCode} className="pt-1.5 border-t border-amber-200/60 flex gap-2">
+                      <form onSubmit={handleClaimInvitationCode} className="pt-1.5 border-t border-blue-200/60 flex gap-2">
                         <Input
                           value={invitationCodeInput}
                           onChange={(e) => setInvitationCodeInput(e.target.value)}
                           placeholder="Masukkan Kode Upline"
-                          className="font-mono text-xs bg-white rounded-xl border-amber-200 h-8"
+                          className="font-mono text-xs bg-white rounded-xl border-blue-200 h-8"
                           disabled={claimingCode}
                         />
                         <Button
                           type="submit"
                           disabled={claimingCode || !invitationCodeInput.trim()}
-                          className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl h-8 shrink-0"
+                          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl h-8 shrink-0"
                         >
                           {claimingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : "Hubungkan"}
                         </Button>
@@ -1267,10 +1267,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </Card>
 
               {/* DAFTAR TIM DOWNLINE */}
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-amber-600" />
+                    <Users className="w-4 h-4 text-blue-600" />
                     Daftar Tim Downline ({downlines.data.length})
                   </CardTitle>
                 </CardHeader>
@@ -1278,18 +1278,18 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   {downlines.loading ? (
                     <p className="text-xs text-gray-400 text-center py-6">Memuat data downline...</p>
                   ) : downlines.data.length === 0 ? (
-                    <div className="p-6 border border-dashed border-amber-200 rounded-2xl text-center space-y-1.5 bg-[#FFF8F0]">
-                      <Users className="w-6 h-6 text-amber-500 mx-auto" />
-                      <p className="text-xs font-bold text-amber-950">Belum Ada Downline Terdaftar</p>
-                      <p className="text-[11px] text-amber-900/80">
+                    <div className="p-6 border border-dashed border-blue-200 rounded-2xl text-center space-y-1.5 bg-[#f8fafc]">
+                      <Users className="w-6 h-6 text-blue-500 mx-auto" />
+                      <p className="text-xs font-bold text-blue-950">Belum Ada Downline Terdaftar</p>
+                      <p className="text-[11px] text-blue-900/80">
                         Bagikan link referral Anda untuk mulai mengumpulkan komisi pasif income.
                       </p>
                     </div>
                   ) : (
-                    <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
+                    <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-white">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
+                          <thead className="bg-[#f8fafc] border-b border-[#e2e8f0] text-blue-950 font-bold">
                             <tr>
                               <th className="px-3 py-2">Worker</th>
                               <th className="px-3 py-2">Bergabung</th>
@@ -1304,7 +1304,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                               const totalComm = dwAcc * commRate;
 
                               return (
-                                <tr key={dw.uid} className="hover:bg-amber-50/50 transition-colors">
+                                <tr key={dw.uid} className="hover:bg-blue-50/50 transition-colors">
                                   <td className="px-3 py-2">
                                     <p className="font-bold text-gray-900">{dw.name || "Worker"}</p>
                                   </td>
@@ -1312,11 +1312,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                     {formatDateTime(dw.createdAt)}
                                   </td>
                                   <td className="px-3 py-2 text-center">
-                                    <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-bold text-[10px]">
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-900 border-blue-300 font-bold text-[10px]">
                                       {dwAcc} ACC
                                     </Badge>
                                   </td>
-                                  <td className="px-3 py-2 text-right font-bold text-[#E65100]">
+                                  <td className="px-3 py-2 text-right font-bold text-[#2563eb]">
                                     {formatMoney(totalComm)}
                                   </td>
                                 </tr>
@@ -1331,10 +1331,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </Card>
 
               {/* LOG TRANSAKSI KOMISI */}
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-amber-600" />
+                    <Coins className="w-4 h-4 text-blue-600" />
                     Riwayat Log Komisi Referral ({referralTxs.data.length})
                   </CardTitle>
                 </CardHeader>
@@ -1342,14 +1342,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   {referralTxs.loading ? (
                     <p className="text-xs text-gray-400 text-center py-6">Memuat riwayat...</p>
                   ) : referralTxs.data.length === 0 ? (
-                    <p className="text-xs text-gray-500 text-center py-4 border border-dashed border-amber-200 rounded-xl bg-[#FFF8F0]">
+                    <p className="text-xs text-gray-500 text-center py-4 border border-dashed border-blue-200 rounded-xl bg-[#f8fafc]">
                       Belum ada riwayat transaksi komisi.
                     </p>
                   ) : (
-                    <div className="border border-amber-200/80 rounded-xl overflow-hidden bg-white">
+                    <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-white">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-[#FFF8F0] border-b border-[#FFE0B2] text-amber-950 font-bold">
+                          <thead className="bg-[#f8fafc] border-b border-[#e2e8f0] text-blue-950 font-bold">
                             <tr>
                               <th className="px-3 py-2">Waktu</th>
                               <th className="px-3 py-2">Downline</th>
@@ -1359,7 +1359,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </thead>
                           <tbody className="divide-y divide-amber-100">
                             {referralTxs.data.map((tx) => (
-                              <tr key={tx.id} className="hover:bg-amber-50/50">
+                              <tr key={tx.id} className="hover:bg-blue-50/50">
                                 <td className="px-3 py-2 font-mono text-gray-500 text-[11px]">
                                   {formatDateTime(tx.createdAt)}
                                 </td>
@@ -1369,7 +1369,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                 <td className="px-3 py-2 text-center font-bold text-gray-800">
                                   {tx.accCount}
                                 </td>
-                                <td className="px-3 py-2 text-right font-black text-[#E65100]">
+                                <td className="px-3 py-2 text-right font-black text-[#2563eb]">
                                   +{formatMoney(tx.totalCommission)}
                                 </td>
                               </tr>
@@ -1388,17 +1388,17 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "withdraw" && (
             <div className="space-y-5">
               {/* SALDO HIGHLIGHT BANNER */}
-              <Card className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-amber-400/50 shadow-md overflow-hidden relative">
+              <Card className="bg-gradient-to-r from-blue-500 via-orange-500 to-blue-600 text-white border-blue-400/50 shadow-md overflow-hidden relative">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                     <div className="space-y-0.5">
-                      <p className="text-[10px] text-amber-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5 text-amber-200" /> Salso Siap Ditarik
+                      <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Salso Siap Ditarik
                       </p>
                       <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
                         {formatMoney(profile.balance)}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-amber-100/90 pt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-blue-100/90 pt-0.5">
                         <span>Min: <strong className="text-white">{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong></span>
                         <span>•</span>
                         <span>Max: <strong className="text-white">{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong></span>
@@ -1410,7 +1410,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       onClick={() => setActiveView("referral")}
                       className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold text-xs h-8 px-3 rounded-xl border border-white/30 shadow-2xs gap-1 shrink-0"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                      <Sparkles className="w-3.5 h-3.5 text-blue-200" />
                       Bonus Referral
                       <ArrowRight className="w-3 h-3" />
                     </Button>
@@ -1418,7 +1418,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
@@ -1432,7 +1432,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       className={`text-[10px] font-bold px-2 py-0.5 ${
                         activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
                           ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                          : "bg-amber-50 text-amber-800 border-amber-300"
+                          : "bg-blue-50 text-blue-800 border-blue-300"
                       }`}
                     >
                       {currentFeeBadgeText}
@@ -1444,19 +1444,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1">
-                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">1</span>
+                          <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">1</span>
                           Pilih Metode Pembayaran
                         </Label>
                       </div>
 
-                      <div className="inline-flex p-1 bg-amber-100/60 border border-amber-200/60 rounded-xl gap-1 text-xs font-medium w-full sm:w-auto">
+                      <div className="inline-flex p-1 bg-blue-100/60 border border-blue-200/60 rounded-xl gap-1 text-xs font-medium w-full sm:w-auto">
                         <button
                           type="button"
                           onClick={() => handleSelectCategory("ewallet")}
                           className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                             categoryTab === "ewallet"
-                              ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs"
-                              : "text-amber-950 hover:text-amber-900"
+                              ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-xs"
+                              : "text-blue-950 hover:text-blue-900"
                           }`}
                         >
                           <Smartphone className="w-3.5 h-3.5" />
@@ -1467,8 +1467,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           onClick={() => handleSelectCategory("bank")}
                           className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                             categoryTab === "bank"
-                              ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs"
-                              : "text-amber-950 hover:text-amber-900"
+                              ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-xs"
+                              : "text-blue-950 hover:text-blue-900"
                           }`}
                         >
                           <Building2 className="w-3.5 h-3.5" />
@@ -1488,20 +1488,20 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                               onClick={() => setMethod(m.method)}
                               className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 select-none ${
                                 isSelected
-                                  ? "border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50/80 ring-2 ring-amber-500/30 shadow-xs"
-                                  : "border-gray-200 bg-white hover:border-amber-300"
+                                  ? "border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50/80 ring-2 ring-blue-500/30 shadow-xs"
+                                  : "border-gray-200 bg-white hover:border-blue-300"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <div className="flex items-center gap-1 min-w-0">
                                   {isEWallet ? (
-                                    <Smartphone className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
+                                    <Smartphone className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
                                   ) : (
-                                    <Building2 className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`} />
+                                    <Building2 className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
                                   )}
                                   <span className="font-bold text-xs text-gray-900 truncate">{m.method}</span>
                                 </div>
-                                {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                                {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                               </div>
 
                               <Badge
@@ -1509,7 +1509,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                 className={`text-[9px] w-fit font-semibold px-1.5 py-0 ${
                                   m.feeType === "free" || m.feeValue <= 0
                                     ? "bg-emerald-100 text-emerald-800"
-                                    : "bg-amber-100 text-amber-800"
+                                    : "bg-blue-100 text-blue-800"
                                 }`}
                               >
                                 {feeBadge}
@@ -1522,7 +1522,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
                     <div className="space-y-2 pt-2 border-t border-gray-100">
                       <Label htmlFor="amount" className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1">
-                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">2</span>
+                        <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">2</span>
                         Nominal Penarikan
                       </Label>
 
@@ -1531,7 +1531,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         value={amount}
                         onChange={(val) => setAmount(val)}
                         placeholder="Contoh: 100.000"
-                        className="font-mono text-sm font-semibold h-10 border-gray-200 focus-visible:ring-amber-500 rounded-xl"
+                        className="font-mono text-sm font-semibold h-10 border-gray-200 focus-visible:ring-blue-500 rounded-xl"
                         required
                       />
 
@@ -1551,8 +1551,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             onClick={() => setAmount(chip.value)}
                             className={`text-[11px] h-6 px-2.5 rounded-full ${
                               amount === chip.value
-                                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 font-bold"
-                                : "bg-slate-50 text-gray-700 hover:bg-amber-50 border-gray-200"
+                                ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-400 font-bold"
+                                : "bg-slate-50 text-gray-700 hover:bg-blue-50 border-gray-200"
                             }`}
                           >
                             {chip.label}
@@ -1563,7 +1563,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
                     <div className="space-y-2 pt-2 border-t border-gray-100">
                       <Label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1">
-                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">3</span>
+                        <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">3</span>
                         Detail Akun Penerima
                       </Label>
 
@@ -1577,7 +1577,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             value={account}
                             onChange={(e) => setAccount(e.target.value)}
                             placeholder={`Nomor HP ${method} / Rekening`}
-                            className="mt-1 border-gray-200 focus-visible:ring-amber-500 rounded-xl h-9 text-xs"
+                            className="mt-1 border-gray-200 focus-visible:ring-blue-500 rounded-xl h-9 text-xs"
                             required
                           />
                         </div>
@@ -1590,24 +1590,24 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             value={accountHolderName}
                             onChange={(e) => setAccountHolderName(e.target.value)}
                             placeholder="Nama pemilik rekening"
-                            className="mt-1 border-gray-200 focus-visible:ring-amber-500 rounded-xl h-9 text-xs"
+                            className="mt-1 border-gray-200 focus-visible:ring-blue-500 rounded-xl h-9 text-xs"
                             required
                           />
                         </div>
                       </div>
 
-                      <div className="p-3 bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-amber-100/30 rounded-xl border border-amber-200/80 space-y-1.5 text-xs">
+                      <div className="p-3 bg-gradient-to-br from-blue-50/80 via-orange-50/40 to-blue-100/30 rounded-xl border border-blue-200/80 space-y-1.5 text-xs">
                         <div className="flex justify-between items-center text-gray-600">
                           <span>Nominal Penarikan:</span>
                           <span className="font-bold text-gray-900">{formatMoney(amount)}</span>
                         </div>
                         <div className="flex justify-between items-center text-gray-600">
                           <span>Biaya Admin ({activeMethodConfig.method}):</span>
-                          <span className={calculatedFee > 0 ? "font-bold text-amber-700" : "font-bold text-emerald-700"}>
+                          <span className={calculatedFee > 0 ? "font-bold text-blue-700" : "font-bold text-emerald-700"}>
                             {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Free)"}
                           </span>
                         </div>
-                        <div className="pt-1.5 border-t border-amber-200/80 flex justify-between items-center text-xs sm:text-sm">
+                        <div className="pt-1.5 border-t border-blue-200/80 flex justify-between items-center text-xs sm:text-sm">
                           <span className="font-bold text-gray-900">Net Saldo Diterima:</span>
                           <span className="font-black text-emerald-700">{formatMoney(calculatedNet)}</span>
                         </div>
@@ -1617,7 +1617,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     <Button
                       type="submit"
                       disabled={withdrawing}
-                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 gap-2 text-xs rounded-xl shadow-sm border border-amber-400/20 active:scale-95 transition-transform"
+                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold h-10 gap-2 text-xs rounded-xl shadow-sm border border-blue-400/20 active:scale-95 transition-transform"
                     >
                       {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
                       Ajukan Penarikan ({formatMoney(calculatedNet)})
@@ -1649,10 +1649,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 8. BANTUAN CS VIEW ==================== */}
           {activeView === "cs" && (
             <div className="space-y-4">
-              <Card className="bg-white border-amber-100 shadow-xs">
+              <Card className="bg-white border-blue-100 shadow-xs">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-amber-600" />
+                    <HelpCircle className="w-4 h-4 text-blue-600" />
                     Pusat Bantuan & Layanan Pelanggan
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -1661,22 +1661,22 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
+                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
                             <TelegramIcon className="w-4 h-4" />
                           </div>
                           <span className="font-extrabold text-sm text-[#FFB74D]">CS Telegram</span>
                         </div>
-                        <p className="text-xs text-[#FFE0B2]/80 leading-relaxed">
+                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
                           Layanan cepat penanganan kendala akun, email setoran, dan status payout saldo.
                         </p>
                       </div>
                       {supportConfig.telegramUrl ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-amber-400/30"
+                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
                         >
                           <a
                             href={supportConfig.telegramUrl}
@@ -1695,22 +1695,22 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       )}
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-[#2D1B00] border border-amber-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
+                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-amber-500/20 text-[#FFB74D] border border-amber-500/30">
+                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
                             <MessageCircle className="w-4 h-4" />
                           </div>
                           <span className="font-extrabold text-sm text-[#FFB74D]">Komunitas WhatsApp</span>
                         </div>
-                        <p className="text-xs text-[#FFE0B2]/80 leading-relaxed">
+                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
                           Saluran resmi informasi worker, update jam operasional, dan diskusi komunitas.
                         </p>
                       </div>
                       {supportConfig.communityWaLink ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-amber-400/30"
+                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
                         >
                           <a
                             href={supportConfig.communityWaLink}
@@ -1737,24 +1737,24 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
           {activeView === "chat" && (
             <div className="space-y-4">
-              <Card className="bg-white border-amber-200/80 shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
+              <Card className="bg-white border-blue-200/80 shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
                 {/* CHAT HEADER */}
-                <CardHeader className="p-3 sm:p-4 bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-500/10 border-b border-amber-200/80 shrink-0">
+                <CardHeader className="p-3 sm:p-4 bg-gradient-to-r from-blue-500/10 via-amber-50/50 to-indigo-500/10 border-b border-blue-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-700 border border-amber-400/30 shrink-0">
+                      <div className="p-2 rounded-xl bg-blue-500/20 text-blue-700 border border-blue-400/30 shrink-0">
                         <MessageSquare className="w-5 h-5" />
                       </div>
                       <div>
                         <CardTitle className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5">
                           <span>Chat Resmi Admin / CS</span>
                         </CardTitle>
-                        <CardDescription className="text-[11px] text-amber-900/80 font-medium">
+                        <CardDescription className="text-[11px] text-blue-900/80 font-medium">
                           Saluran percakapan privat 1-on-1 langsung dengan Admin.
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-900 border-amber-300 font-bold hidden sm:inline-flex">
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-900 border-blue-300 font-bold hidden sm:inline-flex">
                       Privat & Aman
                     </Badge>
                   </div>
@@ -1764,12 +1764,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <CardContent className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 bg-slate-50/50">
                   {workerMessagesData.loading ? (
                     <div className="flex items-center justify-center py-12 text-xs text-gray-500 gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                       Memuat pesan chat...
                     </div>
                   ) : workerMessagesData.messages.length === 0 ? (
-                    <div className="p-8 text-center border border-dashed border-amber-200/80 rounded-2xl bg-white space-y-2">
-                      <div className="p-3 rounded-full bg-amber-50 text-amber-600 w-fit mx-auto border border-amber-200/60">
+                    <div className="p-8 text-center border border-dashed border-blue-200/80 rounded-2xl bg-white space-y-2">
+                      <div className="p-3 rounded-full bg-blue-50 text-blue-600 w-fit mx-auto border border-blue-200/60">
                         <MessageCircle className="w-6 h-6" />
                       </div>
                       <p className="text-xs font-bold text-gray-900">Belum Ada Pesan</p>
@@ -1802,8 +1802,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             <div
                               className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs relative ${
                                 isMe
-                                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-br-none"
-                                  : "bg-white border border-amber-200/80 text-gray-900 rounded-bl-none"
+                                  ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-br-none"
+                                  : "bg-white border border-blue-200/80 text-gray-900 rounded-bl-none"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
@@ -1812,7 +1812,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                   <button
                                     type="button"
                                     onClick={() => setDeleteChatModalMsg(msg)}
-                                    className="opacity-0 group-hover:opacity-100 hover:text-amber-200 p-0.5 transition-opacity"
+                                    className="opacity-0 group-hover:opacity-100 hover:text-blue-200 p-0.5 transition-opacity"
                                     title="Opsi Pesan"
                                   >
                                     <MoreVertical className="w-3 h-3" />
@@ -1841,7 +1841,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
                               <div className="flex items-center justify-end gap-1 text-[9px] font-mono mt-1 opacity-80">
                                 {msg.disappearingTimer && msg.disappearingTimer !== "off" && (
-                                  <span className="flex items-center gap-0.5 text-amber-200" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
+                                  <span className="flex items-center gap-0.5 text-blue-200" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
                                     <Timer className="w-2.5 h-2.5" />
                                   </span>
                                 )}
@@ -1851,7 +1851,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                     {isRead ? (
                                       <CheckCheck className="w-3.5 h-3.5 text-sky-200" />
                                     ) : (
-                                      <Check className="w-3 h-3 text-amber-100" />
+                                      <Check className="w-3 h-3 text-blue-100" />
                                     )}
                                   </span>
                                 )}
@@ -1867,7 +1867,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 {/* CHAT INPUT FORM */}
                 <form
                   onSubmit={handleSendWorkerChat}
-                  className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
+                  className="p-3 bg-white border-t border-blue-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
@@ -1877,7 +1877,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       <select
                         value={chatTimerOption}
                         onChange={(e) => setChatTimerOption(e.target.value as DisappearingTimer)}
-                        className="text-[11px] h-10 px-2 rounded-xl bg-amber-50/50 border border-amber-200/80 text-amber-900 font-semibold focus:outline-none min-h-[44px]"
+                        className="text-[11px] h-10 px-2 rounded-xl bg-blue-50/50 border border-blue-200/80 text-blue-900 font-semibold focus:outline-none min-h-[44px]"
                         title="Timer Pesan Menghilang"
                       >
                         <option value="off">⏱️ Timer Off</option>
@@ -1893,13 +1893,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     value={workerChatText}
                     onChange={(e) => setWorkerChatText(e.target.value)}
                     disabled={sendingWorkerChat}
-                    className="text-xs h-10 bg-amber-50/30 border-amber-200/80 text-gray-900 focus:border-amber-500 flex-1 rounded-xl min-h-[44px]"
+                    className="text-xs h-10 bg-blue-50/30 border-blue-200/80 text-gray-900 focus:border-blue-500 flex-1 rounded-xl min-h-[44px]"
                   />
 
                   <Button
                     type="submit"
                     disabled={sendingWorkerChat || !workerChatText.trim()}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-amber-400/20 shrink-0 min-h-[44px]"
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-blue-400/20 shrink-0 min-h-[44px]"
                   >
                     {sendingWorkerChat ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1912,7 +1912,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
               {/* DELETE MESSAGE CONFIRMATION DIALOG */}
               <Dialog open={!!deleteChatModalMsg} onOpenChange={(open) => !open && setDeleteChatModalMsg(null)}>
-                <DialogContent className="max-w-md bg-white border-amber-200">
+                <DialogContent className="max-w-md bg-white border-blue-200">
                   <DialogHeader>
                     <DialogTitle className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
                       <Trash2 className="w-4 h-4 text-rose-600" />
@@ -1934,9 +1934,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           onClick={() => handleDeleteMessageForMe(deleteChatModalMsg)}
                           disabled={deletingChat}
                           variant="outline"
-                          className="w-full text-xs h-10 justify-start font-semibold border-amber-200 hover:bg-amber-50 min-h-[44px]"
+                          className="w-full text-xs h-10 justify-start font-semibold border-blue-200 hover:bg-blue-50 min-h-[44px]"
                         >
-                          <Trash2 className="w-4 h-4 text-amber-600 mr-2" />
+                          <Trash2 className="w-4 h-4 text-blue-600 mr-2" />
                           Hapus untuk Saya (Sembunyikan hanya di perangkat Anda)
                         </Button>
 
@@ -1964,7 +1964,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               <Card className="bg-white border-gray-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                    <Megaphone className="w-4 h-4 text-amber-600" />
+                    <Megaphone className="w-4 h-4 text-blue-600" />
                     Pusat Pengumuman & Informasi Resmi
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -1993,7 +1993,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
                           badgeStyle = "bg-red-100 text-red-800 hover:bg-red-100";
                         } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
-                          badgeStyle = "bg-amber-100 text-amber-800 hover:bg-amber-100";
+                          badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
                         } else if (badgeUpper === "INFO") {
                           badgeStyle = "bg-sky-100 text-sky-800 hover:bg-sky-100";
                         }
@@ -2040,12 +2040,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("home")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "home"
-                  ? "text-amber-400 font-bold scale-105"
+                  ? "text-blue-400 font-bold scale-105"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {activeView === "home" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
               )}
               <Home className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">Home</span>
@@ -2057,11 +2057,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("submit")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "submit"
-                  ? "text-amber-400 font-bold scale-105"
+                  ? "text-blue-400 font-bold scale-105"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <div className="p-1 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 shadow-md shadow-amber-500/20 mb-0.5">
+              <div className="p-1 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-slate-950 shadow-md shadow-blue-500/20 mb-0.5">
                 <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               </div>
               <span className="text-[10px] tracking-tight font-semibold">Setor</span>
@@ -2073,12 +2073,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("withdraw")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "withdraw"
-                  ? "text-amber-400 font-bold scale-105"
+                  ? "text-blue-400 font-bold scale-105"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {activeView === "withdraw" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
               )}
               <Wallet className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">Withdraw</span>
@@ -2090,12 +2090,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setActiveView("cs")}
               className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
                 activeView === "cs"
-                  ? "text-amber-400 font-bold scale-105"
+                  ? "text-blue-400 font-bold scale-105"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {activeView === "cs" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
               )}
               <HelpCircle className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] tracking-tight">CS</span>
@@ -2107,7 +2107,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               onClick={() => setIsMobileSidebarOpen(true)}
               className="relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] text-slate-400 hover:text-slate-200"
             >
-              <Menu className="w-5 h-5 mb-0.5 text-amber-400" />
+              <Menu className="w-5 h-5 mb-0.5 text-blue-400" />
               <span className="text-[10px] tracking-tight font-semibold">Menu</span>
             </button>
           </nav>
@@ -2156,7 +2156,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       </div>
                       <div>
                         <span className="text-gray-500">Total Didapat:</span>
-                        <p className="font-bold text-amber-700">{formatMoney(earned)}</p>
+                        <p className="font-bold text-blue-700">{formatMoney(earned)}</p>
                       </div>
                     </div>
 
@@ -2165,7 +2165,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                         <Label className="text-xs text-gray-600">
                           Status per Alamat Email ({baseItems.length} item):
                         </Label>
-                        <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
+                        <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-800 border-blue-300">
                           Rate: {formatMoney(pricePerItem)}/akun
                         </Badge>
                       </div>
@@ -2181,7 +2181,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                   ? "bg-green-50/60 border-green-200"
                                   : st === "rejected"
                                     ? "bg-red-50/60 border-red-200"
-                                    : "bg-amber-50/60 border-amber-200"
+                                    : "bg-blue-50/60 border-blue-200"
                               }`}
                             >
                               <div className="min-w-0 flex-1">
@@ -2197,7 +2197,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                     ? "bg-green-100 text-green-800 hover:bg-green-100"
                                     : st === "rejected"
                                       ? "bg-red-100 text-red-800 hover:bg-red-100"
-                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                      : "bg-blue-100 text-blue-800 hover:bg-blue-100"
                                 }`}
                               >
                                 {st === "approved" ? "✓ Terjual" : st === "rejected" ? "X Ditolak" : "Menunggu"}
@@ -2209,7 +2209,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     </div>
 
                     {detailSubmission.reviewNote && (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
                         <p className="font-bold mb-0.5">Catatan Admin:</p>
                         <p className="italic">{detailSubmission.reviewNote}</p>
                       </div>

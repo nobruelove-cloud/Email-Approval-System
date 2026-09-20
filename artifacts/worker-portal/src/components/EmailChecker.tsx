@@ -209,16 +209,16 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
     <div className="space-y-6">
       {/* 1. DISCLAIMER BANNER (WORKER & ADMIN) */}
       {!isAdminView && (
-        <Card className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-amber-300/80 shadow-xs">
+        <Card className="bg-gradient-to-r from-blue-500/15 via-orange-500/10 to-blue-500/15 border-blue-300/80 shadow-xs">
           <CardContent className="p-4 sm:p-5 flex items-start gap-3.5">
-            <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shrink-0 mt-0.5 shadow-xs">
+            <div className="p-2.5 rounded-xl bg-blue-500 text-slate-950 font-black shrink-0 mt-0.5 shadow-xs">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-extrabold text-amber-950 text-sm tracking-tight uppercase flex items-center gap-1.5">
+              <h4 className="font-extrabold text-blue-950 text-sm tracking-tight uppercase flex items-center gap-1.5">
                 <span>CATATAN PENTING (DISCLAIMER)</span>
               </h4>
-              <p className="text-xs text-amber-900 leading-relaxed font-medium">
+              <p className="text-xs text-blue-900 leading-relaxed font-medium">
                 Tools Checker ini berfungsi sebagai alat bantu screening awal (Format Rules & Status Aktif). Hasil di Checker <strong>TIDAK MENJAMIN 100%</strong> email pasti di-ACC oleh Vendor. Keputusan akhir ACC dan pencairan saldo tetap sepenuhnya mengikuti verifikasi akhir sistem Vendor.
               </p>
             </div>
@@ -330,19 +330,19 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
       )}
 
       {/* 2. BULK TEXTAREA INPUT & CHECKER PANEL */}
-      <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-amber-100 shadow-xs"}>
+      <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-blue-100 shadow-xs"}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className={`text-base font-bold flex items-center gap-2 ${isAdminView ? "text-slate-100" : "text-gray-900"}`}>
-                <ShieldCheck className={`w-4 h-4 ${isAdminView ? "text-emerald-400" : "text-amber-600"}`} />
+                <ShieldCheck className={`w-4 h-4 ${isAdminView ? "text-emerald-400" : "text-blue-600"}`} />
                 Input Massal Checker Status & Screening Format
               </CardTitle>
               <CardDescription className={`text-xs ${isAdminView ? "text-slate-400" : "text-gray-600"}`}>
                 Masukkan multi-line email. Dukungan format: <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email|password</code>, <code className="font-mono bg-slate-800 px-1 py-0.5 rounded text-[11px]">email:password</code>, atau pemisah spasi.
               </CardDescription>
             </div>
-            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-xs" : "bg-amber-50 text-amber-900 border-amber-300 font-bold text-xs"}>
+            <Badge variant="outline" className={isAdminView ? "bg-slate-800 text-slate-300 border-slate-700 font-mono text-xs" : "bg-blue-50 text-blue-900 border-blue-300 font-bold text-xs"}>
               Rules: {activeConfigToUse.minBirthYear}-{activeConfigToUse.maxBirthYear} · Digit ≤ {activeConfigToUse.maxUsernameDigits}
             </Badge>
           </div>
@@ -350,11 +350,11 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
         <CardContent className="space-y-4">
           {/* DEDICATED MASTER PASSWORD INPUT FIELD */}
           <div className={`p-4 rounded-xl border space-y-2 ${
-            isAdminView ? "bg-slate-955 border-slate-800" : "bg-amber-50/60 border-amber-200/80"
+            isAdminView ? "bg-slate-955 border-slate-800" : "bg-blue-50/60 border-blue-200/80"
           }`}>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <Label className={`text-xs font-extrabold uppercase tracking-wide flex items-center gap-1.5 ${
-                isAdminView ? "text-emerald-400" : "text-amber-950"
+                isAdminView ? "text-emerald-400" : "text-blue-950"
               }`}>
                 <span>Master Password Setoran</span>
               </Label>
@@ -391,7 +391,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
               className={`font-mono text-xs h-9 rounded-lg ${
                 isAdminView
                   ? "bg-slate-900 border-slate-800 text-slate-100 focus-visible:ring-emerald-500"
-                  : "bg-white border-gray-200 text-gray-900 focus-visible:ring-amber-500"
+                  : "bg-white border-gray-200 text-gray-900 focus-visible:ring-blue-500"
               }`}
             />
             <p className={`text-[11px] ${isAdminView ? "text-slate-400" : "text-gray-500"}`}>
@@ -422,7 +422,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
               className={`font-mono text-xs rounded-xl ${
                 isAdminView
                   ? "bg-slate-955/90 border-slate-800 text-slate-100 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
-                  : "bg-white border-gray-200 text-gray-900 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                  : "bg-white border-gray-200 text-gray-900 focus-visible:ring-blue-500 focus-visible:border-blue-500"
               }`}
             />
           </div>
@@ -430,7 +430,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
           {/* SUMMARY STATS & ONE-CLICK COPY CTA */}
           {checkResult.total > 0 && (
             <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-              isAdminView ? "bg-slate-955 border-slate-800" : "bg-gradient-to-r from-amber-50 to-orange-50/60 border-amber-200/80"
+              isAdminView ? "bg-slate-955 border-slate-800" : "bg-gradient-to-r from-blue-50 to-indigo-50/60 border-blue-200/80"
             }`}>
               <div className="flex items-center gap-4 text-xs">
                 <div>
@@ -453,7 +453,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 className={`font-bold text-xs h-11 min-h-[44px] px-4 rounded-xl shrink-0 gap-1.5 shadow-sm active:scale-95 transition-transform ${
                   isAdminView
                     ? "bg-emerald-500 hover:bg-emerald-600 text-slate-955"
-                    : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                    : "bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
                 }`}
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -466,7 +466,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
 
       {/* 3. INTERACTIVE FILTER TABS & RESULTS TABLE */}
       {checkResult.total > 0 && (
-        <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-amber-100 shadow-xs"}>
+        <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl" : "bg-white border-blue-100 shadow-xs"}>
           <CardHeader className="pb-3 border-b border-gray-100 dark:border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* FILTER PILLS */}
@@ -478,7 +478,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                     filterTab === "ALL"
                       ? isAdminView
                         ? "bg-emerald-500 text-slate-955 shadow-xs"
-                        : "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs"
+                        : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-xs"
                       : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                   }`}
                 >
@@ -539,7 +539,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className={`border-b font-bold ${
-                        isAdminView ? "bg-slate-955 border-slate-800 text-slate-300" : "bg-amber-50/80 border-amber-200 text-amber-950"
+                        isAdminView ? "bg-slate-955 border-slate-800 text-slate-300" : "bg-blue-50/80 border-blue-200 text-blue-950"
                       }`}>
                         <tr>
                           <th className="px-3.5 py-2.5">#</th>
