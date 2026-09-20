@@ -392,7 +392,7 @@ export function TransactionHistory({
                 Menampilkan <strong className="text-gray-900 font-bold">{startIndex + 1}–{endIndex}</strong> dari <strong className="text-gray-900 font-bold">{totalItems}</strong> transaksi
               </div>
 
-              {/* DARK SLATE PAGINATION CONTROLS */}
+              {/* LIGHT PAGINATION CONTROLS */}
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -400,14 +400,14 @@ export function TransactionHistory({
                   size="sm"
                   disabled={validCurrentPage <= 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-40 disabled:pointer-events-none text-xs h-8 px-3 rounded-xl font-bold gap-1 shadow-xs"
+                  className="bg-white border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-40 disabled:pointer-events-none text-xs h-8 px-3 rounded-xl font-bold gap-1 shadow-2xs"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   Previous
                 </Button>
 
-                <div data-testid="pagination-page-indicator" className="px-3 py-1 bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs font-bold rounded-xl shadow-2xs">
-                  Page <span className="text-blue-400">{validCurrentPage}</span> of {totalPages}
+                <div data-testid="pagination-page-indicator" className="px-3 py-1 bg-blue-50/80 border border-blue-200/80 text-blue-950 font-mono text-xs font-bold rounded-xl shadow-2xs">
+                  Page <span className="text-blue-600">{validCurrentPage}</span> of {totalPages}
                 </div>
 
                 <Button
@@ -416,7 +416,7 @@ export function TransactionHistory({
                   size="sm"
                   disabled={validCurrentPage >= totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-40 disabled:pointer-events-none text-xs h-8 px-3 rounded-xl font-bold gap-1 shadow-xs"
+                  className="bg-white border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-40 disabled:pointer-events-none text-xs h-8 px-3 rounded-xl font-bold gap-1 shadow-2xs"
                 >
                   Next
                   <ChevronRight className="w-3.5 h-3.5" />
