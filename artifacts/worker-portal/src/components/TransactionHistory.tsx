@@ -137,12 +137,12 @@ export function TransactionHistory({
   };
 
   return (
-    <Card className="bg-white border-amber-100 shadow-xs">
+    <Card className="bg-white border-blue-100 shadow-xs">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-base font-bold flex items-center gap-2 text-gray-900">
-              <Wallet className="w-4 h-4 text-amber-600 shrink-0" />
+              <Wallet className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Riwayat Transaksi</span>
             </CardTitle>
             <CardDescription className="text-xs text-gray-600 mt-0.5">
@@ -206,11 +206,11 @@ export function TransactionHistory({
                 onClick={() => handleStatusFilterChange("pending")}
                 className={`text-xs h-8 px-3 rounded-xl transition-colors font-semibold gap-1.5 ${
                   statusFilter === "pending"
-                    ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-xs"
-                    : "bg-amber-50/80 text-amber-800 hover:bg-amber-100 border-amber-200"
+                    ? "bg-blue-500 text-white border-blue-600 hover:bg-blue-600 shadow-xs"
+                    : "bg-blue-50/80 text-blue-800 hover:bg-blue-100 border-blue-200"
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <Clock className="w-3.5 h-3.5 text-blue-400" />
                 Pending ({statusCounts.pending})
               </Button>
 
@@ -237,7 +237,7 @@ export function TransactionHistory({
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Cari transaksi / ID..."
-                className="pl-8 text-xs h-8 bg-slate-50 border-gray-200 focus-visible:ring-amber-500 rounded-xl"
+                className="pl-8 text-xs h-8 bg-slate-50 border-gray-200 focus-visible:ring-blue-500 rounded-xl"
               />
             </div>
           </div>
@@ -250,8 +250,8 @@ export function TransactionHistory({
         )}
 
         {!loading && transactions.length === 0 && (
-          <div className="p-8 border border-dashed border-amber-200 rounded-2xl text-center space-y-2 bg-amber-50/20">
-            <Wallet className="w-8 h-8 text-amber-400 mx-auto" />
+          <div className="p-8 border border-dashed border-blue-200 rounded-2xl text-center space-y-2 bg-blue-50/20">
+            <Wallet className="w-8 h-8 text-blue-400 mx-auto" />
             <p className="text-sm font-bold text-gray-800">Belum Ada Riwayat Transaksi</p>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
               Anda belum memiliki riwayat penarikan saldo atau penerimaan bonus reward.
@@ -273,7 +273,7 @@ export function TransactionHistory({
                 setStatusFilter("all");
                 setSearchQuery("");
               }}
-              className="text-xs h-8 mt-2 rounded-xl border-amber-200 hover:bg-amber-50 text-amber-950 font-bold"
+              className="text-xs h-8 mt-2 rounded-xl border-blue-200 hover:bg-blue-50 text-blue-950 font-bold"
             >
               Reset Filter
             </Button>
@@ -286,7 +286,7 @@ export function TransactionHistory({
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-amber-100 text-amber-950 bg-amber-50/50">
+                  <tr className="border-b border-blue-100 text-blue-950 bg-blue-50/50">
                     <th className="py-2.5 px-3 font-bold">Tanggal & ID</th>
                     <th className="py-2.5 px-3 font-bold">Jenis Transaksi</th>
                     <th className="py-2.5 px-3 font-bold">Keterangan</th>
@@ -296,7 +296,7 @@ export function TransactionHistory({
                 </thead>
                 <tbody className="divide-y divide-amber-100/60">
                   {currentPaginatedItems.map(({ raw }) => (
-                    <tr key={raw.id} className="hover:bg-amber-50/40 transition-colors">
+                    <tr key={raw.id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3 align-top whitespace-nowrap">
                         <p className="font-bold text-gray-900">#{shortId(raw.id)}</p>
                         <p className="text-[11px] text-gray-400">{formatDateTime(raw.date)}</p>
@@ -338,7 +338,7 @@ export function TransactionHistory({
               {currentPaginatedItems.map(({ raw }) => (
                 <div
                   key={raw.id}
-                  className="p-3.5 rounded-2xl border border-amber-200/80 bg-white shadow-2xs hover:border-amber-300 transition-all space-y-2"
+                  className="p-3.5 rounded-2xl border border-blue-200/80 bg-white shadow-2xs hover:border-blue-300 transition-all space-y-2"
                 >
                   {/* TOP ROW: TYPE BADGE & STATUS */}
                   <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2">
@@ -365,7 +365,7 @@ export function TransactionHistory({
                       {raw.description}
                     </p>
                     {raw.note && (
-                      <p className="text-[11px] text-gray-500 italic bg-amber-50/60 p-2 rounded-lg border border-amber-100/80">
+                      <p className="text-[11px] text-gray-500 italic bg-blue-50/60 p-2 rounded-lg border border-blue-100/80">
                         Catatan: {raw.note}
                       </p>
                     )}
@@ -407,7 +407,7 @@ export function TransactionHistory({
                 </Button>
 
                 <div data-testid="pagination-page-indicator" className="px-3 py-1 bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs font-bold rounded-xl shadow-2xs">
-                  Page <span className="text-amber-400">{validCurrentPage}</span> of {totalPages}
+                  Page <span className="text-blue-400">{validCurrentPage}</span> of {totalPages}
                 </div>
 
                 <Button

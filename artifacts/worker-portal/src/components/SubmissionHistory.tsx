@@ -182,12 +182,12 @@ export function SubmissionHistory({
   };
 
   return (
-    <Card className="bg-white border-amber-100 shadow-xs">
+    <Card className="bg-white border-blue-100 shadow-xs">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-base font-bold flex items-center gap-2 text-gray-900">
-              <History className="w-4 h-4 text-amber-600 shrink-0" />
+              <History className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Riwayat Storan Email</span>
             </CardTitle>
             <CardDescription className="text-xs text-gray-600 mt-0.5">
@@ -251,11 +251,11 @@ export function SubmissionHistory({
                 onClick={() => handleStatusFilterChange("pending")}
                 className={`text-xs h-8 px-3 rounded-xl transition-colors font-semibold gap-1.5 ${
                   statusFilter === "pending"
-                    ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-xs"
-                    : "bg-amber-50/80 text-amber-800 hover:bg-amber-100 border-amber-200"
+                    ? "bg-blue-500 text-white border-blue-600 hover:bg-blue-600 shadow-xs"
+                    : "bg-blue-50/80 text-blue-800 hover:bg-blue-100 border-blue-200"
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <Clock className="w-3.5 h-3.5 text-blue-400" />
                 Pending ({statusCounts.pending})
               </Button>
 
@@ -282,7 +282,7 @@ export function SubmissionHistory({
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Cari ID / email..."
-                className="pl-8 text-xs h-8 bg-slate-50 border-gray-200 focus-visible:ring-amber-500 rounded-xl"
+                className="pl-8 text-xs h-8 bg-slate-50 border-gray-200 focus-visible:ring-blue-500 rounded-xl"
               />
             </div>
           </div>
@@ -295,8 +295,8 @@ export function SubmissionHistory({
         )}
 
         {!loading && submissions.length === 0 && (
-          <div className="p-8 border border-dashed border-amber-200 rounded-2xl text-center space-y-2 bg-amber-50/20">
-            <History className="w-8 h-8 text-amber-400 mx-auto" />
+          <div className="p-8 border border-dashed border-blue-200 rounded-2xl text-center space-y-2 bg-blue-50/20">
+            <History className="w-8 h-8 text-blue-400 mx-auto" />
             <p className="text-sm font-bold text-gray-800">Belum Ada Storan Email</p>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
               Anda belum mengirim setoran email. Buka tab STORAN untuk mengirim batch email pertama Anda.
@@ -318,7 +318,7 @@ export function SubmissionHistory({
                 setStatusFilter("all");
                 setSearchQuery("");
               }}
-              className="text-xs h-8 mt-2 rounded-xl border-amber-200 hover:bg-amber-50 text-amber-950 font-bold"
+              className="text-xs h-8 mt-2 rounded-xl border-blue-200 hover:bg-blue-50 text-blue-950 font-bold"
             >
               Reset Filter
             </Button>
@@ -331,7 +331,7 @@ export function SubmissionHistory({
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-amber-100 text-amber-950 bg-amber-50/50">
+                  <tr className="border-b border-blue-100 text-blue-950 bg-blue-50/50">
                     <th className="py-2.5 px-3 font-bold">Tanggal & ID</th>
                     <th className="py-2.5 px-3 font-bold">Jumlah Email</th>
                     <th className="py-2.5 px-3 font-bold">Tier & Harga</th>
@@ -343,7 +343,7 @@ export function SubmissionHistory({
                 </thead>
                 <tbody className="divide-y divide-amber-100/60">
                   {currentPaginatedItems.map(({ raw, count, approvedCount, rejectedCount, pendingCount, tierCfg, pricePerItem, earnedAmount }) => (
-                    <tr key={raw.id} className="hover:bg-amber-50/40 transition-colors">
+                    <tr key={raw.id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3 align-top whitespace-nowrap">
                         <p className="font-bold text-gray-900">#{shortId(raw.id)}</p>
                         <p className="text-[11px] text-gray-400">{formatDateTime(raw.submittedAt)}</p>
@@ -352,7 +352,7 @@ export function SubmissionHistory({
                         {count} Email
                       </td>
                       <td className="py-3 px-3 align-top whitespace-nowrap">
-                        <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-900 border-amber-300 font-bold">
+                        <Badge variant="outline" className="text-[11px] py-0 bg-blue-50 text-blue-900 border-blue-300 font-bold">
                           {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                         </Badge>
                       </td>
@@ -361,12 +361,12 @@ export function SubmissionHistory({
                           <p className="text-emerald-600 font-bold">ACC: {approvedCount}</p>
                           <p className="text-rose-600 font-bold">Ditolak: {rejectedCount}</p>
                           {pendingCount > 0 && (
-                            <p className="text-amber-600 font-bold">Menunggu: {pendingCount}</p>
+                            <p className="text-blue-600 font-bold">Menunggu: {pendingCount}</p>
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-3 align-top whitespace-nowrap">
-                        <p className="font-black text-amber-700">{formatMoney(earnedAmount)}</p>
+                        <p className="font-black text-blue-700">{formatMoney(earnedAmount)}</p>
                       </td>
                       <td className="py-3 px-3 align-top whitespace-nowrap">
                         <StatusBadge status={raw.status} />
@@ -381,9 +381,9 @@ export function SubmissionHistory({
                           size="sm"
                           variant="outline"
                           onClick={() => onViewDetail(raw)}
-                          className="text-xs h-7 gap-1 border-amber-200 hover:bg-amber-50 hover:border-amber-300 text-amber-950 font-bold rounded-lg"
+                          className="text-xs h-7 gap-1 border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-blue-950 font-bold rounded-lg"
                         >
-                          <Eye className="w-3.5 h-3.5 text-amber-600" /> Lihat Email
+                          <Eye className="w-3.5 h-3.5 text-blue-600" /> Lihat Email
                         </Button>
                       </td>
                     </tr>
@@ -400,7 +400,7 @@ export function SubmissionHistory({
                 return (
                   <div
                     key={raw.id}
-                    className="p-3.5 rounded-2xl border border-amber-200/80 bg-white shadow-2xs hover:border-amber-300 transition-all space-y-2.5"
+                    className="p-3.5 rounded-2xl border border-blue-200/80 bg-white shadow-2xs hover:border-blue-300 transition-all space-y-2.5"
                   >
                     {/* COLLAPSED HEADER LINE */}
                     <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2.5">
@@ -414,7 +414,7 @@ export function SubmissionHistory({
 
                       <div className="text-right flex items-center gap-1.5">
                         <div>
-                          <p className="text-xs font-black text-amber-700">{formatMoney(earnedAmount)}</p>
+                          <p className="text-xs font-black text-blue-700">{formatMoney(earnedAmount)}</p>
                           <p className="text-[11px] text-gray-600 font-semibold">{count} Email</p>
                         </div>
                         <Button
@@ -422,7 +422,7 @@ export function SubmissionHistory({
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleCardExpanded(raw.id)}
-                          className="w-7 h-7 p-0 text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg shrink-0"
+                          className="w-7 h-7 p-0 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg shrink-0"
                           title={isExpanded ? "Sembunyikan detail" : "Tampilkan detail"}
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -432,11 +432,11 @@ export function SubmissionHistory({
 
                     {/* EXPANDABLE DETAILS */}
                     {isExpanded && (
-                      <div className="pt-1 space-y-3 text-xs bg-amber-50/30 p-3 rounded-xl border border-amber-100">
+                      <div className="pt-1 space-y-3 text-xs bg-blue-50/30 p-3 rounded-xl border border-blue-100">
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
                             <span className="text-gray-500 text-[11px] block">Tier & Harga:</span>
-                            <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-900 border-amber-300 font-bold mt-0.5">
+                            <Badge variant="outline" className="text-[11px] py-0 bg-blue-50 text-blue-900 border-blue-300 font-bold mt-0.5">
                               {tierCfg.name} ({formatMoney(pricePerItem)}/item)
                             </Badge>
                           </div>
@@ -445,13 +445,13 @@ export function SubmissionHistory({
                             <div className="flex items-center gap-2 mt-0.5 font-bold text-[11px]">
                               <span className="text-emerald-600">ACC: {approvedCount}</span>
                               <span className="text-rose-600">Ditolak: {rejectedCount}</span>
-                              {pendingCount > 0 && <span className="text-amber-600">Menunggu: {pendingCount}</span>}
+                              {pendingCount > 0 && <span className="text-blue-600">Menunggu: {pendingCount}</span>}
                             </div>
                           </div>
                         </div>
 
                         {raw.reviewNote && (
-                          <div className="p-2 bg-amber-100/60 rounded-lg text-[11px] text-amber-950">
+                          <div className="p-2 bg-blue-100/60 rounded-lg text-[11px] text-blue-950">
                             <span className="font-bold">Catatan Admin: </span>
                             <span className="italic">{raw.reviewNote}</span>
                           </div>
@@ -462,9 +462,9 @@ export function SubmissionHistory({
                             size="sm"
                             variant="outline"
                             onClick={() => onViewDetail(raw)}
-                            className="w-full text-xs h-8 gap-1.5 border-amber-300 bg-white hover:bg-amber-50 text-amber-950 font-bold rounded-xl shadow-2xs"
+                            className="w-full text-xs h-8 gap-1.5 border-blue-300 bg-white hover:bg-blue-50 text-blue-950 font-bold rounded-xl shadow-2xs"
                           >
-                            <Eye className="w-3.5 h-3.5 text-amber-600" /> Lihat Email
+                            <Eye className="w-3.5 h-3.5 text-blue-600" /> Lihat Email
                           </Button>
                         </div>
                       </div>
@@ -495,7 +495,7 @@ export function SubmissionHistory({
                 </Button>
 
                 <div data-testid="pagination-page-indicator" className="px-3 py-1 bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs font-bold rounded-xl shadow-2xs">
-                  Page <span className="text-amber-400">{validCurrentPage}</span> of {totalPages}
+                  Page <span className="text-blue-400">{validCurrentPage}</span> of {totalPages}
                 </div>
 
                 <Button

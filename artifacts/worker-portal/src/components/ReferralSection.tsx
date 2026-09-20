@@ -43,36 +43,36 @@ export const ReferralSection: React.FC = () => {
   return (
     <div className="referral-container space-y-6">
       {/* 1. Header & Banner Informasi */}
-      <div className="bg-gradient-to-r from-amber-900 to-amber-950 p-6 rounded-2xl text-white">
+      <div className="bg-gradient-to-r from-blue-900 to-blue-950 p-6 rounded-2xl text-white">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full font-medium">
+          <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full font-medium">
             PROGRAM PASIF INCOME KERJA
           </span>
-          <span className="text-xs bg-amber-400 text-slate-950 font-bold px-3 py-1 rounded-full">
+          <span className="text-xs bg-blue-400 text-slate-950 font-bold px-3 py-1 rounded-full">
             Flat: Rp 100 / ACC
           </span>
         </div>
         <h2 className="text-2xl font-bold mb-2">Pasif Income Tanpa Batas</h2>
-        <p className="text-sm text-amber-200/80">
+        <p className="text-sm text-blue-200/80">
           Ajak rekan kerja Anda bergabung. Setiap kali partner Anda menyetor email dan disetujui (ACC) oleh admin, komisi referal otomatis <b>Rp 100</b> LANGSUNG masuk ke Saldo Utama Anda tanpa perlu penarikan terpisah!
         </p>
       </div>
 
       {/* 2. Kalkulator Simulasi Pasif Income */}
-      <div className="bg-amber-950/40 border border-amber-900/50 p-6 rounded-2xl space-y-4">
+      <div className="bg-blue-950/40 border border-blue-900/50 p-6 rounded-2xl space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-amber-100 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-blue-100 flex items-center gap-2">
             📊 Kalkulator Simulasi Profit Income
           </h3>
-          <span className="text-xs text-amber-400 bg-amber-900/60 px-2.5 py-1 rounded-lg">
+          <span className="text-xs text-blue-400 bg-blue-900/60 px-2.5 py-1 rounded-lg">
             Flat: Rp 100 / ACC
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-amber-200/70 block mb-1">
-              JUMLAH DOWNLINE: <span className="text-amber-400 font-bold">{downlineCount} Orang</span>
+            <label className="text-xs text-blue-200/70 block mb-1">
+              JUMLAH DOWNLINE: <span className="text-blue-400 font-bold">{downlineCount} Orang</span>
             </label>
             <input
               type="range"
@@ -85,8 +85,8 @@ export const ReferralSection: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs text-amber-200/70 block mb-1">
-              EMAIL ACC / DOWNLINE / HARI: <span className="text-amber-400 font-bold">{emailPerDay} Email</span>
+            <label className="text-xs text-blue-200/70 block mb-1">
+              EMAIL ACC / DOWNLINE / HARI: <span className="text-blue-400 font-bold">{emailPerDay} Email</span>
             </label>
             <input
               type="range"
@@ -99,25 +99,25 @@ export const ReferralSection: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-amber-900/40">
-          <div className="bg-amber-900/20 p-3 rounded-xl border border-amber-800/30">
-            <span className="text-xs text-amber-300/70 block">ESTIMASI / HARI</span>
-            <span className="text-lg font-bold text-amber-400">Rp {estimasiHarian.toLocaleString('id-ID')}</span>
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-blue-900/40">
+          <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-800/30">
+            <span className="text-xs text-blue-300/70 block">ESTIMASI / HARI</span>
+            <span className="text-lg font-bold text-blue-400">Rp {estimasiHarian.toLocaleString('id-ID')}</span>
           </div>
-          <div className="bg-amber-900/20 p-3 rounded-xl border border-amber-800/30">
-            <span className="text-xs text-amber-300/70 block">ESTIMASI / BULAN (20 HARI)</span>
-            <span className="text-lg font-bold text-amber-400">Rp {estimasiBulanan.toLocaleString('id-ID')}</span>
+          <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-800/30">
+            <span className="text-xs text-blue-300/70 block">ESTIMASI / BULAN (20 HARI)</span>
+            <span className="text-lg font-bold text-blue-400">Rp {estimasiBulanan.toLocaleString('id-ID')}</span>
           </div>
         </div>
       </div>
 
       {/* 3. Input Kode Upline (Saling Sambung 1-on-1) */}
-      <div className="bg-amber-950/30 border border-amber-900/40 p-6 rounded-2xl space-y-4">
-        <h3 className="text-sm font-semibold text-amber-200">🔗 Tautan Referral Saya</h3>
+      <div className="bg-blue-950/30 border border-blue-900/40 p-6 rounded-2xl space-y-4">
+        <h3 className="text-sm font-semibold text-blue-200">🔗 Tautan Referral Saya</h3>
 
         {/* Input Upline / Binding */}
         <div>
-          <label className="text-xs text-amber-300/70 block mb-1.5">
+          <label className="text-xs text-blue-300/70 block mb-1.5">
             Jika Anda belum memiliki pengundang, masukkan kode pengundang / partner di bawah:
           </label>
 
@@ -133,12 +133,12 @@ export const ReferralSection: React.FC = () => {
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
                 disabled={loading}
-                className="flex-1 bg-amber-900/20 border border-amber-800/50 rounded-xl px-4 py-2 text-sm text-amber-100 placeholder-amber-700 focus:outline-none focus:border-amber-500"
+                className="flex-1 bg-blue-900/20 border border-blue-800/50 rounded-xl px-4 py-2 text-sm text-blue-100 placeholder-amber-700 focus:outline-none focus:border-blue-500"
               />
               <button
                 onClick={handleBind}
                 disabled={loading}
-                className="bg-amber-500 hover:bg-amber-600 disabled:bg-amber-800 text-slate-950 font-semibold px-5 py-2 rounded-xl text-sm transition-all"
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-800 text-slate-950 font-semibold px-5 py-2 rounded-xl text-sm transition-all"
               >
                 {loading ? 'Proses...' : 'Hubungkan'}
               </button>
@@ -155,17 +155,17 @@ export const ReferralSection: React.FC = () => {
         {/* Kode / Link Referral Milik Sendiri */}
         <div className="pt-2 space-y-3">
           <div>
-            <label className="text-xs text-amber-300/70 block mb-1">Kode Referral Unik Anda:</label>
+            <label className="text-xs text-blue-300/70 block mb-1">Kode Referral Unik Anda:</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 readOnly
                 value={currentUser?.referralCode || currentUser?.uid || ''}
-                className="flex-1 bg-amber-900/30 border border-amber-800/40 rounded-xl px-4 py-2 text-sm font-mono text-amber-300"
+                className="flex-1 bg-blue-900/30 border border-blue-800/40 rounded-xl px-4 py-2 text-sm font-mono text-blue-300"
               />
               <button
                 onClick={() => copyToClipboard(currentUser?.referralCode || currentUser?.uid || '')}
-                className="bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-600/40 px-4 py-2 rounded-xl text-xs font-medium"
+                className="bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-600/40 px-4 py-2 rounded-xl text-xs font-medium"
               >
                 Salin Kode
               </button>

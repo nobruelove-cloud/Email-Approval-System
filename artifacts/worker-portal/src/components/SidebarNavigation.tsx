@@ -170,7 +170,7 @@ export function SidebarNavigation({
 
       {/* ==================== SIDEBAR CONTAINER ==================== */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen bg-white border-r border-amber-100/80 shadow-xl md:shadow-none flex flex-col justify-between transition-all duration-300 ease-in-out ${
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen bg-white border-r border-blue-100/80 shadow-xl md:shadow-none flex flex-col justify-between transition-all duration-300 ease-in-out ${
           // Mobile state: slide in drawer (82% width, max 300px)
           isOpenMobile
             ? "translate-x-0 w-[82vw] max-w-[300px]"
@@ -181,17 +181,17 @@ export function SidebarNavigation({
         }`}
       >
         {/* SIDEBAR HEADER BRANDING */}
-        <div className="p-3.5 sm:p-4 border-b border-amber-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-orange-50/30">
+        <div className="p-3.5 sm:p-4 border-b border-blue-100 flex items-center justify-between bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black flex items-center justify-center text-sm shadow-sm ring-2 ring-amber-400/30 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-sm ring-2 ring-blue-400/30 shrink-0">
               <Mail className="w-5 h-5 text-white" />
             </div>
             {(!isCollapsedDesktop || isOpenMobile) && (
               <div className="min-w-0 flex-1">
-                <h1 className="font-black text-amber-950 text-sm tracking-tight leading-none truncate">
+                <h1 className="font-black text-blue-950 text-sm tracking-tight leading-none truncate">
                   GMAIL JOB ID
                 </h1>
-                <p className="text-[10px] text-amber-700/80 font-bold truncate mt-0.5">
+                <p className="text-[10px] text-blue-700/80 font-bold truncate mt-0.5">
                   Platform Kerja Online
                 </p>
               </div>
@@ -202,7 +202,7 @@ export function SidebarNavigation({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="md:hidden p-1.5 rounded-xl text-gray-500 hover:text-amber-900 hover:bg-amber-100/60 transition-colors focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="md:hidden p-1.5 rounded-xl text-gray-500 hover:text-blue-900 hover:bg-blue-100/60 transition-colors focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
             title="Tutup Menu"
           >
             <X className="w-5 h-5" />
@@ -212,13 +212,13 @@ export function SidebarNavigation({
           <button
             type="button"
             onClick={onToggleCollapseDesktop}
-            className="hidden md:flex p-1.5 rounded-xl text-gray-400 hover:text-amber-900 hover:bg-amber-100/60 transition-colors focus:outline-none"
+            className="hidden md:flex p-1.5 rounded-xl text-gray-400 hover:text-blue-900 hover:bg-blue-100/60 transition-colors focus:outline-none"
             title={isCollapsedDesktop ? "Perluas Sidebar" : "Ciutkan Sidebar"}
           >
             {isCollapsedDesktop ? (
-              <ChevronRight className="w-4 h-4 text-amber-700" />
+              <ChevronRight className="w-4 h-4 text-blue-700" />
             ) : (
-              <ChevronLeft className="w-4 h-4 text-amber-700" />
+              <ChevronLeft className="w-4 h-4 text-blue-700" />
             )}
           </button>
         </div>
@@ -234,14 +234,14 @@ export function SidebarNavigation({
                 onClick={() => handleNavClick(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all min-h-[44px] group relative ${
                   isActive
-                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm ring-1 ring-amber-400/30"
-                    : "text-gray-700 hover:text-amber-950 hover:bg-amber-50/80"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm ring-1 ring-blue-400/30"
+                    : "text-gray-700 hover:text-blue-950 hover:bg-blue-50/80"
                 } ${isCollapsedDesktop && !isOpenMobile ? "justify-center px-0" : ""}`}
                 title={item.label}
               >
                 <div
                   className={`transition-transform duration-200 group-hover:scale-110 ${
-                    isActive ? "text-white" : "text-amber-600 group-hover:text-amber-700"
+                    isActive ? "text-white" : "text-blue-600 group-hover:text-blue-700"
                   }`}
                 >
                   {item.icon}
@@ -254,7 +254,7 @@ export function SidebarNavigation({
                 {(!isCollapsedDesktop || isOpenMobile) && item.badge && !isActive && (
                   <Badge
                     variant="outline"
-                    className="text-[9px] bg-amber-50 text-amber-800 border-amber-300 font-bold px-1.5 py-0 shrink-0"
+                    className="text-[9px] bg-blue-50 text-blue-800 border-blue-300 font-bold px-1.5 py-0 shrink-0"
                   >
                     {item.badge}
                   </Badge>
@@ -272,11 +272,11 @@ export function SidebarNavigation({
         </div>
 
         {/* USER PROFILE & LOGOUT SECTION */}
-        <div className="p-3 border-t border-amber-100 bg-gradient-to-br from-amber-50/40 via-white to-orange-50/20 space-y-2">
+        <div className="p-3 border-t border-blue-100 bg-gradient-to-br from-blue-50/40 via-white to-indigo-50/20 space-y-2">
           {(!isCollapsedDesktop || isOpenMobile) ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2.5 p-2 rounded-xl bg-amber-50/80 border border-amber-200/60">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black flex items-center justify-center text-xs shadow-2xs shrink-0">
+              <div className="flex items-center gap-2.5 p-2 rounded-xl bg-blue-50/80 border border-blue-200/60">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black flex items-center justify-center text-xs shadow-2xs shrink-0">
                   {displayName.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -292,14 +292,14 @@ export function SidebarNavigation({
                     <button
                       type="button"
                       onClick={onToggleEmailVisible}
-                      className="text-gray-400 hover:text-amber-600 p-0.5 rounded focus:outline-none shrink-0"
+                      className="text-gray-400 hover:text-blue-600 p-0.5 rounded focus:outline-none shrink-0"
                       title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                     >
                       {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                     </button>
                   </div>
                   <div className="mt-0.5 flex items-center gap-1">
-                    <Badge variant="outline" className="text-[9px] bg-white text-amber-900 border-amber-300 font-bold px-1 py-0">
+                    <Badge variant="outline" className="text-[9px] bg-white text-blue-900 border-blue-300 font-bold px-1 py-0">
                       Saldo: {formatMoney(profile.balance)}
                     </Badge>
                   </div>
@@ -318,7 +318,7 @@ export function SidebarNavigation({
           ) : (
             <div className="flex flex-col items-center space-y-2">
               <div
-                className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black flex items-center justify-center text-xs shadow-2xs"
+                className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black flex items-center justify-center text-xs shadow-2xs"
                 title={`${displayName} (${formatMoney(profile.balance)})`}
               >
                 {displayName.charAt(0).toUpperCase()}
