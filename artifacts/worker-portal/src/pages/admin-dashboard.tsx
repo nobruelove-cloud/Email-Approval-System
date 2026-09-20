@@ -43,6 +43,12 @@ import {
   MessageSquare,
   Send,
   Search,
+  Paperclip,
+  Image as ImageIcon,
+  X,
+  MoreVertical,
+  Maximize2,
+  Timer,
 } from "lucide-react";
 
 export type AdminTab =
@@ -134,7 +140,15 @@ import {
   sendChatMessage,
   markConversationAsRead,
   initiateWorkerConversation,
+  uploadChatImage,
+  deleteMessageForMe,
+  deleteMessageForAll,
 } from "@/hooks/use-portal";
+import {
+  type ChatMessage,
+  type ChatAttachment,
+  type DisappearingTimer,
+} from "@/lib/portal-types";
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
 import { sendTelegramNotification } from "@/lib/telegram-bot";
@@ -292,6 +306,17 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   const [adminChatText, setAdminChatText] = useState("");
   const [sendingAdminChat, setSendingAdminChat] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
+
+  // Admin Chat Media & Timer & Modal State
+  const [selectedAdminChatFiles, setSelectedAdminChatFiles] = useState<File[]>([]);
+  const [adminUploadProgress, setAdminUploadProgress] = useState<number | null>(null);
+  const [adminChatTimerOption, setAdminChatTimerOption] = useState<DisappearingTimer>("off");
+
+  const [adminPreviewImageModalUrl, setAdminPreviewImageModalUrl] = useState<string | null>(null);
+  const [adminDeleteChatModalMsg, setAdminDeleteChatModalMsg] = useState<ChatMessage | null>(null);
+  const [deletingAdminChat, setDeletingAdminChat] = useState(false);
+
+  const adminFileInputRef = useRef<HTMLInputElement | null>(null);
   const adminChatMessagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom of admin chat & mark read on select or update
@@ -302,28 +327,98 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     }
   }, [selectedWorkerUid, selectedWorkerMessages.messages]);
 
+  const handleSelectAdminChatImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (files.length > 5) {
+      toast.error("Maksimal 5 foto per album/pengiriman.");
+      return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const oversized = files.find((f) => f.size > MAX_SIZE);
+    if (oversized) {
+      toast.error(`Ukuran file "${oversized.name}" melebihi batas 5MB.`);
+      return;
+    }
+
+    setSelectedAdminChatFiles(files);
+  };
+
+  const handleRemoveSelectedAdminFile = (index: number) => {
+    setSelectedAdminChatFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   async function handleSendAdminChat(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedWorkerUid || !adminChatText.trim() || sendingAdminChat) return;
+    if (!selectedWorkerUid || (!adminChatText.trim() && selectedAdminChatFiles.length === 0) || sendingAdminChat) return;
 
-    const textToSend = adminChatText.trim();
-    setAdminChatText("");
     setSendingAdminChat(true);
+    setAdminUploadProgress(0);
 
     try {
+      let attachments: ChatAttachment[] = [];
+      if (selectedAdminChatFiles.length > 0) {
+        const dummyMsgId = `msg_${Date.now()}`;
+        for (let i = 0; i < selectedAdminChatFiles.length; i++) {
+          const file = selectedAdminChatFiles[i];
+          const att = await uploadChatImage(selectedWorkerUid, dummyMsgId, file, (percent) => {
+            const overall = ((i + percent / 100) / selectedAdminChatFiles.length) * 100;
+            setAdminUploadProgress(Math.round(overall));
+          });
+          attachments.push(att);
+        }
+      }
+
       await sendChatMessage({
         conversationId: selectedWorkerUid,
         senderId: profile.uid,
         senderRole: "admin",
         senderName: "Admin",
         senderEmail: profile.email,
-        text: textToSend,
+        text: adminChatText,
+        type: attachments.length > 1 ? "album" : attachments.length === 1 ? "image" : "text",
+        attachments: attachments.length > 0 ? attachments : undefined,
+        disappearingTimer: adminChatTimerOption,
       });
+
+      setAdminChatText("");
+      setSelectedAdminChatFiles([]);
+      if (adminFileInputRef.current) adminFileInputRef.current.value = "";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan chat.");
-      setAdminChatText(textToSend);
     } finally {
       setSendingAdminChat(false);
+      setAdminUploadProgress(null);
+    }
+  }
+
+  const handleDeleteAdminMessageForMe = async (msg: ChatMessage) => {
+    if (!selectedWorkerUid) return;
+    setDeletingAdminChat(true);
+    try {
+      await deleteMessageForMe(selectedWorkerUid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk Anda.");
+      setAdminDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingAdminChat(false);
+    }
+  };
+
+  const handleDeleteAdminMessageForAll = async (msg: ChatMessage) => {
+    if (!selectedWorkerUid) return;
+    setDeletingAdminChat(true);
+    try {
+      await deleteMessageForAll(selectedWorkerUid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk semua.");
+      setAdminDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingAdminChat(false);
     }
   }
 
@@ -5280,17 +5375,27 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                               </p>
                             </div>
                           ) : (
-                            selectedWorkerMessages.messages.map((msg: any) => {
+                          selectedWorkerMessages.messages
+                            .filter((msg: any) => !(Array.isArray(msg.deletedFor) && msg.deletedFor.includes(profile.uid)))
+                            .map((msg: any) => {
                               const isAdmin = msg.senderRole === "admin";
                               const isRead = !!msg.readAt;
 
+                              const isDeleted = !!msg.deletedAt;
+
+                              const nowMs = Date.now();
+                              const expiresMs = msg.expiresAt && typeof msg.expiresAt === "object" && "toMillis" in msg.expiresAt
+                                ? msg.expiresAt.toMillis()
+                                : msg.expiresAt ? new Date(msg.expiresAt).getTime() : null;
+                              const isExpired = expiresMs ? expiresMs <= nowMs : false;
+
                               return (
-                                <div
-                                  key={msg.id}
-                                  className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
-                                >
                                   <div
-                                    className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs ${
+                                  key={msg.id}
+                                  className={`flex flex-col group ${isAdmin ? "items-end" : "items-start"}`}
+                                  >
+                                  <div
+                                    className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs relative ${
                                       isAdmin
                                         ? "bg-indigo-600 text-white rounded-br-none"
                                         : "bg-white border border-slate-200 text-slate-900 rounded-bl-none"
@@ -5298,11 +5403,83 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                   >
                                     <div className="flex items-center justify-between gap-2 text-[10px] opacity-80 font-semibold mb-0.5">
                                       <span>{isAdmin ? "Admin" : msg.senderName || "Worker"}</span>
+                                      {!isDeleted && !isExpired && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setAdminDeleteChatModalMsg(msg)}
+                                          className="opacity-0 group-hover:opacity-100 hover:text-indigo-200 p-0.5 transition-opacity"
+                                          title="Opsi Pesan"
+                                        >
+                                          <MoreVertical className="w-3 h-3" />
+                                        </button>
+                                      )}
                                     </div>
-                                    <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+
+                                    {isDeleted ? (
+                                      <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
+                                        <Trash2 className="w-3 h-3 text-slate-400" />
+                                        <span>Pesan telah dihapus</span>
+                                      </p>
+                                    ) : isExpired ? (
+                                      <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
+                                        <Clock className="w-3 h-3 text-slate-400" />
+                                        <span>Pesan telah kedaluwarsa</span>
+                                      </p>
+                                    ) : (
+                                      <>
+                                        {msg.text && (
+                                          <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                                          )}
+
+                                        {msg.attachments && msg.attachments.length > 0 && (
+                                          <div className="pt-1.5 space-y-1.5">
+                                            {msg.attachments.length === 1 ? (
+                                              <div
+                                                onClick={() => setAdminPreviewImageModalUrl(msg.attachments![0].downloadUrl)}
+                                                className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img max-w-[240px]"
+                                              >
+                                                <img
+                                                  src={msg.attachments[0].downloadUrl}
+                                                  alt={msg.attachments[0].fileName}
+                                                  className="w-full h-auto object-cover max-h-60 rounded-xl group-hover/img:scale-105 transition-transform"
+                                                />
+                                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                                  <Maximize2 className="w-5 h-5 drop-shadow-md" />
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="grid grid-cols-2 gap-1.5 max-w-[280px]">
+                                                {msg.attachments.map((att: any, idx: number) => (
+                                                  <div
+                                                    key={idx}
+                                                    onClick={() => setAdminPreviewImageModalUrl(att.downloadUrl)}
+                                                    className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img aspect-square bg-slate-900/10"
+                                                  >
+                                                    <img
+                                                      src={att.downloadUrl}
+                                                      alt={att.fileName}
+                                                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                                      <Maximize2 className="w-4 h-4 drop-shadow-md" />
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </>
+                                      )}
+
                                     <div className={`flex items-center justify-end gap-1 text-[9px] font-mono mt-1 ${isAdmin ? "text-indigo-200" : "text-slate-500"}`}>
+                                      {msg.disappearingTimer && msg.disappearingTimer !== "off" && (
+                                        <span className="flex items-center gap-0.5 text-indigo-200" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
+                                          <Timer className="w-2.5 h-2.5" />
+                                        </span>
+                                      )}
                                       <span>{formatDateTime(msg.createdAt)}</span>
-                                      {isAdmin && (
+                                      {isAdmin && !isDeleted && !isExpired && (
                                         <span title={isRead ? "Telah dibaca Worker (2 check)" : "Terkirim (1 check)"}>
                                           {isRead ? (
                                             <CheckCheck className="w-3.5 h-3.5 text-indigo-100" />
@@ -5312,27 +5489,114 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                                         </span>
                                       )}
                                     </div>
+                                    </div>
                                   </div>
-                                </div>
                               );
                             })
                           )}
                           <div ref={adminChatMessagesEndRef} />
                         </div>
 
+                        {/* SELECTED IMAGE PREVIEW & UPLOAD PROGRESS BAR */}
+                        {selectedAdminChatFiles.length > 0 && (
+                          <div className="px-3 py-2 bg-indigo-50/50 border-t border-slate-200 shrink-0 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                                <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                                {selectedAdminChatFiles.length} foto dipilih (Album)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAdminChatFiles([])}
+                                className="text-[10px] font-semibold text-rose-600 hover:text-rose-800"
+                              >
+                                Batal Semua
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                              {selectedAdminChatFiles.map((file, idx) => (
+                                <div key={idx} className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-indigo-200 group">
+                                  <img
+                                    src={URL.createObjectURL(file)}
+                                    alt={file.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveSelectedAdminFile(idx)}
+                                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-rose-600"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {adminUploadProgress !== null && (
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[10px] font-semibold text-indigo-900">
+                                  <span>Mengunggah media...</span>
+                                  <span>{adminUploadProgress}%</span>
+                                </div>
+                                <div className="w-full bg-indigo-200/60 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-indigo-600 h-1.5 transition-all duration-200"
+                                    style={{ width: `${adminUploadProgress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* INPUT FORM BAR */}
-                        <form onSubmit={handleSendAdminChat} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+                        <form onSubmit={handleSendAdminChat} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                          <input
+                            type="file"
+                            ref={adminFileInputRef}
+                            onChange={handleSelectAdminChatImages}
+                            accept="image/jpeg,image/png,image/webp,image/gif,image/jpg"
+                            multiple
+                            className="hidden"
+                          />
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => adminFileInputRef.current?.click()}
+                              disabled={sendingAdminChat}
+                              className="p-2 rounded-xl text-indigo-700 hover:bg-indigo-50 transition-colors border border-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              title="Lampirkan Foto / Album (Max 5)"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                            </button>
+
+                            <select
+                              value={adminChatTimerOption}
+                              onChange={(e) => setAdminChatTimerOption(e.target.value as DisappearingTimer)}
+                              className="text-[11px] h-10 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none min-h-[44px]"
+                              title="Timer Pesan Menghilang"
+                            >
+                              <option value="off">⏱️ Off</option>
+                              <option value="24h">⏱️ 24h</option>
+                              <option value="7d">⏱️ 7d</option>
+                              <option value="30d">⏱️ 30d</option>
+                            </select>
+                          </div>
+
                           <Input
-                            placeholder="Tulis pesan untuk worker..."
+                            placeholder={selectedAdminChatFiles.length > 0 ? "Tambah keterangan foto (opsional)..." : "Tulis pesan untuk worker..."}
                             value={adminChatText}
                             onChange={(e) => setAdminChatText(e.target.value)}
                             disabled={sendingAdminChat}
-                            className="text-xs h-10 bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500 flex-1"
+                            className="text-xs h-10 bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500 flex-1 min-h-[44px]"
                           />
+
                           <Button
                             type="submit"
-                            disabled={sendingAdminChat || !adminChatText.trim()}
-                            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs shrink-0"
+                            disabled={sendingAdminChat || (!adminChatText.trim() && selectedAdminChatFiles.length === 0)}
+                            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs shrink-0 min-h-[44px]"
                           >
                             {sendingAdminChat ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -5342,6 +5606,65 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                             <span className="hidden sm:inline">Kirim</span>
                           </Button>
                         </form>
+
+                        {/* HIGH-RES IMAGE PREVIEW MODAL */}
+                        <Dialog open={!!adminPreviewImageModalUrl} onOpenChange={(open) => !open && setAdminPreviewImageModalUrl(null)}>
+                          <DialogContent className="max-w-2xl bg-black/90 border-slate-800 text-white p-2">
+                            {adminPreviewImageModalUrl && (
+                              <div className="relative flex flex-col items-center justify-center p-2">
+                                <img
+                                  src={adminPreviewImageModalUrl}
+                                  alt="Preview Foto"
+                                  className="max-h-[80vh] w-auto object-contain rounded-xl"
+                                />
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+
+                        {/* DELETE MESSAGE CONFIRMATION DIALOG */}
+                        <Dialog open={!!adminDeleteChatModalMsg} onOpenChange={(open) => !open && setAdminDeleteChatModalMsg(null)}>
+                          <DialogContent className="max-w-md bg-white border-slate-200">
+                            <DialogHeader>
+                              <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                <Trash2 className="w-4 h-4 text-rose-600" />
+                                <span>Hapus Pesan</span>
+                              </DialogTitle>
+                              <DialogDescription className="text-xs text-slate-600">
+                                Pilih opsi penghapusan untuk pesan ini.
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            {adminDeleteChatModalMsg && (
+                              <div className="space-y-3 pt-2">
+                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 italic">
+                                  "{adminDeleteChatModalMsg.text || (adminDeleteChatModalMsg.attachments?.length ? "[Lampiran Gambar/Album]" : "Pesan")}"
+                                </div>
+
+                                <div className="flex flex-col gap-2 pt-2">
+                                  <Button
+                                    onClick={() => handleDeleteAdminMessageForMe(adminDeleteChatModalMsg)}
+                                    disabled={deletingAdminChat}
+                                    variant="outline"
+                                    className="w-full text-xs h-10 justify-start font-semibold border-slate-200 hover:bg-slate-50 min-h-[44px]"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-indigo-600 mr-2" />
+                                    Hapus untuk Saya (Sembunyikan hanya di perangkat Admin)
+                                  </Button>
+
+                                  <Button
+                                    onClick={() => handleDeleteAdminMessageForAll(adminDeleteChatModalMsg)}
+                                    disabled={deletingAdminChat}
+                                    className="w-full text-xs h-10 justify-start bg-rose-600 hover:bg-rose-700 text-white font-semibold min-h-[44px]"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Hapus untuk Semua (Hapus untuk Worker & Admin)
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
                       </>
                     )}
                   </div>

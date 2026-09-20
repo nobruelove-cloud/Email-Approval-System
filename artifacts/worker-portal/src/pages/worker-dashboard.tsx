@@ -38,6 +38,13 @@ import {
   SearchCheck,
   Menu,
   CheckCheck,
+  Paperclip,
+  Image as ImageIcon,
+  Trash2,
+  X,
+  MoreVertical,
+  Maximize2,
+  Timer,
 } from "lucide-react";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { EmailChecker } from "@/components/EmailChecker";
@@ -73,7 +80,15 @@ import {
   useConversationMessages,
   sendChatMessage,
   markConversationAsRead,
+  uploadChatImage,
+  deleteMessageForMe,
+  deleteMessageForAll,
 } from "@/hooks/use-portal";
+import {
+  type ChatMessage,
+  type ChatAttachment,
+  type DisappearingTimer,
+} from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { SubmissionHistory } from "@/components/SubmissionHistory";
@@ -356,6 +371,16 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Worker Chat State
   const [workerChatText, setWorkerChatText] = useState("");
   const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+  const [selectedChatFiles, setSelectedChatFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [chatTimerOption, setChatTimerOption] = useState<DisappearingTimer>("off");
+
+  // Image Viewer & Delete Modal state
+  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
+  const [deleteChatModalMsg, setDeleteChatModalMsg] = useState<ChatMessage | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workerChatEndRef = useRef<HTMLDivElement | null>(null);
 
   const workerChatData = useWorkerChat(profile.uid);
@@ -375,12 +400,50 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }, [activeView, workerMessagesData.messages]);
 
+  const handleSelectChatImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (files.length > 5) {
+      toast.error("Maksimal 5 foto per album/pengiriman.");
+      return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const oversized = files.find((f) => f.size > MAX_SIZE);
+    if (oversized) {
+      toast.error(`Ukuran file "${oversized.name}" melebihi batas 5MB.`);
+      return;
+    }
+
+    setSelectedChatFiles(files);
+  };
+
+  const handleRemoveSelectedFile = (index: number) => {
+    setSelectedChatFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendWorkerChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workerChatText.trim() || sendingWorkerChat) return;
+    if ((!workerChatText.trim() && selectedChatFiles.length === 0) || sendingWorkerChat) return;
 
     setSendingWorkerChat(true);
+    setUploadProgress(0);
+
     try {
+      let attachments: ChatAttachment[] = [];
+      if (selectedChatFiles.length > 0) {
+        const dummyMsgId = `msg_${Date.now()}`;
+        for (let i = 0; i < selectedChatFiles.length; i++) {
+          const file = selectedChatFiles[i];
+          const att = await uploadChatImage(profile.uid, dummyMsgId, file, (percent) => {
+            const overall = ((i + percent / 100) / selectedChatFiles.length) * 100;
+            setUploadProgress(Math.round(overall));
+          });
+          attachments.push(att);
+        }
+      }
+
       await sendChatMessage({
         conversationId: profile.uid,
         senderId: profile.uid,
@@ -388,12 +451,45 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         senderName: profile.name,
         senderEmail: profile.email,
         text: workerChatText,
+        type: attachments.length > 1 ? "album" : attachments.length === 1 ? "image" : "text",
+        attachments: attachments.length > 0 ? attachments : undefined,
+        disappearingTimer: chatTimerOption,
       });
+
       setWorkerChatText("");
+      setSelectedChatFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan.");
     } finally {
       setSendingWorkerChat(false);
+      setUploadProgress(null);
+    }
+  };
+
+  const handleDeleteMessageForMe = async (msg: ChatMessage) => {
+    setDeletingChat(true);
+    try {
+      await deleteMessageForMe(profile.uid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk Anda.");
+      setDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingChat(false);
+    }
+  };
+
+  const handleDeleteMessageForAll = async (msg: ChatMessage) => {
+    setDeletingChat(true);
+    try {
+      await deleteMessageForAll(profile.uid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk semua.");
+      setDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingChat(false);
     }
   };
 
@@ -1732,63 +1828,240 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       </p>
                     </div>
                   ) : (
-                    workerMessagesData.messages.map((msg) => {
-                      const isMe = msg.senderRole === "worker";
-                      const isRead = !!msg.readAt;
+                    workerMessagesData.messages
+                      .filter((msg) => !(Array.isArray(msg.deletedFor) && msg.deletedFor.includes(profile.uid)))
+                      .map((msg) => {
+                        const isMe = msg.senderRole === "worker";
+                        const isRead = !!msg.readAt;
 
-                      return (
-                        <div
-                          key={msg.id}
-                          className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
-                        >
+                        // Check if deleted for all
+                        const isDeleted = !!msg.deletedAt;
+
+                        // Check if expired
+                        const nowMs = Date.now();
+                        const expiresMs = msg.expiresAt && typeof msg.expiresAt === "object" && "toMillis" in msg.expiresAt
+                          ? msg.expiresAt.toMillis()
+                          : msg.expiresAt ? new Date(msg.expiresAt).getTime() : null;
+                        const isExpired = expiresMs ? expiresMs <= nowMs : false;
+
+                        return (
                           <div
-                            className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs ${
-                              isMe
-                                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-br-none"
-                                : "bg-white border border-amber-200/80 text-gray-900 rounded-bl-none"
-                            }`}
+                            key={msg.id}
+                            className={`flex flex-col group ${isMe ? "items-end" : "items-start"}`}
                           >
-                            <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
-                              <span>{isMe ? "Saya" : "Admin / CS"}</span>
-                            </div>
-                            <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
-                            <div className="flex items-center justify-end gap-1 text-[9px] font-mono mt-1 opacity-80">
-                              <span>{formatDateTime(msg.createdAt)}</span>
-                              {isMe && (
-                                <span title={isRead ? "Telah dibaca Admin (2 check)" : "Terkirim (1 check)"}>
-                                  {isRead ? (
-                                    <CheckCheck className="w-3.5 h-3.5 text-sky-200" />
-                                  ) : (
-                                    <Check className="w-3 h-3 text-amber-100" />
+                            <div
+                              className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs relative ${
+                                isMe
+                                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-br-none"
+                                  : "bg-white border border-amber-200/80 text-gray-900 rounded-bl-none"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
+                                <span>{isMe ? "Saya" : "Admin / CS"}</span>
+                                {!isDeleted && !isExpired && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteChatModalMsg(msg)}
+                                    className="opacity-0 group-hover:opacity-100 hover:text-amber-200 p-0.5 transition-opacity"
+                                    title="Opsi Pesan"
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {isDeleted ? (
+                                <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
+                                  <Trash2 className="w-3 h-3 text-slate-400" />
+                                  <span>Pesan telah dihapus</span>
+                                </p>
+                              ) : isExpired ? (
+                                <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <span>Pesan telah kedaluwarsa</span>
+                                </p>
+                              ) : (
+                                <>
+                                  {/* Text Message */}
+                                  {msg.text && (
+                                    <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
                                   )}
-                                </span>
+
+                                  {/* Image / Photo Album Rendering */}
+                                  {msg.attachments && msg.attachments.length > 0 && (
+                                    <div className="pt-1.5 space-y-1.5">
+                                      {msg.attachments.length === 1 ? (
+                                        <div
+                                          onClick={() => setPreviewImageModalUrl(msg.attachments![0].downloadUrl)}
+                                          className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img max-w-[240px]"
+                                        >
+                                          <img
+                                            src={msg.attachments[0].downloadUrl}
+                                            alt={msg.attachments[0].fileName}
+                                            className="w-full h-auto object-cover max-h-60 rounded-xl group-hover/img:scale-105 transition-transform"
+                                          />
+                                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                            <Maximize2 className="w-5 h-5 drop-shadow-md" />
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="grid grid-cols-2 gap-1.5 max-w-[280px]">
+                                          {msg.attachments.map((att, idx) => (
+                                            <div
+                                              key={idx}
+                                              onClick={() => setPreviewImageModalUrl(att.downloadUrl)}
+                                              className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img aspect-square bg-slate-900/10"
+                                            >
+                                              <img
+                                                src={att.downloadUrl}
+                                                alt={att.fileName}
+                                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                                              />
+                                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                                <Maximize2 className="w-4 h-4 drop-shadow-md" />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
                               )}
+
+                              <div className="flex items-center justify-end gap-1 text-[9px] font-mono mt-1 opacity-80">
+                                {msg.disappearingTimer && msg.disappearingTimer !== "off" && (
+                                  <span className="flex items-center gap-0.5 text-amber-200" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
+                                    <Timer className="w-2.5 h-2.5" />
+                                  </span>
+                                )}
+                                <span>{formatDateTime(msg.createdAt)}</span>
+                                {isMe && !isDeleted && !isExpired && (
+                                  <span title={isRead ? "Telah dibaca Admin (2 check)" : "Terkirim (1 check)"}>
+                                    {isRead ? (
+                                      <CheckCheck className="w-3.5 h-3.5 text-sky-200" />
+                                    ) : (
+                                      <Check className="w-3 h-3 text-amber-100" />
+                                    )}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   )}
                   <div ref={workerChatEndRef} />
                 </CardContent>
 
+                {/* SELECTED IMAGE PREVIEW & UPLOAD PROGRESS BAR */}
+                {selectedChatFiles.length > 0 && (
+                  <div className="px-3 py-2 bg-amber-50/80 border-t border-amber-200/80 shrink-0 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                        <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                        {selectedChatFiles.length} foto dipilih (Album)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChatFiles([])}
+                        className="text-[10px] font-semibold text-rose-600 hover:text-rose-800"
+                      >
+                        Batal Semua
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {selectedChatFiles.map((file, idx) => (
+                        <div key={idx} className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-amber-300 group">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSelectedFile(idx)}
+                            className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-rose-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {uploadProgress !== null && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-semibold text-amber-900">
+                          <span>Mengunggah media...</span>
+                          <span>{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full bg-amber-200/60 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-amber-600 h-1.5 transition-all duration-200"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* CHAT INPUT FORM */}
                 <form
                   onSubmit={handleSendWorkerChat}
-                  className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2 shrink-0"
+                  className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
                 >
-                  <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleSelectChatImages}
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/jpg"
+                    multiple
+                    className="hidden"
+                  />
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sendingWorkerChat}
+                      className="p-2 rounded-xl text-amber-700 hover:bg-amber-50 transition-colors border border-amber-200/60 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="Lampirkan Foto / Album (Max 5)"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+
+                    <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
+
+                    {/* Disappearing Timer Selector */}
+                    <div className="relative group">
+                      <select
+                        value={chatTimerOption}
+                        onChange={(e) => setChatTimerOption(e.target.value as DisappearingTimer)}
+                        className="text-[11px] h-10 px-2 rounded-xl bg-amber-50/50 border border-amber-200/80 text-amber-900 font-semibold focus:outline-none min-h-[44px]"
+                        title="Timer Pesan Menghilang"
+                      >
+                        <option value="off">⏱️ Timer Off</option>
+                        <option value="24h">⏱️ 24 Jam</option>
+                        <option value="7d">⏱️ 7 Hari</option>
+                        <option value="30d">⏱️ 30 Hari</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <Input
-                    placeholder="Tulis pesan untuk Admin..."
+                    placeholder={selectedChatFiles.length > 0 ? "Tambah keterangan foto (opsional)..." : "Tulis pesan untuk Admin..."}
                     value={workerChatText}
                     onChange={(e) => setWorkerChatText(e.target.value)}
                     disabled={sendingWorkerChat}
-                    className="text-xs h-10 bg-amber-50/30 border-amber-200/80 text-gray-900 focus:border-amber-500 flex-1 rounded-xl"
+                    className="text-xs h-10 bg-amber-50/30 border-amber-200/80 text-gray-900 focus:border-amber-500 flex-1 rounded-xl min-h-[44px]"
                   />
+
                   <Button
                     type="submit"
-                    disabled={sendingWorkerChat || !workerChatText.trim()}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-amber-400/20 shrink-0"
+                    disabled={sendingWorkerChat || (!workerChatText.trim() && selectedChatFiles.length === 0)}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-amber-400/20 shrink-0 min-h-[44px]"
                   >
                     {sendingWorkerChat ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1798,6 +2071,67 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </Button>
                 </form>
               </Card>
+
+              {/* HIGH-RES IMAGE PREVIEW MODAL */}
+              <Dialog open={!!previewImageModalUrl} onOpenChange={(open) => !open && setPreviewImageModalUrl(null)}>
+                <DialogContent className="max-w-2xl bg-black/90 border-slate-800 text-white p-2">
+                  {previewImageModalUrl && (
+                    <div className="relative flex flex-col items-center justify-center p-2">
+                      <img
+                        src={previewImageModalUrl}
+                        alt="Preview Foto"
+                        className="max-h-[80vh] w-auto object-contain rounded-xl"
+                      />
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* DELETE MESSAGE CONFIRMATION DIALOG */}
+              <Dialog open={!!deleteChatModalMsg} onOpenChange={(open) => !open && setDeleteChatModalMsg(null)}>
+                <DialogContent className="max-w-md bg-white border-amber-200">
+                  <DialogHeader>
+                    <DialogTitle className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-rose-600" />
+                      <span>Hapus Pesan</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-gray-600">
+                      Pilih opsi penghapusan untuk pesan ini.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {deleteChatModalMsg && (
+                    <div className="space-y-3 pt-2">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 italic">
+                        "{deleteChatModalMsg.text || (deleteChatModalMsg.attachments?.length ? "[Lampiran Gambar/Album]" : "Pesan")}"
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-2">
+                        <Button
+                          onClick={() => handleDeleteMessageForMe(deleteChatModalMsg)}
+                          disabled={deletingChat}
+                          variant="outline"
+                          className="w-full text-xs h-10 justify-start font-semibold border-amber-200 hover:bg-amber-50 min-h-[44px]"
+                        >
+                          <Trash2 className="w-4 h-4 text-amber-600 mr-2" />
+                          Hapus untuk Saya (Sembunyikan hanya di perangkat Anda)
+                        </Button>
+
+                        {deleteChatModalMsg.senderRole === "worker" && (
+                          <Button
+                            onClick={() => handleDeleteMessageForAll(deleteChatModalMsg)}
+                            disabled={deletingChat}
+                            className="w-full text-xs h-10 justify-start bg-rose-600 hover:bg-rose-700 text-white font-semibold min-h-[44px]"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Hapus untuk Semua (Hapus untuk Worker & Admin)
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
