@@ -6,6 +6,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 vi.mock("@/hooks/use-portal", () => ({
   useWorkerData: () => ({ submissions: { data: [], loading: false }, withdrawals: { data: [], loading: false } }),
   useWorkerEngagementData: () => ({ referrals: { data: [] }, referralClaims: { data: [] }, rewardLedger: { data: [] } }),
+  useReferralTransactions: () => ({ data: [], loading: false }),
+  useDownlineWorkers: () => ({ data: [], loading: false }),
   useSettings: (name: string, initial: any) => {
     if (name === "maintenance") {
       return { data: { enabled: true, message: "Maintenance test", targetEndTime: "2026-12-31T23:59:59Z" }, loading: false };
@@ -14,10 +16,15 @@ vi.mock("@/hooks/use-portal", () => ({
   },
   useMyReferral: () => ({ data: null }),
   useAnnouncements: () => ({ data: [], loading: false }),
+  useWorkerChat: () => ({ conversation: null, loading: false }),
+  useConversationMessages: () => ({ messages: [], loading: false }),
   claimReferralCode: vi.fn(),
   claimReferralReward: vi.fn(),
   createSubmission: vi.fn(),
   createWithdrawal: vi.fn(),
+  markConversationAsRead: vi.fn(),
+  deleteMessageForMe: vi.fn(),
+  deleteMessageForAll: vi.fn(),
 }));
 
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";

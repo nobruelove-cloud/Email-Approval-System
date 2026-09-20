@@ -19,8 +19,7 @@ import {
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
-import { auth, createWorkerAuthAccount, db, storage, firebaseConfigured } from "@/lib/firebase";
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/firebase";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
@@ -3385,7 +3384,6 @@ export function usePortal() {
 import {
   type ChatMessage,
   type ChatMessageType,
-  type ChatAttachment,
   type DisappearingTimer,
   type Conversation,
 } from "@/lib/portal-types";
@@ -3555,68 +3553,6 @@ export async function initiateWorkerConversation(worker: {
   }
 }
 
-/**
- * Uploads an image file for chat media to Firebase Storage under `chatMedia/{workerUid}/{messageId}/{fileName}`.
- * Validates file size (max 5MB) and mime type (`image/*`).
- */
-export async function uploadChatImage(
-  workerUid: string,
-  messageId: string,
-  file: File,
-  onProgress?: (percent: number) => void
-): Promise<ChatAttachment> {
-  const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-  if (file.size > MAX_SIZE) {
-    throw new Error(`Ukuran file "${file.name}" melebihi batas maksimal 5MB.`);
-  }
-
-  const validMimes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"];
-  if (!file.type || !validMimes.some((m) => file.type.toLowerCase().startsWith(m))) {
-    throw new Error(`Format file "${file.name}" tidak didukung. Harap pilih gambar (JPG, PNG, WEBP, GIF).`);
-  }
-
-  const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-  const path = `chatMedia/${workerUid}/${messageId}/${Date.now()}_${sanitizedFileName}`;
-
-  if (!storage) {
-    // Demo fallback / unconfigured storage fallback
-    return {
-      storagePath: path,
-      downloadUrl: URL.createObjectURL(file),
-      fileName: file.name,
-      fileSize: file.size,
-    };
-  }
-
-  const stRef = storageRef(storage, path);
-  const uploadTask = uploadBytesResumable(stRef, file, { contentType: file.type });
-
-  return new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        if (onProgress) onProgress(progress);
-      },
-      (error) => {
-        reject(new Error(`Gagal mengunggah gambar "${file.name}": ${error.message}`));
-      },
-      async () => {
-        try {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({
-            storagePath: path,
-            downloadUrl,
-            fileName: file.name,
-            fileSize: file.size,
-          });
-        } catch (err) {
-          reject(err);
-        }
-      }
-    );
-  });
-}
 
 /**
  * Calculates server expiration timestamp based on DisappearingTimer setting.
@@ -3632,7 +3568,7 @@ export function calculateExpirationTimestamp(timer?: DisappearingTimer): Date | 
 
 /**
  * Sends a chat message in conversations/{conversationId}/messages and updates conversation metadata atomically.
- * Supports text, single image, album attachments, and expiring timer.
+ * Supports text and expiring timer.
  */
 export async function sendChatMessage(params: {
   conversationId: string; // workerId
@@ -3642,18 +3578,16 @@ export async function sendChatMessage(params: {
   senderEmail?: string;
   text: string;
   type?: ChatMessageType;
-  attachments?: ChatAttachment[];
   disappearingTimer?: DisappearingTimer;
 }) {
   if (!db) throw new Error("Firestore DB instance not initialized");
   const trimmed = params.text.trim();
-  const hasAttachments = params.attachments && params.attachments.length > 0;
 
-  if (!trimmed && !hasAttachments) {
+  if (!trimmed) {
     throw new Error("Pesan tidak boleh kosong.");
   }
 
-  const msgType: ChatMessageType = params.type || (hasAttachments ? (params.attachments!.length > 1 ? "album" : "image") : "text");
+  const msgType: ChatMessageType = "text";
   const convRef = doc(db, "conversations", params.conversationId);
   const messagesColRef = collection(db, "conversations", params.conversationId, "messages");
 
@@ -3674,10 +3608,7 @@ export async function sendChatMessage(params: {
     const isWorker = params.senderRole === "worker";
 
     // Summary text for lastMessage in conversation metadata
-    let lastMsgText = trimmed;
-    if (!lastMsgText && hasAttachments) {
-      lastMsgText = msgType === "album" ? `[Foto Album: ${params.attachments!.length} foto]` : `[Foto]`;
-    }
+    const lastMsgText = trimmed;
 
     // Create message doc inside subcollection
     const msgRef = doc(messagesColRef);
@@ -3690,10 +3621,6 @@ export async function sendChatMessage(params: {
       type: msgType,
       createdAt: serverTimestamp(),
     };
-
-    if (hasAttachments) {
-      msgPayload.attachments = params.attachments;
-    }
 
     if (params.disappearingTimer && params.disappearingTimer !== "off") {
       msgPayload.disappearingTimer = params.disappearingTimer;
