@@ -3406,7 +3406,8 @@ export function useWorkerChat(workerUid?: string) {
     const unsub = onSnapshot(
       convRef,
       (snap) => {
-        if (snap.exists()) {
+        const exists = snap && typeof snap.exists === "function" ? snap.exists() : false;
+        if (exists) {
           setConversation({ id: snap.id, ...snap.data() } as Conversation);
         } else {
           setConversation(null);
@@ -3445,9 +3446,11 @@ export function useAdminConversations() {
       q,
       (snap) => {
         const list: Conversation[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        }
         setConversations(list);
         setLoading(false);
       },
@@ -3494,9 +3497,11 @@ export function useConversationMessages(conversationId: string | null) {
       q,
       (snap) => {
         const list: ChatMessage[] = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
-        });
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        }
         setMessages(list);
         setLoading(false);
       },
