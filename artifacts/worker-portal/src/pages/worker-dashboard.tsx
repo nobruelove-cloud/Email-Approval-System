@@ -38,12 +38,9 @@ import {
   SearchCheck,
   Menu,
   CheckCheck,
-  Paperclip,
-  Image as ImageIcon,
   Trash2,
   X,
   MoreVertical,
-  Maximize2,
   Timer,
 } from "lucide-react";
 import { EmojiPicker } from "@/components/EmojiPicker";
@@ -80,13 +77,11 @@ import {
   useConversationMessages,
   sendChatMessage,
   markConversationAsRead,
-  uploadChatImage,
   deleteMessageForMe,
   deleteMessageForAll,
 } from "@/hooks/use-portal";
 import {
   type ChatMessage,
-  type ChatAttachment,
   type DisappearingTimer,
 } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
@@ -371,16 +366,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   // Worker Chat State
   const [workerChatText, setWorkerChatText] = useState("");
   const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
-  const [selectedChatFiles, setSelectedChatFiles] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [chatTimerOption, setChatTimerOption] = useState<DisappearingTimer>("off");
 
-  // Image Viewer & Delete Modal state
-  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
+  // Delete Modal state
   const [deleteChatModalMsg, setDeleteChatModalMsg] = useState<ChatMessage | null>(null);
   const [deletingChat, setDeletingChat] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workerChatEndRef = useRef<HTMLDivElement | null>(null);
 
   const workerChatData = useWorkerChat(profile.uid);
@@ -400,50 +391,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }, [activeView, workerMessagesData.messages]);
 
-  const handleSelectChatImages = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    if (files.length > 5) {
-      toast.error("Maksimal 5 foto per album/pengiriman.");
-      return;
-    }
-
-    const MAX_SIZE = 5 * 1024 * 1024;
-    const oversized = files.find((f) => f.size > MAX_SIZE);
-    if (oversized) {
-      toast.error(`Ukuran file "${oversized.name}" melebihi batas 5MB.`);
-      return;
-    }
-
-    setSelectedChatFiles(files);
-  };
-
-  const handleRemoveSelectedFile = (index: number) => {
-    setSelectedChatFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleSendWorkerChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!workerChatText.trim() && selectedChatFiles.length === 0) || sendingWorkerChat) return;
+    if (!workerChatText.trim() || sendingWorkerChat) return;
 
     setSendingWorkerChat(true);
-    setUploadProgress(0);
 
     try {
-      let attachments: ChatAttachment[] = [];
-      if (selectedChatFiles.length > 0) {
-        const dummyMsgId = `msg_${Date.now()}`;
-        for (let i = 0; i < selectedChatFiles.length; i++) {
-          const file = selectedChatFiles[i];
-          const att = await uploadChatImage(profile.uid, dummyMsgId, file, (percent) => {
-            const overall = ((i + percent / 100) / selectedChatFiles.length) * 100;
-            setUploadProgress(Math.round(overall));
-          });
-          attachments.push(att);
-        }
-      }
-
       await sendChatMessage({
         conversationId: profile.uid,
         senderId: profile.uid,
@@ -451,19 +405,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         senderName: profile.name,
         senderEmail: profile.email,
         text: workerChatText,
-        type: attachments.length > 1 ? "album" : attachments.length === 1 ? "image" : "text",
-        attachments: attachments.length > 0 ? attachments : undefined,
+        type: "text",
         disappearingTimer: chatTimerOption,
       });
 
       setWorkerChatText("");
-      setSelectedChatFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan.");
     } finally {
       setSendingWorkerChat(false);
-      setUploadProgress(null);
     }
   };
 
@@ -1886,46 +1836,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                                   {msg.text && (
                                     <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
                                   )}
-
-                                  {/* Image / Photo Album Rendering */}
-                                  {msg.attachments && msg.attachments.length > 0 && (
-                                    <div className="pt-1.5 space-y-1.5">
-                                      {msg.attachments.length === 1 ? (
-                                        <div
-                                          onClick={() => setPreviewImageModalUrl(msg.attachments![0].downloadUrl)}
-                                          className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img max-w-[240px]"
-                                        >
-                                          <img
-                                            src={msg.attachments[0].downloadUrl}
-                                            alt={msg.attachments[0].fileName}
-                                            className="w-full h-auto object-cover max-h-60 rounded-xl group-hover/img:scale-105 transition-transform"
-                                          />
-                                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                            <Maximize2 className="w-5 h-5 drop-shadow-md" />
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="grid grid-cols-2 gap-1.5 max-w-[280px]">
-                                          {msg.attachments.map((att, idx) => (
-                                            <div
-                                              key={idx}
-                                              onClick={() => setPreviewImageModalUrl(att.downloadUrl)}
-                                              className="relative rounded-xl overflow-hidden cursor-pointer border border-black/10 group/img aspect-square bg-slate-900/10"
-                                            >
-                                              <img
-                                                src={att.downloadUrl}
-                                                alt={att.fileName}
-                                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
-                                              />
-                                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                                <Maximize2 className="w-4 h-4 drop-shadow-md" />
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
                                 </>
                               )}
 
@@ -1954,84 +1864,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <div ref={workerChatEndRef} />
                 </CardContent>
 
-                {/* SELECTED IMAGE PREVIEW & UPLOAD PROGRESS BAR */}
-                {selectedChatFiles.length > 0 && (
-                  <div className="px-3 py-2 bg-amber-50/80 border-t border-amber-200/80 shrink-0 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                        <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
-                        {selectedChatFiles.length} foto dipilih (Album)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedChatFiles([])}
-                        className="text-[10px] font-semibold text-rose-600 hover:text-rose-800"
-                      >
-                        Batal Semua
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                      {selectedChatFiles.map((file, idx) => (
-                        <div key={idx} className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-amber-300 group">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSelectedFile(idx)}
-                            className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-rose-600"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {uploadProgress !== null && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-semibold text-amber-900">
-                          <span>Mengunggah media...</span>
-                          <span>{uploadProgress}%</span>
-                        </div>
-                        <div className="w-full bg-amber-200/60 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-amber-600 h-1.5 transition-all duration-200"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* CHAT INPUT FORM */}
                 <form
                   onSubmit={handleSendWorkerChat}
                   className="p-3 bg-white border-t border-amber-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
                 >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleSelectChatImages}
-                    accept="image/jpeg,image/png,image/webp,image/gif,image/jpg"
-                    multiple
-                    className="hidden"
-                  />
-
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={sendingWorkerChat}
-                      className="p-2 rounded-xl text-amber-700 hover:bg-amber-50 transition-colors border border-amber-200/60 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      title="Lampirkan Foto / Album (Max 5)"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </button>
-
                     <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
 
                     {/* Disappearing Timer Selector */}
@@ -2051,7 +1889,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </div>
 
                   <Input
-                    placeholder={selectedChatFiles.length > 0 ? "Tambah keterangan foto (opsional)..." : "Tulis pesan untuk Admin..."}
+                    placeholder="Tulis pesan untuk Admin..."
                     value={workerChatText}
                     onChange={(e) => setWorkerChatText(e.target.value)}
                     disabled={sendingWorkerChat}
@@ -2060,7 +1898,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
                   <Button
                     type="submit"
-                    disabled={sendingWorkerChat || (!workerChatText.trim() && selectedChatFiles.length === 0)}
+                    disabled={sendingWorkerChat || !workerChatText.trim()}
                     className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-amber-400/20 shrink-0 min-h-[44px]"
                   >
                     {sendingWorkerChat ? (
@@ -2071,21 +1909,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   </Button>
                 </form>
               </Card>
-
-              {/* HIGH-RES IMAGE PREVIEW MODAL */}
-              <Dialog open={!!previewImageModalUrl} onOpenChange={(open) => !open && setPreviewImageModalUrl(null)}>
-                <DialogContent className="max-w-2xl bg-black/90 border-slate-800 text-white p-2">
-                  {previewImageModalUrl && (
-                    <div className="relative flex flex-col items-center justify-center p-2">
-                      <img
-                        src={previewImageModalUrl}
-                        alt="Preview Foto"
-                        className="max-h-[80vh] w-auto object-contain rounded-xl"
-                      />
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
 
               {/* DELETE MESSAGE CONFIRMATION DIALOG */}
               <Dialog open={!!deleteChatModalMsg} onOpenChange={(open) => !open && setDeleteChatModalMsg(null)}>
@@ -2103,7 +1926,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   {deleteChatModalMsg && (
                     <div className="space-y-3 pt-2">
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 italic">
-                        "{deleteChatModalMsg.text || (deleteChatModalMsg.attachments?.length ? "[Lampiran Gambar/Album]" : "Pesan")}"
+                        "{deleteChatModalMsg.text || "Pesan"}"
                       </div>
 
                       <div className="flex flex-col gap-2 pt-2">
