@@ -209,16 +209,16 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
     <div className="space-y-6">
       {/* 1. DISCLAIMER BANNER (WORKER & ADMIN) */}
       {!isAdminView && (
-        <Card className="bg-gradient-to-r from-blue-500/15 via-orange-500/10 to-blue-500/15 border-blue-300/80 shadow-xs">
+        <Card className="bg-blue-50/80 border-blue-200/80 shadow-2xs rounded-2xl">
           <CardContent className="p-4 sm:p-5 flex items-start gap-3.5">
-            <div className="p-2.5 rounded-xl bg-blue-500 text-slate-950 font-black shrink-0 mt-0.5 shadow-xs">
+            <div className="p-2 rounded-xl bg-blue-600 text-white font-bold shrink-0 mt-0.5 shadow-2xs">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-extrabold text-blue-950 text-sm tracking-tight uppercase flex items-center gap-1.5">
+              <h4 className="font-bold text-slate-900 text-sm tracking-tight uppercase flex items-center gap-1.5">
                 <span>CATATAN PENTING (DISCLAIMER)</span>
               </h4>
-              <p className="text-xs text-blue-900 leading-relaxed font-medium">
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
                 Tools Checker ini berfungsi sebagai alat bantu screening awal (Format Rules & Status Aktif). Hasil di Checker <strong>TIDAK MENJAMIN 100%</strong> email pasti di-ACC oleh Vendor. Keputusan akhir ACC dan pencairan saldo tetap sepenuhnya mengikuti verifikasi akhir sistem Vendor.
               </p>
             </div>
