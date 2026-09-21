@@ -155,7 +155,7 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\n--- NEGATIVE TEST: Worker attempting invalid field types (non-string phone) fails ---');
+  console.log('\n--- NEGATIVE TEST: Worker attempting invalid field types (non-string phone / referredBy) fails ---');
   const invalidPhoneUid = 'invalid_phone_user';
   const invalidPhoneDb = testEnv.authenticatedContext(invalidPhoneUid).firestore();
   try {
@@ -175,6 +175,90 @@ async function main() {
     console.log('[PASS] Worker attempting non-string phone correctly rejected.');
   } catch (err) {
     console.error('[FAIL] Worker attempting non-string phone was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  const invalidRefUid = 'invalid_ref_user';
+  const invalidRefDb = testEnv.authenticatedContext(invalidRefUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(invalidRefDb, 'users', invalidRefUid), {
+        uid: invalidRefUid,
+        name: 'Invalid Ref User',
+        email: 'invalidref@example.com',
+        referredBy: 12345, // number instead of string
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Worker attempting non-string referredBy correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting non-string referredBy was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker registration missing required fields fails ---');
+  const missingFieldUid = 'missing_field_user';
+  const missingFieldDb = testEnv.authenticatedContext(missingFieldUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(missingFieldDb, 'users', missingFieldUid), {
+        uid: missingFieldUid,
+        name: 'Missing Field User',
+        email: 'missing@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        // missing createdAt
+      })
+    );
+    console.log('[PASS] Worker registration missing required field correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker registration missing required field was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker attempting negative balance update fails ---');
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'users', workerUid), {
+        uid: workerUid,
+        name: 'Worker User',
+        email: 'worker@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 2,
+        balance: -500, // negative balance
+        createdAt: new Date(),
+      })
+    );
+    console.log('[PASS] Worker attempting negative balance update correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting negative balance update was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- NEGATIVE TEST: Worker attempting status change in update fails ---');
+  try {
+    await assertFails(
+      setDoc(doc(existingWorkerDb, 'users', workerUid), {
+        uid: workerUid,
+        name: 'Worker User',
+        email: 'worker@example.com',
+        role: 'worker',
+        status: 'suspended', // status change
+        tier: 2,
+        balance: 15000,
+        createdAt: new Date(),
+      })
+    );
+    console.log('[PASS] Worker attempting status change in update correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker attempting status change in update was not rejected:', err);
     process.exitCode = 1;
   }
 

@@ -50,9 +50,29 @@ service cloud.firestore {
       // 12. uid must equal document UID (request.auth.uid)
       allow create: if isAdmin() || (
         isSelf(uid) &&
-        request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
-        request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'referredBy', 'role', 'status', 'tier', 'balance', 'createdAt']) &&
-        request.resource.data.uid == uid &&
+        request.resource.data.keys().hasAll([
+          'uid',
+          'name',
+          'email',
+          'role',
+          'status',
+          'tier',
+          'balance',
+          'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'uid',
+          'name',
+          'email',
+          'phone',
+          'referredBy',
+          'role',
+          'status',
+          'tier',
+          'balance',
+          'createdAt'
+        ]) &&
+        request.resource.data.uid == request.auth.uid &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
         request.resource.data.email is string &&
@@ -70,18 +90,18 @@ service cloud.firestore {
       // - Admin can update any user profile field.
       // - Worker self-update enforces:
       //   * isSelf(uid)
-      //   * role is immutable (request.resource.data.role == resource.data.role)
-      //   * status is immutable (request.resource.data.status == resource.data.status)
-      //   * tier is immutable (request.resource.data.tier == resource.data.tier)
-      //   * balance may only decrease or stay equal, never increase (request.resource.data.balance <= resource.data.balance && >= 0)
-      //   * workers cannot grant themselves administrative privileges or credit their own balance.
+      //   * role must remain unchanged (request.resource.data.role == resource.data.role)
+      //   * status must remain unchanged (request.resource.data.status == resource.data.status)
+      //   * tier must remain unchanged (request.resource.data.tier == resource.data.tier)
+      //   * balance must never increase (request.resource.data.balance <= resource.data.balance)
+      //   * balance must never become negative (request.resource.data.balance >= 0)
       allow update: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.tier == resource.data.tier &&
-        request.resource.data.balance >= 0 &&
-        request.resource.data.balance <= resource.data.balance
+        request.resource.data.balance <= resource.data.balance &&
+        request.resource.data.balance >= 0
       );
 
       allow delete: if isAdmin();
