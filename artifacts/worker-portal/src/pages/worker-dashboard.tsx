@@ -1892,34 +1892,51 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 8. BANTUAN CS VIEW ==================== */}
           {activeView === "cs" && (
             <div className="space-y-4">
-              <Card className="bg-white border-blue-100 shadow-xs">
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Bantuan CS
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Hubungi CS jika membutuhkan bantuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* SUPPORT CHANNELS CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <CardTitle className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                     <HelpCircle className="w-4 h-4 text-blue-600" />
                     Pusat Bantuan & Layanan Pelanggan
                   </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="text-xs text-slate-500">
                     Hubungi customer service kami jika mengalami kendala setoran, pembayaran, atau pertanyaan lainnya.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
+                    {/* CS TELEGRAM CARD */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-900 shadow-2xs flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
                             <TelegramIcon className="w-4 h-4" />
                           </div>
-                          <span className="font-extrabold text-sm text-[#FFB74D]">CS Telegram</span>
+                          <span className="font-extrabold text-sm text-slate-900">CS Telegram</span>
                         </div>
-                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
+                        <p className="text-xs text-slate-500 leading-relaxed">
                           Layanan cepat penanganan kendala akun, email setoran, dan status payout saldo.
                         </p>
                       </div>
                       {supportConfig.telegramUrl ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl min-h-[44px] shadow-xs active:scale-95 transition-transform"
                         >
                           <a
                             href={supportConfig.telegramUrl}
@@ -1932,28 +1949,29 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </a>
                         </Button>
                       ) : (
-                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-900/80 text-slate-500 border-slate-800">
+                        <Button disabled variant="outline" className="w-full text-xs h-10 rounded-xl bg-slate-50 text-slate-400 border-slate-200">
                           Belum Diatur
                         </Button>
                       )}
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-[#1e293b] border border-blue-900/60 text-slate-100 shadow-xs flex flex-col justify-between space-y-3">
+                    {/* KOMUNITAS WHATSAPP CARD */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-900 shadow-2xs flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
                             <MessageCircle className="w-4 h-4" />
                           </div>
-                          <span className="font-extrabold text-sm text-[#FFB74D]">Komunitas WhatsApp</span>
+                          <span className="font-extrabold text-sm text-slate-900">Komunitas WhatsApp</span>
                         </div>
-                        <p className="text-xs text-[#e2e8f0]/80 leading-relaxed">
+                        <p className="text-xs text-slate-500 leading-relaxed">
                           Saluran resmi informasi worker, update jam operasional, dan diskusi komunitas.
                         </p>
                       </div>
                       {supportConfig.communityWaLink ? (
                         <Button
                           asChild
-                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-slate-950 font-bold text-xs h-9 rounded-xl border border-blue-400/30"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl min-h-[44px] shadow-xs active:scale-95 transition-transform"
                         >
                           <a
                             href={supportConfig.communityWaLink}
@@ -1966,12 +1984,35 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </a>
                         </Button>
                       ) : (
-                        <Button disabled variant="outline" className="w-full text-xs h-9 bg-slate-900/80 text-slate-500 border-slate-800">
+                        <Button disabled variant="outline" className="w-full text-xs h-10 rounded-xl bg-slate-50 text-slate-400 border-slate-200">
                           Belum Diatur
                         </Button>
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* LIVE CHAT DIRECT SHORTCUT CARD */}
+              <Card
+                onClick={() => setActiveView("chat")}
+                className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer group"
+              >
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        Live Chat 1-on-1 dengan Admin
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                        Kirim pesan langsung ke Admin untuk bantuan privat real-time.
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
                 </CardContent>
               </Card>
             </div>
@@ -1980,24 +2021,40 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
           {activeView === "chat" && (
             <div className="space-y-4">
-              <Card className="bg-white border-blue-200/80 shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Bantuan CS
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Hubungi CS jika membutuhkan bantuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* CHAT CONTAINER CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
                 {/* CHAT HEADER */}
-                <CardHeader className="p-3 sm:p-4 bg-gradient-to-r from-blue-500/10 via-amber-50/50 to-indigo-500/10 border-b border-blue-200/80 shrink-0">
+                <CardHeader className="p-3.5 sm:p-4 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-blue-500/20 text-blue-700 border border-blue-400/30 shrink-0">
-                        <MessageSquare className="w-5 h-5" />
+                      <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                        <MessageSquare className="w-4 h-4" />
                       </div>
                       <div>
-                        <CardTitle className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-1.5">
+                        <CardTitle className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
                           <span>Chat Resmi Admin / CS</span>
                         </CardTitle>
-                        <CardDescription className="text-[11px] text-blue-900/80 font-medium">
+                        <CardDescription className="text-[11px] text-slate-500 font-medium">
                           Saluran percakapan privat 1-on-1 langsung dengan Admin.
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-900 border-blue-300 font-bold hidden sm:inline-flex">
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-bold hidden sm:inline-flex">
                       Privat & Aman
                     </Badge>
                   </div>
@@ -2006,18 +2063,18 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 {/* MESSAGES BODY */}
                 <CardContent className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 bg-slate-50/50">
                   {workerMessagesData.loading ? (
-                    <div className="flex items-center justify-center py-12 text-xs text-gray-500 gap-2">
+                    <div className="flex items-center justify-center py-12 text-xs text-slate-500 gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      Memuat pesan chat...
+                      <span>Memuat pesan chat...</span>
                     </div>
                   ) : workerMessagesData.messages.length === 0 ? (
-                    <div className="p-8 text-center border border-dashed border-blue-200/80 rounded-2xl bg-white space-y-2">
-                      <div className="p-3 rounded-full bg-blue-50 text-blue-600 w-fit mx-auto border border-blue-200/60">
+                    <div className="p-6 sm:p-8 text-center border border-dashed border-slate-200/80 rounded-2xl bg-white space-y-2 shadow-2xs my-auto">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto">
                         <MessageCircle className="w-6 h-6" />
                       </div>
-                      <p className="text-xs font-bold text-gray-900">Belum Ada Pesan</p>
-                      <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
-                        Tanyakan seputar akun, setoran email, kendala verifikasi, atau bantuan pencairan saldo di sini.
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">Belum Ada Percakapan</p>
+                      <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
+                        Kirim pesan di bawah untuk menghubungi CS / Admin. Kami siap membantu kendala akun, setoran email, atau pencairan saldo Anda.
                       </p>
                     </div>
                   ) : (
@@ -2045,17 +2102,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                             <div
                               className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs relative ${
                                 isMe
-                                  ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-br-none"
-                                  : "bg-white border border-blue-200/80 text-gray-900 rounded-bl-none"
+                                  ? "bg-blue-600 text-white rounded-br-xs"
+                                  : "bg-white border border-slate-200/80 text-slate-900 rounded-bl-xs"
                               }`}
                             >
-                              <div className="flex items-center justify-between gap-2 text-[10px] opacity-90 font-semibold mb-0.5">
+                              <div className="flex items-center justify-between gap-2 text-[10px] font-semibold mb-0.5 opacity-90">
                                 <span>{isMe ? "Saya" : "Admin / CS"}</span>
                                 {!isDeleted && !isExpired && (
                                   <button
                                     type="button"
                                     onClick={() => setDeleteChatModalMsg(msg)}
-                                    className="opacity-0 group-hover:opacity-100 hover:text-blue-200 p-0.5 transition-opacity"
+                                    className={`opacity-0 group-hover:opacity-100 p-0.5 transition-opacity ${
+                                      isMe ? "hover:text-blue-200 text-white" : "hover:text-blue-600 text-slate-400"
+                                    }`}
                                     title="Opsi Pesan"
                                   >
                                     <MoreVertical className="w-3 h-3" />
@@ -2064,27 +2123,27 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                               </div>
 
                               {isDeleted ? (
-                                <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
-                                  <Trash2 className="w-3 h-3 text-slate-400" />
+                                <p className={`italic flex items-center gap-1 my-1 text-[11px] ${isMe ? "text-blue-100" : "text-slate-400"}`}>
+                                  <Trash2 className="w-3 h-3" />
                                   <span>Pesan telah dihapus</span>
                                 </p>
                               ) : isExpired ? (
-                                <p className="italic text-slate-300 flex items-center gap-1 my-1 text-[11px]">
-                                  <Clock className="w-3 h-3 text-slate-400" />
+                                <p className={`italic flex items-center gap-1 my-1 text-[11px] ${isMe ? "text-blue-100" : "text-slate-400"}`}>
+                                  <Clock className="w-3 h-3" />
                                   <span>Pesan telah kedaluwarsa</span>
                                 </p>
                               ) : (
                                 <>
                                   {/* Text Message */}
                                   {msg.text && (
-                                    <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                                    <p className="whitespace-pre-wrap leading-relaxed break-words text-xs">{msg.text}</p>
                                   )}
                                 </>
                               )}
 
-                              <div className="flex items-center justify-end gap-1 text-[9px] font-mono mt-1 opacity-80">
+                              <div className={`flex items-center justify-end gap-1 text-[9px] font-mono mt-1 ${isMe ? "text-blue-100" : "text-slate-400"}`}>
                                 {msg.disappearingTimer && msg.disappearingTimer !== "off" && (
-                                  <span className="flex items-center gap-0.5 text-blue-200" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
+                                  <span className="flex items-center gap-0.5" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
                                     <Timer className="w-2.5 h-2.5" />
                                   </span>
                                 )}
@@ -2107,10 +2166,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <div ref={workerChatEndRef} />
                 </CardContent>
 
-                {/* CHAT INPUT FORM */}
+                {/* CHAT INPUT FORM COMPOSER */}
                 <form
                   onSubmit={handleSendWorkerChat}
-                  className="p-3 bg-white border-t border-blue-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
+                  className="p-3 bg-white border-t border-slate-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
@@ -2120,10 +2179,10 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                       <select
                         value={chatTimerOption}
                         onChange={(e) => setChatTimerOption(e.target.value as DisappearingTimer)}
-                        className="text-[11px] h-10 px-2 rounded-xl bg-blue-50/50 border border-blue-200/80 text-blue-900 font-semibold focus:outline-none min-h-[44px]"
+                        className="text-[11px] h-10 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:outline-none min-h-[44px] cursor-pointer"
                         title="Timer Pesan Menghilang"
                       >
-                        <option value="off">⏱️ Timer Off</option>
+                        <option value="off">⏱️ Off</option>
                         <option value="24h">⏱️ 24 Jam</option>
                         <option value="7d">⏱️ 7 Hari</option>
                         <option value="30d">⏱️ 30 Hari</option>
@@ -2136,13 +2195,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                     value={workerChatText}
                     onChange={(e) => setWorkerChatText(e.target.value)}
                     disabled={sendingWorkerChat}
-                    className="text-xs h-10 bg-blue-50/30 border-blue-200/80 text-gray-900 focus:border-blue-500 flex-1 rounded-xl min-h-[44px]"
+                    className="text-xs sm:text-sm h-10 bg-slate-50 border-slate-200 text-slate-900 focus-visible:ring-blue-500 rounded-xl flex-1 min-h-[44px]"
                   />
 
                   <Button
                     type="submit"
                     disabled={sendingWorkerChat || !workerChatText.trim()}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold h-10 px-4 rounded-xl shadow-2xs border border-blue-400/20 shrink-0 min-h-[44px]"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-4 rounded-xl shadow-2xs shrink-0 min-h-[44px] min-w-[44px] active:scale-95 transition-transform disabled:opacity-50"
                   >
                     {sendingWorkerChat ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2155,20 +2214,20 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
               {/* DELETE MESSAGE CONFIRMATION DIALOG */}
               <Dialog open={!!deleteChatModalMsg} onOpenChange={(open) => !open && setDeleteChatModalMsg(null)}>
-                <DialogContent className="max-w-md bg-white border-blue-200">
+                <DialogContent className="max-w-md bg-white border-slate-200 rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                       <Trash2 className="w-4 h-4 text-rose-600" />
                       <span>Hapus Pesan</span>
                     </DialogTitle>
-                    <DialogDescription className="text-xs text-gray-600">
+                    <DialogDescription className="text-xs text-slate-500">
                       Pilih opsi penghapusan untuk pesan ini.
                     </DialogDescription>
                   </DialogHeader>
 
                   {deleteChatModalMsg && (
                     <div className="space-y-3 pt-2">
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 italic">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 italic">
                         "{deleteChatModalMsg.text || "Pesan"}"
                       </div>
 
@@ -2177,7 +2236,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           onClick={() => handleDeleteMessageForMe(deleteChatModalMsg)}
                           disabled={deletingChat}
                           variant="outline"
-                          className="w-full text-xs h-10 justify-start font-semibold border-blue-200 hover:bg-blue-50 min-h-[44px]"
+                          className="w-full text-xs h-10 justify-start font-bold border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl min-h-[44px]"
                         >
                           <Trash2 className="w-4 h-4 text-blue-600 mr-2" />
                           Hapus untuk Saya (Sembunyikan hanya di perangkat Anda)
@@ -2187,7 +2246,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           <Button
                             onClick={() => handleDeleteMessageForAll(deleteChatModalMsg)}
                             disabled={deletingChat}
-                            className="w-full text-xs h-10 justify-start bg-rose-600 hover:bg-rose-700 text-white font-semibold min-h-[44px]"
+                            className="w-full text-xs h-10 justify-start bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl min-h-[44px]"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Hapus untuk Semua (Hapus untuk Worker & Admin)
