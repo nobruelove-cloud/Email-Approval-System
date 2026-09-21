@@ -1242,40 +1242,21 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <Coins className="w-4 h-4 text-blue-600" />
-                      Informasi Reward & Pasif Income
+                      Komisi Passive Income
                     </CardTitle>
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
-                      Komisi Otomatis
+                      {formatMoney(rules.data.referralCommissionPerAcc || 100)} / 1 ACC
                     </Badge>
                   </div>
-                  <CardDescription className="text-xs text-slate-500">
-                    Setiap email setoran downline yang disetujui (ACC) menghasilkan komisi referral langsung.
-                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Tiers / Volume reference grid matching configured rules */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { acc: 5, reward: 5 * (rules.data.referralCommissionPerAcc || 100) },
-                      { acc: 10, reward: 10 * (rules.data.referralCommissionPerAcc || 100) },
-                      { acc: 20, reward: 20 * (rules.data.referralCommissionPerAcc || 100) },
-                      { acc: 50, reward: 50 * (rules.data.referralCommissionPerAcc || 100) },
-                    ].map((item, idx) => (
-                      <div key={idx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{item.acc} ACC</span>
-                        <p className="text-sm font-extrabold text-blue-600">{formatMoney(item.reward)}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Pasif income note banner */}
-                  <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-700 leading-relaxed space-y-1">
+                <CardContent>
+                  <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-700 leading-relaxed space-y-1">
                     <p className="font-bold text-blue-900 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      Skema Komisi Pasif Income Flat
+                      Skema Komisi Passive Income
                     </p>
-                    <p className="text-[11px] text-slate-600">
-                      Komisi dihitung sebesar <strong className="text-blue-700">{formatMoney(rules.data.referralCommissionPerAcc || 100)}</strong> per setiap 1 email ACC yang dicapai oleh seluruh tim downline Anda. Semakin aktif tim Anda, semakin besar komisi harian yang Anda dapatkan!
+                    <p className="text-xs text-slate-600">
+                      Anda mendapatkan komisi <strong className="text-blue-700">{formatMoney(rules.data.referralCommissionPerAcc || 100)}</strong> untuk setiap email ACC yang dicapai oleh downline Anda.
                     </p>
                   </div>
                 </CardContent>
