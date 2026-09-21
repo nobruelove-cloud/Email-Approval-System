@@ -203,6 +203,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [invitationCodeInput, setInvitationCodeInput] = useState("");
   const [claimingCode, setClaimingCode] = useState(false);
   const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
@@ -254,6 +255,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       setCopiedLink(true);
       toast.success("Tautan referral berhasil disalin!");
       setTimeout(() => setCopiedLink(false), 2500);
+    }
+  }
+
+  function handleCopyReferralCode() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(profile.uid);
+      setCopiedCode(true);
+      toast.success("Kode referral berhasil disalin!");
+      setTimeout(() => setCopiedCode(false), 2500);
     }
   }
 
@@ -1072,252 +1082,292 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* ==================== 5. REFERRAL VIEW ==================== */}
           {activeView === "referral" && (
-            <div className="space-y-5">
-              {/* BANNER REFERRAL */}
-              <Card className="bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[#1e1b4b] text-white border-blue-900/80 shadow-lg overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-                <CardContent className="p-5 sm:p-6 space-y-2 relative z-10">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] font-bold uppercase tracking-wider">
-                    <Sparkles className="w-3 h-3 text-blue-300" />
-                    Program Pasif Income Kerja
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-                    Pasif Income Tanpa Batas
+            <div className="space-y-4">
+              {/* 1. REFERRAL HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Referral
                   </h2>
-                  <p className="text-xs text-blue-100/90 leading-relaxed max-w-2xl">
-                    Ajak rekan kerja Anda bergabung. Setiap kali downline Anda menyetor email dan disetujui (ACC) oleh admin, komisi referral otomatis LANGSUNG masuk ke Saldo Utama Anda!
+                  <p className="text-xs text-slate-500">
+                    Ajak teman dan dapatkan komisi dari aktivitas mereka.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* WIDGET SIMULASI PASIF INCOME */}
-              <Card className="bg-gradient-to-br from-[#0f172a] via-[#321D00] to-[#0f172a] text-[#e2e8f0] border-blue-900/60 shadow-lg overflow-hidden relative">
-                <CardHeader className="p-3 sm:p-4 pb-2 border-b border-blue-900/50">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle className="text-xs sm:text-sm font-black text-[#FFB74D] flex items-center gap-1.5">
-                      <div className="p-1 rounded-md bg-blue-500/20 text-[#FFB74D] border border-blue-500/30">
-                        <Coins className="w-3.5 h-3.5" />
-                      </div>
-                      Kalkulator Simulasi Pasif Income
-                    </CardTitle>
-                    <Badge variant="outline" className="bg-blue-500/10 text-[#FFB74D] border-blue-500/30 font-bold text-[10px] px-2 py-0.5">
-                      Flat: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
+              {/* 2. REFERRAL SUMMARY CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-900">Referral Anda</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">Ajak teman untuk bergabung</CardDescription>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
+                      Rate: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
                     </Badge>
                   </div>
                 </CardHeader>
-
-                <CardContent className="p-3 sm:p-4 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
-                          Jumlah Downline
-                        </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
-                          {simFriends} Orang
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={1}
-                        max={50}
-                        value={simFriends}
-                        onChange={(e) => setSimFriends(Number(e.target.value))}
-                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
-                      />
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        Total Downline
+                        <Users className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-extrabold text-slate-900">
+                        {downlines.data.length || refStats.total} <span className="text-xs font-semibold text-slate-500">Worker</span>
+                      </p>
                     </div>
 
-                    <div className="space-y-1.5 p-2.5 bg-[#1e293b]/80 rounded-xl border border-blue-900/40">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-bold text-[#e2e8f0] uppercase tracking-wider">
-                          Email ACC / Downline / Hari
-                        </Label>
-                        <span className="text-xs font-black text-[#FFB74D] bg-blue-950 px-2 py-0.5 rounded border border-blue-800/60">
-                          {simAccPerFriend} Email
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={1}
-                        max={50}
-                        value={simAccPerFriend}
-                        onChange={(e) => setSimAccPerFriend(Number(e.target.value))}
-                        className="w-full h-1.5 bg-blue-950 rounded-lg appearance-none cursor-pointer accent-[#FFB74D]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-[#1A0E00] border border-blue-800/50 space-y-2">
-                    <div className="text-[11px] text-blue-200/80 flex items-center justify-between border-b border-blue-900/60 pb-1.5">
-                      <span>Total Volume Email ACC Tim / Hari:</span>
-                      <strong className="text-[#FFB74D] font-mono text-xs">{simFriends * simAccPerFriend} ACC</strong>
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        Total ACC
+                        <Award className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-extrabold text-slate-900">
+                        {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-semibold text-slate-500">Email</span>
+                      </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-0.5">
-                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Hari</p>
-                        <p className="text-base font-black text-[#FFB74D] tracking-tight">
-                          {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100))}
-                        </p>
-                      </div>
-                      <div className="p-2 rounded-lg bg-[#281500] border border-blue-900/60 space-y-0.5">
-                        <p className="text-[10px] font-bold text-blue-300/80 uppercase tracking-wider">Estimasi / Bulan</p>
-                        <p className="text-base font-black text-[#FFB74D] tracking-tight">
-                          {formatMoney(simFriends * simAccPerFriend * (rules.data.referralCommissionPerAcc || 100) * 30)}
-                        </p>
-                      </div>
+                    <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 space-y-1">
+                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center justify-between">
+                        Total Komisi
+                        <Coins className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-black text-blue-600">
+                        {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* 3 STATS CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL BONUS DIDAPAT</p>
-                      <Wallet className="w-4 h-4 text-[#2563eb]" />
-                    </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
-                      {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL DOWNLINE</p>
-                      <Users className="w-4 h-4 text-[#2563eb]" />
-                    </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
-                      {downlines.data.length || refStats.total} <span className="text-xs font-medium text-blue-900/70">Worker</span>
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-[#f8fafc] border-[#e2e8f0] shadow-xs">
-                  <CardContent className="p-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-blue-900/70 uppercase tracking-wider">TOTAL EMAIL ACC TIM</p>
-                      <Award className="w-4 h-4 text-[#2563eb]" />
-                    </div>
-                    <p className="text-xl font-black text-[#2563eb] tracking-tight">
-                      {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-medium text-blue-900/70">Email</span>
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* TAUTAN REFERRAL */}
-              <Card className="bg-white border-blue-100 shadow-xs">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              {/* 3. REFERRAL LINK / CODE CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <Share2 className="w-4 h-4 text-blue-600" />
-                    Tautan Referral Saya
+                    Link Referral Anda
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={referralLink}
-                      className="font-mono text-xs bg-blue-50/40 border-blue-200 text-blue-950 rounded-xl"
-                    />
-                    <Button
-                      onClick={handleCopyReferralLink}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white shrink-0 font-bold text-xs h-10 px-3.5 rounded-xl border border-blue-400/20"
-                    >
-                      {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      {copiedLink ? "Tersalin!" : "Salin Link"}
-                    </Button>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Tautan Pendaftaran</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={referralLink}
+                        className="font-mono text-xs bg-slate-50 border-slate-200 text-slate-800 rounded-xl min-h-[44px]"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleCopyReferralLink}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 font-bold text-xs h-10 px-3.5 rounded-xl gap-1.5 min-h-[44px] active:scale-95 transition-transform"
+                      >
+                        {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedLink ? "Tersalin" : "Salin Link"}</span>
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl space-y-1.5 text-xs text-blue-950">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="font-bold">Kode Referral Anda:</span>
-                      <Badge variant="outline" className="font-mono bg-white text-blue-950 border-blue-300 font-bold text-xs">
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Kode Referral</Label>
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="font-mono font-bold text-slate-900 text-sm pl-1">
                         {profile.uid}
-                      </Badge>
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={handleCopyReferralCode}
+                        variant="outline"
+                        className="bg-white text-blue-700 border-blue-200 hover:bg-blue-50 font-bold text-xs h-9 px-3 rounded-xl gap-1.5 min-h-[36px]"
+                      >
+                        {copiedCode ? <Check className="w-3.5 h-3.5 text-blue-600" /> : <Copy className="w-3.5 h-3.5 text-blue-600" />}
+                        <span>{copiedCode ? "Tersalin" : "Salin Kode"}</span>
+                      </Button>
                     </div>
-                    {isAlreadyLinked ? (
-                      <p className="text-[11px] text-blue-900">
-                        ✓ Terhubung Upline: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
-                      </p>
-                    ) : (
-                      <form onSubmit={handleClaimInvitationCode} className="pt-1.5 border-t border-blue-200/60 flex gap-2">
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. INVITATION CODE CLAIM CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-600" />
+                    Masukkan Kode Undangan
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isAlreadyLinked ? (
+                    <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-xs text-blue-900 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>
+                        Akun kamu sudah terhubung dengan upline: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
+                      </span>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleClaimInvitationCode} className="space-y-3">
+                      <div className="flex gap-2">
                         <Input
                           value={invitationCodeInput}
                           onChange={(e) => setInvitationCodeInput(e.target.value)}
-                          placeholder="Masukkan Kode Upline"
-                          className="font-mono text-xs bg-white rounded-xl border-blue-200 h-8"
+                          placeholder="Kode Undangan Teman / Upline"
+                          className="font-mono text-xs bg-slate-50 border-slate-200 rounded-xl text-slate-900 h-10 min-h-[44px]"
                           disabled={claimingCode}
                         />
                         <Button
                           type="submit"
                           disabled={claimingCode || !invitationCodeInput.trim()}
-                          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl h-8 shrink-0"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl h-10 px-4 shrink-0 min-h-[44px] active:scale-95 transition-transform"
                         >
-                          {claimingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : "Hubungkan"}
+                          {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : "Klaim Kode"}
                         </Button>
-                      </form>
-                    )}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Hubungkan akun ke upline untuk saling mendapatkan statistik tim referral.
+                      </p>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 5. REFERRAL REWARD / PASSIVE INCOME INFO */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-blue-600" />
+                      Informasi Reward & Pasif Income
+                    </CardTitle>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                      Komisi Otomatis
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs text-slate-500">
+                    Setiap email setoran downline yang disetujui (ACC) menghasilkan komisi referral langsung.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Tiers / Volume reference grid matching configured rules */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { acc: 5, reward: 5 * (rules.data.referralCommissionPerAcc || 100) },
+                      { acc: 10, reward: 10 * (rules.data.referralCommissionPerAcc || 100) },
+                      { acc: 20, reward: 20 * (rules.data.referralCommissionPerAcc || 100) },
+                      { acc: 50, reward: 50 * (rules.data.referralCommissionPerAcc || 100) },
+                    ].map((item, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{item.acc} ACC</span>
+                        <p className="text-sm font-extrabold text-blue-600">{formatMoney(item.reward)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pasif income note banner */}
+                  <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-700 leading-relaxed space-y-1">
+                    <p className="font-bold text-blue-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      Skema Komisi Pasif Income Flat
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Komisi dihitung sebesar <strong className="text-blue-700">{formatMoney(rules.data.referralCommissionPerAcc || 100)}</strong> per setiap 1 email ACC yang dicapai oleh seluruh tim downline Anda. Semakin aktif tim Anda, semakin besar komisi harian yang Anda dapatkan!
+                    </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* DAFTAR TIM DOWNLINE */}
-              <Card className="bg-white border-blue-100 shadow-xs">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-600" />
-                    Daftar Tim Downline ({downlines.data.length})
-                  </CardTitle>
+              {/* 6. DAFTAR TIM DOWNLINE */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      Daftar Tim Downline ({downlines.data.length})
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-bold bg-slate-50 border-slate-200 text-slate-700">
+                      {downlines.data.length} Orang
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {downlines.loading ? (
-                    <p className="text-xs text-gray-400 text-center py-6">Memuat data downline...</p>
+                    <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Memuat data downline...</span>
+                    </div>
                   ) : downlines.data.length === 0 ? (
-                    <div className="p-6 border border-dashed border-blue-200 rounded-2xl text-center space-y-1.5 bg-[#f8fafc]">
-                      <Users className="w-6 h-6 text-blue-500 mx-auto" />
-                      <p className="text-xs font-bold text-blue-950">Belum Ada Downline Terdaftar</p>
-                      <p className="text-[11px] text-blue-900/80">
-                        Bagikan link referral Anda untuk mulai mengumpulkan komisi pasif income.
+                    <div className="p-6 border border-dashed border-slate-200 rounded-2xl text-center space-y-1.5 bg-slate-50/50">
+                      <Users className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-800">Belum Ada Downline Terdaftar</p>
+                      <p className="text-[11px] text-slate-500">
+                        Bagikan link referral Anda untuk mulai membangun tim dan mengumpulkan komisi pasif income.
                       </p>
                     </div>
                   ) : (
-                    <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-white">
-                      <div className="overflow-x-auto">
+                    <>
+                      {/* Mobile View: Compact Cards */}
+                      <div className="space-y-2.5 md:hidden">
+                        {downlines.data.map((dw) => {
+                          const dwAcc = dw.accCount ?? 0;
+                          const commRate = rules.data.referralCommissionPerAcc ?? 100;
+                          const totalComm = dwAcc * commRate;
+
+                          return (
+                            <div
+                              key={dw.uid}
+                              className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">{dw.name || "Worker"}</span>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                                  {dwAcc} ACC
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100 text-slate-500">
+                                <span>Bergabung: <strong className="text-slate-700 font-mono">{formatDateTime(dw.createdAt)}</strong></span>
+                                <span className="font-bold text-blue-600">{formatMoney(totalComm)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Desktop View: Table */}
+                      <div className="hidden md:block border border-slate-200/80 rounded-xl overflow-hidden bg-white">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-[#f8fafc] border-b border-[#e2e8f0] text-blue-950 font-bold">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
                             <tr>
-                              <th className="px-3 py-2">Worker</th>
-                              <th className="px-3 py-2">Bergabung</th>
-                              <th className="px-3 py-2 text-center">ACC</th>
-                              <th className="px-3 py-2 text-right">Komisi</th>
+                              <th className="px-3 py-2.5">Worker</th>
+                              <th className="px-3 py-2.5">Bergabung</th>
+                              <th className="px-3 py-2.5 text-center">ACC</th>
+                              <th className="px-3 py-2.5 text-right">Komisi</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-amber-100">
+                          <tbody className="divide-y divide-slate-100">
                             {downlines.data.map((dw) => {
                               const dwAcc = dw.accCount ?? 0;
                               const commRate = rules.data.referralCommissionPerAcc ?? 100;
                               const totalComm = dwAcc * commRate;
 
                               return (
-                                <tr key={dw.uid} className="hover:bg-blue-50/50 transition-colors">
-                                  <td className="px-3 py-2">
-                                    <p className="font-bold text-gray-900">{dw.name || "Worker"}</p>
+                                <tr key={dw.uid} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="px-3 py-2.5 font-bold text-slate-900">
+                                    {dw.name || "Worker"}
                                   </td>
-                                  <td className="px-3 py-2 text-gray-600 font-mono text-[11px]">
+                                  <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">
                                     {formatDateTime(dw.createdAt)}
                                   </td>
-                                  <td className="px-3 py-2 text-center">
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-900 border-blue-300 font-bold text-[10px]">
+                                  <td className="px-3 py-2.5 text-center">
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
                                       {dwAcc} ACC
                                     </Badge>
                                   </td>
-                                  <td className="px-3 py-2 text-right font-bold text-[#2563eb]">
+                                  <td className="px-3 py-2.5 text-right font-bold text-blue-600">
                                     {formatMoney(totalComm)}
                                   </td>
                                 </tr>
@@ -1326,51 +1376,85 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
 
-              {/* LOG TRANSAKSI KOMISI */}
-              <Card className="bg-white border-blue-100 shadow-xs">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-blue-600" />
-                    Riwayat Log Komisi Referral ({referralTxs.data.length})
-                  </CardTitle>
+              {/* 7. RIWAYAT KOMISI REFERRAL */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-blue-600" />
+                      Riwayat Log Komisi Referral ({referralTxs.data.length})
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-bold bg-slate-50 border-slate-200 text-slate-700">
+                      Log Transaksi
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {referralTxs.loading ? (
-                    <p className="text-xs text-gray-400 text-center py-6">Memuat riwayat...</p>
+                    <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Memuat riwayat...</span>
+                    </div>
                   ) : referralTxs.data.length === 0 ? (
-                    <p className="text-xs text-gray-500 text-center py-4 border border-dashed border-blue-200 rounded-xl bg-[#f8fafc]">
+                    <p className="text-xs text-slate-500 text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                       Belum ada riwayat transaksi komisi.
                     </p>
                   ) : (
-                    <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-white">
-                      <div className="overflow-x-auto">
+                    <>
+                      {/* Mobile View: Compact Transaction Cards */}
+                      <div className="space-y-2.5 md:hidden">
+                        {referralTxs.data.map((tx) => (
+                          <div
+                            key={tx.id}
+                            className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-slate-900">
+                                {tx.downlineName || shortId(tx.downlineId)}
+                              </span>
+                              <span className="font-black text-xs text-emerald-600">
+                                +{formatMoney(tx.totalCommission)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                              <span className="font-mono">{formatDateTime(tx.createdAt)}</span>
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                                {tx.accCount} ACC
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop View: Table */}
+                      <div className="hidden md:block border border-slate-200/80 rounded-xl overflow-hidden bg-white">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-[#f8fafc] border-b border-[#e2e8f0] text-blue-950 font-bold">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
                             <tr>
-                              <th className="px-3 py-2">Waktu</th>
-                              <th className="px-3 py-2">Downline</th>
-                              <th className="px-3 py-2 text-center">ACC</th>
-                              <th className="px-3 py-2 text-right">Total</th>
+                              <th className="px-3 py-2.5">Waktu</th>
+                              <th className="px-3 py-2.5">Downline</th>
+                              <th className="px-3 py-2.5 text-center">ACC</th>
+                              <th className="px-3 py-2.5 text-right">Total</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-amber-100">
+                          <tbody className="divide-y divide-slate-100">
                             {referralTxs.data.map((tx) => (
-                              <tr key={tx.id} className="hover:bg-blue-50/50">
-                                <td className="px-3 py-2 font-mono text-gray-500 text-[11px]">
+                              <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-3 py-2.5 font-mono text-slate-500 text-[11px]">
                                   {formatDateTime(tx.createdAt)}
                                 </td>
-                                <td className="px-3 py-2 font-semibold text-gray-900">
+                                <td className="px-3 py-2.5 font-bold text-slate-900">
                                   {tx.downlineName || shortId(tx.downlineId)}
                                 </td>
-                                <td className="px-3 py-2 text-center font-bold text-gray-800">
+                                <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                   {tx.accCount}
                                 </td>
-                                <td className="px-3 py-2 text-right font-black text-[#2563eb]">
+                                <td className="px-3 py-2.5 text-right font-black text-emerald-600">
                                   +{formatMoney(tx.totalCommission)}
                                 </td>
                               </tr>
@@ -1378,7 +1462,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
