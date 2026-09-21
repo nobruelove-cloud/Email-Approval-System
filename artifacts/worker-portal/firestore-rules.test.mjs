@@ -110,9 +110,6 @@ async function main() {
         email: 'casec@example.com',
         phone: '08123456789',
         referredBy: workerUid,
-        referralCode: 'REF123',
-        hasUsedReferral: true,
-        reciprocalPartner: 'partner_456',
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -120,7 +117,7 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Case C: Self-registration with optional phone, referredBy, referralCode, hasUsedReferral, reciprocalPartner succeeded.');
+    console.log('[PASS] Case C: Self-registration with optional phone and referredBy succeeded.');
   } catch (err) {
     console.error('[FAIL] Case C: Self-registration failed:', err);
     process.exitCode = 1;
@@ -391,16 +388,16 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('4. Self balance update (permitted under simplified self update rule):');
+  console.log('4. Worker balance increase:');
   try {
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(workerDb, 'users', workerUid), {
         balance: 20000,
       })
     );
-    console.log('[PASS] Self balance update succeeded as permitted by security rules.');
+    console.log('[PASS] Negative Update: Worker balance increase correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Self balance update failed:', err);
+    console.error('[FAIL] Negative Update: Worker balance increase was not rejected:', err);
     process.exitCode = 1;
   }
 
@@ -553,7 +550,7 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\nScenario 3: Worker (referrer) claimReferralReward transaction succeeds');
+  console.log('\nScenario 3: Admin claimReferralReward transaction succeeds');
   const workerClaimRefId = 'worker_claim_ref_doc_1';
   const workerClaimId = `${workerClaimRefId}_tier_5`;
   const workerLedgerId = `${workerClaimRefId}_ledger_tier_5`;
@@ -575,14 +572,14 @@ async function main() {
 
   try {
     await assertSucceeds(
-      runTransaction(regWorker1Db, async (tx) => {
-        const refDocRef = doc(regWorker1Db, 'referrals', workerClaimRefId);
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', workerClaimRefId);
         const refSnap = await tx.get(refDocRef);
-        const referrerUserRef = doc(regWorker1Db, 'users', regWorker1);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
         const referrerSnap = await tx.get(referrerUserRef);
-        const claimDocRef = doc(regWorker1Db, 'referralClaims', workerClaimId);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', workerClaimId);
         const claimSnap = await tx.get(claimDocRef);
-        const ledgerRef = doc(regWorker1Db, 'rewardLedger', workerLedgerId);
+        const ledgerRef = doc(regAdminDb, 'rewardLedger', workerLedgerId);
         const ledgerSnap = await tx.get(ledgerRef);
 
         tx.update(refDocRef, {
@@ -620,7 +617,7 @@ async function main() {
         });
       })
     );
-    console.log('[PASS] Scenario 3: Worker claimReferralReward transaction succeeded.');
+    console.log('[PASS] Scenario 3: Admin claimReferralReward transaction succeeded.');
   } catch (err) {
     console.error('[FAIL] Scenario 3 failed:', err);
     process.exitCode = 1;
