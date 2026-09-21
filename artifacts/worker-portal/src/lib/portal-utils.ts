@@ -3,10 +3,19 @@ import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
   DEFAULT_OPERATING_HOURS,
+  DEFAULT_PAYMENT_METHOD_FEES,
+  DEFAULT_CHECKER_RULES,
   type EmailSubmission,
   type TierConfig,
   type ReferralTierConfig,
   type OperatingHoursConfig,
+  type Referral,
+  type PaymentMethodFeeConfig,
+  type WithdrawalSettings,
+  type PortalRules,
+  type CheckerRulesConfig,
+  type CheckedEmailItem,
+  type BulkCheckResult,
 } from "./portal-types";
 
 export function formatDate(value: unknown, fallback = "Menunggu tanggal") {
@@ -39,6 +48,161 @@ export function formatMoney(value: number) {
 
 export function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 5)}…${id.slice(-4)}` : id;
+}
+
+/**
+ * Masks worker usernames for privacy (e.g., "Ahmad Fauzi" -> "Ahm***", "User" -> "Use***").
+ */
+/**
+ * Resolves a worker profile object from a list of users using workerId, workerEmail, or workerName.
+ * Matches across UID, normalized email, and normalized name/username.
+ */
+export function resolveWorkerUser<T extends { uid: string; name?: string; email?: string }>(
+  workerQuery: { workerId?: string; workerEmail?: string; workerName?: string },
+  users: T[]
+): T | undefined {
+  if (!users || !Array.isArray(users) || users.length === 0) return undefined;
+
+  const id = workerQuery.workerId?.trim();
+  const email = workerQuery.workerEmail?.trim().toLowerCase();
+  const name = workerQuery.workerName?.trim().toLowerCase();
+
+  // 1. Direct UID match
+  if (id) {
+    const directUidMatch = users.find((u) => u.uid === id);
+    if (directUidMatch) return directUidMatch;
+  }
+
+  // 2. Direct Email match
+  const searchEmail = email || (id && id.includes("@") ? id.toLowerCase() : undefined);
+  if (searchEmail) {
+    const emailMatch = users.find((u) => u.email && u.email.trim().toLowerCase() === searchEmail);
+    if (emailMatch) return emailMatch;
+  }
+
+  // 3. Direct Name match
+  const searchName = name || (id && !id.includes("@") ? id.toLowerCase() : undefined);
+  if (searchName) {
+    const nameMatch = users.find((u) => u.name && u.name.trim().toLowerCase() === searchName);
+    if (nameMatch) return nameMatch;
+  }
+
+  return undefined;
+}
+
+export function maskWorkerName(name?: string | null): string {
+  if (!name || typeof name !== "string") return "User***";
+  const trimmed = name.trim();
+  if (!trimmed) return "User***";
+
+  // Handle email addresses (e.g., edward@gmail.com -> ed***@gmail.com)
+  if (trimmed.includes("@") && !trimmed.startsWith("@")) {
+    const parts = trimmed.split("@");
+    const local = parts[0];
+    const domain = parts.slice(1).join("@");
+    const maskedLocal = local.length <= 2 ? `${local.charAt(0)}***` : `${local.slice(0, 2)}***`;
+    return `${maskedLocal}@${domain}`;
+  }
+
+  // Handle handles starting with @ (e.g., @edi_kurniawan -> @ed***)
+  if (trimmed.startsWith("@")) {
+    const handle = trimmed.slice(1);
+    const maskedHandle = handle.length <= 2 ? `${handle.charAt(0)}***` : `${handle.slice(0, 2)}***`;
+    return `@${maskedHandle}`;
+  }
+
+  // Handle standard names (e.g., Ahmad Fauzi -> Ahm***)
+  if (trimmed.length <= 2) {
+    return `${trimmed.charAt(0)}***`;
+  }
+  return `${trimmed.slice(0, 3)}***`;
+}
+
+/**
+ * Formats a list of email submission items into a line-separated email string for bulk copying.
+ */
+export function formatBatchEmailsOnly(items: { email: string; password?: string }[]): string {
+  if (!Array.isArray(items)) return "";
+  return items.map((it) => it.email).filter(Boolean).join("\n");
+}
+
+/**
+ * Formats a list of email submission items into email|password line-separated strings for bulk copying.
+ */
+export function formatBatchEmailsWithPasswords(items: { email: string; password?: string }[]): string {
+  if (!Array.isArray(items)) return "";
+  return items
+    .map((it) => `${it.email || ""}|${it.password || ""}`)
+    .filter((line) => line !== "|")
+    .join("\n");
+}
+
+/**
+ * Resolves fee configuration for a specific payment method from WithdrawalSettings or fallback PortalRules.
+ */
+export function getPaymentMethodFeeConfig(
+  methodName: string,
+  withdrawalSettings?: WithdrawalSettings | null,
+  fallbackRules?: PortalRules | null
+): PaymentMethodFeeConfig {
+  const normName = (methodName || "").trim().toLowerCase();
+
+  if (withdrawalSettings?.methods && Array.isArray(withdrawalSettings.methods)) {
+    const found = withdrawalSettings.methods.find((m) => m.method.trim().toLowerCase() === normName);
+    if (found) return found;
+  }
+
+  const defaultFound = DEFAULT_PAYMENT_METHOD_FEES.find((m) => m.method.trim().toLowerCase() === normName);
+  if (defaultFound) return defaultFound;
+
+  // Fallback if legacy withdrawFeePercent is set in rules
+  const legacyPercent = fallbackRules?.withdrawFeePercent ?? 0;
+  return {
+    method: methodName || "Transfer Bank",
+    enabled: true,
+    feeType: legacyPercent > 0 ? "percentage" : "free",
+    feeValue: legacyPercent,
+  };
+}
+
+/**
+ * Calculates withdrawal fee based on provider configuration and withdrawal amount.
+ */
+export function calculateWithdrawalFee(amount: number, feeConfig?: PaymentMethodFeeConfig | null): number {
+  if (!feeConfig || feeConfig.feeType === "free" || !Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+
+  if (feeConfig.feeType === "fixed") {
+    return Math.max(0, Math.round(feeConfig.feeValue));
+  }
+
+  if (feeConfig.feeType === "percentage") {
+    const fee = (amount * Math.max(0, feeConfig.feeValue)) / 100;
+    return Math.max(0, Math.round(fee));
+  }
+
+  return 0;
+}
+
+/**
+ * Formats a fee configuration into a human-readable badge text.
+ * e.g. "Bebas Biaya", "Biaya Rp 2.500", or "Biaya 1.5%"
+ */
+export function formatFeeBadge(feeConfig?: PaymentMethodFeeConfig | null): string {
+  if (!feeConfig || feeConfig.feeType === "free" || feeConfig.feeValue <= 0) {
+    return "Bebas Biaya";
+  }
+
+  if (feeConfig.feeType === "fixed") {
+    return `Biaya ${formatMoney(feeConfig.feeValue)}`;
+  }
+
+  if (feeConfig.feeType === "percentage") {
+    return `Biaya ${feeConfig.feeValue}%`;
+  }
+
+  return "Bebas Biaya";
 }
 
 /**
@@ -338,6 +502,46 @@ export function isValidTelegramUrl(url: string): boolean {
 }
 
 /**
+ * Checks whether a specific referral tier (by minAcc) has already been claimed for a referral.
+ */
+export function isReferralTierClaimed(
+  referral?: Partial<Referral> | null,
+  minAcc?: number,
+  referralTiers?: ReferralTierConfig[]
+): boolean {
+  if (!referral || typeof minAcc !== "number") return false;
+  const key = String(minAcc);
+  if (referral.claimedTiers && typeof referral.claimedTiers[key] === "boolean") {
+    return referral.claimedTiers[key];
+  }
+  // Fallback for legacy PAID referrals created before per-tier tracking
+  if ((referral.status === "PAID" || referral.status === "REWARDED") && (!referral.claimedTiers || Object.keys(referral.claimedTiers).length === 0)) {
+    const acc = referral.currentAccCount ?? 0;
+    const tierReward = getReferralRewardForAccCount(minAcc, referralTiers);
+    const paidReward = referral.rewardAmount ?? 0;
+    if (acc >= minAcc && tierReward > 0 && paidReward >= tierReward) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks whether a specific referral tier (by minAcc) is eligible to be claimed for a referral.
+ */
+export function isReferralTierClaimable(
+  referral?: Partial<Referral> | null,
+  minAcc?: number,
+  referralTiers?: ReferralTierConfig[]
+): boolean {
+  if (!referral || typeof minAcc !== "number") return false;
+  if (referral.status === "REJECTED") return false;
+  const acc = referral.currentAccCount ?? 0;
+  if (acc < minAcc) return false;
+  return !isReferralTierClaimed(referral, minAcc, referralTiers);
+}
+
+/**
  * Returns total reward for a given ACC count based on highest reached tier.
  */
 export function getReferralRewardForAccCount(accCount: number, referralTiers?: ReferralTierConfig[]): number {
@@ -480,6 +684,34 @@ export function getStartAndEndOfWeek(inputDate?: Date): { start: Date; end: Date
 }
 
 /**
+ * Returns weekly period options for admin dropdown selection (e.g. past N weeks).
+ */
+export function getWeeklyPeriodOptions(weeksCount = 8): { value: string; label: string; start: Date; end: Date; isCurrent: boolean }[] {
+  const options: { value: string; label: string; start: Date; end: Date; isCurrent: boolean }[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < weeksCount; i++) {
+    const refDate = new Date(now.getTime() - i * 7 * 24 * 3600 * 1000);
+    const { start, end } = getStartAndEndOfWeek(refDate);
+    const key = getWeeklyPeriodKey(refDate);
+
+    // Avoid duplicate keys if week boundary aligns
+    if (!options.some((o) => o.value === key)) {
+      const isCurrent = i === 0;
+      const label = isCurrent
+        ? `Minggu Ini (${key})`
+        : i === 1
+          ? `Minggu Lalu (${key})`
+          : `Periode ${key}`;
+
+      options.push({ value: key, label, start, end, isCurrent });
+    }
+  }
+
+  return options;
+}
+
+/**
  * Calculates valid ACC (approved) email count for a worker within a time window.
  */
 export function getWorkerAccInPeriod(
@@ -487,12 +719,29 @@ export function getWorkerAccInPeriod(
   startDate: Date,
   endDate: Date,
   workerId?: string,
+  users?: Array<{ uid: string; name?: string; role?: string; email?: string }>
 ): number {
   const startMs = startDate.getTime();
   const endMs = endDate.getTime();
 
   return submissions.reduce((sum, sub) => {
-    if (workerId && sub.workerId !== workerId) return sum;
+    if (workerId) {
+      let isMatch = sub.workerId === workerId;
+      if (!isMatch && Array.isArray(users) && users.length > 0) {
+        const resolved = resolveWorkerUser(
+          {
+            workerId: sub.workerId || (sub as any).userId,
+            workerEmail: (sub as any).workerEmail || (sub as any).userEmail,
+            workerName: sub.workerName,
+          },
+          users
+        );
+        if (resolved && resolved.uid === workerId) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch) return sum;
+    }
 
     let subDate: Date | null = null;
     if (sub.submittedAt) {
@@ -503,7 +752,8 @@ export function getWorkerAccInPeriod(
     const t = subDate.getTime();
     if (t < startMs || t > endMs) return sum;
 
-    const isFinalized = sub.status === "approved" || sub.status === "available" || sub.status === "sold";
+    const statusNorm = typeof sub.status === "string" ? sub.status.trim().toLowerCase() : "";
+    const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold" || statusNorm === "acc" || statusNorm === "terjual";
     if (!isFinalized) return sum;
 
     let approvedCount = 0;
@@ -523,6 +773,437 @@ export function getWorkerAccInPeriod(
  * Validates a submitted password against password format rules found in submission notes.
  * Returns an error string in Indonesian if validation fails, or null if valid.
  */
+export interface LeaderboardEntry {
+  workerId: string;
+  workerName: string;
+  maskedName: string;
+  validAccCount: number;
+  rank: number;
+  officialRank: number | null;
+  isQualified: boolean;
+  rewardAmount?: number;
+}
+
+export interface LeaderboardUserProgress {
+  acc: number;
+  arrayRank: number | null;
+  positionText: string;
+  nextTarget: number;
+  targetTitle: string;
+  remaining: number;
+  progressPercent: number;
+  descriptionText: string;
+}
+
+/**
+ * Calculates user qualification status, rank title, next target, and progress bar for Leaderboard UI.
+ */
+export function getLeaderboardUserProgress(
+  acc: number,
+  arrayRank: number | null
+): LeaderboardUserProgress {
+  const validAcc = Math.max(0, acc || 0);
+
+  // 1. Unqualified if ACC < 50 (Minimum threshold for Juara 3)
+  if (validAcc < 50) {
+    const nextTarget = 50;
+    const targetTitle = "Juara 3 (Bonus Rp 15.000)";
+    const remaining = nextTarget - validAcc;
+    const progressPercent = Math.min(100, Math.round((validAcc / nextTarget) * 100));
+    const positionText = arrayRank !== null && arrayRank <= 3 ? "Belum Terkualifikasi" : "Di Luar Top 3";
+    const descriptionText = `Butuh ${remaining} email ACC lagi untuk masuk kualifikasi Juara 3`;
+
+    return {
+      acc: validAcc,
+      arrayRank,
+      positionText,
+      nextTarget,
+      targetTitle,
+      remaining,
+      progressPercent,
+      descriptionText,
+    };
+  }
+
+  // 2. Qualified (ACC >= 50)
+  let officialRankLabel = "Di Luar Top 3";
+  let nextTarget = 50;
+  let targetTitle = "Juara 3 (Bonus Rp 15.000)";
+
+  if (arrayRank === 1) {
+    if (validAcc >= 200) {
+      officialRankLabel = "Peringkat #1";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else if (validAcc >= 100) {
+      officialRankLabel = "Peringkat #2";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      officialRankLabel = "Peringkat #3";
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else if (arrayRank === 2) {
+    if (validAcc >= 100) {
+      officialRankLabel = "Peringkat #2";
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      officialRankLabel = "Peringkat #3";
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else if (arrayRank === 3) {
+    officialRankLabel = "Peringkat #3";
+    if (validAcc >= 100) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  } else {
+    // arrayRank > 3 or null
+    officialRankLabel = "Di Luar Top 3";
+    if (validAcc >= 100) {
+      nextTarget = 200;
+      targetTitle = "Juara 1 (Bonus Rp 50.000)";
+    } else {
+      nextTarget = 100;
+      targetTitle = "Juara 2 (Bonus Rp 30.000)";
+    }
+  }
+
+  const remaining = Math.max(0, nextTarget - validAcc);
+  const progressPercent = Math.min(100, Math.round((validAcc / nextTarget) * 100));
+
+  let descriptionText = "";
+  if (remaining > 0) {
+    const targetName = targetTitle.startsWith("Juara 1")
+      ? "Juara 1"
+      : targetTitle.startsWith("Juara 2")
+      ? "Juara 2"
+      : "Juara 3";
+    descriptionText = `Butuh ${remaining} email ACC lagi untuk masuk kualifikasi ${targetName}`;
+  } else {
+    descriptionText = "🎉 Selamat! Anda telah mencapai target kualifikasi bonus!";
+  }
+
+  return {
+    acc: validAcc,
+    arrayRank,
+    positionText: officialRankLabel,
+    nextTarget,
+    targetTitle,
+    remaining,
+    progressPercent,
+    descriptionText,
+  };
+}
+
+/**
+ * Calculates real-time leaderboard standings based ONLY on APPROVED email submissions within a timeframe.
+ */
+export function calculateLeaderboardStandings(
+  submissions: EmailSubmission[],
+  users: Array<{ uid: string; name?: string; role?: string; email?: string }>,
+  startDate: Date,
+  endDate: Date,
+  rewardConfigs?: { rank: number; rewardAmount: number }[]
+): LeaderboardEntry[] {
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+
+  const workerUsers = Array.isArray(users) ? users.filter((u) => u.role === "worker" || !u.role) : [];
+
+  const accMap = new Map<string, { name: string; count: number }>();
+
+  if (Array.isArray(submissions)) {
+    submissions.forEach((sub) => {
+      const statusNorm = typeof sub.status === "string" ? sub.status.trim().toLowerCase() : "";
+      const isFinalized = statusNorm === "approved" || statusNorm === "available" || statusNorm === "sold" || statusNorm === "acc" || statusNorm === "terjual";
+      if (!isFinalized) return;
+
+      let subDate: Date | null = null;
+      if (sub.submittedAt) {
+        if (typeof sub.submittedAt === "object" && sub.submittedAt !== null && "toMillis" in (sub.submittedAt as any)) {
+          subDate = new Date((sub.submittedAt as any).toMillis());
+        } else {
+          subDate = new Date(sub.submittedAt as string | number);
+        }
+      }
+      if (!subDate || isNaN(subDate.getTime())) return;
+
+      const t = subDate.getTime();
+      if (t < startMs || t > endMs) return;
+
+      let approvedCount = 0;
+      if (typeof sub.approvedItemCount === "number") {
+        approvedCount = sub.approvedItemCount;
+      } else if (Array.isArray(sub.items) && sub.items.length > 0) {
+        approvedCount = sub.items.filter((i) => i.status === "approved").length;
+      } else if (sub.email) {
+        approvedCount = 1;
+      }
+
+      if (approvedCount <= 0) return;
+
+      const resolvedWorker = resolveWorkerUser(
+        {
+          workerId: sub.workerId || (sub as any).userId,
+          workerEmail: (sub as any).workerEmail || (sub as any).userEmail,
+          workerName: sub.workerName,
+        },
+        workerUsers
+      );
+
+      const wId = resolvedWorker ? resolvedWorker.uid : (sub.workerId || (sub as any).userId || "unknown");
+      const resolvedName = resolvedWorker ? (resolvedWorker.name || "Worker") : (sub.workerName || "Worker");
+
+      const existing = accMap.get(wId);
+      if (existing) {
+        existing.count += approvedCount;
+        if ((existing.name === "Worker" || !existing.name) && resolvedName !== "Worker") {
+          existing.name = resolvedName;
+        }
+      } else {
+        accMap.set(wId, { name: resolvedName, count: approvedCount });
+      }
+    });
+  }
+
+  const sorted = Array.from(accMap.entries())
+    .map(([workerId, data]) => ({
+      workerId,
+      workerName: data.name,
+      maskedName: maskWorkerName(data.name),
+      validAccCount: data.count,
+    }))
+    .sort((a, b) => b.validAccCount - a.validAccCount);
+
+  const rewardMap = new Map<number, number>();
+  if (Array.isArray(rewardConfigs)) {
+    rewardConfigs.forEach((r) => rewardMap.set(r.rank, r.rewardAmount));
+  }
+
+  const WEEKLY_MIN_ACC_THRESHOLDS: Record<number, number> = {
+    1: 200, // Juara 1: Min 200 ACC
+    2: 100, // Juara 2: Min 100 ACC
+    3: 50,  // Juara 3: Min 50 ACC
+  };
+
+  // Determine official ranks sequentially based on sorted position and minimum ACC thresholds
+  let assignedRank1 = false;
+  let assignedRank2 = false;
+  let assignedRank3 = false;
+
+  return sorted.map((entry, idx) => {
+    const sortedPosition = idx + 1;
+    const isQualified = entry.validAccCount >= 50;
+
+    let officialRank: number | null = null;
+
+    if (sortedPosition === 1) {
+      if (entry.validAccCount >= 200) {
+        officialRank = 1;
+        assignedRank1 = true;
+      } else if (entry.validAccCount >= 100) {
+        officialRank = 2;
+        assignedRank2 = true;
+      } else if (entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
+    } else if (sortedPosition === 2) {
+      if (assignedRank1 && entry.validAccCount >= 100) {
+        officialRank = 2;
+        assignedRank2 = true;
+      } else if ((assignedRank1 || assignedRank2) && !assignedRank3 && entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
+    } else if (sortedPosition === 3) {
+      if (assignedRank1 && assignedRank2 && !assignedRank3 && entry.validAccCount >= 50) {
+        officialRank = 3;
+        assignedRank3 = true;
+      }
+    }
+
+    const baseReward = officialRank ? (rewardMap.get(officialRank) ?? (officialRank === 1 ? 50000 : officialRank === 2 ? 30000 : 15000)) : 0;
+    const eligibleReward = officialRank !== null ? baseReward : 0;
+
+    return {
+      ...entry,
+      rank: sortedPosition,
+      officialRank,
+      isQualified,
+      rewardAmount: eligibleReward,
+    };
+  });
+}
+
+/**
+ * Bulk Email Checker / Master Riset Screening Logic
+ */
+export function parseAndCheckEmailLine(
+  rawLine: string,
+  rulesConfig?: CheckerRulesConfig | null,
+  masterPassword?: string
+): CheckedEmailItem {
+  const activeRules = rulesConfig ?? DEFAULT_CHECKER_RULES;
+  const line = (rawLine || "").trim();
+
+  if (!line) {
+    return {
+      originalLine: rawLine,
+      email: "",
+      username: "",
+      status: "BAD",
+      reasons: ["Baris kosong"],
+    };
+  }
+
+  // Split by |, :, or whitespace (space/tab)
+  let emailPart = "";
+  let passwordPart: string | undefined = undefined;
+
+  if (line.includes("|")) {
+    const parts = line.split("|");
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join("|").trim();
+  } else if (line.includes(":")) {
+    const parts = line.split(":");
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join(":").trim();
+  } else if (/\s+/.test(line)) {
+    const parts = line.split(/\s+/);
+    emailPart = (parts[0] || "").trim();
+    passwordPart = parts.slice(1).join(" ").trim();
+  } else {
+    emailPart = line;
+  }
+
+  const effectivePassword =
+    passwordPart !== undefined && passwordPart.length > 0
+      ? passwordPart
+      : masterPassword && masterPassword.trim().length > 0
+      ? masterPassword.trim()
+      : undefined;
+
+  const reasons: string[] = [];
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(emailPart)) {
+    reasons.push("Format email tidak valid");
+  }
+
+  const username = emailPart.includes("@") ? emailPart.split("@")[0] : emailPart;
+
+  // 1. Birth year range check in username
+  let detectedBirthYear: number | undefined = undefined;
+  let birthYearStr: string | null = null;
+  if (activeRules.enabled) {
+    // Look for 4-digit year in username (e.g. 1992, 2005)
+    const yearMatches = username.match(/(19\d\d|20\d\d)/g);
+    if (yearMatches && yearMatches.length > 0) {
+      birthYearStr = yearMatches[yearMatches.length - 1];
+      detectedBirthYear = parseInt(birthYearStr, 10);
+      if (
+        detectedBirthYear < activeRules.minBirthYear ||
+        detectedBirthYear > activeRules.maxBirthYear
+      ) {
+        reasons.push(`Tahun di luar ${activeRules.minBirthYear}-${activeRules.maxBirthYear}`);
+      }
+    }
+  }
+
+  // 2. Digit count in username check (excluding birth year digits if present)
+  let usernameForDigitCount = username;
+  if (birthYearStr) {
+    usernameForDigitCount = username.replace(birthYearStr, "");
+  }
+  const digitsInUsername = (usernameForDigitCount.match(/\d/g) || []).length;
+  if (activeRules.enabled && activeRules.maxUsernameDigits >= 0) {
+    if (digitsInUsername > activeRules.maxUsernameDigits) {
+      reasons.push(`Digit angka > ${activeRules.maxUsernameDigits}`);
+    }
+  }
+
+  // 3. Password rules & required password check
+  const requiredPwd = activeRules.requiredPassword?.trim();
+  if (requiredPwd && requiredPwd.length > 0) {
+    if (!effectivePassword || effectivePassword !== requiredPwd) {
+      reasons.push("Password tidak sesuai dengan rules / sandi wajib");
+    }
+  }
+
+  if (effectivePassword !== undefined && effectivePassword.length > 0) {
+    if (activeRules.enabled && activeRules.requirePasswordLowercaseOnly) {
+      if (/[A-Z]/.test(effectivePassword)) {
+        reasons.push("Format password tidak valid (mengandung huruf kapital)");
+      }
+    }
+  }
+
+  return {
+    originalLine: line,
+    email: emailPart,
+    password: effectivePassword,
+    username,
+    status: reasons.length === 0 ? "GOOD" : "BAD",
+    reasons,
+    birthYearDetected: detectedBirthYear,
+    digitCountDetected: digitsInUsername,
+  };
+}
+
+export function bulkCheckEmails(
+  rawText: string,
+  rulesConfig?: CheckerRulesConfig | null,
+  masterPassword?: string
+): BulkCheckResult {
+  if (!rawText || typeof rawText !== "string") {
+    return {
+      total: 0,
+      goodCount: 0,
+      badCount: 0,
+      items: [],
+    };
+  }
+
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const items = lines.map((line) => parseAndCheckEmailLine(line, rulesConfig, masterPassword));
+  const goodCount = items.filter((i) => i.status === "GOOD").length;
+  const badCount = items.length - goodCount;
+
+  return {
+    total: items.length,
+    goodCount,
+    badCount,
+    items,
+  };
+}
+
+export function formatGoodEmailsForCopy(
+  items: CheckedEmailItem[],
+  includePassword = true,
+  fallbackMasterPassword?: string
+): string {
+  if (!Array.isArray(items)) return "";
+  const goodItems = items.filter((i) => i.status === "GOOD");
+  return goodItems
+    .map((i) => {
+      const pwd = i.password || fallbackMasterPassword || "";
+      return includePassword && pwd ? `${i.email}|${pwd}` : i.email;
+    })
+    .join("\n");
+}
+
 export function validatePasswordAgainstRules(password: string, submissionNotes: string[] = []): string | null {
   if (!password || password.trim().length === 0) {
     return "Kata sandi akun tidak boleh kosong.";

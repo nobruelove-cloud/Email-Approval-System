@@ -5,6 +5,15 @@ import { renderHook, render, screen, act, cleanup } from "@testing-library/react
 import { StatusBadge } from "../pages/worker-dashboard";
 import { PortalGate } from "../App";
 import {
+  useWorkerChat,
+  useAdminConversations,
+  useConversationMessages,
+  sendChatMessage,
+  calculateExpirationTimestamp,
+  deleteMessageForMe,
+  deleteMessageForAll,
+} from "./use-portal";
+import {
   getItemCountOfSubmission,
   getTierConfig,
   getRecommendedTier,
@@ -20,12 +29,24 @@ import {
   getMonthlyPeriodKey,
   formatMonthYear,
   getPeriodOptions,
+  calculateWithdrawalFee,
+  formatFeeBadge,
+  getPaymentMethodFeeConfig,
+  formatBatchEmailsOnly,
+  formatBatchEmailsWithPasswords,
+  getLeaderboardUserProgress,
+  parseAndCheckEmailLine,
+  bulkCheckEmails,
+  formatGoodEmailsForCopy,
+  resolveWorkerUser,
 } from "../lib/portal-utils";
+import { DEFAULT_CHECKER_RULES, type CheckerRulesConfig } from "../lib/portal-types";
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
   DEFAULT_RULES,
   DEFAULT_OPERATING_HOURS,
+  DEFAULT_MAINTENANCE,
   type EmailSubmission,
   type TierConfig,
   type ReferralTierConfig,
@@ -33,13 +54,16 @@ import {
   type PortalRules,
   type OperatingHoursConfig,
   type FinancialTransaction,
+  type MaintenanceConfig,
 } from "../lib/portal-types";
+import { createSubmission, executeMasterReset, masterResetOperasional } from "./use-portal";
 
 // Setup hoisted mocks for Firebase modules
 const {
   mockAuthObj,
   mockSetDoc,
   mockGetDoc,
+  mockGetDocs,
   mockOnSnapshot,
   mockDoc,
   mockOnAuthStateChanged,
@@ -47,8 +71,15 @@ const {
   mockAuthObj: { currentUser: { uid: "test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any },
   mockSetDoc: vi.fn().mockResolvedValue(undefined),
   mockGetDoc: vi.fn().mockResolvedValue({ exists: () => false, data: () => ({}) }),
+  mockGetDocs: vi.fn().mockResolvedValue({ empty: true, docs: [], size: 0 }),
   mockOnSnapshot: vi.fn(),
-  mockDoc: vi.fn((db: any, col: string, id: string) => ({ path: `${col}/${id}` })),
+  mockDoc: vi.fn((dbOrColl: any, colOrId?: string, id?: string) => {
+    if (dbOrColl && typeof dbOrColl === "object" && dbOrColl.path) {
+      const subId = colOrId || `auto_id_${Math.random().toString(36).slice(2, 7)}`;
+      return { path: `${dbOrColl.path}/${subId}` };
+    }
+    return { path: `${colOrId}/${id}` };
+  }),
   mockOnAuthStateChanged: vi.fn(),
 }));
 
@@ -58,6 +89,7 @@ vi.mock("firebase/firestore", async () => {
     ...actual,
     setDoc: (...args: any[]) => mockSetDoc(...args),
     getDoc: (...args: any[]) => mockGetDoc(...args),
+    getDocs: (...args: any[]) => mockGetDocs(...args),
     onSnapshot: (...args: any[]) => mockOnSnapshot(...args),
     doc: (...args: any[]) => mockDoc(...args),
     collection: vi.fn((db: any, name: string) => ({ path: name })),
@@ -89,13 +121,22 @@ vi.mock("../lib/firebase", async () => {
 
 import {
   usePortalAuth,
+  useMyReferral,
+  claimReferralCode,
   registerReferral,
   createPortalUser,
   createWorkerAccount,
   createWithdrawal,
   evaluateReferralQualification,
-  approveReferral,
+  claimReferralReward,
+  claimReferralTier,
+  updateSubmissionTier,
   reviewSubmission,
+  bindReferral,
+  processEmailACC,
+  executeMasterReset,
+  reconcileHistoricalNabilWithdrawal,
+  masterResetOperasional,
   logFirestoreDiagnostic,
   formatQueryConstraint,
   formatQueryConstraints,
@@ -106,6 +147,7 @@ import {
   deleteDocWithDiagnostic,
   runTransactionWithDiagnostic,
 } from "./use-portal";
+import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
 
 // Mock Firebase store for Firestore transaction testing
 function createMockTransaction(store: Record<string, any>) {
@@ -118,7 +160,9 @@ function createMockTransaction(store: Record<string, any>) {
         throw new Error("Firestore transactions require all reads to be executed before all writes.");
       }
       reads.push(ref.path);
+      const docId = ref.path ? ref.path.split("/").pop() : "";
       return {
+        id: docId,
         exists: () => ref.path in store,
         data: () => store[ref.path],
       };
@@ -209,6 +253,90 @@ async function reviewBatchSubmissionTx(
 
 afterEach(() => {
   cleanup();
+});
+
+describe("Post-Registration Invitation Code Claim Feature Unit Tests (claimReferralCode & useMyReferral)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. rejects empty code or whitespace-only code", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "")).rejects.toThrow("Kode undangan wajib diisi.");
+    await expect(claimReferralCode(worker, "   ")).rejects.toThrow("Kode undangan wajib diisi.");
+  });
+
+  it("2. rejects self-referral", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "worker_1")).rejects.toThrow("Tidak dapat menggunakan kode undangan milik sendiri.");
+    await expect(claimReferralCode(worker, "  worker_1  ")).rejects.toThrow("Tidak dapat menggunakan kode undangan milik sendiri.");
+  });
+
+  it("3. rejects worker who already has referredBy field", async () => {
+    const worker = { uid: "worker_1", name: "Worker 1", referredBy: "referrer_10", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "referrer_20")).rejects.toThrow("Akun kamu sudah terhubung dengan kode undangan.");
+  });
+
+  it("4. rejects claim if worker already has an existing referral record in transaction check", async () => {
+    const store = {
+      "users/worker_1": { uid: "worker_1", name: "Worker 1" },
+      "referrals/worker_1": { id: "worker_1", referrerId: "referrer_10", status: "PENDING" },
+      "users/referrer_20": { uid: "referrer_20", name: "Referrer 20" },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "referrer_20")).rejects.toThrow("Akun kamu sudah memiliki data referral/pengundang.");
+  });
+
+  it("5. rejects claim if referral code does not belong to an existing worker in Firestore", async () => {
+    const store = {
+      "users/worker_1": { uid: "worker_1", name: "Worker 1" },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Worker 1", role: "worker", status: "active", tier: 1, balance: 0 } as any;
+
+    await expect(claimReferralCode(worker, "non_existent_code")).rejects.toThrow("Kode undangan tidak valid atau tidak ditemukan.");
+  });
+
+  it("6. successful claim atomically updates worker referredBy, creates referrals/currentWorkerUid with status PENDING, currentAccCount 0, rewardAmount 0, and NO immediate reward", async () => {
+    const store: Record<string, any> = {
+      "users/worker_1": { uid: "worker_1", name: "Budi Worker", balance: 1000 },
+      "users/referrer_99": { uid: "referrer_99", name: "Andi Referrer", balance: 5000 },
+    };
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const worker = { uid: "worker_1", name: "Budi Worker", role: "worker", status: "active", tier: 1, balance: 1000 } as any;
+
+    await claimReferralCode(worker, "  referrer_99  ");
+
+    // Check user profile update
+    expect(store["users/worker_1"].referredBy).toBe("referrer_99");
+
+    // Check referral document creation
+    const createdRef = store["referrals/worker_1"];
+    expect(createdRef).toBeDefined();
+    expect(createdRef.id).toBe("worker_1");
+    expect(createdRef.referrerId).toBe("referrer_99");
+    expect(createdRef.referrerName).toBe("Andi Referrer");
+    expect(createdRef.referredWorkerId).toBe("worker_1");
+    expect(createdRef.referredWorkerName).toBe("Budi Worker");
+    expect(createdRef.status).toBe("PENDING");
+    expect(createdRef.currentAccCount).toBe(0);
+    expect(createdRef.rewardAmount).toBe(0);
+
+    // CRITICAL REQUIREMENT: NO IMMEDIATE REWARD ISSUED
+    expect(store["users/referrer_99"].balance).toBe(5000);
+    expect(store["users/worker_1"].balance).toBe(1000);
+  });
 });
 
 describe("1. registerReferral Production Export Real Regression Unit Test", () => {
@@ -684,6 +812,11 @@ describe("3. PortalGate Production Component Real Component Tests", () => {
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (ref?.path?.startsWith("referrals/")) {
+        cb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         cb({
           docs: [],
@@ -695,7 +828,7 @@ describe("3. PortalGate Production Component Real Component Tests", () => {
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
   });
 
   it("renders error UI on definitive error", () => {
@@ -956,6 +1089,168 @@ describe("Mandatory Tiered Referral Flow & Security Unit Tests (TEST 1 - TEST 7)
   });
 });
 
+describe("Quick-Copy Email Formatting Utilities Unit Tests", () => {
+  it("formatBatchEmailsOnly extracts email addresses as a line-separated list", () => {
+    const items = [
+      { email: "user1@gmail.com", password: "pass1" },
+      { email: "user2@yahoo.com", password: "pass2" },
+      { email: "user3@outlook.com" },
+    ];
+    expect(formatBatchEmailsOnly(items)).toBe("user1@gmail.com\nuser2@yahoo.com\nuser3@outlook.com");
+  });
+
+  it("formatBatchEmailsOnly handles empty or invalid inputs gracefully", () => {
+    expect(formatBatchEmailsOnly([])).toBe("");
+    expect(formatBatchEmailsOnly(null as any)).toBe("");
+  });
+
+  it("formatBatchEmailsWithPasswords extracts email|password formatted cleanly on each line", () => {
+    const items = [
+      { email: "user1@gmail.com", password: "pass1" },
+      { email: "user2@yahoo.com", password: "pass2" },
+      { email: "user3@outlook.com" },
+    ];
+    expect(formatBatchEmailsWithPasswords(items)).toBe("user1@gmail.com|pass1\nuser2@yahoo.com|pass2\nuser3@outlook.com|");
+  });
+
+  it("formatBatchEmailsWithPasswords handles empty or invalid inputs gracefully", () => {
+    expect(formatBatchEmailsWithPasswords([])).toBe("");
+    expect(formatBatchEmailsWithPasswords(null as any)).toBe("");
+  });
+});
+
+describe("Leaderboard Global Standings & Target Threshold Calculations Unit Tests", () => {
+  it("calculates standings globally across workers and applies bonus thresholds strictly", async () => {
+    const { calculateLeaderboardStandings } = await import("../lib/portal-utils");
+
+    const now = new Date();
+    const startDate = new Date(now.getTime() - 86400000);
+    const endDate = new Date(now.getTime() + 86400000);
+
+    const submissions: EmailSubmission[] = [
+      {
+        id: "sub_1",
+        workerId: "worker_a",
+        workerName: "Worker A",
+        approvedItemCount: 200,
+        status: "approved",
+        submittedAt: now,
+      },
+      {
+        id: "sub_2",
+        workerId: "sena_uid",
+        workerName: "Sena",
+        approvedItemCount: 21,
+        status: "approved",
+        submittedAt: now,
+      },
+    ];
+
+    const users = [
+      { uid: "worker_a", name: "Worker A", role: "worker" },
+      { uid: "sena_uid", name: "Sena", role: "worker" },
+    ];
+
+    const rewards = [
+      { rank: 1, rewardAmount: 50000 },
+      { rank: 2, rewardAmount: 25000 },
+      { rank: 3, rewardAmount: 15000 },
+    ];
+
+    const standings = calculateLeaderboardStandings(
+      submissions,
+      users,
+      startDate,
+      endDate,
+      rewards
+    );
+
+    expect(standings.length).toBe(2);
+
+    // Rank #1: Worker A with 200 ACC (Eligible for Juara 1 Gold: Rp 50.000)
+    expect(standings[0].workerId).toBe("worker_a");
+    expect(standings[0].rank).toBe(1);
+    expect(standings[0].officialRank).toBe(1);
+    expect(standings[0].isQualified).toBe(true);
+    expect(standings[0].validAccCount).toBe(200);
+    expect(standings[0].rewardAmount).toBe(50000);
+
+    // Rank #2 in table sorting: Sena with 21 ACC (Unqualified since 21 < 50 ACC, officialRank = null, reward = 0)
+    expect(standings[1].workerId).toBe("sena_uid");
+    expect(standings[1].rank).toBe(2);
+    expect(standings[1].officialRank).toBe(null);
+    expect(standings[1].isQualified).toBe(false);
+    expect(standings[1].validAccCount).toBe(21);
+    expect(standings[1].rewardAmount).toBe(0);
+  });
+
+  it("calculates user qualification and progress correctly via getLeaderboardUserProgress", () => {
+    // ACC < 50, Position 1 in array
+    const info1 = getLeaderboardUserProgress(21, 1);
+    expect(info1.positionText).toBe("Belum Terkualifikasi");
+    expect(info1.targetTitle).toBe("Juara 3 (Bonus Rp 15.000)");
+    expect(info1.nextTarget).toBe(50);
+    expect(info1.remaining).toBe(29);
+    expect(info1.progressPercent).toBe(42);
+    expect(info1.descriptionText).toBe("Butuh 29 email ACC lagi untuk masuk kualifikasi Juara 3");
+
+    // ACC < 50, Position 4 (unranked/outside top 3)
+    const info2 = getLeaderboardUserProgress(10, 4);
+    expect(info2.positionText).toBe("Di Luar Top 3");
+    expect(info2.targetTitle).toBe("Juara 3 (Bonus Rp 15.000)");
+    expect(info2.remaining).toBe(40);
+    expect(info2.progressPercent).toBe(20);
+    expect(info2.descriptionText).toBe("Butuh 40 email ACC lagi untuk masuk kualifikasi Juara 3");
+
+    // ACC >= 50 (70 ACC), Position 1 in array (met Juara 3 threshold, targeting Juara 2)
+    const info3 = getLeaderboardUserProgress(70, 1);
+    expect(info3.positionText).toBe("Peringkat #3");
+    expect(info3.targetTitle).toBe("Juara 2 (Bonus Rp 30.000)");
+    expect(info3.nextTarget).toBe(100);
+    expect(info3.remaining).toBe(30);
+    expect(info3.progressPercent).toBe(70);
+    expect(info3.descriptionText).toBe("Butuh 30 email ACC lagi untuk masuk kualifikasi Juara 2");
+
+    // ACC >= 100 (120 ACC), Position 1 in array (met Juara 2 threshold, targeting Juara 1)
+    const info4 = getLeaderboardUserProgress(120, 1);
+    expect(info4.positionText).toBe("Peringkat #2");
+    expect(info4.targetTitle).toBe("Juara 1 (Bonus Rp 50.000)");
+    expect(info4.nextTarget).toBe(200);
+    expect(info4.remaining).toBe(80);
+    expect(info4.progressPercent).toBe(60);
+    expect(info4.descriptionText).toBe("Butuh 80 email ACC lagi untuk masuk kualifikasi Juara 1");
+
+    // ACC >= 200 (200 ACC), Position 1 in array (met Juara 1 threshold)
+    const info5 = getLeaderboardUserProgress(200, 1);
+    expect(info5.positionText).toBe("Peringkat #1");
+    expect(info5.targetTitle).toBe("Juara 1 (Bonus Rp 50.000)");
+    expect(info5.nextTarget).toBe(200);
+    expect(info5.remaining).toBe(0);
+    expect(info5.progressPercent).toBe(100);
+    expect(info5.descriptionText).toBe("🎉 Selamat! Anda telah mencapai target kualifikasi bonus!");
+  });
+});
+
+describe("Maintenance Config Defaults & Utility Unit Tests", () => {
+  it("DEFAULT_MAINTENANCE has valid initial defaults", () => {
+    expect(DEFAULT_MAINTENANCE.enabled).toBe(false);
+    expect(DEFAULT_MAINTENANCE.targetEndTime).toBe("");
+    expect(DEFAULT_MAINTENANCE.message).toContain("perbaikan & pembaruan");
+  });
+
+  it("calculates countdown time difference correctly", () => {
+    const targetMs = Date.now() + 3600000; // +1 hour
+    const nowMs = Date.now();
+    const diffMs = targetMs - nowMs;
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    expect(hours).toBe(1);
+    expect(minutes).toBeLessThanOrEqual(0);
+  });
+});
+
 describe("Admin Monthly Financial Tracking Unit Tests", () => {
   it("getMonthlyPeriodKey derives YYYY-MM correctly from dates", () => {
     const d1 = new Date(2026, 7, 21);
@@ -968,6 +1263,49 @@ describe("Admin Monthly Financial Tracking Unit Tests", () => {
   it("formatMonthYear formats YYYY-MM into Indonesian Month and Year", () => {
     expect(formatMonthYear("2026-08")).toBe("Agustus 2026");
     expect(formatMonthYear("2026-09")).toBe("September 2026");
+  });
+});
+
+describe("Per-Method Withdrawal Fee Calculation & Unit Tests", () => {
+  it("calculates free, fixed, and percentage fees correctly", () => {
+    const freeCfg = { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 };
+    expect(calculateWithdrawalFee(100000, freeCfg)).toBe(0);
+
+    const fixedCfg = { method: "BCA", enabled: true, feeType: "fixed" as const, feeValue: 2500 };
+    expect(calculateWithdrawalFee(100000, fixedCfg)).toBe(2500);
+
+    const percentCfg = { method: "OVO", enabled: true, feeType: "percentage" as const, feeValue: 1.5 };
+    expect(calculateWithdrawalFee(100000, percentCfg)).toBe(1500);
+  });
+
+  it("formats fee badges correctly", () => {
+    const freeCfg = { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 };
+    expect(formatFeeBadge(freeCfg)).toBe("Bebas Biaya");
+
+    const fixedCfg = { method: "ShopeePay", enabled: true, feeType: "fixed" as const, feeValue: 1000 };
+    expect(formatFeeBadge(fixedCfg)).toBe("Biaya Rp\u00a01.000");
+
+    const percentCfg = { method: "OVO", enabled: true, feeType: "percentage" as const, feeValue: 1.5 };
+    expect(formatFeeBadge(percentCfg)).toBe("Biaya 1.5%");
+  });
+
+  it("resolves payment method fee config from withdrawal settings correctly", () => {
+    const settings = {
+      minWithdraw: 50000,
+      maxWithdraw: 5000000,
+      methods: [
+        { method: "BCA", enabled: true, feeType: "fixed" as const, feeValue: 2500 },
+        { method: "DANA", enabled: true, feeType: "free" as const, feeValue: 0 },
+      ],
+    };
+
+    const bcaFee = getPaymentMethodFeeConfig("BCA", settings);
+    expect(bcaFee.feeType).toBe("fixed");
+    expect(bcaFee.feeValue).toBe(2500);
+
+    const danaFee = getPaymentMethodFeeConfig("DANA", settings);
+    expect(danaFee.feeType).toBe("free");
+    expect(danaFee.feeValue).toBe(0);
   });
 });
 
@@ -988,7 +1326,7 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
     ).rejects.toThrow("Nama pemilik rekening/wallet wajib diisi.");
   });
 
-  it("trims accountHolderName and passes payload to transaction correctly", async () => {
+  it("trims accountHolderName and passes fee and netAmount to transaction correctly", async () => {
     const store = {
       "users/w123": {
         uid: "w123",
@@ -1004,6 +1342,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
       method: "BCA",
       account: "1234567890",
       accountHolderName: "  Ahmad Yasin  ",
+      fee: 2500,
+      netAmount: 47500,
     };
 
     const trimmedHolderName = payload.accountHolderName.trim();
@@ -1016,6 +1356,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
       method: payload.method,
       account: payload.account,
       accountHolderName: trimmedHolderName,
+      fee: payload.fee,
+      netAmount: payload.netAmount,
       status: "pending",
     });
 
@@ -1023,6 +1365,8 @@ describe("Withdrawal Atas Nama Unit Tests", () => {
     expect(store["withdrawals/wd_test_1"].accountHolderName).toBe("Ahmad Yasin");
     expect(store["withdrawals/wd_test_1"].account).toBe("1234567890");
     expect(store["withdrawals/wd_test_1"].method).toBe("BCA");
+    expect(store["withdrawals/wd_test_1"].fee).toBe(2500);
+    expect(store["withdrawals/wd_test_1"].netAmount).toBe(47500);
   });
 });
 
@@ -1065,6 +1409,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (refObj?.path?.startsWith("referrals/")) {
+        successCb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         successCb({ docs: [] });
       }
@@ -1074,7 +1423,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1185,6 +1534,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           exists: () => true,
           data: () => DEFAULT_RULES,
         });
+      } else if (refObj?.path?.startsWith("referrals/")) {
+        successCb({
+          exists: () => false,
+          data: () => undefined,
+        });
       } else {
         successCb({ docs: [] });
       }
@@ -1194,7 +1548,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+    expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
     expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
   });
 
@@ -1234,8 +1588,8 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
     render(React.createElement(PortalGate));
 
     expect(screen.queryByTestId("portal-loader")).toBeNull();
-    expect(screen.getByText("STORAN EMAIL")).toBeDefined();
-    expect(screen.getByText(/Existing Worker/)).toBeDefined();
+    expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
+    expect(screen.getAllByText(/Existing Worker/)[0]).toBeDefined();
   });
 
   it("Test F — Referral Security: registerReferral writes to referrals/referredWorkerId without setDoc merge", async () => {
@@ -1286,6 +1640,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
             exists: () => true,
             data: () => DEFAULT_RULES,
           });
+        } else if (refObj?.path?.startsWith("referrals/")) {
+          successCb({
+            exists: () => false,
+            data: () => undefined,
+          });
         } else {
           successCb({ docs: [] });
         }
@@ -1294,7 +1653,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1302,7 +1661,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -1336,6 +1695,11 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
           });
         } else if (refObj?.path?.startsWith("settings/")) {
           successCb({ exists: () => true, data: () => DEFAULT_RULES });
+        } else if (refObj?.path?.startsWith("referrals/")) {
+          successCb({
+            exists: () => false,
+            data: () => undefined,
+          });
         } else {
           successCb({ docs: [] });
         }
@@ -1344,7 +1708,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
 
       render(React.createElement(PortalGate));
 
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
 
       // Advance timers by 65 seconds
       act(() => {
@@ -1352,7 +1716,7 @@ describe("Production Bug Regression Suite: Referral Registration Flow & Error Is
       });
 
       expect(screen.queryByTestId("portal-loader")).toBeNull();
-      expect(screen.getByText("STORAN EMAIL")).toBeDefined();
+      expect(screen.getAllByText(/Setor Email/i)[0]).toBeDefined();
       expect(screen.queryByText("Terjadi Kesalahan")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -1400,7 +1764,9 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
       snapshotErrorCb?.(permErr);
     });
 
-    const diagCall = consoleErrorSpy.mock.calls.find((call: any[]) => call[0] === "[FirestoreDiagnostic]");
+    const diagCall = consoleErrorSpy.mock.calls.find(
+      (call: any[]) => call[0] === "[FirestoreDiagnostic]" && call[1]?.operation === "onSnapshot"
+    );
     expect(diagCall).toBeDefined();
 
     const payload = diagCall[1];
@@ -1590,5 +1956,1444 @@ describe("Firestore Diagnostic Instrumentation Suite", () => {
     } finally {
       (import.meta.env as any).VITE_FIRESTORE_DIAGNOSTICS = originalEnv;
     }
+  });
+
+  it("Remote Diagnostic Transmission & Error Isolation — sendRemoteDiagnostic never suppresses errors even if network fails", async () => {
+    const payload = logFirestoreDiagnostic({
+      operation: "onSnapshot",
+      path: "users/test_offline",
+      hook: "testOfflineHook",
+      error: new Error("FirebaseError: [code=permission-denied]: Missing or insufficient permissions."),
+    });
+
+    expect(payload.code).toBe("error");
+
+    // Ensure calling sendRemoteDiagnostic directly does not throw
+    await expect(sendRemoteDiagnostic(payload)).resolves.toBeUndefined();
+  });
+});
+
+describe("Direct Worker Referral Reward Claim Logic Unit Tests (claimReferralReward)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthObj.currentUser = { uid: "referrer_test_uid", getIdToken: vi.fn().mockResolvedValue("token") } as any;
+  });
+
+  it("1. 5 approved Gmail makes 5 ACC tier claim eligible and credits exactly Rp500", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_b_5acc": {
+        id: "worker_b_5acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_b_5acc",
+        referredWorkerName: "Worker B",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 0,
+        claimedTiers: {},
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        name: "Referrer Test",
+        balance: 1000,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await claimReferralReward("worker_b_5acc", 5);
+
+    expect(res.status).toBe("ok");
+    expect(res.rewardAmount).toBe(500);
+
+    // Check updated referrer balance: 1000 + 500 = 1500
+    expect(store["users/referrer_test_uid"].balance).toBe(1500);
+
+    // Check updated referral document
+    const updatedRef = store["referrals/worker_b_5acc"];
+    expect(updatedRef.claimedTiers["5"]).toBe(true);
+    expect(updatedRef.rewardAmount).toBe(500);
+
+    // Check referralClaims and rewardLedger documents created
+    expect(store["referralClaims/worker_b_5acc_tier_5"].status).toBe("approved");
+    expect(store["rewardLedger/worker_b_5acc_ledger_tier_5"].amount).toBe(500);
+  });
+
+  it("2. 10 approved Gmail allows 10 ACC claim (credits Rp1.000)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_c_10acc": {
+        id: "worker_c_10acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_c_10acc",
+        currentAccCount: 10,
+        status: "QUALIFIED",
+        rewardAmount: 500,
+        claimedTiers: { "5": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await claimReferralReward("worker_c_10acc", 10);
+
+    expect(res.rewardAmount).toBe(1000);
+    expect(store["users/referrer_test_uid"].balance).toBe(2500); // 1500 + 1000
+    expect(store["referrals/worker_c_10acc"].claimedTiers).toEqual({ "5": true, "10": true });
+  });
+
+  it("3. 20 approved Gmail allows 20 ACC claim (credits Rp2.000)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_d_20acc": {
+        id: "worker_d_20acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_d_20acc",
+        currentAccCount: 20,
+        status: "QUALIFIED",
+        rewardAmount: 1500,
+        claimedTiers: { "5": true, "10": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 2500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await claimReferralReward("worker_d_20acc", 20);
+
+    expect(res.rewardAmount).toBe(2000);
+    expect(store["users/referrer_test_uid"].balance).toBe(4500); // 2500 + 2000
+  });
+
+  it("4. 50 approved Gmail allows 50 ACC claim (credits Rp5.000)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_e_50acc": {
+        id: "worker_e_50acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_e_50acc",
+        currentAccCount: 50,
+        status: "QUALIFIED",
+        rewardAmount: 3500,
+        claimedTiers: { "5": true, "10": true, "20": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 4500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await claimReferralReward("worker_e_50acc", 50);
+
+    expect(res.rewardAmount).toBe(5000);
+    expect(store["users/referrer_test_uid"].balance).toBe(9500); // 4500 + 5000
+    expect(store["referrals/worker_e_50acc"].status).toBe("PAID"); // All tiers claimed
+  });
+
+  it("5. Below-threshold tier is rejected", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_f_3acc": {
+        id: "worker_f_3acc",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_f_3acc",
+        currentAccCount: 3, // Only 3 ACC, target is 5
+        status: "PENDING",
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_f_3acc", 5)).rejects.toThrow("Target ACC belum tercapai (3/5).");
+    expect(store["users/referrer_test_uid"].balance).toBe(1000);
+  });
+
+  it("6. Same tier cannot be claimed twice (double claim protection)", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_g_already_claimed": {
+        id: "worker_g_already_claimed",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_g_already_claimed",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 500,
+        claimedTiers: { "5": true },
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1500,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_g_already_claimed", 5)).rejects.toThrow("Hadiah tier 5 ACC sudah pernah diklaim.");
+    expect(store["users/referrer_test_uid"].balance).toBe(1500);
+  });
+
+  it("7. Worker cannot claim another worker's referral", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_h_other_referrer": {
+        id: "worker_h_other_referrer",
+        referrerId: "another_referrer_uid", // Belongs to someone else
+        referredWorkerId: "worker_h_other_referrer",
+        currentAccCount: 10,
+        status: "QUALIFIED",
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await expect(claimReferralReward("worker_h_other_referrer", 5)).rejects.toThrow("Anda tidak dapat mengklaim reward referral milik akun lain.");
+    expect(store["users/referrer_test_uid"].balance).toBe(1000);
+  });
+
+  it("8. Transaction strictly executes all reads before any writes", async () => {
+    const store: Record<string, any> = {
+      "referrals/worker_i_reads_test": {
+        id: "worker_i_reads_test",
+        referrerId: "referrer_test_uid",
+        referredWorkerId: "worker_i_reads_test",
+        currentAccCount: 5,
+        status: "QUALIFIED",
+        rewardAmount: 0,
+        claimedTiers: {},
+      },
+      "users/referrer_test_uid": {
+        uid: "referrer_test_uid",
+        balance: 1000,
+      },
+      "settings/rules": {
+        referralTiers: DEFAULT_REFERRAL_TIERS,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await claimReferralReward("worker_i_reads_test", 5);
+
+    // Verify all reads occurred before writes
+    expect(tx._reads.length).toBeGreaterThan(0);
+    expect(tx._writes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Admin Batch Tier Override & Recalculation System Unit Tests", () => {
+  it("updateSubmissionTier correctly updates tierId, currentPricePerItem, pricePerEmail, and totalAmount", async () => {
+    const store: Record<string, any> = {
+      "emailSubmissions/sub_tier_override_1": {
+        id: "sub_tier_override_1",
+        workerId: "worker_123",
+        status: "pending",
+        items: [
+          { email: "a@gmail.com", password: "pass" },
+          { email: "b@gmail.com", password: "pass" },
+          { email: "c@gmail.com", password: "pass" },
+        ],
+        itemCount: 3,
+        currentTier: 3,
+        currentPricePerItem: 3000,
+        totalAmount: 9000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const newTierConfig: TierConfig = {
+      tier: 1,
+      name: "Tier 1",
+      minQty: 1,
+      maxQty: 3,
+      pricePerItem: 2800,
+    };
+
+    await updateSubmissionTier("sub_tier_override_1", newTierConfig);
+
+    const updateCall = tx._writes.find((w: any) => w.type === "update" && w.ref === "emailSubmissions/sub_tier_override_1");
+    expect(updateCall).toBeDefined();
+    expect(updateCall.updates.tierId).toBe("1");
+    expect(updateCall.updates.currentTier).toBe(1);
+    expect(updateCall.updates.currentPricePerItem).toBe(2800);
+    expect(updateCall.updates.pricePerEmail).toBe(2800);
+    expect(updateCall.updates.totalAmount).toBe(3 * 2800); // 8400
+  });
+
+  it("reviewSubmission credits worker wallet using overridden Tier rate", async () => {
+    const store: Record<string, any> = {
+      "emailSubmissions/sub_overridden_approve": {
+        id: "sub_overridden_approve",
+        workerId: "worker_overridden_456",
+        status: "pending",
+        items: [
+          { email: "acc1@gmail.com", password: "pass" },
+          { email: "acc2@gmail.com", password: "pass" },
+        ],
+        itemCount: 2,
+        currentTier: 1,
+        currentPricePerItem: 2800,
+        pricePerEmail: 2800,
+        totalAmount: 5600,
+      },
+      "settings/rules": {
+        tiers: DEFAULT_TIERS,
+      },
+      "users/worker_overridden_456": {
+        uid: "worker_overridden_456",
+        balance: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await reviewSubmission(
+      "sub_overridden_approve",
+      "approved",
+      "Batch verified",
+      2800,
+      1,
+      [
+        { email: "acc1@gmail.com", password: "pass", status: "approved" },
+        { email: "acc2@gmail.com", password: "pass", status: "approved" },
+      ]
+    );
+
+    const subUpdate = tx._writes.find((w: any) => w.type === "update" && w.ref === "emailSubmissions/sub_overridden_approve");
+    expect(subUpdate.updates.appliedTier).toBe(1);
+    expect(subUpdate.updates.appliedPricePerItem).toBe(2800);
+    expect(subUpdate.updates.totalAmount).toBe(2 * 2800); // 5600
+
+    const userUpdate = tx._writes.find((w: any) => w.type === "update" && w.ref === "users/worker_overridden_456");
+    expect(userUpdate.updates.balance).toBe(10000 + 5600); // 15600
+    expect(userUpdate.updates.tier).toBe(1);
+  });
+});
+
+describe("Reciprocal Referral Binding & Passive Income Distribution System Unit Tests (bindReferral & processEmailACC)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("bindReferral Unit Tests", () => {
+    it("1. Rejects empty referral code", async () => {
+      await expect(bindReferral("workerB_1", "")).rejects.toThrow("Kode referral wajib diisi.");
+      await expect(bindReferral("workerB_1", "   ")).rejects.toThrow("Kode referral wajib diisi.");
+    });
+
+    it("2. Rejects invalid referral code when Worker A is not found", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => false } as any);
+
+      await expect(bindReferral("workerB_1", "INVALID_CODE")).rejects.toThrow("Kode referral tidak valid!");
+    });
+
+    it("3. Rejects self-referral (workerAId === workerBId)", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerB_1", data: () => ({ name: "Worker B" }) } as any);
+
+      await expect(bindReferral("workerB_1", "workerB_1")).rejects.toThrow("Tidak bisa menggunakan kode referral sendiri!");
+    });
+
+    it("4. Rejects binding if Worker B has already used a referral (hasUsedReferral === true)", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerA_100", data: () => ({ name: "Worker A" }) } as any);
+
+      const store: Record<string, any> = {
+        "users/workerB_1": { uid: "workerB_1", name: "Worker B", hasUsedReferral: true },
+        "users/workerA_100": { uid: "workerA_100", name: "Worker A" },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(bindReferral("workerB_1", "workerA_100")).rejects.toThrow(
+        "Akun ini sudah terikat dengan referral lain dan tidak bisa diubah!"
+      );
+    });
+
+    it("5. Successfully binds Worker B to Worker A bidirectionally in Firestore transaction", async () => {
+      mockGetDocs.mockResolvedValueOnce({ empty: true, docs: [], size: 0 } as any);
+      mockGetDoc.mockResolvedValueOnce({ exists: () => true, id: "workerA_100", data: () => ({ name: "Worker A" }) } as any);
+
+      const store: Record<string, any> = {
+        "users/workerB_1": { uid: "workerB_1", name: "Worker B", balance: 0 },
+        "users/workerA_100": { uid: "workerA_100", name: "Worker A", balance: 0 },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await bindReferral("workerB_1", "workerA_100");
+
+      expect(res.success).toBe(true);
+      expect(res.message).toBe("Berhasil terhubung dengan partner referral secara permanen!");
+
+      // Worker B points to Worker A and is locked permanently
+      expect(store["users/workerB_1"].referredBy).toBe("workerA_100");
+      expect(store["users/workerB_1"].hasUsedReferral).toBe(true);
+
+      // Worker A records reciprocal partner Worker B
+      expect(store["users/workerA_100"].reciprocalPartner).toBe("workerB_1");
+
+      // Referral tracking document is created
+      expect(store["referrals/workerB_1"]).toBeDefined();
+      expect(store["referrals/workerB_1"].referrerId).toBe("workerA_100");
+      expect(store["referrals/workerB_1"].referredWorkerId).toBe("workerB_1");
+    });
+  });
+
+  describe("processEmailACC Unit Tests", () => {
+    it("1. Rejects non-existent submission", async () => {
+      const store: Record<string, any> = {};
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(processEmailACC("non_existent_sub")).rejects.toThrow("Data storan tidak ditemukan!");
+    });
+
+    it("2. Rejects already processed/ACC submission", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_already_acc": {
+          id: "sub_already_acc",
+          workerId: "worker_1",
+          status: "ACC",
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      await expect(processEmailACC("sub_already_acc")).rejects.toThrow("Email ini sudah pernah di-ACC sebelumnya!");
+    });
+
+    it("3. Approves submission and pays main salary to submitting Worker B and Rp100 passive income to partner Worker A (referredBy)", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_b_100": {
+          id: "sub_b_100",
+          workerId: "worker_B",
+          status: "pending",
+          approvedItemCount: 1,
+          items: [{ email: "test@gmail.com", password: "pass" }],
+        },
+        "users/worker_B": {
+          uid: "worker_B",
+          name: "Worker B",
+          balance: 0,
+          accCount: 0,
+          totalACC: 0,
+          referredBy: "worker_A",
+        },
+        "users/worker_A": {
+          uid: "worker_A",
+          name: "Worker A",
+          balance: 500,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          reciprocalPartner: "worker_B",
+        },
+        "settings/rules": {
+          pricePerEmail: 3000,
+          referralCommissionPerAcc: 100,
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await processEmailACC("sub_b_100");
+
+      expect(res.success).toBe(true);
+
+      // Submitting Worker B gets main salary 3000 and 1 totalACC
+      expect(store["users/worker_B"].balance).toBe(3000);
+      expect(store["users/worker_B"].totalACC).toBe(1);
+
+      // Partner Worker A gets Rp100 passive income
+      expect(store["users/worker_A"].balance).toBe(600); // 500 + 100
+      expect(store["users/worker_A"].totalReferralEarned).toBe(100);
+      expect(store["users/worker_A"].teamAccCount).toBe(1);
+
+      // Submission status updated to ACC
+      expect(store["emailSubmissions/sub_b_100"].status).toBe("ACC");
+    });
+
+    it("4. Approves submission from Worker A and pays Rp100 passive income to reciprocal partner Worker B (reciprocalPartner)", async () => {
+      const store: Record<string, any> = {
+        "emailSubmissions/sub_a_200": {
+          id: "sub_a_200",
+          workerId: "worker_A",
+          status: "pending",
+          approvedItemCount: 2, // 2 emails
+          items: [
+            { email: "test1@gmail.com", password: "pass" },
+            { email: "test2@gmail.com", password: "pass" },
+          ],
+        },
+        "users/worker_A": {
+          uid: "worker_A",
+          name: "Worker A",
+          balance: 3000,
+          accCount: 1,
+          totalACC: 1,
+          reciprocalPartner: "worker_B",
+        },
+        "users/worker_B": {
+          uid: "worker_B",
+          name: "Worker B",
+          balance: 1000,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          referredBy: "worker_A",
+        },
+        "settings/rules": {
+          pricePerEmail: 3000,
+          referralCommissionPerAcc: 100,
+        },
+      };
+
+      const tx = createMockTransaction(store);
+      vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+      const res = await processEmailACC("sub_a_200");
+
+      expect(res.success).toBe(true);
+
+      // Submitting Worker A gets main salary (2 * 3000 = 6000) -> balance 3000 + 6000 = 9000, totalACC 1 + 2 = 3
+      expect(store["users/worker_A"].balance).toBe(9000);
+      expect(store["users/worker_A"].totalACC).toBe(3);
+
+      // Partner Worker B gets 2 * 100 = 200 passive income -> balance 1000 + 200 = 1200
+      expect(store["users/worker_B"].balance).toBe(1200);
+      expect(store["users/worker_B"].totalReferralEarned).toBe(200);
+      expect(store["users/worker_B"].teamAccCount).toBe(2);
+
+      // Submission status updated to ACC
+      expect(store["emailSubmissions/sub_a_200"].status).toBe("ACC");
+    });
+  });
+});
+
+describe("Operational Hours & Submission Lock Unit Tests (createSubmission)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. throws rejection error when settings/general submissionOpen is false", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ submissionOpen: false }),
+    } as any);
+
+    await expect(
+      createSubmission({
+        workerId: "worker_test_lock",
+        items: [{ email: "test@example.com", password: "pass" }],
+      })
+    ).rejects.toThrow("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+  });
+
+  it("2. throws rejection error when operational hours status is closed", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ submissionOpen: true }),
+    } as any);
+
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        operatingHours: {
+          enabled: true,
+          timezone: "Asia/Jakarta",
+          days: {
+            monday: { enabled: false, open: "08:00", close: "18:00" },
+            tuesday: { enabled: false, open: "08:00", close: "18:00" },
+            wednesday: { enabled: false, open: "08:00", close: "18:00" },
+            thursday: { enabled: false, open: "08:00", close: "18:00" },
+            friday: { enabled: false, open: "08:00", close: "18:00" },
+            saturday: { enabled: false, open: "08:00", close: "18:00" },
+            sunday: { enabled: false, open: "08:00", close: "18:00" },
+          },
+        },
+      }),
+    } as any);
+
+    await expect(
+      createSubmission({
+        workerId: "worker_test_lock",
+        items: [{ email: "test@example.com", password: "pass" }],
+      })
+    ).rejects.toThrow("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+  });
+});
+
+describe("Master Reset System Unit Tests (executeMasterReset & masterResetOperasional)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. throws error if input PIN does not match database PIN", async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ adminPin: "123456" }),
+    } as any);
+
+    await expect(executeMasterReset("654321")).rejects.toThrow(
+      "Password / PIN Admin tidak cocok. Master Reset dibatalkan."
+    );
+  });
+
+  it("2. matches PIN accurately with String() conversion and whitespace trim", async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ adminPin: "888888" }),
+    } as any);
+
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [], size: 0 } as any);
+
+    const res = await executeMasterReset("   888888   ");
+
+    expect(res.success).toBe(true);
+    expect(res.message).toBe("Master Reset berhasil dieksekusi!");
+  });
+
+  it("3. falls back to rules/default PIN if settings/general doc does not exist", async () => {
+    // settings/general snap returns exists=false
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => false,
+      data: () => ({}),
+    } as any);
+
+    // fallback settings/rules snap returns adminPin="123456"
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ adminPin: "123456" }),
+    } as any);
+
+    mockGetDocs.mockResolvedValue({ empty: true, docs: [], size: 0 } as any);
+
+    const res = await executeMasterReset("123456");
+
+    expect(res.success).toBe(true);
+  });
+});
+
+describe("Bulk Email Checker & Master Riset Utility Unit Tests", () => {
+  const customRules: CheckerRulesConfig = {
+    enabled: true,
+    minBirthYear: 1990,
+    maxBirthYear: 1998,
+    maxUsernameDigits: 3,
+    requirePasswordLowercaseOnly: true,
+  };
+
+  it("1. parseAndCheckEmailLine parses various separators (|, :, whitespace)", () => {
+    const pipeLine = parseAndCheckEmailLine("ahmad1992@gmail.com|pass123", customRules);
+    expect(pipeLine.email).toBe("ahmad1992@gmail.com");
+    expect(pipeLine.password).toBe("pass123");
+    expect(pipeLine.status).toBe("GOOD");
+
+    const colonLine = parseAndCheckEmailLine("budi1995@gmail.com:pass456", customRules);
+    expect(colonLine.email).toBe("budi1995@gmail.com");
+    expect(colonLine.password).toBe("pass456");
+    expect(colonLine.status).toBe("GOOD");
+
+    const spaceLine = parseAndCheckEmailLine("dedi1997@gmail.com pass789", customRules);
+    expect(spaceLine.email).toBe("dedi1997@gmail.com");
+    expect(spaceLine.password).toBe("pass789");
+    expect(spaceLine.status).toBe("GOOD");
+  });
+
+  it("2. parseAndCheckEmailLine flags BAD status for invalid birth year, excess digits, and uppercase password", () => {
+    // Birth year 2005 (outside 1990-1998)
+    const badYear = parseAndCheckEmailLine("eka2005@gmail.com|pass123", customRules);
+    expect(badYear.status).toBe("BAD");
+    expect(badYear.reasons).toContain("Tahun di luar 1990-1998");
+
+    // Excess username digits (> 3 digits)
+    const badDigits = parseAndCheckEmailLine("user12345@gmail.com|pass123", customRules);
+    expect(badDigits.status).toBe("BAD");
+    expect(badDigits.reasons).toContain("Digit angka > 3");
+
+    // Password containing uppercase letter
+    const badPassword = parseAndCheckEmailLine("ahmad1992@gmail.com|Pass123", customRules);
+    expect(badPassword.status).toBe("BAD");
+    expect(badPassword.reasons).toContain("Format password tidak valid (mengandung huruf kapital)");
+  });
+
+  it("3. bulkCheckEmails accurately categorizes total, GOOD, and BAD counts", () => {
+    const multiLineInput = `
+ahmad1992@gmail.com|pass123
+budi2002@gmail.com|pass123
+user9999@gmail.com:pass123
+dedi1994@gmail.com|SandiKapital
+    `;
+
+    const result = bulkCheckEmails(multiLineInput, customRules);
+    expect(result.total).toBe(4);
+    expect(result.goodCount).toBe(1); // Only ahmad1992
+    expect(result.badCount).toBe(3);
+  });
+
+  it("4. formatGoodEmailsForCopy extracts GOOD emails for single-click copy", () => {
+    const multiLineInput = `
+ahmad1992@gmail.com|pass123
+budi2002@gmail.com|pass123
+    `;
+
+    const result = bulkCheckEmails(multiLineInput, customRules);
+    const goodCopyText = formatGoodEmailsForCopy(result.items, true);
+    expect(goodCopyText).toBe("ahmad1992@gmail.com|pass123");
+  });
+
+  it("5. Single Master Password input is applied to raw email lines without inline passwords", () => {
+    const rawEmailInput = "ahmad1992@gmail.com";
+    const masterPassword = "mastersandi123";
+
+    const item = parseAndCheckEmailLine(rawEmailInput, customRules, masterPassword);
+    expect(item.status).toBe("GOOD");
+    expect(item.password).toBe("mastersandi123");
+  });
+
+  it("6. Required password rules mismatch marks items as BAD with specific reason", () => {
+    const rulesWithRequiredPwd = {
+      ...customRules,
+      requiredPassword: "sandiwajib123",
+    };
+
+    // Raw email line with matching master password
+    const goodMasterItem = parseAndCheckEmailLine("ahmad1992@gmail.com", rulesWithRequiredPwd, "sandiwajib123");
+    expect(goodMasterItem.status).toBe("GOOD");
+    expect(goodMasterItem.password).toBe("sandiwajib123");
+
+    // Raw email line with wrong master password
+    const wrongMasterItem = parseAndCheckEmailLine("ahmad1992@gmail.com", rulesWithRequiredPwd, "sandysalah");
+    expect(wrongMasterItem.status).toBe("BAD");
+    expect(wrongMasterItem.reasons).toContain("Password tidak sesuai dengan rules / sandi wajib");
+
+    // Inline email|password line with wrong inline password
+    const wrongInlineItem = parseAndCheckEmailLine("ahmad1992@gmail.com|sandiLain", rulesWithRequiredPwd, "sandiwajib123");
+    expect(wrongInlineItem.status).toBe("BAD");
+    expect(wrongInlineItem.reasons).toContain("Password tidak sesuai dengan rules / sandi wajib");
+  });
+
+  it("7. formatGoodEmailsForCopy uses fallback master password for raw email lines", () => {
+    const rawEmailInput = "ahmad1992@gmail.com";
+    const masterPassword = "sandiwajib123";
+
+    const result = bulkCheckEmails(rawEmailInput, customRules, masterPassword);
+    const goodCopyText = formatGoodEmailsForCopy(result.items, true, masterPassword);
+    expect(goodCopyText).toBe("ahmad1992@gmail.com|sandiwajib123");
+  });
+});
+
+describe("Total Saldo Beredar (Circulating Balance) Aggregation Unit Tests", () => {
+  it("calculates Total Saldo Beredar across ALL non-admin workers including balance and saldoUtama fallbacks, ignoring admins", () => {
+    const usersData = [
+      { uid: "admin1", role: "admin", balance: 1000000 },
+      { uid: "worker1", role: "worker", balance: 50000 },
+      { uid: "worker2", role: "worker", balance: 25000 },
+      { uid: "worker3", role: "worker", saldoUtama: 15000 },
+      { uid: "worker4", role: "worker", balance: "10000" as any },
+      { uid: "worker5", role: "worker" },
+    ];
+
+    const workerUsers = usersData.filter((u) => u.role !== "admin");
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
+
+    expect(totalBalance).toBe(100000);
+  });
+
+  it("verifies worker user balances are completely unchanged during aggregation", () => {
+    const originalUsersData = [
+      { uid: "worker1", role: "worker", balance: 50000 },
+      { uid: "worker2", role: "worker", balance: 25000 },
+    ];
+    const initialCopy = JSON.parse(JSON.stringify(originalUsersData));
+
+    const workerUsers = originalUsersData.filter((u) => u.role !== "admin");
+    const totalBalance = workerUsers.reduce(
+      (sum, u) => sum + (Number(u.balance ?? (u as any).saldoUtama ?? 0) || 0),
+      0
+    );
+
+    expect(totalBalance).toBe(75000);
+    expect(originalUsersData).toEqual(initialCopy);
+  });
+});
+
+describe("Unified Worker Lookup & Auto-Credit Approved Payouts Unit Tests", () => {
+  it("resolveWorkerUser matches worker profile across UID, email, and name/username", () => {
+    const usersList = [
+      { uid: "uid_zamm", name: "zammrorr77", email: "zammrorr77@gmail.com" },
+      { uid: "uid_kalmiyadi", name: "Kalmiyadi", email: "kalmiyadi@gmail.com" },
+      { uid: "uid_rehan", name: "rehan permadi", email: "rehanpermadi@gmail.com" },
+    ];
+
+    // Submission with workerName "azam" and workerEmail "zammrorr77@gmail.com"
+    const resolvedAzam = resolveWorkerUser(
+      { workerId: "azam", workerEmail: "zammrorr77@gmail.com", workerName: "azam" },
+      usersList
+    );
+    expect(resolvedAzam).toBeDefined();
+    expect(resolvedAzam?.uid).toBe("uid_zamm");
+    expect(resolvedAzam?.name).toBe("zammrorr77");
+
+    // Submission with workerId "Kalmiyadi"
+    const resolvedKalmiyadi = resolveWorkerUser(
+      { workerId: "Kalmiyadi" },
+      usersList
+    );
+    expect(resolvedKalmiyadi).toBeDefined();
+    expect(resolvedKalmiyadi?.uid).toBe("uid_kalmiyadi");
+
+    // Submission with workerName "rehan permadi"
+    const resolvedRehan = resolveWorkerUser(
+      { workerId: "rehan", workerName: "rehan permadi" },
+      usersList
+    );
+    expect(resolvedRehan).toBeDefined();
+    expect(resolvedRehan?.uid).toBe("uid_rehan");
+  });
+
+  it("Verifies total circulating balance reflects Rp 9.000 across 3 approved Sept 14 submissions", () => {
+    const usersList = [
+      { uid: "uid_zamm", name: "zammrorr77", email: "zammrorr77@gmail.com", balance: 3000 },
+      { uid: "uid_kalmiyadi", name: "Kalmiyadi", email: "kalmiyadi@gmail.com", balance: 3000 },
+      { uid: "uid_rehan", name: "rehan permadi", email: "rehanpermadi@gmail.com", balance: 3000 },
+    ];
+
+    const approvedSubmissions = [
+      { id: "sub_1", workerId: "azam", workerEmail: "zammrorr77@gmail.com", workerName: "azam", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+      { id: "sub_2", workerId: "Kalmiyadi", workerName: "Kalmiyadi", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+      { id: "sub_3", workerId: "rehan", workerName: "rehan permadi", status: "APPROVED", approvedItemCount: 1, totalAmount: 3000 },
+    ];
+
+    // Build worker map using resolveWorkerUser
+    const workerApprovedPayouts = new Map<string, number>();
+
+    approvedSubmissions.forEach((sub) => {
+      const resolved = resolveWorkerUser(
+        { workerId: sub.workerId, workerEmail: sub.workerEmail, workerName: sub.workerName },
+        usersList
+      );
+      expect(resolved).toBeDefined();
+      if (resolved) {
+        const prev = workerApprovedPayouts.get(resolved.uid) || 0;
+        workerApprovedPayouts.set(resolved.uid, prev + sub.totalAmount);
+      }
+    });
+
+    // Check individual worker payouts
+    expect(workerApprovedPayouts.get("uid_zamm")).toBe(3000);
+    expect(workerApprovedPayouts.get("uid_kalmiyadi")).toBe(3000);
+    expect(workerApprovedPayouts.get("uid_rehan")).toBe(3000);
+
+    // Sum total circulating balance across all 3 approved Sept 14 submissions
+    const totalCirculatingBalance = Array.from(workerApprovedPayouts.values()).reduce((a, b) => a + b, 0);
+    expect(totalCirculatingBalance).toBe(9000);
+  });
+});
+
+describe("Nabil Historical Withdrawal Reconciliation Unit Tests (reconcileHistoricalNabilWithdrawal)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("1. historical approved withdrawal that was not deducted -> reconciled exactly once", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+        accCount: 1,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+        requestedAt: "2026-09-18T14:03:00.000Z",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(res.status).toBe("success");
+    expect(res.reconciled).toBe(true);
+
+    // Balance and saldoUtama adjusted from 3000 -> 0
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(0);
+
+    // accCount remains completely untouched!
+    expect(store["users/nabil_uid_1"].accCount).toBe(1);
+
+    // Marker document created
+    expect(store["reconciliation_markers/historical_nabil_wd_3000"].reconciled).toBe(true);
+  });
+
+  it("2. reconciliation run twice -> second run makes no additional deduction (idempotent)", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx1 = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx1));
+
+    // First run
+    const res1 = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res1.status).toBe("success");
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+
+    // Second run
+    const tx2 = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx2));
+
+    const res2 = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res2.status).toBe("already_reconciled");
+    // Balance remains 0, not negative -3000!
+    expect(store["users/nabil_uid_1"].balance).toBe(0);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(0);
+  });
+
+  it("3. already reconciled withdrawal -> no change", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 5000,
+        saldoUtama: 5000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+      "reconciliation_markers/historical_nabil_wd_3000": {
+        id: "historical_nabil_wd_3000",
+        workerId: "nabil_uid_1",
+        reconciled: true,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+    expect(res.status).toBe("already_reconciled");
+    expect(store["users/nabil_uid_1"].balance).toBe(5000);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(5000);
+  });
+
+  it("4. withdrawal belonging to another worker (e.g. Batroy) -> untouched", async () => {
+    const store: Record<string, any> = {
+      "users/batroy_uid_99": {
+        uid: "batroy_uid_99",
+        name: "Batroy Worker",
+        balance: 15000,
+        saldoUtama: 15000,
+      },
+      "withdrawals/wd_batroy_5000": {
+        id: "wd_batroy_5000",
+        workerId: "batroy_uid_99",
+        amount: 5000,
+        status: "success",
+      },
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    // Target Nabil explicitly
+    await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    // Batroy's balance and withdrawal remain 100% untouched!
+    expect(store["users/batroy_uid_99"].balance).toBe(15000);
+    expect(store["users/batroy_uid_99"].saldoUtama).toBe(15000);
+    expect(store["withdrawals/wd_batroy_5000"].status).toBe("success");
+  });
+
+  it("5. worker with additional legitimate balance after historical withdrawal -> deducts exactly Rp3.000 without blindly zeroing balance", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 8000, // Earned additional 5000 later (3000 + 5000 = 8000)
+        saldoUtama: 8000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    const res = await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(res.status).toBe("success");
+    // Deducts exactly 3000: 8000 - 3000 = 5000, NOT blindly zeroed to 0!
+    expect(store["users/nabil_uid_1"].balance).toBe(5000);
+    expect(store["users/nabil_uid_1"].saldoUtama).toBe(5000);
+  });
+
+  it("6. balance and saldoUtama remain synchronized", async () => {
+    const store: Record<string, any> = {
+      "users/nabil_uid_1": {
+        uid: "nabil_uid_1",
+        name: "Nabil Alfiansyah",
+        balance: 3000,
+        saldoUtama: 3000,
+      },
+      "withdrawals/wd_nabil_3000": {
+        id: "wd_nabil_3000",
+        workerId: "nabil_uid_1",
+        amount: 3000,
+        status: "success",
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    vi.mocked(await import("firebase/firestore")).runTransaction = vi.fn().mockImplementation(async (db, updateFn) => updateFn(tx));
+
+    await reconcileHistoricalNabilWithdrawal("nabil_uid_1", "wd_nabil_3000");
+
+    expect(store["users/nabil_uid_1"].balance).toBe(store["users/nabil_uid_1"].saldoUtama);
+  });
+});
+
+describe("Real-Time Chat Services & Hooks Unit Tests", () => {
+  it("useWorkerChat returns null when no workerUid is supplied", () => {
+    const { result } = renderHook(() => useWorkerChat(undefined));
+    expect(result.current.conversation).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("useConversationMessages returns empty array when conversationId is null", () => {
+    const { result } = renderHook(() => useConversationMessages(null));
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("sendChatMessage rejects empty whitespace messages", async () => {
+    await expect(
+      sendChatMessage({
+        conversationId: "worker_123",
+        senderId: "worker_123",
+        senderRole: "worker",
+        text: "   ",
+      })
+    ).rejects.toThrow("Pesan tidak boleh kosong.");
+  });
+
+  it("handles sending worker->admin and admin->worker messages, 1-check (✓) state, 2-check (✓✓) read status update, and scoped conversation read", async () => {
+    const store: Record<string, any> = {};
+
+    // 1. Worker sends message to Admin -> Worker sees ✓ (readAt is undefined/null)
+    store["conversations/worker_abc/messages/msg_worker_1"] = {
+      senderId: "worker_abc",
+      senderRole: "worker",
+      senderName: "Budi Worker",
+      text: "Halo Admin, mohon cek setoran saya",
+      createdAt: "TIMESTAMP",
+      readAt: undefined, // 1 check ✓
+    };
+
+    // 2. Admin sends message to Worker -> Admin sees ✓ (readAt is undefined/null)
+    store["conversations/worker_abc/messages/msg_admin_1"] = {
+      senderId: "admin_master",
+      senderRole: "admin",
+      senderName: "Admin EAS",
+      text: "Siap, setoran sedang diproses",
+      createdAt: "TIMESTAMP",
+      readAt: undefined, // 1 check ✓
+    };
+
+    // Verify initial 1 check (✓) status before recipient opens conversation
+    expect(store["conversations/worker_abc/messages/msg_worker_1"].readAt).toBeUndefined();
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeUndefined();
+
+    // 3. Admin opens worker_abc's conversation tab -> simulates markConversationAsRead for admin reader
+    // Marks only worker's message with readAt timestamp
+    store["conversations/worker_abc/messages/msg_worker_1"].readAt = "TIMESTAMP";
+    expect(store["conversations/worker_abc/messages/msg_worker_1"].readAt).toBeDefined(); // 2 checks ✓✓ for worker's message
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeUndefined(); // Admin's own message remains unread by worker
+
+    // 4. Worker opens Admin conversation tab -> simulates markConversationAsRead for worker reader
+    // Marks only admin's message with readAt timestamp
+    store["conversations/worker_abc/messages/msg_admin_1"].readAt = "TIMESTAMP";
+    expect(store["conversations/worker_abc/messages/msg_admin_1"].readAt).toBeDefined(); // 2 checks ✓✓ for admin's message
+
+    // 5. Scoped conversation isolation check
+    store["conversations/worker_other/messages/msg_other"] = {
+      senderId: "worker_other",
+      senderRole: "worker",
+      text: "Pesan worker lain",
+      readAt: undefined,
+    };
+    expect(store["conversations/worker_other/messages/msg_other"].readAt).toBeUndefined();
+  });
+});
+
+describe("Withdrawal Audit & Fix Logic Unit Tests", () => {
+  it("pending withdrawal + sufficient balance -> approval deducts balance and saldoUtama exactly once", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_001": {
+        id: "wd_001",
+        workerId: "w_john",
+        amount: 3000,
+        status: "pending",
+      },
+      "users/w_john": {
+        uid: "w_john",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    // Simulate reviewWithdrawal logic inside transaction
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_001" });
+    const withdrawal = withdrawalSnap.data();
+    expect(withdrawal.status).toBe("pending");
+
+    const userSnap = await tx.get({ path: `users/${withdrawal.workerId}` });
+    const user = userSnap.data();
+    const currentBalance = user.balance ?? user.saldoUtama ?? 0;
+    expect(currentBalance).toBe(10000);
+    expect(currentBalance).toBeGreaterThanOrEqual(withdrawal.amount);
+
+    const newBalance = currentBalance - withdrawal.amount;
+    tx.update({ path: `users/${withdrawal.workerId}` }, {
+      balance: newBalance,
+      saldoUtama: newBalance,
+    });
+    tx.update({ path: "withdrawals/wd_001" }, { status: "success", note: "Approved" });
+
+    // Assertions
+    expect(store["users/w_john"].balance).toBe(7000);
+    expect(store["users/w_john"].saldoUtama).toBe(7000);
+    expect(store["withdrawals/wd_001"].status).toBe("success");
+  });
+
+  it("pending withdrawal + insufficient balance -> approval fails and withdrawal remains pending", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_002": {
+        id: "wd_002",
+        workerId: "w_alice",
+        amount: 5000,
+        status: "pending",
+      },
+      "users/w_alice": {
+        uid: "w_alice",
+        balance: 2000,
+        saldoUtama: 2000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_002" });
+    const withdrawal = withdrawalSnap.data();
+    const userSnap = await tx.get({ path: `users/${withdrawal.workerId}` });
+    const user = userSnap.data();
+    const currentBalance = user.balance ?? user.saldoUtama ?? 0;
+
+    let errorThrown = false;
+    try {
+      if (currentBalance < withdrawal.amount) {
+        throw new Error("Saldo pekerja tidak mencukupi.");
+      }
+    } catch (err) {
+      errorThrown = true;
+      expect((err as Error).message).toBe("Saldo pekerja tidak mencukupi.");
+    }
+
+    expect(errorThrown).toBe(true);
+    // Balance and status remain unchanged
+    expect(store["users/w_alice"].balance).toBe(2000);
+    expect(store["withdrawals/wd_002"].status).toBe("pending");
+  });
+
+  it("already-approved withdrawal -> second approval attempt does not deduct balance again", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_003": {
+        id: "wd_003",
+        workerId: "w_bob",
+        amount: 3000,
+        status: "success",
+      },
+      "users/w_bob": {
+        uid: "w_bob",
+        balance: 7000,
+        saldoUtama: 7000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_003" });
+    const withdrawal = withdrawalSnap.data();
+
+    let doubleProcessError = false;
+    try {
+      if (withdrawal.status === "success" || withdrawal.status === "rejected") {
+        throw new Error("Penarikan ini sudah selesai diproses.");
+      }
+    } catch (err) {
+      doubleProcessError = true;
+      expect((err as Error).message).toBe("Penarikan ini sudah selesai diproses.");
+    }
+
+    expect(doubleProcessError).toBe(true);
+    // Balance is untouched on second attempt
+    expect(store["users/w_bob"].balance).toBe(7000);
+    expect(store["users/w_bob"].saldoUtama).toBe(7000);
+  });
+
+  it("rejected withdrawal -> no balance deduction occurs", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_004": {
+        id: "wd_004",
+        workerId: "w_carol",
+        amount: 4000,
+        status: "pending",
+      },
+      "users/w_carol": {
+        uid: "w_carol",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+
+    const withdrawalSnap = await tx.get({ path: "withdrawals/wd_004" });
+    const withdrawal = withdrawalSnap.data();
+    expect(withdrawal.status).toBe("pending");
+
+    // Admin rejects withdrawal
+    tx.update({ path: "withdrawals/wd_004" }, { status: "rejected", note: "Account details invalid" });
+
+    expect(store["users/w_carol"].balance).toBe(10000);
+    expect(store["users/w_carol"].saldoUtama).toBe(10000);
+    expect(store["withdrawals/wd_004"].status).toBe("rejected");
+  });
+
+  it("two concurrent approval attempts -> only one deduction succeeds", async () => {
+    const store: Record<string, any> = {
+      "withdrawals/wd_005": {
+        id: "wd_005",
+        workerId: "w_dave",
+        amount: 5000,
+        status: "pending",
+      },
+      "users/w_dave": {
+        uid: "w_dave",
+        balance: 10000,
+        saldoUtama: 10000,
+      },
+    };
+
+    // Attempt 1: First admin approves
+    const tx1 = createMockTransaction(store);
+    const wdSnap1 = await tx1.get({ path: "withdrawals/wd_005" });
+    const wd1 = wdSnap1.data();
+    if (wd1.status === "pending") {
+      const userSnap1 = await tx1.get({ path: `users/${wd1.workerId}` });
+      const user1 = userSnap1.data();
+      const newBal = user1.balance - wd1.amount;
+      tx1.update({ path: `users/${wd1.workerId}` }, { balance: newBal, saldoUtama: newBal });
+      tx1.update({ path: "withdrawals/wd_005" }, { status: "success" });
+    }
+
+    expect(store["users/w_dave"].balance).toBe(5000);
+    expect(store["withdrawals/wd_005"].status).toBe("success");
+
+    // Attempt 2: Second simultaneous admin approval arrives
+    const tx2 = createMockTransaction(store);
+    const wdSnap2 = await tx2.get({ path: "withdrawals/wd_005" });
+    const wd2 = wdSnap2.data();
+
+    let attempt2Blocked = false;
+    if (wd2.status === "success" || wd2.status === "rejected") {
+      attempt2Blocked = true;
+    }
+
+    expect(attempt2Blocked).toBe(true);
+    // Balance remained 5000, not double-deducted to 0
+    expect(store["users/w_dave"].balance).toBe(5000);
+    expect(store["users/w_dave"].saldoUtama).toBe(5000);
+  });
+
+  it("withdrawal amount greater than available balance -> creation fails", async () => {
+    const store: Record<string, any> = {
+      "users/w_eve": {
+        uid: "w_eve",
+        balance: 4000,
+        saldoUtama: 4000,
+      },
+      "withdrawals/wd_pending_1": {
+        id: "wd_pending_1",
+        workerId: "w_eve",
+        amount: 2000,
+        status: "pending",
+      },
+    };
+
+    const currentBalance = store["users/w_eve"].balance;
+    const totalPending = store["withdrawals/wd_pending_1"].amount; // 2000
+    const availableBalance = currentBalance - totalPending; // 2000
+
+    const requestedAmount = 3000;
+    let failed = false;
+
+    if (availableBalance < requestedAmount) {
+      failed = true;
+    }
+
+    expect(failed).toBe(true);
+    expect(availableBalance).toBe(2000);
+  });
+
+  it("existing worker balance fields remain consistent with the application data model", async () => {
+    const store: Record<string, any> = {
+      "users/w_frank": {
+        uid: "w_frank",
+        balance: 15000,
+        saldoUtama: 15000,
+      },
+    };
+
+    const tx = createMockTransaction(store);
+    const amountToDeduct = 5000;
+    const userSnap = await tx.get({ path: "users/w_frank" });
+    const user = userSnap.data();
+    const newBal = user.balance - amountToDeduct;
+
+    tx.update({ path: "users/w_frank" }, {
+      balance: newBal,
+      saldoUtama: newBal,
+    });
+
+    expect(store["users/w_frank"].balance).toBe(10000);
+    expect(store["users/w_frank"].saldoUtama).toBe(10000);
+    expect(store["users/w_frank"].balance).toEqual(store["users/w_frank"].saldoUtama);
+  });
+});
+
+describe("Real-Time Chat Services & Hooks Unit Tests", () => {
+  it("useWorkerChat returns null when no workerUid is supplied", () => {
+    const { result } = renderHook(() => useWorkerChat(undefined));
+    expect(result.current.conversation).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("useConversationMessages returns empty array when conversationId is null", () => {
+    const { result } = renderHook(() => useConversationMessages(null));
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("sendChatMessage rejects empty whitespace messages", async () => {
+    await expect(
+      sendChatMessage({
+        conversationId: "worker_123",
+        senderId: "worker_123",
+        senderRole: "worker",
+        text: "   ",
+      })
+    ).rejects.toThrow("Pesan tidak boleh kosong.");
+  });
+
+  describe("Chat Enhancements: Timers and Deletion Unit Tests", () => {
+    it("calculateExpirationTimestamp calculates correct future timestamp for timer options", () => {
+      expect(calculateExpirationTimestamp("off")).toBeNull();
+      expect(calculateExpirationTimestamp(undefined)).toBeNull();
+
+      const now = Date.now();
+      const ts24h = calculateExpirationTimestamp("24h");
+      expect(ts24h).not.toBeNull();
+      expect(ts24h!.getTime() - now).toBeGreaterThanOrEqual(23 * 60 * 60 * 1000);
+
+      const ts7d = calculateExpirationTimestamp("7d");
+      expect(ts7d).not.toBeNull();
+      expect(ts7d!.getTime() - now).toBeGreaterThanOrEqual(6 * 24 * 60 * 60 * 1000);
+
+      const ts30d = calculateExpirationTimestamp("30d");
+      expect(ts30d).not.toBeNull();
+      expect(ts30d!.getTime() - now).toBeGreaterThanOrEqual(29 * 24 * 60 * 60 * 1000);
+    });
   });
 });

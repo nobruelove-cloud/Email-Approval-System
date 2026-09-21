@@ -2,13 +2,6 @@ rules_version = '2';
 
 // Deploy this from the Firebase Console → Firestore Database → Rules tab,
 // or with `firebase deploy --only firestore:rules` if you use the CLI.
-//
-// NOTE: this is a different kind of "rules" from the admin dashboard's
-// "Aturan & Harga" tab. This file is Firestore's own security layer
-// (who is allowed to read/write which documents). The admin dashboard's
-// rules are application/business settings (price per email, min withdraw,
-// etc.) stored in the settings/rules document and read dynamically by the
-// app — both are needed, and both are now wired up.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -22,7 +15,6 @@ service cloud.firestore {
     }
 
     // Evaluates whether the authenticated user has role = "admin" in Firestore users/{uid}.
-    // Case-insensitive regex matching handles formatting variations (e.g. "Admin", "ADMIN", " admin ").
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -31,23 +23,24 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.matches('(?i)^\\s*admin\\s*$');
     }
 
+    function isValidReferralTierReward(minAcc, rewardAmount) {
+      return (minAcc == 5 && rewardAmount == 500) ||
+             (minAcc == 10 && rewardAmount == 1000) ||
+             (minAcc == 20 && rewardAmount == 2000) ||
+             (minAcc == 50 && rewardAmount == 5000) ||
+             (
+               exists(/databases/$(database)/documents/settings/rules) &&
+               ('referralTiers' in get(/databases/$(database)/documents/settings/rules).data) &&
+               get(/databases/$(database)/documents/settings/rules).data.referralTiers is list &&
+               get(/databases/$(database)/documents/settings/rules).data.referralTiers.exists(t, t.minAcc == minAcc && t.reward == rewardAmount)
+             );
+    }
+
     // ---- users/{uid} ----
     match /users/{uid} {
-      allow read: if isSelf(uid) || isAdmin();
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
 
-      // Self-registration rule:
-      // 1. Self-registration requires isSelf(uid).
-      // 2. Required fields: uid, name, email, role, status, tier, balance, createdAt
-      // 3. Optional fields: phone, referredBy
-      // 4. Allowed keys must be strictly: ['uid', 'name', 'email', 'phone', 'referredBy', 'role', 'status', 'tier', 'balance', 'createdAt']
-      // 5. role must equal "worker"
-      // 6. status MUST equal "active" (NOT "pending")
-      // 7. tier MUST equal 1
-      // 8. balance MUST equal 0
-      // 9. createdAt MUST be timestamp
-      // 10. phone, if present, must be string
-      // 11. referredBy, if present, must be string
-      // 12. uid must equal document UID (request.auth.uid)
       allow create: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.keys().hasAll([
@@ -86,15 +79,6 @@ service cloud.firestore {
         request.resource.data.createdAt is timestamp
       );
 
-      // User update rule:
-      // - Admin can update any user profile field.
-      // - Worker self-update enforces:
-      //   * isSelf(uid)
-      //   * role must remain unchanged (request.resource.data.role == resource.data.role)
-      //   * status must remain unchanged (request.resource.data.status == resource.data.status)
-      //   * tier must remain unchanged (request.resource.data.tier == resource.data.tier)
-      //   * balance must never increase (request.resource.data.balance <= resource.data.balance)
-      //   * balance must never become negative (request.resource.data.balance >= 0)
       allow update: if isAdmin() || (
         isSelf(uid) &&
         request.resource.data.role == resource.data.role &&
@@ -109,14 +93,12 @@ service cloud.firestore {
 
     // ---- emailSubmissions/{id} ----
     match /emailSubmissions/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&
         request.resource.data.status == 'pending';
 
-      // Only an admin resolves a submission (approve/reject); this is what
-      // credits the worker's balance, done atomically in application code.
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -125,23 +107,17 @@ service cloud.firestore {
     match /withdrawals/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
 
-      // A worker may request a withdrawal for themselves only. The paired
-      // debit to users/{workerId}.balance happens in the same client
-      // transaction and is allowed by the users/update rule above (which
-      // permits a self-decrease but never a self-increase) — so a worker
-      // can request withdrawals but can never credit their own balance.
       allow create: if isSignedIn() &&
         request.resource.data.workerId == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.amount is number &&
         request.resource.data.amount > 0;
 
-      // Only an admin resolves a withdrawal (process/success/reject).
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ---- settings/{name} ---- (dynamic rules, payment methods, pricing)
+    // ---- settings/{name} ----
     match /settings/{name} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -152,13 +128,16 @@ service cloud.firestore {
       allow get: if isAdmin() || (
         isSignedIn() && (
           id == request.auth.uid ||
-          (resource != null && (resource.data.referrerId == request.auth.uid || resource.data.referredWorkerId == request.auth.uid))
+          (resource != null && (
+            ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+            ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
+          ))
         )
       );
       allow list: if isAdmin() || (
         isSignedIn() && (
-          resource.data.referrerId == request.auth.uid ||
-          resource.data.referredWorkerId == request.auth.uid
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+          ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
         )
       );
       allow create: if isSignedIn() &&
@@ -167,7 +146,32 @@ service cloud.firestore {
         request.resource.data.status == 'PENDING' &&
         request.resource.data.currentAccCount == 0 &&
         request.resource.data.rewardAmount == 0;
-      allow update, delete: if isAdmin();
+
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          id == request.auth.uid ||
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid) ||
+          ('referredWorkerId' in resource.data && resource.data.referredWorkerId == request.auth.uid)
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---- referralClaims/{id} ----
+    match /referralClaims/{id} {
+      allow get: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid)
+        )
+      );
+      allow list: if isAdmin() || (
+        isSignedIn() &&
+        ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid)
+      );
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
     }
 
     // ---- missionClaims/{id} ----
@@ -187,13 +191,119 @@ service cloud.firestore {
 
     // ---- rewardLedger/{id} ----
     match /rewardLedger/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
-      allow write: if isAdmin();
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('workerId' in resource.data && resource.data.workerId == request.auth.uid)
+        )
+      );
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
     }
 
     // ---- financialTransactions/{id} ----
     match /financialTransactions/{id} {
       allow read, write: if isAdmin();
+    }
+
+    // ---- reconciliation_markers/{markerId} ----
+    match /reconciliation_markers/{markerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---- reconciliation_logs/{logId} ----
+    match /reconciliation_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---- announcements/{id} ----
+    match /announcements/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- referral_transactions/{id} ----
+    match /referral_transactions/{id} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource == null ||
+          ('uplineId' in resource.data && resource.data.uplineId == request.auth.uid) ||
+          ('downlineId' in resource.data && resource.data.downlineId == request.auth.uid)
+        )
+      );
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // ---- conversations/{conversationId} ----
+    // Strict Worker ↔ Admin private chat rules
+    match /conversations/{conversationId} {
+      allow get: if isAdmin() || (isSignedIn() && conversationId == request.auth.uid);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        conversationId == request.auth.uid &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.keys().hasOnly([
+          'workerId', 'workerName', 'workerEmail', 'adminId',
+          'lastMessage', 'lastMessageAt', 'workerUnread', 'adminUnread',
+          'createdAt', 'updatedAt', 'workerClearedAt', 'workerPinnedMessageId',
+          'adminClearedAt', 'adminPinnedMessageId'
+        ]) &&
+        (!('workerUnread' in request.resource.data) || request.resource.data.workerUnread == 0) &&
+        (!('adminUnread' in request.resource.data) || request.resource.data.adminUnread == 1 || request.resource.data.adminUnread == 0)
+      );
+
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        conversationId == request.auth.uid &&
+        request.resource.data.workerId == resource.data.workerId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'workerUnread',
+          'workerClearedAt',
+          'workerPinnedMessageId',
+          'lastMessage',
+          'lastMessageAt',
+          'updatedAt',
+          'adminUnread'
+        ]) &&
+        (!('workerUnread' in request.resource.data.diff(resource.data).affectedKeys()) ||
+          request.resource.data.workerUnread == 0 ||
+          ('workerUnread' in resource.data && request.resource.data.workerUnread <= resource.data.workerUnread)
+        ) &&
+        (!('adminUnread' in request.resource.data.diff(resource.data).affectedKeys()) ||
+          request.resource.data.adminUnread == (('adminUnread' in resource.data) ? resource.data.adminUnread + 1 : 1)
+        )
+      );
+
+      allow delete: if isAdmin();
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isSignedIn() && conversationId == request.auth.uid);
+
+        allow create: if isAdmin() || (
+          isSignedIn() &&
+          conversationId == request.auth.uid &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.senderRole == 'worker'
+        );
+
+        allow update: if isAdmin() || (
+          isSignedIn() &&
+          conversationId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'readAt', 'deliveredAt', 'deletedAt', 'deletedBy', 'deletedFor'
+          ]) &&
+          request.resource.data.senderId == resource.data.senderId &&
+          request.resource.data.senderRole == resource.data.senderRole &&
+          request.resource.data.text == resource.data.text &&
+          request.resource.data.createdAt == resource.data.createdAt
+        );
+
+        allow delete: if isAdmin();
+      }
     }
   }
 }

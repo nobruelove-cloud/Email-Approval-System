@@ -1,7 +1,54 @@
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  badge?: string; // e.g., "BARU", "IMPORTANT", "INFO"
+  createdAt: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
+  createdBy: string; // Admin UID
+  isActive: boolean;
+}
+
+export type ChatSenderRole = "admin" | "worker";
+
+export type ChatMessageType = "text";
+export type DisappearingTimer = "off" | "24h" | "7d" | "30d";
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderRole: ChatSenderRole;
+  senderName?: string;
+  senderEmail?: string;
+  text: string;
+  createdAt: any;
+  readAt?: any;
+  type?: ChatMessageType;
+  expiresAt?: any;
+  disappearingTimer?: DisappearingTimer;
+  deletedAt?: any;
+  deletedBy?: string;
+  deletedFor?: string[];
+}
+
+export interface Conversation {
+  id: string; // workerId
+  workerId: string;
+  workerName?: string;
+  workerEmail?: string;
+  adminId?: string;
+  lastMessage: string;
+  lastMessageAt: any;
+  workerUnread: number;
+  adminUnread: number;
+  createdAt: any;
+  updatedAt?: any;
+}
+
 export type Role = "admin" | "worker";
 export type UserStatus = "pending" | "approved" | "active" | "rejected" | "inactive";
 export type UserTier = number;
-export type SubmissionStatus = "pending" | "approved" | "available" | "sold" | "rejected";
+export type SubmissionStatus = "pending" | "approved" | "available" | "sold" | "rejected" | "ACC";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "rejected";
 
 export type TierConfig = {
@@ -21,7 +68,29 @@ export type PortalUser = {
   status: UserStatus;
   tier: UserTier;
   balance: number;
+  saldoUtama?: number;
   referredBy?: string;
+  referralCode?: string;
+  hasUsedReferral?: boolean;
+  reciprocalPartner?: string;
+  totalReferralEarned?: number;
+  teamAccCount?: number;
+  accCount?: number;
+  totalACC?: number;
+  createdAt?: unknown;
+  lastActiveAt?: unknown;
+};
+
+export type ReferralTransaction = {
+  id: string;
+  uplineId: string;
+  uplineName?: string;
+  downlineId: string;
+  downlineName?: string;
+  accCount: number;
+  commissionPerEmail: number;
+  totalCommission: number;
+  submissionId: string;
   createdAt?: unknown;
 };
 
@@ -40,6 +109,22 @@ export type Referral = {
   rewardedAt?: unknown;
   rewardAmount?: number;
   reviewNote?: string;
+  claimedTiers?: Record<string, boolean>;
+};
+
+export type ReferralClaimStatus = "pending" | "approved" | "rejected";
+
+export type ReferralClaim = {
+  id: string;
+  referralId: string;
+  referrerId: string;
+  referredWorkerId: string;
+  minAcc: number;
+  rewardAmount: number;
+  status: ReferralClaimStatus;
+  requestedAt?: unknown;
+  processedAt?: unknown;
+  note?: string;
 };
 
 export type MissionType = "daily" | "weekly";
@@ -128,8 +213,10 @@ export type EmailSubmission = {
   approvedItemCount?: number;
   rejectedItemCount?: number;
   // Snapshot/info at submission time
+  tierId?: string;
   currentTier?: number;
   currentPricePerItem?: number;
+  pricePerEmail?: number;
   // Snapshot saved upon approval
   appliedTier?: number;
   appliedPricePerItem?: number;
@@ -143,6 +230,40 @@ export type EmailSubmission = {
   updatedAt?: unknown;
 };
 
+export type MethodFeeType = "free" | "fixed" | "percentage";
+
+export type PaymentMethodFeeConfig = {
+  method: string;
+  category?: "bank" | "ewallet" | "other";
+  enabled: boolean;
+  feeType: MethodFeeType;
+  feeValue: number; // e.g. 0 for free, 1000 for fixed Rp 1.000, 1.5 for 1.5%
+};
+
+export type WithdrawalSettings = {
+  minWithdraw: number;
+  maxWithdraw: number;
+  methods: PaymentMethodFeeConfig[];
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_PAYMENT_METHOD_FEES: PaymentMethodFeeConfig[] = [
+  { method: "BCA", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "BRI", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "BNI", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "Mandiri", category: "bank", enabled: true, feeType: "fixed", feeValue: 2500 },
+  { method: "DANA", category: "ewallet", enabled: true, feeType: "free", feeValue: 0 },
+  { method: "OVO", category: "ewallet", enabled: true, feeType: "percentage", feeValue: 1.5 },
+  { method: "GoPay", category: "ewallet", enabled: true, feeType: "free", feeValue: 0 },
+  { method: "ShopeePay", category: "ewallet", enabled: true, feeType: "fixed", feeValue: 1000 },
+];
+
+export const DEFAULT_WITHDRAWAL_SETTINGS: WithdrawalSettings = {
+  minWithdraw: 50000,
+  maxWithdraw: 5000000,
+  methods: DEFAULT_PAYMENT_METHOD_FEES,
+};
+
 export type Withdrawal = {
   id: string;
   workerId: string;
@@ -151,6 +272,8 @@ export type Withdrawal = {
   account: string;
   accountName?: string;
   accountHolderName?: string;
+  fee?: number;
+  netAmount?: number;
   status: WithdrawalStatus;
   requestedAt?: unknown;
   processedAt?: unknown;
@@ -162,11 +285,48 @@ export type ReferralTierConfig = {
   reward: number;
 };
 
+export type MaintenanceConfig = {
+  enabled: boolean;
+  targetEndTime: string; // ISO date string e.g., "2026-03-30T12:00" or empty
+  message: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_MAINTENANCE: MaintenanceConfig = {
+  enabled: false,
+  targetEndTime: "",
+  message: "Sistem sedang dalam perbaikan & pembaruan server. Silakan cek kembali beberapa saat lagi.",
+};
+
+export type TelegramConfig = {
+  enabled?: boolean;
+  botToken: string;
+  adminChatId: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
+  enabled: true,
+  botToken: "",
+  adminChatId: "",
+};
+
 export type SupportConfig = {
   enabled: boolean;
   title: string;
   description: string;
   telegramUrl: string;
+  communityWaLink?: string;
+};
+
+export type GeneralSettings = {
+  submissionOpen?: boolean;
+  adminPin?: string;
+  updatedAt?: unknown;
+};
+
+export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  submissionOpen: true,
 };
 
 export type DayOperatingHours = {
@@ -187,6 +347,42 @@ export type OperatingHoursConfig = {
     saturday: DayOperatingHours;
     sunday: DayOperatingHours;
   };
+};
+
+export type CheckerRulesConfig = {
+  enabled: boolean;
+  minBirthYear: number;
+  maxBirthYear: number;
+  maxUsernameDigits: number;
+  requirePasswordLowercaseOnly: boolean;
+  requiredPassword?: string;
+};
+
+export const DEFAULT_CHECKER_RULES: CheckerRulesConfig = {
+  enabled: true,
+  minBirthYear: 1990,
+  maxBirthYear: 1998,
+  maxUsernameDigits: 3,
+  requirePasswordLowercaseOnly: true,
+  requiredPassword: "",
+};
+
+export type CheckedEmailItem = {
+  originalLine: string;
+  email: string;
+  password?: string;
+  username: string;
+  status: "GOOD" | "BAD";
+  reasons: string[];
+  birthYearDetected?: number;
+  digitCountDetected?: number;
+};
+
+export type BulkCheckResult = {
+  total: number;
+  goodCount: number;
+  badCount: number;
+  items: CheckedEmailItem[];
 };
 
 export const DEFAULT_OPERATING_HOURS: OperatingHoursConfig = {
@@ -224,6 +420,7 @@ export type PortalRules = {
   // Referral Settings
   referralEnabled?: boolean;
   referralReward?: number;
+  referralCommissionPerAcc?: number;
   referralMinAcc?: number;
   referralMinEarnings?: number;
   referralTiers?: ReferralTierConfig[];
@@ -242,8 +439,15 @@ export type PortalRules = {
   // Support / Help Center Settings
   supportConfig?: SupportConfig;
 
+  // Telegram Bot Notification Settings
+  telegramConfig?: TelegramConfig;
+
   // Operating Hours Settings
   operatingHours?: OperatingHoursConfig;
+
+  // Bulk Email Checker / Master Riset Settings
+  checkerRules?: CheckerRulesConfig;
+  requiredPassword?: string;
 
   updatedAt?: unknown;
 };
@@ -270,6 +474,7 @@ export const DEFAULT_RULES: PortalRules = {
 
   referralEnabled: true,
   referralReward: 500,
+  referralCommissionPerAcc: 100,
   referralMinAcc: 5,
   referralMinEarnings: 0,
   referralTiers: DEFAULT_REFERRAL_TIERS,
@@ -310,7 +515,9 @@ export const DEFAULT_RULES: PortalRules = {
     title: "Pusat Bantuan",
     description: "Ada kendala? Hubungi Customer Service kami melalui Telegram.",
     telegramUrl: "",
+    communityWaLink: "",
   },
 
   operatingHours: DEFAULT_OPERATING_HOURS,
+  checkerRules: DEFAULT_CHECKER_RULES,
 };

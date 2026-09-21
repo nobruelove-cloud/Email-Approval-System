@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import {
   Send,
@@ -12,16 +12,42 @@ import {
   XCircle,
   Loader2,
   Eye,
+  EyeOff,
   Award,
   Users,
   Copy,
   Check,
   HelpCircle,
   MessageCircle,
+  MessageSquare,
   User,
-  Mail,
-  Phone,
+  Megaphone,
+  Building2,
+  Smartphone,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Share2,
+  Coins,
+  Trophy,
+  Home,
+  PlusCircle,
+  ChevronRight,
+  BookOpen,
+  Tag,
+  SearchCheck,
+  Menu,
+  CheckCheck,
+  Trash2,
+  X,
+  MoreVertical,
+  Timer,
+  Bell,
 } from "lucide-react";
+import { EmojiPicker } from "@/components/EmojiPicker";
+import { EmailChecker } from "@/components/EmailChecker";
+import { Leaderboard } from "@/components/Leaderboard";
+import { SidebarNavigation, type DashboardView } from "@/components/SidebarNavigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,14 +55,6 @@ import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -48,26 +66,52 @@ import {
   useWorkerData,
   useWorkerEngagementData,
   useSettings,
+  useMyReferral,
+  useAnnouncements,
+  useReferralTransactions,
+  useDownlineWorkers,
+  claimReferralCode,
+  claimReferralReward,
   createSubmission,
   createWithdrawal,
+  useWorkerChat,
+  useConversationMessages,
+  sendChatMessage,
+  markConversationAsRead,
+  deleteMessageForMe,
+  deleteMessageForAll,
 } from "@/hooks/use-portal";
-import { DEFAULT_RULES, DEFAULT_REFERRAL_TIERS, DEFAULT_OPERATING_HOURS, type EmailSubmission, type PortalUser } from "@/lib/portal-types";
+import {
+  type ChatMessage,
+  type DisappearingTimer,
+} from "@/lib/portal-types";
+import { DEFAULT_RULES, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_MAINTENANCE, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type PaymentMethodFeeConfig } from "@/lib/portal-types";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { SubmissionHistory } from "@/components/SubmissionHistory";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import {
   formatDateTime,
   formatMoney,
-  getItemCountOfSubmission,
   getTierConfig,
   shortId,
   validatePasswordAgainstRules,
-  getReferralRewardForAccCount,
-  getReferralTierForAccCount,
-  getNextReferralTierForAccCount,
   getOperatingStatus,
+  getPaymentMethodFeeConfig,
+  calculateWithdrawalFee,
+  formatFeeBadge,
 } from "@/lib/portal-utils";
+
+function TelegramIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.96 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  );
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string; icon: React.JSX.Element }> = {
-    pending: { label: "Menunggu", className: "bg-amber-100 text-amber-800 hover:bg-amber-100", icon: <Clock className="w-3 h-3" /> },
+    pending: { label: "Menunggu", className: "bg-blue-100 text-blue-800 hover:bg-blue-100", icon: <Clock className="w-3 h-3" /> },
     processing: { label: "Diproses", className: "bg-blue-100 text-blue-800 hover:bg-blue-100", icon: <Loader2 className="w-3 h-3" /> },
     approved: { label: "Terjual", className: "bg-green-100 text-green-800 hover:bg-green-100", icon: <CheckCircle2 className="w-3 h-3" /> },
     available: { label: "Terjual", className: "bg-green-100 text-green-800 hover:bg-green-100", icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -87,13 +131,123 @@ export function StatusBadge({ status }: { status: string }) {
 export default function WorkerDashboard({ profile, onLogout }: { profile: PortalUser; onLogout: () => void }) {
   const { submissions, withdrawals } = useWorkerData(profile.uid);
   const engagement = useWorkerEngagementData(profile.uid);
+  const referralTxs = useReferralTransactions(profile.uid);
+  const downlines = useDownlineWorkers(profile.uid);
   const rules = useSettings("rules", DEFAULT_RULES);
+  const generalSettingsHook = useSettings("general", DEFAULT_GENERAL_SETTINGS);
+  const withdrawalSettingsHook = useSettings("withdrawal", DEFAULT_WITHDRAWAL_SETTINGS);
+  const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
+  const myReferral = useMyReferral(profile.uid);
+  const announcements = useAnnouncements();
+
+  // Maintenance Mode real-time countdown & unlock logic
+  const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
+  const isMaintenanceActive = maintenance.enabled && profile.role !== "admin";
+
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number; totalMs: number }>({
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    totalMs: 0,
+  });
+
+  useEffect(() => {
+    if (!isMaintenanceActive) return;
+
+    function calcTimeLeft() {
+      if (!maintenance.targetEndTime) {
+        return { hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
+      }
+      const targetMs = new Date(maintenance.targetEndTime).getTime();
+      const nowMs = Date.now();
+      const diffMs = targetMs - nowMs;
+
+      if (diffMs <= 0 || isNaN(diffMs)) {
+        return { hours: 0, minutes: 0, seconds: 0, totalMs: 0 };
+      }
+
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+      return { hours, minutes, seconds, totalMs: diffMs };
+    }
+
+    setTimeLeft(calcTimeLeft());
+
+    const timer = setInterval(() => {
+      const remaining = calcTimeLeft();
+      setTimeLeft(remaining);
+      if (remaining.totalMs <= 0 && maintenance.targetEndTime) {
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isMaintenanceActive, maintenance.targetEndTime]);
+
+  // Render Maintenance Mode Screen if maintenance is enabled and user is not Admin
+  if (isMaintenanceActive) {
+    return <MaintenanceScreen maintenance={maintenance} onLogout={onLogout} />;
+  }
+
+  // Active View State (Full-Page Navigation)
+  const [activeView, setActiveView] = useState<DashboardView>("home");
+
+  // Email sensor state
+  const [isEmailVisible, setIsEmailVisible] = useState(false);
+
+  // Sidebar States (Mobile Drawer & Desktop Collapsed)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
 
   // Engagement UI States
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [invitationCodeInput, setInvitationCodeInput] = useState("");
+  const [claimingCode, setClaimingCode] = useState(false);
+  const [busyClaimTierKey, setBusyClaimTierKey] = useState<string | null>(null);
+
+  // Pasif Income Simulation state
+  const [simFriends, setSimFriends] = useState(10);
+  const [simAccPerFriend, setSimAccPerFriend] = useState(10);
+
+  const isAlreadyLinked = !!profile.referredBy || !!myReferral.data;
+  const referrerDisplayName = myReferral.data?.referrerName || (profile.referredBy ? shortId(profile.referredBy) : "");
 
   const referralCode = profile.uid;
   const referralLink = typeof window !== "undefined" ? `${window.location.origin}/register?ref=${referralCode}` : `/register?ref=${referralCode}`;
+
+  async function handleClaimInvitationCode(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanCode = invitationCodeInput.trim();
+
+    if (!cleanCode) {
+      toast.error("Kode undangan wajib diisi.");
+      return;
+    }
+
+    if (cleanCode === profile.uid) {
+      toast.error("Tidak dapat menggunakan kode undangan milik sendiri.");
+      return;
+    }
+
+    if (isAlreadyLinked) {
+      toast.error("Akun kamu sudah terhubung dengan kode undangan.");
+      return;
+    }
+
+    setClaimingCode(true);
+    try {
+      await claimReferralCode(profile, cleanCode);
+      toast.success("Berhasil mengklaim kode undangan! Akun kamu sekarang terhubung.");
+      setInvitationCodeInput("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengklaim kode undangan.");
+    } finally {
+      setClaimingCode(false);
+    }
+  }
 
   function handleCopyReferralLink() {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -104,15 +258,30 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
+  function handleCopyReferralCode() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(profile.uid);
+      setCopiedCode(true);
+      toast.success("Kode referral berhasil disalin!");
+      setTimeout(() => setCopiedCode(false), 2500);
+    }
+  }
+
+  // Active Tier configuration
+  const currentTierConfig = useMemo(() => {
+    return getTierConfig(profile.tier ?? 1, rules.data.tiers);
+  }, [profile.tier, rules.data.tiers]);
+
   // Calculate Engagement Stats
   const refStats = useMemo(() => {
     const total = engagement.referrals.data.length;
     const pending = engagement.referrals.data.filter((r) => r.status === "PENDING").length;
     const qualified = engagement.referrals.data.filter((r) => r.status === "QUALIFIED" || r.status === "REWARDED" || r.status === "PAID").length;
+    const totalTeamAcc = engagement.referrals.data.reduce((sum, r) => sum + (r.currentAccCount ?? 0), 0);
     const earnings = engagement.rewardLedger.data
       .filter((l) => l.rewardType === "referral")
       .reduce((sum, item) => sum + item.amount, 0);
-    return { total, pending, qualified, earnings };
+    return { total, pending, qualified, totalTeamAcc, earnings };
   }, [engagement.referrals.data, engagement.rewardLedger.data]);
 
   // Unified Transaction History derived from existing withdrawals & reward ledger
@@ -150,7 +319,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           ? "Bonus Referral"
           : r.rewardType === "mission"
           ? "Bonus Misi"
-          : "Bonus Klasemen";
+          : "Bonus Reward Leaderboard";
       list.push({
         id: `rw-${r.id}`,
         date: r.createdAt,
@@ -176,22 +345,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     });
   }, [withdrawals.data, engagement.rewardLedger.data]);
 
-  // Active Tier configuration
-  const currentTierConfig = useMemo(() => {
-    return getTierConfig(profile.tier ?? 1, rules.data.tiers);
-  }, [profile.tier, rules.data.tiers]);
-
-  const activeReferralTiers = useMemo(() => {
-    return Array.isArray(rules.data.referralTiers) && rules.data.referralTiers.length > 0
-      ? rules.data.referralTiers
-      : DEFAULT_REFERRAL_TIERS;
-  }, [rules.data.referralTiers]);
-
   const supportConfig = useMemo(() => {
     return rules.data.supportConfig ?? DEFAULT_RULES.supportConfig!;
   }, [rules.data.supportConfig]);
-
-  const isSupportEnabled = supportConfig.enabled !== false;
 
   const operatingHoursConfig = useMemo(() => {
     return rules.data.operatingHours ?? DEFAULT_OPERATING_HOURS;
@@ -201,10 +357,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     return getOperatingStatus(operatingHoursConfig);
   }, [operatingHoursConfig]);
 
+  const isSubmissionClosed = useMemo(() => {
+    const isManualClosed = generalSettingsHook.data?.submissionOpen === false;
+    return isManualClosed || !operatingStatus.isOpen;
+  }, [generalSettingsHook.data?.submissionOpen, operatingStatus.isOpen]);
+
   // Profile fields display with robust fallbacks
   const displayName = profile?.name && profile.name.trim() ? profile.name.trim() : "Worker";
   const displayEmail = profile?.email && profile.email.trim() ? profile.email.trim() : "-";
-  const displayPhone = profile?.phone && profile.phone.trim() ? profile.phone.trim() : "Belum ditambahkan";
 
   // --- Submit emails ---
   const [emailsText, setEmailsText] = useState("");
@@ -213,6 +373,86 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // Detail Dialog state
   const [detailSubmission, setDetailSubmission] = useState<EmailSubmission | null>(null);
+
+  // Worker Chat State
+  const [workerChatText, setWorkerChatText] = useState("");
+  const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+  const [chatTimerOption, setChatTimerOption] = useState<DisappearingTimer>("off");
+
+  // Delete Modal state
+  const [deleteChatModalMsg, setDeleteChatModalMsg] = useState<ChatMessage | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
+
+  const workerChatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const workerChatData = useWorkerChat(profile.uid);
+  const workerMessagesData = useConversationMessages(profile.uid);
+
+  // Automatically mark conversation as read when activeView === 'chat'
+  useEffect(() => {
+    if (activeView === "chat" && profile?.uid) {
+      markConversationAsRead(profile.uid, "worker");
+    }
+  }, [activeView, profile?.uid, workerMessagesData.messages]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (activeView === "chat") {
+      workerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeView, workerMessagesData.messages]);
+
+  const handleSendWorkerChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workerChatText.trim() || sendingWorkerChat) return;
+
+    setSendingWorkerChat(true);
+
+    try {
+      await sendChatMessage({
+        conversationId: profile.uid,
+        senderId: profile.uid,
+        senderRole: "worker",
+        senderName: profile.name,
+        senderEmail: profile.email,
+        text: workerChatText,
+        type: "text",
+        disappearingTimer: chatTimerOption,
+      });
+
+      setWorkerChatText("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengirim pesan.");
+    } finally {
+      setSendingWorkerChat(false);
+    }
+  };
+
+  const handleDeleteMessageForMe = async (msg: ChatMessage) => {
+    setDeletingChat(true);
+    try {
+      await deleteMessageForMe(profile.uid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk Anda.");
+      setDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingChat(false);
+    }
+  };
+
+  const handleDeleteMessageForAll = async (msg: ChatMessage) => {
+    setDeletingChat(true);
+    try {
+      await deleteMessageForAll(profile.uid, msg.id, profile.uid);
+      toast.success("Pesan dihapus untuk semua.");
+      setDeleteChatModalMsg(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus pesan.");
+    } finally {
+      setDeletingChat(false);
+    }
+  };
 
   const emailList = useMemo(
     () =>
@@ -275,10 +515,74 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
   // --- Withdraw ---
   const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState(rules.data.paymentMethods[0] ?? "DANA");
+
+  // Active payment method fee configurations
+  const activeWithdrawalSettings = useMemo(() => {
+    return {
+      minWithdraw: withdrawalSettingsHook.data?.minWithdraw ?? rules.data.minWithdraw ?? 50000,
+      maxWithdraw: withdrawalSettingsHook.data?.maxWithdraw ?? rules.data.maxWithdraw ?? 5000000,
+      methods: Array.isArray(withdrawalSettingsHook.data?.methods) && withdrawalSettingsHook.data.methods.length > 0
+        ? withdrawalSettingsHook.data.methods
+        : (rules.data.paymentMethods ?? ["DANA", "OVO", "GoPay", "ShopeePay", "Bank Transfer"]).map((m) => ({
+            method: m,
+            enabled: true,
+            feeType: "free" as const,
+            feeValue: 0,
+          })),
+    };
+  }, [withdrawalSettingsHook.data, rules.data]);
+
+  const enabledMethods = useMemo(() => {
+    return activeWithdrawalSettings.methods.filter((m) => m.enabled !== false);
+  }, [activeWithdrawalSettings.methods]);
+
+  const [method, setMethod] = useState<string>(() => enabledMethods[0]?.method ?? "DANA");
+
+  // Keep selected method valid if enabled methods list updates
+  const activeMethodConfig = useMemo(() => {
+    return getPaymentMethodFeeConfig(method, activeWithdrawalSettings, rules.data);
+  }, [method, activeWithdrawalSettings, rules.data]);
+
   const [account, setAccount] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
+  const [categoryTab, setCategoryTab] = useState<"ewallet" | "bank">("ewallet");
   const [withdrawing, setWithdrawing] = useState(false);
+
+  const isEWalletMethod = (m: PaymentMethodFeeConfig) => {
+    if (m.category === "ewallet") return true;
+    if (m.category === "bank") return false;
+    const name = m.method.toUpperCase();
+    return ["DANA", "OVO", "GOPAY", "SHOPEEPAY", "LINKAJA", "QRIS", "DOKU"].some((e) => name.includes(e));
+  };
+
+  const ewalletMethods = useMemo(() => enabledMethods.filter(isEWalletMethod), [enabledMethods]);
+  const bankMethods = useMemo(() => enabledMethods.filter((m) => !isEWalletMethod(m)), [enabledMethods]);
+
+  const visibleMethods = useMemo(() => {
+    const list = categoryTab === "ewallet" ? ewalletMethods : bankMethods;
+    return list.length > 0 ? list : enabledMethods;
+  }, [categoryTab, ewalletMethods, bankMethods, enabledMethods]);
+
+  function handleSelectCategory(cat: "ewallet" | "bank") {
+    setCategoryTab(cat);
+    const targetList = cat === "ewallet" ? ewalletMethods : bankMethods;
+    if (targetList.length > 0 && !targetList.some((m) => m.method === method)) {
+      setMethod(targetList[0].method);
+    }
+  }
+
+  // Dynamic fee calculation
+  const calculatedFee = useMemo(() => {
+    return calculateWithdrawalFee(amount, activeMethodConfig);
+  }, [amount, activeMethodConfig]);
+
+  const calculatedNet = useMemo(() => {
+    return Math.max(0, amount - calculatedFee);
+  }, [amount, calculatedFee]);
+
+  const currentFeeBadgeText = useMemo(() => {
+    return formatFeeBadge(activeMethodConfig);
+  }, [activeMethodConfig]);
 
   async function handleWithdraw(e: React.FormEvent) {
     e.preventDefault();
@@ -295,12 +599,12 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       toast.error("Masukkan jumlah penarikan yang valid.");
       return;
     }
-    if (value < rules.data.minWithdraw) {
-      toast.error(`Minimal penarikan adalah ${formatMoney(rules.data.minWithdraw)}.`);
+    if (value < activeWithdrawalSettings.minWithdraw) {
+      toast.error(`Minimal penarikan adalah ${formatMoney(activeWithdrawalSettings.minWithdraw)}.`);
       return;
     }
-    if (value > rules.data.maxWithdraw) {
-      toast.error(`Maksimal penarikan adalah ${formatMoney(rules.data.maxWithdraw)}.`);
+    if (value > activeWithdrawalSettings.maxWithdraw) {
+      toast.error(`Maksimal penarikan adalah ${formatMoney(activeWithdrawalSettings.maxWithdraw)}.`);
       return;
     }
     if (value > profile.balance) {
@@ -313,9 +617,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       await createWithdrawal({
         workerId: profile.uid,
         amount: value,
-        method,
+        method: activeMethodConfig.method,
         account: account.trim(),
         accountHolderName: accountHolderName.trim(),
+        fee: calculatedFee,
+        netAmount: calculatedNet,
       });
       toast.success("Permintaan penarikan berhasil dikirim!");
       setAmount(0);
@@ -328,785 +634,1923 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
     }
   }
 
+  function getViewTitle(view: DashboardView): string {
+    switch (view) {
+      case "submit":
+        return "Job Gmail / Setor Email";
+      case "checker":
+        return "Status ACC & Checker Email";
+      case "leaderboard":
+        return "Klasemen Worker & Reward";
+      case "referral":
+        return "Program Referral & Pasif Income";
+      case "withdraw":
+        return "Tarik Saldo";
+      case "history":
+        return "Riwayat Job & Setoran";
+      case "cs":
+        return "Bantuan CS & Komunitas";
+      case "announcements":
+        return "Informasi Resmi Admin";
+      case "chat":
+        return "Pesan Admin / Live Chat";
+      default:
+        return "Dashboard Worker";
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-gray-900">{profile.name}</p>
-              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300 gap-1">
-                <Award className="w-3 h-3" />
-                {currentTierConfig.name} ({formatMoney(currentTierConfig.pricePerItem)}/item)
+    <div className="min-h-screen bg-[#F0F4F9] flex flex-col md:flex-row">
+      {/* REUSABLE SIDEBAR NAVIGATION */}
+      <SidebarNavigation
+        activeView={activeView}
+        onSelectView={(v) => setActiveView(v)}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        isCollapsedDesktop={isDesktopSidebarCollapsed}
+        onToggleCollapseDesktop={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+        profile={profile}
+        ratePerItem={currentTierConfig.pricePerItem}
+        isEmailVisible={isEmailVisible}
+        onToggleEmailVisible={() => setIsEmailVisible(!isEmailVisible)}
+        onLogout={onLogout}
+      />
+
+      {/* MAIN LAYOUT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* 1. TOP HEADER */}
+        <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+          <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+            {/* Left: Worker avatar + Brand Identity */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="relative rounded-full focus:outline-none ring-2 ring-blue-500/20 active:scale-95 transition-transform"
+                title="Buka Profil / Menu"
+              >
+                <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-xs">
+                  {profile.name?.charAt(0).toUpperCase() || "W"}
+                </div>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+              </button>
+
+              <div>
+                <h1 className="font-black text-slate-900 text-sm tracking-tight flex items-center gap-1.5 leading-tight">
+                  GMAIL JOB ID
+                </h1>
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">
+                  Worker Portal
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Actions (Notification Bell + Menu/Profile action) */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveView("announcements")}
+                className="relative p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                title="Pengumuman / Notifikasi"
+              >
+                <Bell className="w-5 h-5" />
+                {announcements.data.length > 0 && (
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                title="Buka Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-4 pb-24 md:pb-8 space-y-4">
+          {/* SUB-PAGE TOP NAVIGATION BAR (Show on dedicated sub-views) */}
+          {activeView !== "home" && (
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveView("home")}
+                className="gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50 px-2.5 h-8 rounded-xl"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-600" />
+                <span>Kembali ke Home</span>
+              </Button>
+              <Badge variant="outline" className="text-[11px] bg-white text-slate-800 border-slate-200 font-bold px-2.5 py-0.5 shadow-2xs">
+                {getViewTitle(activeView)}
               </Badge>
             </div>
-            <p className="text-xs text-gray-500">{profile.email}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[11px] text-gray-400 uppercase tracking-wide">Saldo</p>
-              <p className="font-bold text-amber-700">{formatMoney(profile.balance)}</p>
-            </div>
-            <Button variant="outline" size="icon" onClick={onLogout} title="Keluar">
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+          )}
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {/* JAM OPERASIONAL CARD */}
-        <Card className="bg-white border-gray-200">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-600" />
-                🕐 Jam Operasional
-              </CardTitle>
-              {operatingStatus.isDisabled ? (
-                <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300 font-medium text-xs">
-                  {operatingStatus.statusText}
-                </Badge>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className={
-                    operatingStatus.isOpen
-                      ? "bg-green-50 text-green-800 border-green-300 font-semibold text-xs"
-                      : "bg-red-50 text-red-800 border-red-300 font-semibold text-xs"
-                  }
-                >
-                  {operatingStatus.statusText}
-                </Badge>
-              )}
-            </div>
-            <CardDescription className="text-xs">
-              Jadwal jam operasional layanan (WIB - Asia/Jakarta).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              {[
-                { key: "monday" as const, label: "Senin" },
-                { key: "tuesday" as const, label: "Selasa" },
-                { key: "wednesday" as const, label: "Rabu" },
-                { key: "thursday" as const, label: "Kamis" },
-                { key: "friday" as const, label: "Jumat" },
-                { key: "saturday" as const, label: "Sabtu" },
-                { key: "sunday" as const, label: "Minggu" },
-              ].map((d) => {
-                const dayCfg = operatingHoursConfig?.days?.[d.key];
-                const isDayActive = dayCfg?.enabled;
-                const scheduleText = isDayActive ? `${dayCfg.open} - ${dayCfg.close}` : "Tutup";
-
-                return (
-                  <div
-                    key={d.key}
-                    className="flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-100"
-                  >
-                    <span className="font-semibold text-gray-700">{d.label}</span>
-                    <span className={isDayActive ? "font-mono font-medium text-gray-900" : "font-medium text-red-600"}>
-                      {scheduleText}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {isSupportEnabled && (
-          <Card className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-blue-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 text-blue-900">
-                <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
-                {supportConfig.title || "Pusat Bantuan"}
-              </CardTitle>
-              <CardDescription className="text-xs text-blue-800/90 whitespace-pre-wrap">
-                {supportConfig.description || "Ada kendala saat menggunakan platform? Hubungi Customer Service kami melalui Telegram."}
-              </CardDescription>
-            </CardHeader>
-            {supportConfig.telegramUrl ? (
-              <CardContent className="pt-1">
-                <Button
-                  asChild
-                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2 text-xs h-9 font-medium"
-                >
-                  <a
-                    href={supportConfig.telegramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Hubungi CS Telegram
-                  </a>
-                </Button>
-              </CardContent>
-            ) : null}
-          </Card>
-        )}
-
-        <Tabs defaultValue="submit">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full h-auto p-1 mb-6">
-            <TabsTrigger value="submit" className="gap-1.5 text-xs py-2">
-              <Send className="w-3.5 h-3.5" /> STORAN EMAIL
-            </TabsTrigger>
-            <TabsTrigger value="withdraw" className="gap-1.5 text-xs py-2">
-              <Wallet className="w-3.5 h-3.5" /> PENARIKAN
-            </TabsTrigger>
-            <TabsTrigger value="referral" className="gap-1.5 text-xs py-2">
-              <Users className="w-3.5 h-3.5" /> REFERRAL
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-1.5 text-xs py-2">
-              <History className="w-3.5 h-3.5" /> RIWAYAT STORAN EMAIL
-            </TabsTrigger>
-          </TabsList>
-
-          {/* SETOR EMAIL (BATCH) */}
-          <TabsContent value="submit" className="space-y-4">
-            {/* TIER CONFIGURATION LIST FOR WORKER */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Award className="w-4 h-4 text-amber-600" />
-                    Daftar Tier & Harga Setor
-                  </CardTitle>
-                  <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
-                    Tier Anda Saat Ini: {currentTierConfig.name}
-                  </Badge>
+          {/* ==================== HOME VIEW ==================== */}
+          {activeView === "home" && (
+            <div className="space-y-4">
+              {/* 2. GREETING SECTION */}
+              <section className="flex items-center justify-between gap-3 pt-1">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    Hallo, {displayName} 👋
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Selamat datang kembali! Siap menyetor email hari ini?
+                  </p>
                 </div>
-                <CardDescription className="text-xs">
-                  Semakin banyak email yang Anda setor dan disetujui, semakin tinggi tier dan harga per akun.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {(rules.data.tiers && rules.data.tiers.length > 0 ? rules.data.tiers : [currentTierConfig]).map((t) => {
-                    const isCurrentTier = Number(t.tier) === Number(currentTierConfig.tier);
-                    const qtyText = t.maxQty >= 99999 ? `${t.minQty}+ akun` : `${t.minQty}–${t.maxQty} akun`;
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs px-2.5 py-1 rounded-full shrink-0">
+                  Rate: {formatMoney(currentTierConfig.pricePerItem)} / email
+                </Badge>
+              </section>
 
-                    return (
-                      <div
-                        key={t.tier}
-                        className={`p-3 rounded-lg border text-center transition-all ${
-                          isCurrentTier
-                            ? "bg-amber-50 border-amber-400 ring-2 ring-amber-400/30 shadow-sm"
-                            : "bg-gray-50 border-gray-200 text-gray-700"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-1.5 mb-1">
-                          <span className="font-bold text-sm text-gray-900">{t.name}</span>
-                          {isCurrentTier && (
-                            <Badge className="bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 font-semibold">
-                              Aktif
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 font-medium mb-1">{qtyText}</p>
-                        <p className="text-sm font-extrabold text-amber-700">
-                          {formatMoney(t.pricePerItem)} <span className="text-[11px] font-normal text-gray-500">/ akun</span>
+              {/* 3. BALANCE CARD */}
+              <Card className="bg-blue-600 text-white border-0 shadow-md rounded-[20px] overflow-hidden">
+                <CardContent className="p-4 sm:p-5 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-blue-100 font-medium flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" />
+                        Saldo Utama
+                      </p>
+                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                        {formatMoney(profile.balance)}
+                      </p>
+                    </div>
+                    <Badge className="bg-blue-700/80 text-blue-100 border-0 font-medium text-xs px-2.5 py-0.5 rounded-full">
+                      Total Setoran ACC: {profile.accCount ?? 0} Email
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5 pt-1">
+                    <Button
+                      type="button"
+                      onClick={() => setActiveView("withdraw")}
+                      className="bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs h-10 rounded-xl shadow-xs gap-1.5 transition-all active:scale-95"
+                    >
+                      <Wallet className="w-4 h-4 text-blue-600" />
+                      Tarik Saldo
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setActiveView("submit")}
+                      className="bg-blue-700/60 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl border border-blue-400/30 gap-1.5 transition-all active:scale-95"
+                    >
+                      <PlusCircle className="w-4 h-4 text-blue-200" />
+                      Setor Email
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. LAYANAN CEPAT (4-COLUMN SERVICE GRID) */}
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between px-0.5">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    Layanan Cepat
+                  </h3>
+                  <span className="text-xs text-slate-400 font-medium">Pilih Menu</span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      id: "submit" as DashboardView,
+                      label: "Job Gmail",
+                      icon: <Send className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "checker" as DashboardView,
+                      label: "Screening Email",
+                      icon: <SearchCheck className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "leaderboard" as DashboardView,
+                      label: "Klasemen",
+                      icon: <Trophy className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "referral" as DashboardView,
+                      label: "Referral",
+                      icon: <Users className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "withdraw" as DashboardView,
+                      label: "Tarik Saldo",
+                      icon: <Wallet className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "history" as DashboardView,
+                      label: "Riwayat",
+                      icon: <History className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "cs" as DashboardView,
+                      label: "Bantuan CS",
+                      icon: <HelpCircle className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      id: "announcements" as DashboardView,
+                      label: "Info Resmi",
+                      icon: <Megaphone className="w-5 h-5 text-blue-600" />,
+                    },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveView(item.id)}
+                      className="bg-white border border-slate-200/80 rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-xs hover:border-blue-300 hover:shadow-sm transition-all active:scale-95 group cursor-pointer min-h-[82px]"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-1.5 group-hover:bg-blue-100 transition-colors">
+                        {item.icon}
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-800 leading-tight group-hover:text-blue-600">
+                        {item.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* 5. OPERATIONAL HOURS */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900">Jam Operasional Layanan</h4>
+                    </div>
+
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      operatingStatus.isOpen
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${operatingStatus.isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                      {operatingStatus.statusText}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500 leading-relaxed pl-10">
+                    Layanan setoran & verifikasi diproses sesuai jadwal operasional WIB (Asia/Jakarta).
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* 6. OFFICIAL ANNOUNCEMENT */}
+              {announcements.data.length > 0 && (
+                <Card
+                  onClick={() => setActiveView("announcements")}
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer"
+                >
+                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Megaphone className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                          INFO RESMI TERBARU
+                        </p>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {announcements.data[0].title}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {announcements.data[0].content}
                         </p>
                       </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* ==================== 2. JOB GMAIL / SETOR EMAIL VIEW ==================== */}
+          {activeView === "submit" && (
+            <div className="space-y-5">
+              {/* 1. PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Setor Email
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Setor akun Gmail Anda untuk diproses dan dapatkan komisi saldo.
+                  </p>
+                </div>
+              </div>
+
+              {/* OPERATIONAL CLOSED WARNING BANNER */}
+              {isSubmissionClosed && (
+                <Card className="bg-rose-50 border-rose-200 shadow-xs rounded-2xl">
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
+                      <AlertCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-rose-900 text-xs sm:text-sm">Pemberitahuan Setoran Ditutup</h4>
+                      <p className="text-[11px] text-rose-800 font-medium leading-relaxed mt-0.5">
+                        Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* RESPONSIVE LAYOUT: 2-COLUMNS ON DESKTOP, 1-COLUMN ON MOBILE */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* LEFT COLUMN (lg:col-span-7): FORM & BATCH PREVIEW */}
+                <div className="lg:col-span-7 space-y-4">
+                  {/* EMAIL SUBMISSION FORM CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Send className="w-4 h-4 text-blue-600" />
+                            Detail Batch Setoran
+                          </CardTitle>
+                          <CardDescription className="text-xs text-slate-500">
+                            Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                          Batch Mode
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleSubmitEmails} className="space-y-4">
+                        <fieldset disabled={isSubmissionClosed} className="space-y-4 disabled:opacity-60 disabled:pointer-events-none">
+                          {/* Email Textarea */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="emails" className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                              <span>Daftar Alamat Email ({emailList.length} item)</span>
+                              {emailsText.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailsText("")}
+                                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                                >
+                                  Bersihkan
+                                </button>
+                              )}
+                            </Label>
+                            <Textarea
+                              id="emails"
+                              rows={6}
+                              value={emailsText}
+                              onChange={(e) => setEmailsText(e.target.value)}
+                              placeholder={"item1@gmail.com\nitem2@gmail.com\nitem3@gmail.com"}
+                              className="font-mono text-xs sm:text-sm border-slate-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl bg-slate-50/50 p-3"
+                              required
+                            />
+                            <p className="text-[11px] text-slate-500">
+                              Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch setoran.
+                            </p>
+                          </div>
+
+                          {/* Password Input */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="password" className="text-xs font-bold text-slate-800 block">
+                              Kata Sandi Akun
+                            </Label>
+                            <Input
+                              id="password"
+                              type="password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="Kata sandi untuk seluruh email di atas"
+                              className="border-slate-200 focus-visible:ring-blue-500 rounded-xl h-11 text-xs sm:text-sm min-h-[44px]"
+                              required
+                            />
+                          </div>
+
+                          {/* BATCH PREVIEW ITEM CARDS (If emailList.length > 0) */}
+                          {emailList.length > 0 && (
+                            <div className="space-y-2 pt-1">
+                              <Label className="text-xs font-bold text-slate-800 block">
+                                Pratinjau Item Setoran ({emailList.length} Email)
+                              </Label>
+                              <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                                {emailList.map((emailItem, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2.5 rounded-lg bg-white border border-slate-200/80 text-xs font-mono flex items-center justify-between gap-2 shadow-2xs"
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="text-slate-900 truncate font-semibold">{emailItem}</span>
+                                    </div>
+                                    <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 font-bold">
+                                      Valid Format
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SUBMISSION SUMMARY */}
+                          <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between text-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-slate-600 font-medium block">Estimasi Total Setoran</span>
+                              <strong className="text-slate-900 font-bold">
+                                {emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}
+                              </strong>
+                            </div>
+                            <span className="font-black text-blue-600 text-sm sm:text-base">
+                              {formatMoney(emailList.length * currentTierConfig.pricePerItem)}
+                            </span>
+                          </div>
+                        </fieldset>
+
+                        {/* MAIN SUBMIT BUTTON */}
+                        <Button
+                          type="submit"
+                          disabled={submitting || isSubmissionClosed}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm h-11 min-h-[44px] rounded-xl shadow-xs gap-2 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {submitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          <span>
+                            {isSubmissionClosed
+                              ? "Setoran Sedang Ditutup"
+                              : `Setor Email (${emailList.length} Item)`}
+                          </span>
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* RIGHT COLUMN (lg:col-span-5): RATE CARD, SCREENING NOTICE, RULES CARD */}
+                <div className="lg:col-span-5 space-y-4">
+                  {/* RATE / EARNING CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-blue-600" />
+                          Informasi Rate Harga Setor
+                        </CardTitle>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
+                          RATE AKTIF
+                        </Badge>
+                      </div>
+                      <CardDescription className="text-xs text-slate-500">
+                        Harga komisi per akun valid ditentukan secara transparan.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50 text-center space-y-1">
+                        <p className="text-xs text-slate-500 font-medium flex items-center justify-center gap-1">
+                          <Tag className="w-3.5 h-3.5 text-blue-600" />
+                          Rate Akun Valid
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
+                          {formatMoney(currentTierConfig.pricePerItem)} <span className="text-xs sm:text-sm font-semibold text-slate-500">/ akun valid</span>
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed text-center">
+                        Komisi dikreditkan ke Saldo Utama secara otomatis setelah email selesai diverifikasi & disetujui ACC oleh Admin.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* SCREENING EMAIL NOTICE */}
+                  <Card
+                    onClick={() => setActiveView("checker")}
+                    className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer group"
+                  >
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                          <SearchCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            Screening Email
+                          </p>
+                          <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                            Gunakan Screening Email sebelum setor untuk mengecek email berdasarkan aturan sistem.
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </CardContent>
+                  </Card>
+
+                  {/* SUBMISSION RULES CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-blue-600" />
+                        Aturan Setor Email
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <ul className="space-y-1.5 text-xs text-slate-600 list-disc list-inside leading-relaxed">
+                        {rules.data.submissionNotes.map((note, idx) => (
+                          <li key={idx} className="whitespace-pre-wrap">{note}</li>
+                        ))}
+                        <li>Harga komisi aktif saat ini: <strong className="text-slate-900 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== 3. CHECKER EMAIL VIEW ==================== */}
+          {activeView === "checker" && (
+            <div className="space-y-4">
+              <EmailChecker isAdminView={false} />
+            </div>
+          )}
+
+          {/* ==================== 4. LEADERBOARD / KLASEMEN VIEW ==================== */}
+          {activeView === "leaderboard" && (
+            <div className="space-y-4">
+              <Leaderboard
+                currentUserId={profile.uid}
+                rewards={rules.data.leaderboardRewards}
+              />
+            </div>
+          )}
+
+          {/* ==================== 5. REFERRAL VIEW ==================== */}
+          {activeView === "referral" && (
+            <div className="space-y-4">
+              {/* 1. REFERRAL HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Referral
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Ajak teman dan dapatkan komisi dari aktivitas mereka.
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. REFERRAL SUMMARY CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-900">Referral Anda</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">Ajak teman untuk bergabung</CardDescription>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
+                      Rate: {formatMoney(rules.data.referralCommissionPerAcc || 100)} / ACC
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        Total Downline
+                        <Users className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-extrabold text-slate-900">
+                        {downlines.data.length || refStats.total} <span className="text-xs font-semibold text-slate-500">Worker</span>
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        Total ACC
+                        <Award className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-extrabold text-slate-900">
+                        {profile.teamAccCount ?? refStats.totalTeamAcc ?? 0} <span className="text-xs font-semibold text-slate-500">Email</span>
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 space-y-1">
+                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center justify-between">
+                        Total Komisi
+                        <Coins className="w-3.5 h-3.5 text-blue-600" />
+                      </p>
+                      <p className="text-xl font-black text-blue-600">
+                        {formatMoney(profile.totalReferralEarned ?? refStats.earnings ?? 0)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 3. REFERRAL LINK / CODE CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-blue-600" />
+                    Link Referral Anda
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Tautan Pendaftaran</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={referralLink}
+                        className="font-mono text-xs bg-slate-50 border-slate-200 text-slate-800 rounded-xl min-h-[44px]"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleCopyReferralLink}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 font-bold text-xs h-10 px-3.5 rounded-xl gap-1.5 min-h-[44px] active:scale-95 transition-transform"
+                      >
+                        {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedLink ? "Tersalin" : "Salin Link"}</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Kode Referral</Label>
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="font-mono font-bold text-slate-900 text-sm pl-1">
+                        {profile.uid}
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={handleCopyReferralCode}
+                        variant="outline"
+                        className="bg-white text-blue-700 border-blue-200 hover:bg-blue-50 font-bold text-xs h-9 px-3 rounded-xl gap-1.5 min-h-[36px]"
+                      >
+                        {copiedCode ? <Check className="w-3.5 h-3.5 text-blue-600" /> : <Copy className="w-3.5 h-3.5 text-blue-600" />}
+                        <span>{copiedCode ? "Tersalin" : "Salin Kode"}</span>
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. INVITATION CODE CLAIM CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-600" />
+                    Masukkan Kode Undangan
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isAlreadyLinked ? (
+                    <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-xs text-blue-900 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>
+                        Akun kamu sudah terhubung dengan upline: <strong className="font-bold">{referrerDisplayName || "Rekan"}</strong>
+                      </span>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleClaimInvitationCode} className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          value={invitationCodeInput}
+                          onChange={(e) => setInvitationCodeInput(e.target.value)}
+                          placeholder="Kode Undangan Teman / Upline"
+                          className="font-mono text-xs bg-slate-50 border-slate-200 rounded-xl text-slate-900 h-10 min-h-[44px]"
+                          disabled={claimingCode}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={claimingCode || !invitationCodeInput.trim()}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl h-10 px-4 shrink-0 min-h-[44px] active:scale-95 transition-transform"
+                        >
+                          {claimingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : "Klaim Kode"}
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Hubungkan akun ke upline untuk saling mendapatkan statistik tim referral.
+                      </p>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 5. REFERRAL REWARD / PASSIVE INCOME INFO */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-blue-600" />
+                      Komisi Passive Income
+                    </CardTitle>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                      {formatMoney(rules.data.referralCommissionPerAcc || 100)} / 1 ACC
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-700 leading-relaxed space-y-1">
+                    <p className="font-bold text-blue-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      Skema Komisi Passive Income
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      Anda mendapatkan komisi <strong className="text-blue-700">{formatMoney(rules.data.referralCommissionPerAcc || 100)}</strong> untuk setiap email ACC yang dicapai oleh downline Anda.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 6. DAFTAR TIM DOWNLINE */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      Daftar Tim Downline ({downlines.data.length})
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-bold bg-slate-50 border-slate-200 text-slate-700">
+                      {downlines.data.length} Orang
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {downlines.loading ? (
+                    <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Memuat data downline...</span>
+                    </div>
+                  ) : downlines.data.length === 0 ? (
+                    <div className="p-6 border border-dashed border-slate-200 rounded-2xl text-center space-y-1.5 bg-slate-50/50">
+                      <Users className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-800">Belum Ada Downline Terdaftar</p>
+                      <p className="text-[11px] text-slate-500">
+                        Bagikan link referral Anda untuk mulai membangun tim dan mengumpulkan komisi pasif income.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mobile View: Compact Cards */}
+                      <div className="space-y-2.5 md:hidden">
+                        {downlines.data.map((dw) => {
+                          const dwAcc = dw.accCount ?? 0;
+                          const commRate = rules.data.referralCommissionPerAcc ?? 100;
+                          const totalComm = dwAcc * commRate;
+
+                          return (
+                            <div
+                              key={dw.uid}
+                              className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-900">{dw.name || "Worker"}</span>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                                  {dwAcc} ACC
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100 text-slate-500">
+                                <span>Bergabung: <strong className="text-slate-700 font-mono">{formatDateTime(dw.createdAt)}</strong></span>
+                                <span className="font-bold text-blue-600">{formatMoney(totalComm)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Desktop View: Table */}
+                      <div className="hidden md:block border border-slate-200/80 rounded-xl overflow-hidden bg-white">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                            <tr>
+                              <th className="px-3 py-2.5">Worker</th>
+                              <th className="px-3 py-2.5">Bergabung</th>
+                              <th className="px-3 py-2.5 text-center">ACC</th>
+                              <th className="px-3 py-2.5 text-right">Komisi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {downlines.data.map((dw) => {
+                              const dwAcc = dw.accCount ?? 0;
+                              const commRate = rules.data.referralCommissionPerAcc ?? 100;
+                              const totalComm = dwAcc * commRate;
+
+                              return (
+                                <tr key={dw.uid} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="px-3 py-2.5 font-bold text-slate-900">
+                                    {dw.name || "Worker"}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">
+                                    {formatDateTime(dw.createdAt)}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-center">
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
+                                      {dwAcc} ACC
+                                    </Badge>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right font-bold text-blue-600">
+                                    {formatMoney(totalComm)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 7. RIWAYAT KOMISI REFERRAL */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-blue-600" />
+                      Riwayat Log Komisi Referral ({referralTxs.data.length})
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-bold bg-slate-50 border-slate-200 text-slate-700">
+                      Log Transaksi
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {referralTxs.loading ? (
+                    <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Memuat riwayat...</span>
+                    </div>
+                  ) : referralTxs.data.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                      Belum ada riwayat transaksi komisi.
+                    </p>
+                  ) : (
+                    <>
+                      {/* Mobile View: Compact Transaction Cards */}
+                      <div className="space-y-2.5 md:hidden">
+                        {referralTxs.data.map((tx) => (
+                          <div
+                            key={tx.id}
+                            className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-slate-900">
+                                {tx.downlineName || shortId(tx.downlineId)}
+                              </span>
+                              <span className="font-black text-xs text-emerald-600">
+                                +{formatMoney(tx.totalCommission)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                              <span className="font-mono">{formatDateTime(tx.createdAt)}</span>
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                                {tx.accCount} ACC
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop View: Table */}
+                      <div className="hidden md:block border border-slate-200/80 rounded-xl overflow-hidden bg-white">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                            <tr>
+                              <th className="px-3 py-2.5">Waktu</th>
+                              <th className="px-3 py-2.5">Downline</th>
+                              <th className="px-3 py-2.5 text-center">ACC</th>
+                              <th className="px-3 py-2.5 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {referralTxs.data.map((tx) => (
+                              <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-3 py-2.5 font-mono text-slate-500 text-[11px]">
+                                  {formatDateTime(tx.createdAt)}
+                                </td>
+                                <td className="px-3 py-2.5 font-bold text-slate-900">
+                                  {tx.downlineName || shortId(tx.downlineId)}
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold text-slate-700">
+                                  {tx.accCount}
+                                </td>
+                                <td className="px-3 py-2.5 text-right font-black text-emerald-600">
+                                  +{formatMoney(tx.totalCommission)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ==================== 6. WITHDRAW / TARIK SALDO VIEW ==================== */}
+          {activeView === "withdraw" && (
+            <div className="space-y-5">
+              {/* 1. PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Tarik Saldo
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Tarik saldo Anda ke E-Wallet atau rekening bank.
+                  </p>
+                </div>
+              </div>
+
+              {/* DESKTOP 2-COLUMN LAYOUT / MOBILE 1-COLUMN */}
+              <form onSubmit={handleWithdraw}>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                  {/* LEFT COLUMN: Payment Method, Amount, Recipient Details */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {/* 3. PAYMENT METHOD SECTION */}
+                    <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 text-blue-600" />
+                            Metode Pembayaran
+                          </CardTitle>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              activeMethodConfig.feeType === "free" || activeMethodConfig.feeValue <= 0
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            }`}
+                          >
+                            {currentFeeBadgeText}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* Category Tabs */}
+                        <div className="inline-flex p-1 bg-slate-100 border border-slate-200 rounded-xl gap-1 text-xs font-medium w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectCategory("ewallet")}
+                            className={`flex-1 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                              categoryTab === "ewallet"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                            }`}
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            E-Wallet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectCategory("bank")}
+                            className={`flex-1 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                              categoryTab === "bank"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                            }`}
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            Transfer Bank
+                          </button>
+                        </div>
+
+                        {/* Payment Method Cards Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                          {visibleMethods.map((m) => {
+                            const isSelected = method === m.method;
+                            const feeBadge = formatFeeBadge(m);
+                            const isEWallet = isEWalletMethod(m);
+
+                            return (
+                              <button
+                                key={m.method}
+                                type="button"
+                                onClick={() => setMethod(m.method)}
+                                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 select-none min-h-[68px] ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50/50 ring-2 ring-blue-500/20 shadow-2xs"
+                                    : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-slate-50/50"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1 w-full">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {isEWallet ? (
+                                      <Smartphone className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-blue-600" : "text-slate-400"}`} />
+                                    ) : (
+                                      <Building2 className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-blue-600" : "text-slate-400"}`} />
+                                    )}
+                                    <span className="font-bold text-xs text-slate-900 truncate">{m.method}</span>
+                                  </div>
+                                  {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
+                                </div>
+
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[9px] w-fit font-semibold px-1.5 py-0 rounded-md ${
+                                    m.feeType === "free" || m.feeValue <= 0
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      : "bg-blue-50 text-blue-700 border border-blue-100"
+                                  }`}
+                                >
+                                  {feeBadge}
+                                </Badge>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* 4. WITHDRAWAL AMOUNT & 5. RECIPIENT DETAILS CARD */}
+                    <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                      <CardContent className="p-4 sm:p-5 space-y-4">
+                        {/* 4. WITHDRAWAL AMOUNT */}
+                        <div className="space-y-2">
+                          <Label htmlFor="amount" className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                            <span>Nominal Penarikan</span>
+                            <span className="text-[11px] font-normal text-slate-500">
+                              Min: {formatMoney(activeWithdrawalSettings.minWithdraw)}
+                            </span>
+                          </Label>
+
+                          <FormattedNumberInput
+                            id="amount"
+                            value={amount}
+                            onChange={(val) => setAmount(val)}
+                            placeholder="Contoh: 100.000"
+                            className="font-mono text-sm font-semibold h-11 border-slate-200 focus-visible:ring-blue-500 rounded-xl"
+                            required
+                          />
+
+                          {/* Quick Amount Chips */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[
+                              { label: "Max Saldo", value: profile.balance },
+                              { label: "Rp25.000", value: 25000 },
+                              { label: "Rp50.000", value: 50000 },
+                              { label: "Rp100.000", value: 100000 },
+                              { label: "Rp250.000", value: 250000 },
+                            ].map((chip, idx) => (
+                              <Button
+                                key={idx}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAmount(chip.value)}
+                                className={`text-xs h-8 px-3 rounded-xl min-h-[36px] font-semibold transition-all ${
+                                  amount === chip.value
+                                    ? "bg-blue-600 text-white border-blue-600 font-bold shadow-2xs"
+                                    : "bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border-slate-200"
+                                }`}
+                              >
+                                {chip.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 5. RECIPIENT DETAILS */}
+                        <div className="pt-3 border-t border-slate-100 space-y-3">
+                          <Label className="text-xs font-bold text-slate-800 block">
+                            Detail Akun Penerima
+                          </Label>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label htmlFor="account" className="text-[11px] text-slate-600 font-semibold">
+                                Nomor HP / Rekening ({method})
+                              </Label>
+                              <Input
+                                id="account"
+                                value={account}
+                                onChange={(e) => setAccount(e.target.value)}
+                                placeholder={`Nomor HP / Rekening ${method}`}
+                                className="border-slate-200 focus-visible:ring-blue-500 rounded-xl h-10 text-xs sm:text-sm min-h-[44px]"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="accountHolderName" className="text-[11px] text-slate-600 font-semibold">
+                                Atas Nama Pemilik
+                              </Label>
+                              <Input
+                                id="accountHolderName"
+                                value={accountHolderName}
+                                onChange={(e) => setAccountHolderName(e.target.value)}
+                                placeholder="Nama sesuai rekening / wallet"
+                                className="border-slate-200 focus-visible:ring-blue-500 rounded-xl h-10 text-xs sm:text-sm min-h-[44px]"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* RIGHT COLUMN: Balance Card, Summary Card, Submit Button, Bonus Referral link */}
+                  <div className="lg:col-span-5 space-y-4">
+                    {/* 2. BALANCE CARD */}
+                    <Card className="bg-blue-600 text-white border-0 shadow-md rounded-[20px] overflow-hidden">
+                      <CardContent className="p-4 sm:p-5 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs text-blue-100 font-medium flex items-center gap-1">
+                              <Wallet className="w-3.5 h-3.5 text-blue-200" />
+                              Saldo Tersedia
+                            </p>
+                            <p className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                              {formatMoney(profile.balance)}
+                            </p>
+                          </div>
+                          <Badge className="bg-blue-700/80 text-blue-100 border-0 font-medium text-[11px] px-2.5 py-0.5 rounded-full">
+                            Batas Penarikan
+                          </Badge>
+                        </div>
+
+                        <div className="pt-2 border-t border-blue-500/50 flex items-center justify-between text-xs text-blue-100">
+                          <span>Min: <strong className="text-white font-bold">{formatMoney(activeWithdrawalSettings.minWithdraw)}</strong></span>
+                          <span>Max: <strong className="text-white font-bold">{formatMoney(activeWithdrawalSettings.maxWithdraw)}</strong></span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* 6. WITHDRAWAL SUMMARY CARD & 7. SUBMIT BUTTON */}
+                    <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold text-slate-900">
+                          Rincian Penarikan
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-5 pt-0 space-y-4">
+                        <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-slate-600">
+                            <span>Nominal Penarikan</span>
+                            <span className="font-bold text-slate-900">{formatMoney(amount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-slate-600">
+                            <span>Biaya Admin ({activeMethodConfig.method})</span>
+                            <span className={calculatedFee > 0 ? "font-bold text-blue-700" : "font-bold text-emerald-700"}>
+                              {calculatedFee > 0 ? `- ${formatMoney(calculatedFee)}` : "Rp 0 (Free)"}
+                            </span>
+                          </div>
+                          <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                            <span className="font-bold text-slate-900">Net Saldo Diterima</span>
+                            <span className="font-black text-emerald-600 text-sm">{formatMoney(calculatedNet)}</span>
+                          </div>
+                        </div>
+
+                        {/* 7. SUBMIT BUTTON */}
+                        <Button
+                          type="submit"
+                          disabled={withdrawing}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm h-11 min-h-[44px] rounded-xl shadow-xs gap-2 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {withdrawing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Wallet className="w-4 h-4" />
+                          )}
+                          <span>Ajukan Penarikan ({formatMoney(calculatedNet)})</span>
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* 8. BONUS REFERRAL SHORTCUT CARD */}
+                    <Card
+                      onClick={() => setActiveView("referral")}
+                      className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer group"
+                    >
+                      <CardContent className="p-3.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                              Butuh Tambahan Saldo?
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Ajak teman & dapatkan komisi referral pasif income.
+                            </p>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </form>
+
+              {/* TRANSACTION HISTORY TABLE / CARDS */}
+              <TransactionHistory
+                transactions={transactionHistory}
+                loading={withdrawals.loading || engagement.rewardLedger.loading}
+              />
+            </div>
+          )}
+
+          {/* ==================== 7. RIWAYAT JOB / SETORAN VIEW ==================== */}
+          {activeView === "history" && (
+            <div className="space-y-4">
+              <SubmissionHistory
+                submissions={submissions.data}
+                loading={submissions.loading}
+                rules={rules.data}
+                userTier={profile.tier}
+                onViewDetail={setDetailSubmission}
+                onGoToSubmit={() => setActiveView("submit")}
+              />
+            </div>
+          )}
+
+          {/* ==================== 8. BANTUAN CS VIEW ==================== */}
+          {activeView === "cs" && (
+            <div className="space-y-4">
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Bantuan CS
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Hubungi CS jika membutuhkan bantuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* SUPPORT CHANNELS CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-blue-600" />
+                    Pusat Bantuan & Layanan Pelanggan
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Hubungi customer service kami jika mengalami kendala setoran, pembayaran, atau pertanyaan lainnya.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* CS TELEGRAM CARD */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-900 shadow-2xs flex flex-col justify-between space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                            <TelegramIcon className="w-4 h-4" />
+                          </div>
+                          <span className="font-extrabold text-sm text-slate-900">CS Telegram</span>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          Layanan cepat penanganan kendala akun, email setoran, dan status payout saldo.
+                        </p>
+                      </div>
+                      {supportConfig.telegramUrl ? (
+                        <Button
+                          asChild
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl min-h-[44px] shadow-xs active:scale-95 transition-transform"
+                        >
+                          <a
+                            href={supportConfig.telegramUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5"
+                          >
+                            <TelegramIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>Hubungi CS Telegram</span>
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button disabled variant="outline" className="w-full text-xs h-10 rounded-xl bg-slate-50 text-slate-400 border-slate-200">
+                          Belum Diatur
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* KOMUNITAS WHATSAPP CARD */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/80 text-slate-900 shadow-2xs flex flex-col justify-between space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                            <MessageCircle className="w-4 h-4" />
+                          </div>
+                          <span className="font-extrabold text-sm text-slate-900">Komunitas WhatsApp</span>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          Saluran resmi informasi worker, update jam operasional, dan diskusi komunitas.
+                        </p>
+                      </div>
+                      {supportConfig.communityWaLink ? (
+                        <Button
+                          asChild
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl min-h-[44px] shadow-xs active:scale-95 transition-transform"
+                        >
+                          <a
+                            href={supportConfig.communityWaLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Gabung Komunitas WA</span>
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button disabled variant="outline" className="w-full text-xs h-10 rounded-xl bg-slate-50 text-slate-400 border-slate-200">
+                          Belum Diatur
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* LIVE CHAT DIRECT SHORTCUT CARD */}
+              <Card
+                onClick={() => setActiveView("chat")}
+                className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer group"
+              >
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        Live Chat 1-on-1 dengan Admin
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                        Kirim pesan langsung ke Admin untuk bantuan privat real-time.
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ==================== 10. PESAN ADMIN / LIVE CHAT VIEW ==================== */}
+          {activeView === "chat" && (
+            <div className="space-y-4">
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Bantuan CS
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Hubungi CS jika membutuhkan bantuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* CHAT CONTAINER CARD */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs flex flex-col h-[650px] max-h-[80vh] overflow-hidden">
+                {/* CHAT HEADER */}
+                <CardHeader className="p-3.5 sm:p-4 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                        <MessageSquare className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>Chat Resmi Admin / CS</span>
+                        </CardTitle>
+                        <CardDescription className="text-[11px] text-slate-500 font-medium">
+                          Saluran percakapan privat 1-on-1 langsung dengan Admin.
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-bold hidden sm:inline-flex">
+                      Privat & Aman
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                {/* MESSAGES BODY */}
+                <CardContent className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 bg-slate-50/50">
+                  {workerMessagesData.loading ? (
+                    <div className="flex items-center justify-center py-12 text-xs text-slate-500 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Memuat pesan chat...</span>
+                    </div>
+                  ) : workerMessagesData.messages.length === 0 ? (
+                    <div className="p-6 sm:p-8 text-center border border-dashed border-slate-200/80 rounded-2xl bg-white space-y-2 shadow-2xs my-auto">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto">
+                        <MessageCircle className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">Belum Ada Percakapan</p>
+                      <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
+                        Kirim pesan di bawah untuk menghubungi CS / Admin. Kami siap membantu kendala akun, setoran email, atau pencairan saldo Anda.
+                      </p>
+                    </div>
+                  ) : (
+                    workerMessagesData.messages
+                      .filter((msg) => !(Array.isArray(msg.deletedFor) && msg.deletedFor.includes(profile.uid)))
+                      .map((msg) => {
+                        const isMe = msg.senderRole === "worker";
+                        const isRead = !!msg.readAt;
+
+                        // Check if deleted for all
+                        const isDeleted = !!msg.deletedAt;
+
+                        // Check if expired
+                        const nowMs = Date.now();
+                        const expiresMs = msg.expiresAt && typeof msg.expiresAt === "object" && "toMillis" in msg.expiresAt
+                          ? msg.expiresAt.toMillis()
+                          : msg.expiresAt ? new Date(msg.expiresAt).getTime() : null;
+                        const isExpired = expiresMs ? expiresMs <= nowMs : false;
+
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex flex-col group ${isMe ? "items-end" : "items-start"}`}
+                          >
+                            <div
+                              className={`max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl text-xs space-y-1 shadow-2xs relative ${
+                                isMe
+                                  ? "bg-blue-600 text-white rounded-br-xs"
+                                  : "bg-white border border-slate-200/80 text-slate-900 rounded-bl-xs"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2 text-[10px] font-semibold mb-0.5 opacity-90">
+                                <span>{isMe ? "Saya" : "Admin / CS"}</span>
+                                {!isDeleted && !isExpired && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteChatModalMsg(msg)}
+                                    className={`opacity-0 group-hover:opacity-100 p-0.5 transition-opacity ${
+                                      isMe ? "hover:text-blue-200 text-white" : "hover:text-blue-600 text-slate-400"
+                                    }`}
+                                    title="Opsi Pesan"
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {isDeleted ? (
+                                <p className={`italic flex items-center gap-1 my-1 text-[11px] ${isMe ? "text-blue-100" : "text-slate-400"}`}>
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Pesan telah dihapus</span>
+                                </p>
+                              ) : isExpired ? (
+                                <p className={`italic flex items-center gap-1 my-1 text-[11px] ${isMe ? "text-blue-100" : "text-slate-400"}`}>
+                                  <Clock className="w-3 h-3" />
+                                  <span>Pesan telah kedaluwarsa</span>
+                                </p>
+                              ) : (
+                                <>
+                                  {/* Text Message */}
+                                  {msg.text && (
+                                    <p className="whitespace-pre-wrap leading-relaxed break-words text-xs">{msg.text}</p>
+                                  )}
+                                </>
+                              )}
+
+                              <div className={`flex items-center justify-end gap-1 text-[9px] font-mono mt-1 ${isMe ? "text-blue-100" : "text-slate-400"}`}>
+                                {msg.disappearingTimer && msg.disappearingTimer !== "off" && (
+                                  <span className="flex items-center gap-0.5" title={`Timer hapus otomatis: ${msg.disappearingTimer}`}>
+                                    <Timer className="w-2.5 h-2.5" />
+                                  </span>
+                                )}
+                                <span>{formatDateTime(msg.createdAt)}</span>
+                                {isMe && !isDeleted && !isExpired && (
+                                  <span title={isRead ? "Telah dibaca Admin (2 check)" : "Terkirim (1 check)"}>
+                                    {isRead ? (
+                                      <CheckCheck className="w-3.5 h-3.5 text-sky-200" />
+                                    ) : (
+                                      <Check className="w-3 h-3 text-blue-100" />
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                  <div ref={workerChatEndRef} />
+                </CardContent>
+
+                {/* CHAT INPUT FORM COMPOSER */}
+                <form
+                  onSubmit={handleSendWorkerChat}
+                  className="p-3 bg-white border-t border-slate-200/80 flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap"
+                >
+                  <div className="flex items-center gap-1">
+                    <EmojiPicker onSelectEmoji={(emoji: string) => setWorkerChatText((prev) => prev + emoji)} />
+
+                    {/* Disappearing Timer Selector */}
+                    <div className="relative group">
+                      <select
+                        value={chatTimerOption}
+                        onChange={(e) => setChatTimerOption(e.target.value as DisappearingTimer)}
+                        className="text-[11px] h-10 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:outline-none min-h-[44px] cursor-pointer"
+                        title="Timer Pesan Menghilang"
+                      >
+                        <option value="off">⏱️ Off</option>
+                        <option value="24h">⏱️ 24 Jam</option>
+                        <option value="7d">⏱️ 7 Hari</option>
+                        <option value="30d">⏱️ 30 Hari</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <Input
+                    placeholder="Tulis pesan untuk Admin..."
+                    value={workerChatText}
+                    onChange={(e) => setWorkerChatText(e.target.value)}
+                    disabled={sendingWorkerChat}
+                    className="text-xs sm:text-sm h-10 bg-slate-50 border-slate-200 text-slate-900 focus-visible:ring-blue-500 rounded-xl flex-1 min-h-[44px]"
+                  />
+
+                  <Button
+                    type="submit"
+                    disabled={sendingWorkerChat || !workerChatText.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-4 rounded-xl shadow-2xs shrink-0 min-h-[44px] min-w-[44px] active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {sendingWorkerChat ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </form>
+              </Card>
+
+              {/* DELETE MESSAGE CONFIRMATION DIALOG */}
+              <Dialog open={!!deleteChatModalMsg} onOpenChange={(open) => !open && setDeleteChatModalMsg(null)}>
+                <DialogContent className="max-w-md bg-white border-slate-200 rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-rose-600" />
+                      <span>Hapus Pesan</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500">
+                      Pilih opsi penghapusan untuk pesan ini.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {deleteChatModalMsg && (
+                    <div className="space-y-3 pt-2">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 italic">
+                        "{deleteChatModalMsg.text || "Pesan"}"
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-2">
+                        <Button
+                          onClick={() => handleDeleteMessageForMe(deleteChatModalMsg)}
+                          disabled={deletingChat}
+                          variant="outline"
+                          className="w-full text-xs h-10 justify-start font-bold border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl min-h-[44px]"
+                        >
+                          <Trash2 className="w-4 h-4 text-blue-600 mr-2" />
+                          Hapus untuk Saya (Sembunyikan hanya di perangkat Anda)
+                        </Button>
+
+                        {deleteChatModalMsg.senderRole === "worker" && (
+                          <Button
+                            onClick={() => handleDeleteMessageForAll(deleteChatModalMsg)}
+                            disabled={deletingChat}
+                            className="w-full text-xs h-10 justify-start bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl min-h-[44px]"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Hapus untuk Semua (Hapus untuk Worker & Admin)
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
+          {/* ==================== 9. PENGUMUMAN / INFO RESMI VIEW ==================== */}
+          {activeView === "announcements" && (
+            <div className="space-y-4">
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Info Resmi
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Informasi dan pengumuman resmi dari GMAIL JOB ID.
+                  </p>
+                </div>
+              </div>
+
+              {/* ANNOUNCEMENT LIST / STATES */}
+              {announcements.loading && (
+                <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>Memuat informasi resmi...</span>
+                  </div>
+                </Card>
+              )}
+
+              {announcements.error && (
+                <Card className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-xs p-4">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Gagal memuat pengumuman: {announcements.error}</span>
+                  </div>
+                </Card>
+              )}
+
+              {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
+                <Card className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 sm:p-10 text-center shadow-xs">
+                  <CardContent className="p-0 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto">
+                      <Megaphone className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                        Belum Ada Pengumuman
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                        Belum ada informasi resmi yang tersedia saat ini.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
+                <div className="space-y-3.5">
+                  {announcements.data.map((item) => {
+                    const badgeUpper = item.badge?.toUpperCase().trim() || "";
+                    let badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+                    if (badgeUpper === "BARU" || badgeUpper === "PENTING" || badgeUpper === "IMPORTANT") {
+                      badgeStyle = "bg-rose-50 text-rose-700 border-rose-200";
+                    } else if (badgeUpper === "PERHATIAN") {
+                      badgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
+                    } else if (badgeUpper === "INFO") {
+                      badgeStyle = "bg-sky-50 text-sky-700 border-sky-200";
+                    }
+
+                    return (
+                      <Card
+                        key={item.id}
+                        className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors"
+                      >
+                        <CardHeader className="p-4 sm:p-5 pb-2">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 mt-0.5">
+                                <Megaphone className="w-4 h-4" />
+                              </div>
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
+                                    {item.title}
+                                  </CardTitle>
+                                  {item.badge && (
+                                    <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeStyle}`}>
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <span>{formatDateTime(item.updatedAt || item.createdAt)}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4 sm:p-5 pt-1">
+                          <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/60">
+                            <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                              {item.content}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
                     );
                   })}
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
+          )}
 
-            <Card className="bg-amber-50 border-amber-200">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-                    <ShieldAlert className="w-4 h-4" />
-                    Aturan Setor Email
-                  </div>
-                  <Badge className="bg-amber-600 text-white font-semibold">
-                    {currentTierConfig.name} · {formatMoney(currentTierConfig.pricePerItem)}/item
-                  </Badge>
-                </div>
-                <ul className="space-y-1 text-xs text-amber-800 list-disc list-inside whitespace-pre-wrap">
-                  {rules.data.submissionNotes.map((note, idx) => (
-                    <li key={idx} className="whitespace-pre-wrap">{note}</li>
-                  ))}
-                  <li>Harga aktif Anda: {formatMoney(currentTierConfig.pricePerItem)} per item ({currentTierConfig.name}).</li>
-                </ul>
-              </CardContent>
-            </Card>
+          {/* 7. MOBILE BOTTOM NAVIGATION */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg px-2 py-1 flex items-center justify-around">
+            {/* 1. HOME */}
+            <button
+              type="button"
+              onClick={() => setActiveView("home")}
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
+                activeView === "home"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <Home className={`w-5 h-5 mb-0.5 ${activeView === "home" ? "text-blue-600 stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] tracking-tight">Home</span>
+            </button>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Detail Batch Setoran</CardTitle>
-                <CardDescription>Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitEmails} className="space-y-4">
-                  <div>
-                    <Label htmlFor="emails">Daftar Alamat Email ({emailList.length} item)</Label>
-                    <Textarea
-                      id="emails"
-                      rows={6}
-                      value={emailsText}
-                      onChange={(e) => setEmailsText(e.target.value)}
-                      placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
-                      className="mt-1.5 font-mono text-sm"
-                      required
-                    />
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch.
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="password">Kata Sandi Akun</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Kata sandi untuk seluruh email di atas"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
+            {/* 2. SETOR / SUBMIT */}
+            <button
+              type="button"
+              onClick={() => setActiveView("submit")}
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
+                activeView === "submit"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <PlusCircle className={`w-5 h-5 mb-0.5 ${activeView === "submit" ? "text-blue-600 stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] tracking-tight">Setor</span>
+            </button>
 
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between text-xs text-gray-600">
+            {/* 3. WITHDRAW */}
+            <button
+              type="button"
+              onClick={() => setActiveView("withdraw")}
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
+                activeView === "withdraw"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <Wallet className={`w-5 h-5 mb-0.5 ${activeView === "withdraw" ? "text-blue-600 stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] tracking-tight">Withdraw</span>
+            </button>
+
+            {/* 4. CS */}
+            <button
+              type="button"
+              onClick={() => setActiveView("cs")}
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
+                activeView === "cs"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <HelpCircle className={`w-5 h-5 mb-0.5 ${activeView === "cs" ? "text-blue-600 stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] tracking-tight">CS</span>
+            </button>
+
+            {/* 5. MENU */}
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-600 transition-colors min-h-[44px] min-w-[44px]"
+            >
+              <Menu className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] tracking-tight">Menu</span>
+            </button>
+          </nav>
+
+          {/* DIALOG LIHAT DETAIL BATCH */}
+          <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Detail Setoran Batch Email</DialogTitle>
+                <DialogDescription>
+                  Waktu setor: {formatDateTime(detailSubmission?.submittedAt)} · #{shortId(detailSubmission?.id ?? "")}
+                </DialogDescription>
+              </DialogHeader>
+              {detailSubmission && (() => {
+                const baseItems = Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0
+                  ? detailSubmission.items
+                  : detailSubmission.email
+                    ? [{
+                        email: detailSubmission.email,
+                        password: detailSubmission.password,
+                        status: detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending"
+                      }]
+                    : [];
+
+                const tierCfg = getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? profile.tier, rules.data.tiers);
+                const pricePerItem = detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? tierCfg.pricePerItem;
+
+                const approvedCount = detailSubmission.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
+                const rejectedCount = detailSubmission.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
+                const earned = detailSubmission.totalAmount ?? (approvedCount * pricePerItem);
+
+                return (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
+                      <div>
+                        <span className="text-gray-500">Total Email:</span>
+                        <p className="font-bold text-gray-900">{baseItems.length} item</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Terjual (✓):</span>
+                        <p className="font-bold text-green-600">{approvedCount} item</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Ditolak (X):</span>
+                        <p className="font-bold text-red-600">{rejectedCount} item</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Total Didapat:</span>
+                        <p className="font-bold text-blue-700">{formatMoney(earned)}</p>
+                      </div>
+                    </div>
+
                     <div>
-                      <span>Estimasi Total Setoran: </span>
-                      <strong className="text-gray-900">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
-                    </div>
-                    <span className="font-bold text-amber-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
-                  </div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-xs text-gray-600">
+                          Status per Alamat Email ({baseItems.length} item):
+                        </Label>
+                        <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-800 border-blue-300">
+                          Rate: {formatMoney(pricePerItem)}/akun
+                        </Badge>
+                      </div>
 
-                  <Button type="submit" disabled={submitting} className="w-full bg-amber-600 hover:bg-amber-700 gap-2">
-                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Kirim Batch ({emailList.length} Item)
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* REFERRAL SYSTEM */}
-          <TabsContent value="referral" className="space-y-4">
-            {/* DAFTAR REWARD REFERRAL (READ-ONLY) */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  🎁 Daftar Reward Referral
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Semakin banyak email ACC dari pekerja yang Anda undang, semakin besar bonus reward referral yang Anda dapatkan.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {activeReferralTiers.map((t, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-lg text-center"
-                    >
-                      <p className="text-xs text-gray-600 font-medium">{t.minAcc} ACC</p>
-                      <p className="text-base font-extrabold text-amber-700 mt-1">
-                        {formatMoney(t.reward)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="w-5 h-5 text-amber-600" /> Tautan & Kode Referral
-                </CardTitle>
-                <CardDescription>
-                  Bagikan tautan ini ke teman atau pekerja lain. Dapatkan bonus saldo untuk setiap referral qualified.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-xs text-gray-600">Tautan Referral Anda</Label>
-                  <div className="flex gap-2 mt-1.5">
-                    <Input readOnly value={referralLink} className="font-mono text-xs bg-white" />
-                    <Button onClick={handleCopyReferralLink} className="bg-amber-600 hover:bg-amber-700 shrink-0 gap-1.5">
-                      {copiedLink ? <Check className="w-4 h-4 text-green-200" /> : <Copy className="w-4 h-4" />}
-                      {copiedLink ? "Tersalin!" : "Salin Link"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Total Referral</p>
-                    <p className="text-lg font-bold text-gray-900 mt-0.5">{refStats.total}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Menunggu (Pending)</p>
-                    <p className="text-lg font-bold text-amber-700 mt-0.5">{refStats.pending}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Qualified (ACC)</p>
-                    <p className="text-lg font-bold text-green-700 mt-0.5">{refStats.qualified}</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200 text-center">
-                    <p className="text-[11px] text-gray-500">Total Bonus Didapat</p>
-                    <p className="text-lg font-bold text-amber-700 mt-0.5">{formatMoney(refStats.earnings)}</p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <p className="font-bold flex items-center gap-1">
-                    <ShieldAlert className="w-3.5 h-3.5" /> Ketentuan Kualifikasi Referral:
-                  </p>
-                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
-                    <li>Pendaftaran akun baru saja TIDAK langsung memberikan bonus.</li>
-                    <li>Pekerja yang diundang harus mencapai minimal email ACC yang disetujui admin untuk membuka tier reward.</li>
-                    <li>Hadiah referral dihitung berdasarkan tier tertinggi yang dicapai ketika admin menyetujui kualifikasi (1 kali payout per referral).</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <Label className="text-xs text-gray-600 mb-2 block font-semibold">
-                    Daftar Referral Saya ({engagement.referrals.data.length})
-                  </Label>
-                  {engagement.referrals.data.length === 0 ? (
-                    <div className="p-4 bg-white rounded-lg border border-gray-200 text-center text-xs text-gray-500">
-                      Belum ada pekerja yang mendaftar menggunakan referral Anda.
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
-                      {engagement.referrals.data.map((ref) => {
-                        const accProgress = ref.currentAccCount ?? 0;
-                        const isPaid = ref.status === "PAID" || ref.status === "REWARDED";
-                        const isQualified = ref.status === "QUALIFIED";
-                        const isRejected = ref.status === "REJECTED";
-
-                        const currentTier = getReferralTierForAccCount(accProgress, activeReferralTiers);
-                        const nextTier = getNextReferralTierForAccCount(accProgress, activeReferralTiers);
-                        const currentReward = isPaid
-                          ? (ref.rewardAmount ?? getReferralRewardForAccCount(accProgress, activeReferralTiers))
-                          : getReferralRewardForAccCount(accProgress, activeReferralTiers);
-
-                        let statusText = "Belum Qualified";
-                        let statusBadgeClass = "bg-amber-100 text-amber-800 hover:bg-amber-100";
-
-                        if (isPaid) {
-                          statusText = "Sudah Disetujui";
-                          statusBadgeClass = "bg-green-100 text-green-800 hover:bg-green-100";
-                        } else if (isQualified) {
-                          statusText = "Menunggu ACC Admin";
-                          statusBadgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                        } else if (isRejected) {
-                          statusText = "Ditolak";
-                          statusBadgeClass = "bg-red-100 text-red-800 hover:bg-red-100";
-                        }
-
-                        const targetAccDisplay = nextTier ? nextTier.minAcc : (currentTier ? currentTier.minAcc : 5);
-
-                        return (
-                          <div key={ref.id} className="p-3 rounded-md border border-gray-200 flex items-center justify-between text-xs bg-gray-50/50">
-                            <div className="space-y-0.5">
-                              <p className="font-bold text-gray-900">{ref.referredWorkerName || shortId(ref.referredWorkerId)}</p>
-                              <p className="text-[11px] text-gray-500">
-                                ACC: <strong className="text-gray-800">{accProgress}/{targetAccDisplay}</strong>
-                              </p>
-                              {nextTier ? (
-                                <p className="text-[11px] text-gray-500">
-                                  Tier berikutnya: <strong className="text-blue-900">{nextTier.minAcc} ACC</strong>
-                                </p>
-                              ) : currentTier ? (
-                                <p className="text-[11px] text-gray-500">
-                                  Tier: <strong className="text-blue-900">{currentTier.minAcc} ACC</strong>
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="text-right space-y-1">
-                              <Badge className={`text-[11px] font-medium ${statusBadgeClass}`}>
-                                {statusText}
-                              </Badge>
-                              <p className="text-[11px] text-amber-800 font-bold">
-                                {isPaid ? `Bonus: ${formatMoney(currentReward)}` : isRejected ? `Bonus: ${formatMoney(0)}` : `Reward saat ini: ${formatMoney(currentReward)}`}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TARIK SALDO */}
-          <TabsContent value="withdraw" className="space-y-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="pt-6 flex items-start gap-2 text-xs text-blue-800">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Saldo tersedia: <strong>{formatMoney(profile.balance)}</strong>. Minimal penarikan{" "}
-                  {formatMoney(rules.data.minWithdraw)}, maksimal {formatMoney(rules.data.maxWithdraw)}.
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Tarik Saldo</CardTitle>
-                <CardDescription>Pilih metode pembayaran dan masukkan nomor tujuan.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleWithdraw} className="space-y-4">
-                  <div>
-                    <Label>Metode Pembayaran</Label>
-                    <Select value={method} onValueChange={setMethod}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Pilih metode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rules.data.paymentMethods.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="account">Nomor Rekening / Nomor E-Wallet</Label>
-                    <Input
-                      id="account"
-                      value={account}
-                      onChange={(e) => setAccount(e.target.value)}
-                      placeholder={`Nomor HP ${method} / Rekening`}
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="accountHolderName">Atas Nama</Label>
-                    <Input
-                      id="accountHolderName"
-                      value={accountHolderName}
-                      onChange={(e) => setAccountHolderName(e.target.value)}
-                      placeholder="Masukkan nama pemilik rekening/wallet"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">Jumlah Penarikan (Rp)</Label>
-                    <FormattedNumberInput
-                      id="amount"
-                      value={amount}
-                      onChange={(val) => setAmount(val)}
-                      placeholder="Contoh: 100.000"
-                      className="mt-1.5"
-                      required
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={withdrawing}
-                    className="w-full bg-amber-600 hover:bg-amber-700 gap-2"
-                  >
-                    {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
-                    Ajukan Penarikan
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* RIWAYAT TRANSAKSI / PENARIKAN */}
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                  <span>💰</span> Riwayat Transaksi
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Riwayat penarikan saldo dan penerimaan bonus reward Anda.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(withdrawals.loading || engagement.rewardLedger.loading) && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat transaksi.</p>
-                )}
-                {!withdrawals.loading && !engagement.rewardLedger.loading && transactionHistory.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                          <th className="py-2.5 px-3 font-semibold">Tanggal</th>
-                          <th className="py-2.5 px-3 font-semibold">Jenis Transaksi</th>
-                          <th className="py-2.5 px-3 font-semibold">Keterangan</th>
-                          <th className="py-2.5 px-3 font-semibold">Nominal</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {transactionHistory.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-gray-50/60 transition-colors">
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-gray-500">
-                              {formatDateTime(tx.date)}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
-                              {tx.type}
-                            </td>
-                            <td className="py-3 px-3 align-top">
-                              <p className="text-gray-800 font-medium">{tx.description}</p>
-                              {tx.note && <p className="text-[11px] text-gray-400 italic mt-0.5">Catatan: {tx.note}</p>}
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap font-bold">
-                              <span className={tx.isCredit ? "text-green-600" : "text-red-600"}>
-                                {tx.isCredit ? "+" : "-"} {formatMoney(tx.amount)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                              <StatusBadge status={tx.status} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* RIWAYAT STORAN EMAIL (TAB BARU) */}
-          <TabsContent value="history" className="space-y-4">
-            <Card className="bg-white border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                  <span>📧</span> Riwayat Storan Email
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Daftar batch email yang telah Anda kirim beserta status persetujuannya.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {submissions.loading && (
-                  <p className="text-sm text-gray-400 text-center py-6">Memuat…</p>
-                )}
-                {!submissions.loading && submissions.data.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Belum ada batch setoran email.</p>
-                )}
-                {!submissions.loading && submissions.data.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                          <th className="py-2.5 px-3 font-semibold">Tanggal & ID</th>
-                          <th className="py-2.5 px-3 font-semibold">Jumlah Email</th>
-                          <th className="py-2.5 px-3 font-semibold">Tier & Harga</th>
-                          <th className="py-2.5 px-3 font-semibold">Rincian Status</th>
-                          <th className="py-2.5 px-3 font-semibold">Total Saldo</th>
-                          <th className="py-2.5 px-3 font-semibold">Status</th>
-                          <th className="py-2.5 px-3 font-semibold text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {submissions.data.map((item) => {
-                          const baseItems =
-                            Array.isArray(item.items) && item.items.length > 0
-                              ? item.items
-                              : item.email
-                              ? [
-                                  {
-                                    email: item.email,
-                                    password: item.password,
-                                    status:
-                                      item.status === "available" || item.status === "approved"
-                                        ? "approved"
-                                        : item.status === "rejected"
-                                        ? "rejected"
-                                        : "pending",
-                                  },
-                                ]
-                              : [];
-
-                          const count = baseItems.length || getItemCountOfSubmission(item);
-                          const approvedCount =
-                            item.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-                          const rejectedCount =
-                            item.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-                          const pendingCount = count - approvedCount - rejectedCount;
-
-                          const tierNum = item.appliedTier ?? item.currentTier ?? profile.tier;
-                          const tierCfg = getTierConfig(tierNum, rules.data.tiers);
-                          const pricePerItem =
-                            item.appliedPricePerItem ?? item.currentPricePerItem ?? tierCfg.pricePerItem;
-                          const earnedAmount = item.totalAmount ?? approvedCount * pricePerItem;
-
+                      <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                        {baseItems.map((it, idx) => {
+                          const st = it.status ?? (detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending");
                           return (
-                            <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-semibold text-gray-900">#{shortId(item.id)}</p>
-                                <p className="text-[11px] text-gray-400">{formatDateTime(item.submittedAt)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-gray-900">
-                                {count} Email
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <Badge variant="outline" className="text-[11px] py-0 bg-amber-50 text-amber-800 border-amber-200">
-                                  {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <div className="space-y-0.5 text-[11px]">
-                                  <p className="text-green-600 font-medium">ACC: {approvedCount}</p>
-                                  <p className="text-red-600 font-medium">Ditolak: {rejectedCount}</p>
-                                  {pendingCount > 0 && (
-                                    <p className="text-amber-600 font-medium">Menunggu: {pendingCount}</p>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <p className="font-bold text-amber-700">{formatMoney(earnedAmount)}</p>
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap">
-                                <StatusBadge status={item.status} />
-                                {item.reviewNote && (
-                                  <p className="text-[11px] text-gray-500 italic mt-1 max-w-[150px] truncate" title={item.reviewNote}>
-                                    Catatan: {item.reviewNote}
-                                  </p>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 align-top whitespace-nowrap text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDetailSubmission(item)}
-                                  className="text-xs h-7 gap-1"
-                                >
-                                  <Eye className="w-3.5 h-3.5" /> Lihat Email
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* DIALOG LIHAT DETAIL BATCH (WORKER PER-ITEM VIEW) */}
-        <Dialog open={!!detailSubmission} onOpenChange={(open) => !open && setDetailSubmission(null)}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Detail Setoran Batch Email</DialogTitle>
-              <DialogDescription>
-                Waktu setor: {formatDateTime(detailSubmission?.submittedAt)} · #{shortId(detailSubmission?.id ?? "")}
-              </DialogDescription>
-            </DialogHeader>
-            {detailSubmission && (() => {
-              const baseItems = Array.isArray(detailSubmission.items) && detailSubmission.items.length > 0
-                ? detailSubmission.items
-                : detailSubmission.email
-                  ? [{
-                      email: detailSubmission.email,
-                      password: detailSubmission.password,
-                      status: detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending"
-                    }]
-                  : [];
-
-              const tierCfg = getTierConfig(detailSubmission.appliedTier ?? detailSubmission.currentTier ?? profile.tier, rules.data.tiers);
-              const pricePerItem = detailSubmission.appliedPricePerItem ?? detailSubmission.currentPricePerItem ?? tierCfg.pricePerItem;
-
-              const approvedCount = detailSubmission.approvedItemCount ?? baseItems.filter((i) => i.status === "approved").length;
-              const rejectedCount = detailSubmission.rejectedItemCount ?? baseItems.filter((i) => i.status === "rejected").length;
-              const earned = detailSubmission.totalAmount ?? (approvedCount * pricePerItem);
-
-              return (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-gray-50 rounded-lg text-xs">
-                    <div>
-                      <span className="text-gray-500">Total Email:</span>
-                      <p className="font-bold text-gray-900">{baseItems.length} item</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Terjual (✓):</span>
-                      <p className="font-bold text-green-600">{approvedCount} item</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Ditolak (X):</span>
-                      <p className="font-bold text-red-600">{rejectedCount} item</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Total Didapat:</span>
-                      <p className="font-bold text-amber-700">{formatMoney(earned)}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label className="text-xs text-gray-600">
-                        Status per Alamat Email ({baseItems.length} item):
-                      </Label>
-                      <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
-                        {tierCfg.name} ({formatMoney(pricePerItem)}/item)
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
-                      {baseItems.map((it, idx) => {
-                        const st = it.status ?? (detailSubmission.status === "available" || detailSubmission.status === "approved" ? "approved" : detailSubmission.status === "rejected" ? "rejected" : "pending");
-                        return (
-                          <div
-                            key={idx}
-                            className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs font-mono transition-colors ${
-                              st === "approved"
-                                ? "bg-green-50/60 border-green-200"
-                                : st === "rejected"
-                                  ? "bg-red-50/60 border-red-200"
-                                  : "bg-amber-50/60 border-amber-200"
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-gray-900 truncate">
-                                {idx + 1}. {it.email}
-                              </p>
-                              {it.password && <p className="text-[11px] text-gray-500 font-sans">Sandi: {it.password}</p>}
-                            </div>
-
-                            <Badge
-                              className={`shrink-0 text-[11px] font-sans ${
+                            <div
+                              key={idx}
+                              className={`p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs font-mono transition-colors ${
                                 st === "approved"
-                                  ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                  ? "bg-green-50/60 border-green-200"
                                   : st === "rejected"
-                                    ? "bg-red-100 text-red-800 hover:bg-red-100"
-                                    : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                    ? "bg-red-50/60 border-red-200"
+                                    : "bg-blue-50/60 border-blue-200"
                               }`}
                             >
-                              {st === "approved" ? "✓ Terjual" : st === "rejected" ? "X Ditolak" : "Menunggu"}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate">
+                                  {idx + 1}. {it.email}
+                                </p>
+                                {it.password && <p className="text-[11px] text-gray-500 font-sans">Sandi: {it.password}</p>}
+                              </div>
 
-                  {detailSubmission.reviewNote && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-                      <p className="font-bold mb-0.5">Catatan Admin:</p>
-                      <p className="italic">{detailSubmission.reviewNote}</p>
+                              <Badge
+                                className={`shrink-0 text-[11px] font-sans ${
+                                  st === "approved"
+                                    ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                    : st === "rejected"
+                                      ? "bg-red-100 text-red-800 hover:bg-red-100"
+                                      : "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                }`}
+                              >
+                                {st === "approved" ? "✓ Terjual" : st === "rejected" ? "X Ditolak" : "Menunggu"}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })()}
-          </DialogContent>
-        </Dialog>
-      </main>
+
+                    {detailSubmission.reviewNote && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
+                        <p className="font-bold mb-0.5">Catatan Admin:</p>
+                        <p className="italic">{detailSubmission.reviewNote}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
+        </main>
+      </div>
     </div>
   );
 }

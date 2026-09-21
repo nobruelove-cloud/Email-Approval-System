@@ -7,6 +7,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  orderBy,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -14,6 +15,7 @@ import {
   addDoc,
   deleteDoc,
   runTransaction,
+  writeBatch,
   Timestamp,
   type QueryConstraint,
 } from "firebase/firestore";
@@ -21,6 +23,7 @@ import { auth, createWorkerAuthAccount, db, firebaseConfigured } from "@/lib/fir
 import {
   DEFAULT_TIERS,
   DEFAULT_REFERRAL_TIERS,
+  DEFAULT_OPERATING_HOURS,
   type EmailSubmission,
   type PortalUser,
   type Withdrawal,
@@ -31,8 +34,11 @@ import {
   type ReferralTierConfig,
   type FinancialTransaction,
   type FinancialTransactionType,
+  type OperatingHoursConfig,
 } from "@/lib/portal-types";
-import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId } from "@/lib/portal-utils";
+import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers, formatDateTime, getOperatingStatus } from "@/lib/portal-utils";
+import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
+import { sendTelegramNotification } from "@/lib/telegram-bot";
 
 import { useRef } from "react";
 
@@ -189,8 +195,10 @@ export function logFirestoreDiagnostic(details: {
 
   if (isError) {
     console.error("[FirestoreDiagnostic]", payload);
+    sendRemoteDiagnostic(payload);
   } else if (isDiagnosticsEnabled) {
     console.log("[FirestoreDiagnostic]", payload);
+    sendRemoteDiagnostic(payload);
   }
 
   return payload;
@@ -226,7 +234,7 @@ export async function getDocsWithDiagnostic(queryRef: any, constraints: unknown[
       path: path || "collection",
       query: constraints,
       hook,
-      message: `getDocs retrieved ${snaps.size} docs`,
+      message: `getDocs retrieved ${snaps?.size ?? 0} docs`,
     });
     return snaps;
   } catch (err) {
@@ -332,6 +340,65 @@ export async function runTransactionWithDiagnostic<T>(
     throw err;
   }
 }
+export async function createPortalUser(uid: string, data: Partial<PortalUser>) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const cleanData = Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
+
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+  console.log(`[Stage 2: users/{uid} CREATE] Initiating profile creation for path: users/${uid}, ProjectID: ${projectId}`);
+
+  const maxAttempts = 3;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
+      await setDocWithDiagnostic(
+        doc(db, "users", uid),
+        { uid, ...cleanData, createdAt: serverTimestamp() },
+        undefined,
+        "createPortalUser"
+      );
+      console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
+
+      // Asynchronously trigger Telegram notification
+      (async () => {
+        try {
+          const settingsSnap = await getDoc(doc(db, "settings", "telegram"));
+          if (settingsSnap.exists()) {
+            const settings = settingsSnap.data();
+            if (settings?.telegramBotToken && settings?.telegramAdminChatId) {
+              await sendTelegramNotification(
+                `👤 <b>WORKER BARU TERDAFTAR!</b>\n\n` +
+                `• <b>Nama/User:</b> ${data.name || "Worker Baru"}\n` +
+                `• <b>Email:</b> ${data.email || "-"}\n` +
+                `• <b>Waktu:</b> ${new Date().toLocaleString('id-ID')}\n\n` +
+                `Silakan cek Dashboard Admin untuk detail akun.`,
+                { botToken: settings.telegramBotToken, adminChatId: settings.telegramAdminChatId }
+              );
+            }
+          }
+        } catch (err) {
+          console.error("Gagal mengirim notifikasi worker baru ke Telegram:", err);
+        }
+      })();
+
+      return;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[createPortalUser] Attempt ${attempt}/${maxAttempts} failed for users/${uid}:`, err);
+      if (attempt < maxAttempts) {
+        const delay = attempt * 500;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 
 export function usePortalAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -397,7 +464,8 @@ export function usePortalAuth() {
       setIsReady(false);
       setError("");
 
-      console.log(`[PortalAuth] Registering Firestore snapshot listener for path: users/${user.uid}`);
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+      console.log(`[Stage 3: users/{uid} GET] Registering Firestore snapshot listener for path: users/${user.uid}, ProjectID: ${projectId}`);
 
       // Set a 10-second safety fallback timeout in case Firestore listener hangs
       profileTimerRef.current = setTimeout(() => {
@@ -631,6 +699,27 @@ export function usePortalAuth() {
     }
   };
 
+  useEffect(() => {
+    if (!db || !firebaseUser?.uid) return;
+    const uid = firebaseUser.uid;
+    const firestore = db;
+
+    const sendHeartbeat = () => {
+      updateDocWithDiagnostic(
+        doc(firestore, "users", uid),
+        { lastActiveAt: serverTimestamp() },
+        "heartbeat"
+      ).catch((err) => {
+        console.warn("[Heartbeat] Failed to update lastActiveAt:", err);
+      });
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [firebaseUser?.uid]);
+
   return {
     firebaseUser,
     profile,
@@ -667,7 +756,7 @@ export function useCollection<T>(
       q,
       (snapshot) => {
         if (!isMounted) return;
-        let rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T);
+        let rows = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as T);
         if (sortBy) {
           const dir = sortBy.direction === "asc" ? 1 : -1;
           rows = [...rows].sort((a, b) => {
@@ -812,7 +901,11 @@ export function useAdminData() {
     field: "createdAt",
     direction: "desc",
   });
-  return { users, submissions, withdrawals, referrals, rewardLedger };
+  const leaderboardPayouts = useCollection<import("@/lib/portal-types").LeaderboardPayout>("leaderboardPayouts", [], true, {
+    field: "paidAt",
+    direction: "desc",
+  });
+  return { users, submissions, withdrawals, referrals, rewardLedger, leaderboardPayouts };
 }
 
 export function useWorkerEngagementData(uid?: string) {
@@ -821,6 +914,11 @@ export function useWorkerEngagementData(uid?: string) {
     uid ? [where("referrerId", "==", uid)] : [],
     !!uid && uid !== "worker_demo",
     { field: "createdAt", direction: "desc" },
+  );
+  const referralClaims = useCollection<import("@/lib/portal-types").ReferralClaim>(
+    "referralClaims",
+    uid ? [where("referrerId", "==", uid)] : [],
+    !!uid && uid !== "worker_demo",
   );
   const missionClaims = useCollection<import("@/lib/portal-types").MissionClaim>(
     "missionClaims",
@@ -837,6 +935,7 @@ export function useWorkerEngagementData(uid?: string) {
   if (uid === "worker_demo") {
     return {
       referrals: { loading: false, error: "", data: [] },
+      referralClaims: { loading: false, error: "", data: [] },
       missionClaims: { loading: false, error: "", data: [] },
       rewardLedger: {
         loading: false,
@@ -856,11 +955,88 @@ export function useWorkerEngagementData(uid?: string) {
     };
   }
 
-  return { referrals, missionClaims, rewardLedger };
+  return { referrals, referralClaims, missionClaims, rewardLedger };
+}
+
+export function useMyReferral(uid?: string) {
+  const [data, setData] = useState<import("@/lib/portal-types").Referral | null>(null);
+  const [loading, setLoading] = useState(!!uid && uid !== "worker_demo" && !!db);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!db || !uid || uid === "worker_demo") {
+      setLoading(false);
+      setData(null);
+      return;
+    }
+    let isMounted = true;
+    setLoading(true);
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    console.log(`[Stage 4: secondary worker collection listener] Registering listener for path: referrals/${uid}, ProjectID: ${projectId}`);
+    const refDoc = doc(db, "referrals", uid);
+    const unsubscribe = onSnapshot(
+      refDoc,
+      (snapshot) => {
+        if (!isMounted) return;
+        const exists = typeof snapshot?.exists === "function" ? snapshot.exists() : false;
+        if (exists) {
+          setData({ ...snapshot.data(), id: snapshot.id } as import("@/lib/portal-types").Referral);
+        } else {
+          setData(null);
+        }
+        setLoading(false);
+      },
+      (reason) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: `referrals/${uid}`,
+          collection: "referrals",
+          docId: uid,
+          hook: "useMyReferral",
+          error: reason,
+        });
+        setError(reason instanceof Error ? reason.message : "Gagal membaca data referral.");
+        setLoading(false);
+      }
+    );
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [uid]);
+
+  return { data, loading, error };
 }
 
 export async function createSubmission(payload: Omit<EmailSubmission, "id" | "status">) {
   if (!db) throw new Error("Firebase is not configured.");
+
+  // Check general settings and operating hours before allowing submission
+  try {
+    const generalSnap = await getDoc(doc(db, "settings", "general"));
+    if (generalSnap.exists()) {
+      const generalData = generalSnap.data();
+      if (generalData?.submissionOpen === false) {
+        throw new Error("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+      }
+    }
+
+    const rulesSnap = await getDoc(doc(db, "settings", "rules"));
+    const rulesData = rulesSnap.exists() ? rulesSnap.data() : null;
+    const opHours: OperatingHoursConfig = rulesData?.operatingHours ?? DEFAULT_OPERATING_HOURS;
+    const opStatus = getOperatingStatus(opHours);
+
+    if (!opStatus.isOpen) {
+      throw new Error("Mohon maaf, setoran email saat ini sedang DITUTUP oleh Admin. Silakan coba lagi pada jam operasional.");
+    }
+  } catch (checkErr) {
+    if (checkErr instanceof Error && checkErr.message.includes("DITUTUP")) {
+      throw checkErr;
+    }
+    console.warn("[createSubmission] Notice when checking operational status:", checkErr);
+  }
+
   try {
     const res = await addDoc(collection(db, "emailSubmissions"), {
       ...payload,
@@ -874,6 +1050,30 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
       hook: "createSubmission",
       message: `Submission created: ${res.id}`,
     });
+
+    // Asynchronously send Telegram Notification without blocking submission
+    (async () => {
+      try {
+        const workerSnap = await getDoc(doc(db, "users", payload.workerId));
+        const workerData = workerSnap.exists() ? (workerSnap.data() as PortalUser) : null;
+        const workerName = payload.workerName || workerData?.name || shortId(payload.workerId);
+        const totalAcc = workerData?.accCount ?? 0;
+        const itemCount = payload.itemCount ?? payload.items?.length ?? 1;
+        const nowStr = formatDateTime(new Date());
+
+        const message =
+          `📩 STORAN EMAIL MASUK\n\n` +
+          `👤 Nama Worker: ${workerName}\n` +
+          `📦 Jumlah Email Disetor: ${itemCount} email\n` +
+          `🕒 Waktu Submit: ${nowStr}\n` +
+          `✅ Total ACC Terkini: ${totalAcc} ACC`;
+
+        await sendTelegramNotification(message);
+      } catch (tgErr) {
+        console.warn("[createSubmission] Telegram notification notice:", tgErr);
+      }
+    })();
+
     return res;
   } catch (err) {
     logFirestoreDiagnostic({
@@ -885,6 +1085,47 @@ export async function createSubmission(payload: Omit<EmailSubmission, "id" | "st
     });
     throw err;
   }
+}
+
+/**
+ * Manually override a pending submission batch's tier and rate.
+ * Dynamically updates tierId, currentTier, currentPricePerItem, pricePerEmail, and totalAmount in Firestore.
+ */
+export async function updateSubmissionTier(
+  submissionId: string,
+  newTierConfig: TierConfig,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+      const submissionSnap = await tx.get(submissionRef);
+      if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
+      const submission = submissionSnap.data() as EmailSubmission;
+
+      if (submission.status !== "pending") {
+        throw new Error("Hanya setoran berstatus pending yang dapat diubah tier-nya.");
+      }
+
+      const count = getItemCountOfSubmission(submission);
+      const newPrice = newTierConfig.pricePerItem;
+      const newTotal = count * newPrice;
+
+      tx.update(submissionRef, {
+        tierId: String(newTierConfig.tier),
+        currentTier: newTierConfig.tier,
+        currentPricePerItem: newPrice,
+        pricePerEmail: newPrice,
+        totalAmount: newTotal,
+        updatedAt: serverTimestamp(),
+      });
+    },
+    "updateSubmissionTier",
+    `emailSubmissions/${submissionId}`,
+  );
 }
 
 /**
@@ -911,75 +1152,164 @@ export async function reviewSubmission(
       // 1. ALL READS FIRST
       const submissionRef = doc(firestore, "emailSubmissions", submissionId);
       const submissionSnap = await tx.get(submissionRef);
-    if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
-    const submission = submissionSnap.data() as EmailSubmission;
-    if (submission.status !== "pending") {
-      throw new Error("Setoran ini sudah pernah ditinjau.");
-    }
-    workerIdToEvaluate = submission.workerId;
+      if (!submissionSnap.exists()) throw new Error("Setoran tidak ditemukan.");
+      const submission = submissionSnap.data() as EmailSubmission;
+      if (submission.status !== "pending") {
+        throw new Error("Setoran ini sudah pernah ditinjau.");
+      }
+      workerIdToEvaluate = submission.workerId;
 
-    const rulesRef = doc(firestore, "settings", "rules");
-    const rulesSnap = await tx.get(rulesRef);
-    const activeTiers =
-      rulesSnap.exists() && Array.isArray(rulesSnap.data()?.tiers) && rulesSnap.data().tiers.length > 0
-        ? (rulesSnap.data().tiers as TierConfig[])
-        : DEFAULT_TIERS;
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await tx.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+      const activeTiers =
+        Array.isArray(rulesData?.tiers) && rulesData.tiers.length > 0
+          ? (rulesData.tiers as TierConfig[])
+          : DEFAULT_TIERS;
 
-    const userRef = doc(firestore, "users", submission.workerId);
-    const userSnap = await tx.get(userRef);
+      let userRef = doc(firestore, "users", submission.workerId);
+      let userSnap = await tx.get(userRef);
 
-    // Determine items & status counts
-    const itemCount = getItemCountOfSubmission(submission);
-    let itemsToSave = updatedItems ?? submission.items;
+      if (!userSnap.exists()) {
+        const usersSnap = await getDocs(collection(firestore, "users"));
+        const targetEmail = ((submission as any).workerEmail || (submission as any).userEmail || (submission.workerId?.includes("@") ? submission.workerId : "")).trim().toLowerCase();
+        const targetName = (submission.workerName || (!submission.workerId?.includes("@") ? submission.workerId : "")).trim().toLowerCase();
 
-    if (!itemsToSave || itemsToSave.length === 0) {
-      // Legacy single email fallback
-      const singleEmail = submission.email ?? "";
-      const singlePassword = submission.password;
-      const singleStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
-      itemsToSave = [{ email: singleEmail, password: singlePassword, status: singleStatus }];
-    } else if (!updatedItems) {
-      // Bulk decision applied to all batch items
-      const bulkItemStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
-      itemsToSave = itemsToSave.map((it) => ({ ...it, status: it.status ?? bulkItemStatus }));
-    }
+        const foundDoc = usersSnap.docs.find((d) => {
+          const data = d.data();
+          const email = (data.email || "").trim().toLowerCase();
+          const name = (data.name || "").trim().toLowerCase();
+          return (targetEmail && email === targetEmail) || (targetName && name === targetName);
+        });
 
-    const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
-    const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
+        if (foundDoc) {
+          userRef = doc(firestore, "users", foundDoc.id);
+          userSnap = await tx.get(userRef);
+          workerIdToEvaluate = foundDoc.id;
+        }
+      }
 
-    // Dynamically calculate Tier and Price per item based ONLY on final ACC/valid email count
-    const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
-    const appliedPricePerItem = overridePricePerItem ?? resultingTierCfg.pricePerItem;
-    const appliedTier = overrideTierNum ?? resultingTierCfg.tier;
-    const creditAmount = approvedCount * appliedPricePerItem;
+      // Determine items & status counts
+      const itemCount = getItemCountOfSubmission(submission);
+      let itemsToSave = updatedItems ?? submission.items;
 
-    const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
+      if (!itemsToSave || itemsToSave.length === 0) {
+        // Legacy single email fallback
+        const singleEmail = submission.email ?? "";
+        const singlePassword = submission.password;
+        const singleStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+        itemsToSave = [{ email: singleEmail, password: singlePassword, status: singleStatus }];
+      } else if (!updatedItems) {
+        // Bulk decision applied to all batch items
+        const bulkItemStatus = decision === "approved" || decision === "available" ? "approved" : "rejected";
+        itemsToSave = itemsToSave.map((it) => ({ ...it, status: it.status ?? bulkItemStatus }));
+      }
 
-    // 2. ALL WRITES AFTER READS
-    tx.update(submissionRef, {
-      status: finalStatus,
-      items: itemsToSave,
-      itemCount,
-      approvedItemCount: approvedCount,
-      rejectedItemCount: rejectedCount,
-      reviewNote,
-      appliedTier,
-      appliedPricePerItem,
-      totalAmount: creditAmount,
-      reviewedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      const approvedCount = itemsToSave.filter((it) => it.status === "approved").length;
+      const rejectedCount = itemsToSave.filter((it) => it.status === "rejected").length;
 
-    if (userSnap && userSnap.exists()) {
-      const currentBalance = (userSnap.data() as PortalUser).balance ?? 0;
-      tx.update(userRef, {
-        balance: currentBalance + creditAmount,
-        tier: appliedTier,
+      // Calculate Tier and Price per item - prioritize manually overridden batch rates over dynamic defaults
+      const resultingTierCfg = getRecommendedTier(approvedCount, activeTiers);
+      const basePrice = submission.currentPricePerItem ?? submission.pricePerEmail ?? resultingTierCfg.pricePerItem;
+      const baseTier = submission.currentTier ?? resultingTierCfg.tier;
+
+      const appliedPricePerItem = overridePricePerItem ?? basePrice;
+      const appliedTier = overrideTierNum ?? baseTier;
+      const creditAmount = approvedCount * appliedPricePerItem;
+
+      const finalStatus: SubmissionStatus = approvedCount > 0 ? "available" : "rejected";
+
+      // Referral / Upline calculations & READS before WRITES
+      let uplineRef: any = null;
+      let uplineSnap: any = null;
+      let referralRef: any = null;
+      let referralSnap: any = null;
+      const referralCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
+      let referralCommissionTotal = 0;
+
+      const workerData = userSnap.exists() ? (userSnap.data() as PortalUser) : null;
+      const uplineId = workerData?.referredBy || workerData?.reciprocalPartner;
+
+      if (approvedCount > 0 && uplineId) {
+        uplineRef = doc(firestore, "users", uplineId);
+        uplineSnap = await tx.get(uplineRef);
+
+        referralRef = doc(firestore, "referrals", submission.workerId);
+        referralSnap = await tx.get(referralRef);
+
+        referralCommissionTotal = approvedCount * referralCommissionPerAcc;
+      }
+
+      // 2. ALL WRITES AFTER READS
+      tx.update(submissionRef, {
+        status: finalStatus,
+        items: itemsToSave,
+        itemCount,
+        approvedItemCount: approvedCount,
+        rejectedItemCount: rejectedCount,
+        reviewNote,
+        appliedTier,
+        appliedPricePerItem,
+        totalAmount: creditAmount,
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-    }
-  },
-  "reviewSubmission",
-  `emailSubmissions/${submissionId}`
+
+      if (userSnap && userSnap.exists()) {
+        const currentBalance = workerData?.balance ?? (workerData as any)?.saldoUtama ?? 0;
+        const currentAccCount = workerData?.accCount ?? 0;
+        tx.update(userRef, {
+          balance: currentBalance + creditAmount,
+          saldoUtama: currentBalance + creditAmount,
+          accCount: currentAccCount + approvedCount,
+          tier: appliedTier,
+        });
+      }
+
+      // Execute Upline Referral Commission directly to Upline's balance
+      if (approvedCount > 0 && uplineId && uplineSnap && uplineSnap.exists()) {
+        const uplineData = uplineSnap.data() as PortalUser;
+        const currentUplineBalance = uplineData.balance ?? (uplineData as any)?.saldoUtama ?? 0;
+        const currentTotalRefEarned = uplineData.totalReferralEarned ?? 0;
+        const currentTeamAccCount = uplineData.teamAccCount ?? 0;
+
+        tx.update(uplineRef, {
+          balance: currentUplineBalance + referralCommissionTotal,
+          saldoUtama: currentUplineBalance + referralCommissionTotal,
+          totalReferralEarned: currentTotalRefEarned + referralCommissionTotal,
+          teamAccCount: currentTeamAccCount + approvedCount,
+        });
+
+        // Record log to referral_transactions collection
+        const refTxRef = doc(collection(firestore, "referral_transactions"));
+        tx.set(refTxRef, {
+          id: refTxRef.id,
+          uplineId,
+          uplineName: uplineData.name || shortId(uplineId),
+          downlineId: submission.workerId,
+          downlineName: workerData?.name || submission.workerName || shortId(submission.workerId),
+          accCount: approvedCount,
+          commissionPerEmail: referralCommissionPerAcc,
+          totalCommission: referralCommissionTotal,
+          submissionId,
+          createdAt: serverTimestamp(),
+        });
+
+        // Update referrals/{submission.workerId} if doc exists
+        if (referralSnap && referralSnap.exists()) {
+          const refData = referralSnap.data();
+          const newAcc = (refData.currentAccCount ?? 0) + approvedCount;
+          const newReward = (refData.rewardAmount ?? 0) + referralCommissionTotal;
+          tx.update(referralRef, {
+            currentAccCount: newAcc,
+            rewardAmount: newReward,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+    },
+    "reviewSubmission",
+    `emailSubmissions/${submissionId}`
   );
 
   // Automatically evaluate referral qualification if worker has a pending referral
@@ -1037,10 +1367,9 @@ export async function updateEmailStockStatus(
 }
 
 /**
- * Requesting a withdrawal deducts the balance immediately (inside the same
- * transaction as the balance check), so a worker can never request more
- * than they have, and can never fire two requests that both pass the
- * balance check against the same starting balance.
+ * Requesting a withdrawal validates available balance taking into account existing
+ * pending withdrawals, and creates a pending withdrawal record without deducting upfront.
+ * Balance is deducted atomically upon admin approval in reviewWithdrawal.
  */
 export async function createWithdrawal(payload: {
   workerId: string;
@@ -1048,6 +1377,8 @@ export async function createWithdrawal(payload: {
   method: string;
   account: string;
   accountHolderName: string;
+  fee?: number;
+  netAmount?: number;
 }) {
   if (!db) throw new Error("Firebase is not configured.");
   const firestore = db;
@@ -1055,6 +1386,20 @@ export async function createWithdrawal(payload: {
   if (!trimmedHolderName) {
     throw new Error("Nama pemilik rekening/wallet wajib diisi.");
   }
+  if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
+
+  // Query pending withdrawals for this worker to calculate reserved pending balance
+  const pendingWdQuery = query(
+    collection(firestore, "withdrawals"),
+    where("workerId", "==", payload.workerId),
+    where("status", "==", "pending")
+  );
+  const pendingSnaps = await getDocs(pendingWdQuery);
+  let totalPending = 0;
+  pendingSnaps.forEach((docSnap) => {
+    const data = docSnap.data();
+    totalPending += Number(data.amount) || 0;
+  });
 
   await runTransactionWithDiagnostic(
     firestore,
@@ -1063,13 +1408,20 @@ export async function createWithdrawal(payload: {
       const userSnap = await tx.get(userRef);
       if (!userSnap.exists()) throw new Error("Profil pekerja tidak ditemukan.");
       const user = userSnap.data() as PortalUser;
-      const balance = user.balance ?? 0;
-      if (payload.amount <= 0) throw new Error("Jumlah penarikan tidak valid.");
-      if (balance < payload.amount) throw new Error("Saldo tidak mencukupi.");
+      const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+      const availableBalance = currentBalance - totalPending;
 
-      tx.update(userRef, { balance: balance - payload.amount });
+      if (availableBalance < payload.amount) {
+        if (totalPending > 0) {
+          throw new Error(
+            `Saldo tidak mencukupi. Saldo tersedia: ${formatMoney(availableBalance)} (Terdapat penarikan pending: ${formatMoney(totalPending)}).`
+          );
+        }
+        throw new Error("Saldo tidak mencukupi.");
+      }
+
       const withdrawalRef = doc(collection(firestore, "withdrawals"));
-      tx.set(withdrawalRef, {
+      const docData: Record<string, unknown> = {
         workerId: payload.workerId,
         amount: payload.amount,
         method: payload.method,
@@ -1077,17 +1429,44 @@ export async function createWithdrawal(payload: {
         accountHolderName: trimmedHolderName,
         status: "pending" as WithdrawalStatus,
         requestedAt: serverTimestamp(),
-      });
+      };
+      if (typeof payload.fee === "number") docData.fee = payload.fee;
+      if (typeof payload.netAmount === "number") docData.netAmount = payload.netAmount;
+
+      tx.set(withdrawalRef, docData);
     },
     "createWithdrawal",
     "withdrawals"
   );
+
+  // Asynchronously send Telegram Notification without blocking withdrawal
+  (async () => {
+    try {
+      const workerSnap = await getDoc(doc(db, "users", payload.workerId));
+      const workerData = workerSnap.exists() ? (workerSnap.data() as PortalUser) : null;
+      const workerName = workerData?.name || shortId(payload.workerId);
+      const formattedAmount = formatMoney(payload.amount);
+      const nowStr = formatDateTime(new Date());
+      const holderName = payload.accountHolderName ? ` (a.n. ${payload.accountHolderName})` : "";
+
+      const message =
+        `💸 REQUEST PENARIKAN SALDO\n\n` +
+        `👤 Nama Worker: ${workerName}\n` +
+        `💰 Nominal Penarikan: ${formattedAmount}\n` +
+        `💳 Metode Payout: ${payload.method} - ${payload.account}${holderName}\n` +
+        `🕒 Waktu Request: ${nowStr}`;
+
+      await sendTelegramNotification(message);
+    } catch (tgErr) {
+      console.warn("[createWithdrawal] Telegram notification notice:", tgErr);
+    }
+  })();
 }
 
 /**
- * Admin resolves a withdrawal. Rejecting refunds the balance atomically;
- * approving to "processing"/"success" just updates status (the balance was
- * already deducted when the request was made).
+ * Admin resolves a withdrawal atomically inside a Firestore transaction.
+ * Approving deducts balance once (updating balance and saldoUtama), verifying pending status
+ * and sufficient available balance. Double processing is prevented.
  */
 export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalStatus, note: string) {
   if (!db) throw new Error("Firebase is not configured.");
@@ -1099,19 +1478,50 @@ export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalS
       const withdrawalSnap = await tx.get(withdrawalRef);
       if (!withdrawalSnap.exists()) throw new Error("Penarikan tidak ditemukan.");
       const withdrawal = withdrawalSnap.data() as Withdrawal;
-      if (withdrawal.status !== "pending" && withdrawal.status !== "processing") {
+
+      const currentStatus = withdrawal.status;
+
+      if (currentStatus === "success" || currentStatus === "rejected") {
         throw new Error("Penarikan ini sudah selesai diproses.");
       }
 
-      const isRejected = status === "rejected";
-      const userRef = isRejected ? doc(firestore, "users", withdrawal.workerId) : null;
-      const userSnap = userRef ? await tx.get(userRef) : null;
+      const userRef = doc(firestore, "users", withdrawal.workerId);
+      const userSnap = await tx.get(userRef);
 
-      tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
-
-      if (isRejected && userRef && userSnap && userSnap.exists()) {
-        const current = (userSnap.data() as PortalUser).balance ?? 0;
-        tx.update(userRef, { balance: current + withdrawal.amount });
+      if (currentStatus === "pending") {
+        if (status === "success" || status === "processing") {
+          if (!userSnap || !userSnap.exists()) {
+            throw new Error("Profil pekerja tidak ditemukan.");
+          }
+          const user = userSnap.data() as PortalUser;
+          const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+          if (currentBalance < withdrawal.amount) {
+            throw new Error("Saldo pekerja tidak mencukupi.");
+          }
+          const newBalance = currentBalance - withdrawal.amount;
+          tx.update(userRef, {
+            balance: newBalance,
+            saldoUtama: newBalance,
+          });
+          tx.update(withdrawalRef, { status, note, processedAt: serverTimestamp() });
+        } else if (status === "rejected") {
+          tx.update(withdrawalRef, { status: "rejected", note, processedAt: serverTimestamp() });
+        }
+      } else if (currentStatus === "processing") {
+        if (status === "success") {
+          tx.update(withdrawalRef, { status: "success", note, processedAt: serverTimestamp() });
+        } else if (status === "rejected") {
+          if (userSnap && userSnap.exists()) {
+            const user = userSnap.data() as PortalUser;
+            const currentBalance = user.balance ?? (user as any).saldoUtama ?? 0;
+            const newBalance = currentBalance + withdrawal.amount;
+            tx.update(userRef, {
+              balance: newBalance,
+              saldoUtama: newBalance,
+            });
+          }
+          tx.update(withdrawalRef, { status: "rejected", note, processedAt: serverTimestamp() });
+        }
       }
     },
     "reviewWithdrawal",
@@ -1122,41 +1532,6 @@ export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalS
 export async function updatePortalUser(uid: string, data: Partial<PortalUser>) {
   if (!db) throw new Error("Firebase is not configured.");
   return updateDocWithDiagnostic(doc(db, "users", uid), data, "updatePortalUser");
-}
-
-export async function createPortalUser(uid: string, data: Omit<PortalUser, "uid">) {
-  if (!db) throw new Error("Firebase is not configured.");
-  const cleanData = Object.fromEntries(
-    Object.entries(data).filter(([_, v]) => v !== undefined)
-  );
-
-  console.log(`[createPortalUser] Initiating profile creation for path: users/${uid}`);
-
-  const maxAttempts = 3;
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      console.log(`[createPortalUser] Attempt ${attempt}/${maxAttempts} writing document users/${uid}`);
-      await setDocWithDiagnostic(
-        doc(db, "users", uid),
-        { uid, ...cleanData, createdAt: serverTimestamp() },
-        undefined,
-        "createPortalUser"
-      );
-      console.log(`[createPortalUser] Document users/${uid} created successfully on attempt ${attempt}`);
-      return;
-    } catch (err) {
-      lastError = err;
-      console.warn(`[createPortalUser] Attempt ${attempt}/${maxAttempts} failed for users/${uid}:`, err);
-      if (attempt < maxAttempts) {
-        const delay = attempt * 500;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  throw lastError;
 }
 
 export async function createWorkerAccount(data: {
@@ -1187,6 +1562,34 @@ export async function deletePortalUser(uid: string) {
   return deleteDocWithDiagnostic(doc(db, "users", uid), "deletePortalUser");
 }
 
+/**
+ * Updates an existing referral tier at index with new minAcc and rewardAmount values.
+ * Validates the updated tiers array before persisting to Firestore settings/rules.
+ */
+export async function updateReferralTier(index: number, updatedTier: ReferralTierConfig) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  const rulesRef = doc(firestore, "settings", "rules");
+  const rulesSnap = await getDocWithDiagnostic(rulesRef, "updateReferralTier");
+  const rulesData = rulesSnap.exists() ? (rulesSnap.data() as import("@/lib/portal-types").PortalRules) : null;
+  const currentTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+  if (index < 0 || index >= currentTiers.length) {
+    throw new Error("Index tier referral tidak valid.");
+  }
+
+  const updatedList = currentTiers.map((t, idx) => (idx === index ? updatedTier : t));
+  const sorted = [...updatedList].sort((a, b) => a.minAcc - b.minAcc);
+
+  const valError = validateReferralTiers(sorted);
+  if (valError) {
+    throw new Error(valError);
+  }
+
+  return saveSettings("rules", { referralTiers: sorted });
+}
+
 export async function saveSettings(name: string, data: Record<string, unknown>) {
   if (!db) throw new Error("Firebase is not configured.");
   const currentUser = auth?.currentUser;
@@ -1215,6 +1618,356 @@ export async function saveSettings(name: string, data: Record<string, unknown>) 
  * Self-referral is rejected.
  * Validates that referrer exists before creating false relationships.
  */
+/**
+ * 1. Fungsi saat Worker B mendaftar dan memasukkan kode referral Worker A
+ */
+export async function bindReferral(workerBId: string, referralCode: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const cleanCode = referralCode ? referralCode.trim() : "";
+  if (!cleanCode) {
+    throw new Error("Kode referral wajib diisi.");
+  }
+
+  const firestore = db;
+
+  // Search for Worker A by referralCode or UID
+  let workerAId: string | null = null;
+  let workerAName: string = "";
+
+  const refCodeQuery = query(collection(firestore, "users"), where("referralCode", "==", cleanCode));
+  const refCodeSnaps = await getDocsWithDiagnostic(
+    refCodeQuery,
+    [where("referralCode", "==", cleanCode)],
+    "bindReferral:findWorkerA",
+    "users"
+  );
+
+  if (refCodeSnaps && !refCodeSnaps.empty) {
+    const docSnap = refCodeSnaps.docs[0];
+    workerAId = docSnap.id;
+    const data = docSnap.data() as Record<string, any>;
+    workerAName = data.name || docSnap.id;
+  } else {
+    const directWorkerASnap = await getDocWithDiagnostic(
+      doc(firestore, "users", cleanCode),
+      "bindReferral:findWorkerADirect"
+    );
+    if (directWorkerASnap && typeof directWorkerASnap.exists === "function" && directWorkerASnap.exists()) {
+      workerAId = directWorkerASnap.id;
+      const data = directWorkerASnap.data() as Record<string, any>;
+      workerAName = data.name || directWorkerASnap.id;
+    }
+  }
+
+  if (!workerAId) {
+    throw new Error("Kode referral tidak valid!");
+  }
+
+  if (workerAId === workerBId) {
+    throw new Error("Tidak bisa menggunakan kode referral sendiri!");
+  }
+
+  const workerBRef = doc(firestore, "users", workerBId);
+  const workerARef = doc(firestore, "users", workerAId);
+  const referralDocRef = doc(firestore, "referrals", workerBId);
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (transaction) => {
+      // 1. ALL READS FIRST
+      const workerBDoc = await transaction.get(workerBRef);
+      if (!workerBDoc.exists()) throw new Error("Worker B tidak ditemukan!");
+
+      const workerBData = workerBDoc.data() as PortalUser;
+      if (workerBData.hasUsedReferral === true || workerBData.referredBy) {
+        throw new Error("Akun ini sudah terikat dengan referral lain dan tidak bisa diubah!");
+      }
+
+      const workerADoc = await transaction.get(workerARef);
+      if (!workerADoc.exists()) throw new Error("Data worker A tidak ditemukan!");
+
+      const referralSnap = await transaction.get(referralDocRef);
+
+      // 2. ALL WRITES AFTER READS
+      transaction.update(workerBRef, {
+        referredBy: workerAId,
+        hasUsedReferral: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      transaction.update(workerARef, {
+        reciprocalPartner: workerBId,
+        updatedAt: serverTimestamp(),
+      });
+
+      if (referralSnap.exists()) {
+        transaction.update(referralDocRef, {
+          referrerId: workerAId,
+          referrerName: workerAName || shortId(workerAId),
+          referredWorkerId: workerBId,
+          referredWorkerName: workerBData.name || shortId(workerBId),
+          status: "PENDING",
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        transaction.set(referralDocRef, {
+          id: workerBId,
+          referrerId: workerAId,
+          referrerName: workerAName || shortId(workerAId),
+          referredWorkerId: workerBId,
+          referredWorkerName: workerBData.name || shortId(workerBId),
+          currentAccCount: 0,
+          rewardAmount: 0,
+          status: "PENDING",
+          createdAt: serverTimestamp(),
+        });
+      }
+    },
+    "bindReferral",
+    `users/${workerBId}`
+  );
+
+  return { success: true, message: "Berhasil terhubung dengan partner referral secara permanen!" };
+}
+
+/**
+ * 2. Fungsi saat Admin mengubah status email menjadi 'ACC'
+ * Mengatur Gaji Utama, Pasif Income Rp100, dan Poin Klasemen
+ */
+export async function processEmailACC(submissionId: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+
+  await runTransactionWithDiagnostic(
+    firestore,
+    async (transaction) => {
+      // 1. ALL READS FIRST
+      const submissionDoc = await transaction.get(submissionRef);
+      if (!submissionDoc.exists()) throw new Error("Data storan tidak ditemukan!");
+
+      const submissionData = submissionDoc.data() as EmailSubmission;
+      if (submissionData.status === "ACC" || submissionData.status === "approved" || submissionData.status === "available" || submissionData.status === "sold") {
+        throw new Error("Email ini sudah pernah di-ACC sebelumnya!");
+      }
+
+      let workerId = submissionData.workerId;
+      let workerRef = doc(firestore, "users", workerId);
+      let workerDoc = await transaction.get(workerRef);
+
+      if (!workerDoc.exists()) {
+        const usersSnap = await getDocs(collection(firestore, "users"));
+        const targetEmail = ((submissionData as any).workerEmail || (submissionData as any).userEmail || (workerId?.includes("@") ? workerId : "")).trim().toLowerCase();
+        const targetName = (submissionData.workerName || (!workerId?.includes("@") ? workerId : "")).trim().toLowerCase();
+
+        const foundDoc = usersSnap.docs.find((d) => {
+          const data = d.data();
+          const email = (data.email || "").trim().toLowerCase();
+          const name = (data.name || "").trim().toLowerCase();
+          return (targetEmail && email === targetEmail) || (targetName && name === targetName);
+        });
+
+        if (foundDoc) {
+          workerRef = doc(firestore, "users", foundDoc.id);
+          workerDoc = await transaction.get(workerRef);
+          workerId = foundDoc.id;
+        }
+      }
+
+      if (!workerDoc.exists()) throw new Error("Data worker tidak ditemukan!");
+
+      const workerData = workerDoc.data() as PortalUser;
+
+      const rulesRef = doc(firestore, "settings", "rules");
+      const rulesSnap = await transaction.get(rulesRef);
+      const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+
+      const approvedCount = submissionData.approvedItemCount ?? getItemCountOfSubmission(submissionData) ?? 1;
+      const mainSalaryPerItem = submissionData.currentPricePerItem ?? submissionData.pricePerEmail ?? rulesData?.pricePerEmail ?? 3000;
+      const mainSalaryTotal = approvedCount * mainSalaryPerItem;
+      const passiveCommissionPerAcc = rulesData?.referralCommissionPerAcc ?? 100;
+      const passiveCommissionTotal = approvedCount * passiveCommissionPerAcc;
+
+      // Check 1-on-1 reciprocal relationship
+      let partnerIdToPay: string | null = null;
+      if (workerData.referredBy) {
+        // Jika worker ini adalah B, maka kirim pasif komisi ke A
+        partnerIdToPay = workerData.referredBy;
+      } else if (workerData.reciprocalPartner) {
+        // Jika worker ini adalah A, maka kirim pasif komisi ke B
+        partnerIdToPay = workerData.reciprocalPartner;
+      }
+
+      let partnerRef: any = null;
+      let partnerDoc: any = null;
+      if (partnerIdToPay) {
+        partnerRef = doc(firestore, "users", partnerIdToPay);
+        partnerDoc = await transaction.get(partnerRef);
+      }
+
+      let referralRef: any = null;
+      let referralSnap: any = null;
+      if (partnerIdToPay) {
+        referralRef = doc(firestore, "referrals", workerId);
+        referralSnap = await transaction.get(referralRef);
+      }
+
+      // 2. ALL WRITES AFTER READS
+      // A. Berikan Gaji Utama ke Worker yang mengerjakan
+      const currentMainBalance = workerData.balance || (workerData as any)?.saldoUtama || 0;
+      const currentAccCount = workerData.accCount || 0;
+      const currentTotalACC = workerData.totalACC || 0;
+
+      transaction.update(workerRef, {
+        balance: currentMainBalance + mainSalaryTotal,
+        saldoUtama: currentMainBalance + mainSalaryTotal,
+        accCount: currentAccCount + approvedCount,
+        totalACC: currentTotalACC + approvedCount,
+        updatedAt: serverTimestamp(),
+      });
+
+      // B. Berikan Pasif Income Rp100 ke Partner-nya
+      if (partnerIdToPay && partnerDoc && partnerDoc.exists()) {
+        const partnerData = partnerDoc.data() as PortalUser;
+        const currentPassiveBalance = partnerData.balance || (partnerData as any)?.saldoUtama || 0;
+        const currentTotalRefEarned = partnerData.totalReferralEarned || 0;
+        const currentTeamAccCount = partnerData.teamAccCount || 0;
+
+        transaction.update(partnerRef, {
+          balance: currentPassiveBalance + passiveCommissionTotal,
+          saldoUtama: currentPassiveBalance + passiveCommissionTotal,
+          totalReferralEarned: currentTotalRefEarned + passiveCommissionTotal,
+          teamAccCount: currentTeamAccCount + approvedCount,
+          updatedAt: serverTimestamp(),
+        });
+
+        // Record log to referral_transactions
+        const refTxRef = doc(collection(firestore, "referral_transactions"));
+        transaction.set(refTxRef, {
+          id: refTxRef.id,
+          uplineId: partnerIdToPay,
+          uplineName: partnerData.name || shortId(partnerIdToPay),
+          downlineId: workerId,
+          downlineName: workerData.name || shortId(workerId),
+          accCount: approvedCount,
+          commissionPerEmail: passiveCommissionPerAcc,
+          totalCommission: passiveCommissionTotal,
+          submissionId,
+          createdAt: serverTimestamp(),
+        });
+
+        if (referralSnap && referralSnap.exists()) {
+          const refData = referralSnap.data();
+          transaction.update(referralRef, {
+            currentAccCount: (refData.currentAccCount ?? 0) + approvedCount,
+            rewardAmount: (refData.rewardAmount ?? 0) + passiveCommissionTotal,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // C. Ubah status submission jadi ACC
+      const itemsToSave = submissionData.items && submissionData.items.length > 0
+        ? submissionData.items.map((it) => ({ ...it, status: "approved" as const }))
+        : [{ email: submissionData.email ?? "", password: submissionData.password, status: "approved" as const }];
+
+      transaction.update(submissionRef, {
+        status: "ACC",
+        items: itemsToSave,
+        approvedItemCount: approvedCount,
+        rejectedItemCount: 0,
+        appliedPricePerItem: mainSalaryPerItem,
+        totalAmount: mainSalaryTotal,
+        processedAt: serverTimestamp(),
+        reviewedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    },
+    "processEmailACC",
+    `emailSubmissions/${submissionId}`
+  );
+
+  return { success: true, message: "Email berhasil di-ACC, gaji dan pasif income otomatis terdistribusi!" };
+}
+
+/**
+ * Claims an invitation code post-registration for an existing worker.
+ * Enforces atomic validation & writes inside a Firestore transaction.
+ */
+export async function claimReferralCode(currentWorker: PortalUser, referralCodeInput: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const code = referralCodeInput ? referralCodeInput.trim() : "";
+
+  if (!code) {
+    throw new Error("Kode undangan wajib diisi.");
+  }
+
+  if (currentWorker.referredBy) {
+    throw new Error("Akun kamu sudah terhubung dengan kode undangan.");
+  }
+
+  if (code === currentWorker.uid) {
+    throw new Error("Tidak dapat menggunakan kode undangan milik sendiri.");
+  }
+
+  const firestore = db;
+
+  return runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // 1. ALL READS FIRST
+      const currentUserRef = doc(firestore, "users", currentWorker.uid);
+      const currentUserSnap = await tx.get(currentUserRef);
+
+      if (!currentUserSnap.exists()) {
+        throw new Error("Profil pengguna tidak ditemukan.");
+      }
+
+      const currentUserData = currentUserSnap.data() as PortalUser;
+      if (currentUserData.referredBy) {
+        throw new Error("Akun kamu sudah terhubung dengan kode undangan.");
+      }
+
+      const existingRefDocRef = doc(firestore, "referrals", currentWorker.uid);
+      const existingRefSnap = await tx.get(existingRefDocRef);
+      if (existingRefSnap.exists()) {
+        throw new Error("Akun kamu sudah memiliki data referral/pengundang.");
+      }
+
+      const referrerUserRef = doc(firestore, "users", code);
+      const referrerUserSnap = await tx.get(referrerUserRef);
+
+      if (!referrerUserSnap.exists()) {
+        throw new Error("Kode undangan tidak valid atau tidak ditemukan.");
+      }
+
+      const referrerData = referrerUserSnap.data() as PortalUser;
+      const referrerName = referrerData.name && referrerData.name.trim() ? referrerData.name.trim() : shortId(code);
+
+      // 2. ALL WRITES AFTER READS
+      tx.update(currentUserRef, {
+        referredBy: code,
+        updatedAt: serverTimestamp(),
+      });
+
+      tx.set(existingRefDocRef, {
+        id: currentWorker.uid,
+        referrerId: code,
+        referrerName,
+        referredWorkerId: currentWorker.uid,
+        referredWorkerName: currentUserData.name || currentWorker.name,
+        currentAccCount: 0,
+        rewardAmount: 0,
+        status: "PENDING",
+        createdAt: serverTimestamp(),
+      });
+    },
+    "claimReferralCode",
+    `referrals/${currentWorker.uid}`
+  );
+}
+
 export async function registerReferral(referrerId: string, referredWorkerId: string, referredWorkerName: string) {
   if (!db) throw new Error("Firebase is not configured.");
   if (!referrerId || !referredWorkerId) return;
@@ -1315,79 +2068,461 @@ export async function evaluateReferralQualification(referredWorkerId: string) {
     "evaluateReferralQualification",
     `referrals/${referredWorkerId}`
   );
+
+  // Automatically claim any eligible unclaimed tiers for the referrer
+  try {
+    await autoClaimEligibleReferralRewards(referredWorkerId);
+  } catch (autoClaimErr) {
+    console.warn("[evaluateReferralQualification] autoClaim notice:", autoClaimErr);
+  }
 }
 
 // Alias for backwards compatibility if needed
 export const evaluateReferralQualificationAndReward = evaluateReferralQualification;
 
 /**
+ * Worker directly claims a qualified referral tier reward via an atomic Firestore transaction.
+ * STRICT ORDERING: ALL READS MUST HAPPEN BEFORE ANY WRITES.
+ */
+export async function claimReferralReward(referralId: string, minAcc: number) {
+  try {
+    if (!db || !auth) throw new Error("Firebase is not configured.");
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error("Anda harus masuk terlebih dahulu.");
+
+    const firestore = db;
+
+    return await runTransactionWithDiagnostic(
+      firestore,
+      async (tx) => {
+        // --- ALL READS FIRST ---
+
+        // READ 1: referrals/{referralId}
+        const referralRef = doc(firestore, "referrals", referralId);
+        const referralSnap = await tx.get(referralRef);
+
+        if (!referralSnap.exists()) {
+          throw new Error("Data referral tidak ditemukan.");
+        }
+
+        const actualDocId = referralSnap.id;
+        const referralData = referralSnap.data() as import("@/lib/portal-types").Referral;
+        const status = referralData.status ?? "PENDING";
+        if (status === "REJECTED") {
+          throw new Error("Referral ini telah ditolak oleh admin.");
+        }
+
+        const effectiveReferrerId =
+          (referralData.referrerId && String(referralData.referrerId).trim()) ||
+          referralData.id ||
+          actualDocId;
+
+        if (effectiveReferrerId !== currentUser.uid) {
+          throw new Error("Anda tidak dapat mengklaim reward referral milik akun lain.");
+        }
+
+        const effectiveReferredWorkerId =
+          (referralData.referredWorkerId && String(referralData.referredWorkerId).trim()) ||
+          referralData.id ||
+          actualDocId;
+
+        const effectiveReferredWorkerName =
+          referralData.referredWorkerName || shortId(effectiveReferredWorkerId);
+
+        // READ 2: settings/rules
+        const rulesRef = doc(firestore, "settings", "rules");
+        const rulesSnap = await tx.get(rulesRef);
+        const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
+        const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+        const matchedTier = referralTiers.find((t) => Number(t.minAcc) === Number(minAcc));
+        if (!matchedTier) {
+          throw new Error(`Tier referral ${minAcc} ACC tidak ditemukan.`);
+        }
+
+        const currentAcc = Number(referralData.currentAccCount ?? 0);
+        if (currentAcc < matchedTier.minAcc) {
+          throw new Error(`Target ACC belum tercapai (${currentAcc}/${matchedTier.minAcc}).`);
+        }
+
+        const claimedTiers: Record<string, boolean> = referralData.claimedTiers || {};
+        if (claimedTiers[String(matchedTier.minAcc)]) {
+          throw new Error(`Hadiah tier ${matchedTier.minAcc} ACC sudah pernah diklaim.`);
+        }
+
+        // READ 3: users/{currentUser.uid}
+        const referrerRef = doc(firestore, "users", currentUser.uid);
+        const referrerSnap = await tx.get(referrerRef);
+
+        if (!referrerSnap.exists()) {
+          throw new Error(`Profil pengundang tidak ditemukan (users/${currentUser.uid}).`);
+        }
+
+        const referrerData = referrerSnap.data() as PortalUser;
+        const currentBalance = Number(referrerData.balance ?? 0);
+        const referrerName =
+          (referrerData.name && String(referrerData.name).trim()) ||
+          referralData.referrerName ||
+          shortId(currentUser.uid);
+
+        // READ 4 & READ 5: referralClaims/{claimId} & rewardLedger/{ledgerId}
+        const claimDocId = `${actualDocId}_tier_${matchedTier.minAcc}`;
+        const claimRef = doc(firestore, "referralClaims", claimDocId);
+        const claimSnap = await tx.get(claimRef);
+
+        if (claimSnap.exists() && claimSnap.data()?.status === "approved") {
+          throw new Error(`Hadiah tier ${matchedTier.minAcc} ACC sudah pernah diklaim.`);
+        }
+
+        const ledgerDocId = `${actualDocId}_ledger_tier_${matchedTier.minAcc}`;
+        const ledgerRef = doc(firestore, "rewardLedger", ledgerDocId);
+        const ledgerSnap = await tx.get(ledgerRef);
+
+        // --- ALL WRITES AFTER READS ---
+
+        // WRITE 1: referrals/{actualDocId}
+        const updatedClaimedTiers = { ...claimedTiers, [String(matchedTier.minAcc)]: true };
+        const newTotalReward = Number(referralData.rewardAmount ?? 0) + matchedTier.reward;
+        const allClaimed = referralTiers.every((t) => Boolean(updatedClaimedTiers[String(t.minAcc)]));
+
+        tx.update(referralRef, {
+          claimedTiers: updatedClaimedTiers,
+          rewardAmount: newTotalReward,
+          status: allClaimed ? "PAID" : "QUALIFIED",
+          rewardedAt: serverTimestamp(),
+        });
+
+        // WRITE 2: users/{currentUser.uid}
+        tx.update(referrerRef, {
+          balance: currentBalance + matchedTier.reward,
+          lastClaimId: claimDocId,
+        });
+
+        // WRITE 3: rewardLedger/{ledgerDocId}
+        const ledgerData = {
+          id: ledgerDocId,
+          workerId: currentUser.uid,
+          workerName: referrerName,
+          rewardType: "referral" as const,
+          amount: matchedTier.reward,
+          sourceRefId: `${actualDocId}_tier_${matchedTier.minAcc}`,
+          description: `Hadiah Referral Tier ${matchedTier.minAcc} ACC (${formatMoney(matchedTier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
+          createdAt: serverTimestamp(),
+        };
+        if (ledgerSnap.exists()) {
+          tx.update(ledgerRef, ledgerData);
+        } else {
+          tx.set(ledgerRef, ledgerData);
+        }
+
+        // WRITE 4: referralClaims/{claimDocId}
+        const claimData = {
+          id: claimDocId,
+          referralId: actualDocId,
+          referrerId: currentUser.uid,
+          referredWorkerId: effectiveReferredWorkerId,
+          minAcc: matchedTier.minAcc,
+          rewardAmount: matchedTier.reward,
+          status: "approved" as const,
+          processedAt: serverTimestamp(),
+        };
+        if (claimSnap.exists()) {
+          tx.update(claimRef, claimData);
+        } else {
+          tx.set(claimRef, claimData);
+        }
+
+        return {
+          status: "ok",
+          message: `🎉 Reward referral berhasil diklaim +${formatMoney(matchedTier.reward)}`,
+          rewardAmount: matchedTier.reward,
+        };
+      },
+      "claimReferralReward",
+      `referrals/${referralId}`
+    );
+  } catch (err) {
+    console.error("REFERRAL_CLAIM_ERROR_DETAIL:", err);
+    throw err;
+  }
+}
+
+export const claimReferralTier = claimReferralReward;
+export const createReferralClaimRequest = claimReferralReward;
+
+/**
+ * Automatically checks for any unclaimed eligible referral tiers for referredWorkerId
+ * and attempts to claim them for the referrer.
+ */
+export async function autoClaimEligibleReferralRewards(referredWorkerId: string) {
+  if (!db || !auth?.currentUser) return;
+  try {
+    const firestore = db;
+    const referralRef = doc(firestore, "referrals", referredWorkerId);
+    const referralSnap = await getDocWithDiagnostic(referralRef, "autoClaimEligibleReferralRewards");
+    if (!referralSnap.exists()) return;
+
+    const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
+    // Only auto-claim if current logged-in user is the referrer
+    if (referral.referrerId !== auth.currentUser.uid) return;
+
+    const currentAcc = referral.currentAccCount ?? 0;
+    const claimedTiers = referral.claimedTiers || {};
+
+    const rulesRef = doc(firestore, "settings", "rules");
+    const rulesSnap = await getDocWithDiagnostic(rulesRef, "autoClaimEligibleReferralRewards");
+    const rulesData = rulesSnap.exists() ? (rulesSnap.data() as import("@/lib/portal-types").PortalRules) : null;
+    const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
+
+    for (const tier of referralTiers) {
+      if (currentAcc >= tier.minAcc && !claimedTiers[String(tier.minAcc)]) {
+        try {
+          await claimReferralReward(referredWorkerId, tier.minAcc);
+        } catch (claimErr) {
+          console.warn(`[autoClaimEligibleReferralRewards] Tier ${tier.minAcc} claim notice:`, claimErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[autoClaimEligibleReferralRewards] Error:", err);
+  }
+}
+
+/**
  * Admin approves a qualified referral, atomically crediting reward to referrer balance
  * and generating a reward ledger record. Prevents double rewards using transaction locks.
+ * Supports optional targetMinAcc for per-tier approval, or approves all eligible unclaimed tiers.
  */
-export async function approveReferral(referralId: string) {
-  if (!db) throw new Error("Firebase is not configured.");
+/**
+ * Admin approves a qualified referral, atomically crediting reward to referrer balance
+ * and generating a reward ledger record using direct Firestore client SDK transaction.
+ * Security is strictly enforced by Firestore security rules (isAdmin check).
+ */
+export async function approveReferral(referralId: string, targetMinAcc?: number) {
+  if (!db || !auth) throw new Error("Firebase is not configured.");
+  if (!auth.currentUser) {
+    const err = new Error("Anda harus masuk terlebih dahulu sebagai admin.");
+    (err as any).status = 401;
+    (err as any).code = "UNAUTHENTICATED";
+    throw err;
+  }
+
   const firestore = db;
 
-  await runTransactionWithDiagnostic(
+  return runTransactionWithDiagnostic(
     firestore,
     async (tx) => {
-      // 1. ALL READS FIRST
+      // --- ALL READS FIRST ---
+
+      // READ 1: referrals/{referralId}
       const referralRef = doc(firestore, "referrals", referralId);
       const referralSnap = await tx.get(referralRef);
+
       if (!referralSnap.exists()) {
-        throw new Error("Data referral tidak ditemukan.");
+        const err = new Error("Data referral tidak ditemukan.");
+        (err as any).status = 404;
+        (err as any).code = "NOT_FOUND";
+        throw err;
       }
 
-      const referral = referralSnap.data() as import("@/lib/portal-types").Referral;
-      if (referral.status === "PAID" || referral.status === "REWARDED") {
-        throw new Error("Referral ini sudah pernah disetujui / dibayar.");
+      const actualDocId = referralSnap.id;
+      const referralData = referralSnap.data() as import("@/lib/portal-types").Referral;
+      const status = referralData.status ?? "PENDING";
+      if (status === "REJECTED") {
+        const err = new Error("Referral ini sudah ditolak.");
+        (err as any).status = 400;
+        (err as any).code = "INVALID_STATUS";
+        throw err;
       }
 
-      if (referral.status === "REJECTED") {
-        throw new Error("Referral ini sudah ditolak.");
-      }
+      const effectiveReferrerId =
+        (referralData.referrerId && String(referralData.referrerId).trim()) ||
+        referralData.id ||
+        actualDocId;
 
+      const effectiveReferredWorkerId =
+        (referralData.referredWorkerId && String(referralData.referredWorkerId).trim()) ||
+        referralData.id ||
+        actualDocId;
+
+      const effectiveReferredWorkerName =
+        referralData.referredWorkerName ||
+        shortId(effectiveReferredWorkerId);
+
+      // READ 2: settings/rules
       const rulesRef = doc(firestore, "settings", "rules");
       const rulesSnap = await tx.get(rulesRef);
       const rulesData = rulesSnap.exists() ? rulesSnap.data() : {};
       const referralTiers = (rulesData?.referralTiers ?? DEFAULT_REFERRAL_TIERS) as ReferralTierConfig[];
 
-      const currentAcc = referral.currentAccCount ?? 0;
-      let rewardAmt = getReferralRewardForAccCount(currentAcc, referralTiers);
-      if (rewardAmt <= 0) {
-        rewardAmt = referral.rewardAmount ?? rulesData?.referralReward ?? 500;
+      const currentAcc = Number(referralData.currentAccCount ?? 0);
+      const claimedTiers: Record<string, boolean> = referralData.claimedTiers || {};
+
+      let tiersToClaim: ReferralTierConfig[] = [];
+      if (typeof targetMinAcc === "number" && !isNaN(targetMinAcc)) {
+        const found = referralTiers.find((t) => Number(t.minAcc) === targetMinAcc);
+        if (!found) {
+          const err = new Error(`Tier referral ${targetMinAcc} ACC tidak ditemukan.`);
+          (err as any).status = 400;
+          (err as any).code = "TIER_NOT_FOUND";
+          throw err;
+        }
+        if (currentAcc < found.minAcc) {
+          const err = new Error(`Target ACC belum tercapai (${currentAcc}/${found.minAcc}).`);
+          (err as any).status = 400;
+          (err as any).code = "TARGET_NOT_MET";
+          throw err;
+        }
+        if (claimedTiers[String(found.minAcc)]) {
+          const err = new Error(`Tier ${found.minAcc} ACC sudah pernah diklaim/disetujui.`);
+          (err as any).status = 409;
+          (err as any).code = "ALREADY_CLAIMED";
+          throw err;
+        }
+        tiersToClaim = [found];
+      } else {
+        tiersToClaim = referralTiers.filter(
+          (t) => currentAcc >= t.minAcc && !claimedTiers[String(t.minAcc)]
+        );
+        if (tiersToClaim.length === 0) {
+          if (status === "PAID" || status === "REWARDED") {
+            const err = new Error("Referral ini sudah pernah disetujui / dibayar seluruhnya.");
+            (err as any).status = 409;
+            (err as any).code = "ALREADY_PAID";
+            throw err;
+          }
+          const err = new Error("Belum ada tier referral yang memenuhi syarat untuk disetujui.");
+          (err as any).status = 400;
+          (err as any).code = "NO_ELIGIBLE_TIERS";
+          throw err;
+        }
       }
 
-      const referrerRef = doc(firestore, "users", referral.referrerId);
+      const totalClaimReward = tiersToClaim.reduce((sum, t) => sum + t.reward, 0);
+
+      // READ 3: users/{effectiveReferrerId}
+      const referrerRef = doc(firestore, "users", effectiveReferrerId);
       const referrerSnap = await tx.get(referrerRef);
+
       if (!referrerSnap.exists()) {
-        throw new Error("Profil pengundang tidak ditemukan.");
+        const err = new Error(`Profil pengundang tidak ditemukan (users/${effectiveReferrerId}).`);
+        (err as any).status = 400;
+        (err as any).code = "REFERRER_NOT_FOUND";
+        throw err;
       }
 
-      const currentBalance = (referrerSnap.data() as PortalUser).balance ?? 0;
-      const referrerName = (referrerSnap.data() as PortalUser).name || referral.referrerName || shortId(referral.referrerId);
+      const referrerData = referrerSnap.data() as PortalUser;
+      const currentBalance = Number(referrerData.balance ?? 0);
+      const referrerName =
+        (referrerData.name && String(referrerData.name).trim()) ||
+        referralData.referrerName ||
+        shortId(effectiveReferrerId);
 
-      // 2. ALL WRITES AFTER READS
+      // READ 4 & 5: referralClaims/{claimId} & rewardLedger/{ledgerId}
+      const claimDocsToProcess: Array<{
+        claimRef: any;
+        claimDocId: string;
+        claimExists: boolean;
+        ledgerRef: any;
+        ledgerDocId: string;
+        ledgerExists: boolean;
+        tier: ReferralTierConfig;
+      }> = [];
+
+      for (const t of tiersToClaim) {
+        const claimDocId = `${actualDocId}_tier_${t.minAcc}`;
+        const claimRef = doc(firestore, "referralClaims", claimDocId);
+        const claimSnap = await tx.get(claimRef);
+
+        const ledgerDocId = `${actualDocId}_ledger_tier_${t.minAcc}`;
+        const ledgerRef = doc(firestore, "rewardLedger", ledgerDocId);
+        const ledgerSnap = await tx.get(ledgerRef);
+
+        claimDocsToProcess.push({
+          claimRef,
+          claimDocId,
+          claimExists: claimSnap.exists(),
+          ledgerRef,
+          ledgerDocId,
+          ledgerExists: ledgerSnap.exists(),
+          tier: t,
+        });
+      }
+
+      // --- ALL WRITES AFTER READS ---
+
+      // WRITE 1: referrals/{actualDocId}
+      const updatedClaimedTiers = { ...claimedTiers };
+      tiersToClaim.forEach((t) => {
+        updatedClaimedTiers[String(t.minAcc)] = true;
+      });
+
+      const newTotalReward = Number(referralData.rewardAmount ?? 0) + totalClaimReward;
+      const allClaimed = referralTiers.every((t) => Boolean(updatedClaimedTiers[String(t.minAcc)]));
+
       tx.update(referralRef, {
-        status: "PAID",
-        rewardAmount: rewardAmt,
+        claimedTiers: updatedClaimedTiers,
+        rewardAmount: newTotalReward,
+        status: allClaimed ? "PAID" : "QUALIFIED",
         rewardedAt: serverTimestamp(),
       });
 
+      // WRITE 2: users/{effectiveReferrerId}
       tx.update(referrerRef, {
-        balance: currentBalance + rewardAmt,
+        balance: currentBalance + totalClaimReward,
       });
 
-      const ledgerRef = doc(collection(firestore, "rewardLedger"));
-      tx.set(ledgerRef, {
-        workerId: referral.referrerId,
-        workerName: referrerName,
-        rewardType: "referral",
-        amount: rewardAmt,
-        sourceRefId: referralId,
-        description: `Hadiah Referral dari pekerja ${referral.referredWorkerName || shortId(referral.referredWorkerId)}`,
-        createdAt: serverTimestamp(),
-      });
+      // WRITE 3 & 4: rewardLedger/{ledgerId} & referralClaims/{claimId}
+      for (const { claimRef, claimDocId, claimExists, ledgerRef, ledgerDocId, ledgerExists, tier } of claimDocsToProcess) {
+        const ledgerData = {
+          id: ledgerDocId,
+          workerId: effectiveReferrerId,
+          workerName: referrerName,
+          rewardType: "referral" as const,
+          amount: tier.reward,
+          sourceRefId: `${actualDocId}_tier_${tier.minAcc}`,
+          description: `Hadiah Referral Tier ${tier.minAcc} ACC (${formatMoney(tier.reward)}) dari pekerja ${effectiveReferredWorkerName}`,
+          createdAt: serverTimestamp(),
+        };
+
+        if (ledgerExists) {
+          tx.update(ledgerRef, ledgerData);
+        } else {
+          tx.set(ledgerRef, ledgerData);
+        }
+
+        const claimData = {
+          id: claimDocId,
+          referralId: actualDocId,
+          referrerId: effectiveReferrerId,
+          referredWorkerId: effectiveReferredWorkerId,
+          minAcc: tier.minAcc,
+          rewardAmount: tier.reward,
+          status: "approved" as const,
+          processedAt: serverTimestamp(),
+        };
+
+        if (claimExists) {
+          tx.update(claimRef, {
+            status: "approved",
+            processedAt: serverTimestamp(),
+          });
+        } else {
+          tx.set(claimRef, claimData);
+        }
+      }
+
+      return {
+        status: "ok",
+        message: "Referral berhasil disetujui & hadiah telah dicairkan ke pengundang!",
+        data: {
+          referralId: actualDocId,
+          effectiveReferrerId,
+          totalClaimReward,
+          approvedTiers: tiersToClaim.map((t) => t.minAcc),
+          status: allClaimed ? "PAID" : "QUALIFIED",
+        },
+      };
     },
     "approveReferral",
     `referrals/${referralId}`
@@ -1581,6 +2716,7 @@ export async function distributeLeaderboardReward(
         rank,
         validAccCount,
         rewardAmount,
+        isPaid: true,
         paidAt: serverTimestamp(),
       });
 
@@ -1595,7 +2731,7 @@ export async function distributeLeaderboardReward(
         rewardType: "leaderboard",
         amount: rewardAmount,
         sourceRefId: payoutId,
-        description: `Hadiah Klasemen Periode ${periodKey} (Juara ${rank})`,
+        description: `Bonus Reward Leaderboard - Juara ${rank} (${periodKey})`,
         createdAt: serverTimestamp(),
       });
     },
@@ -1760,6 +2896,211 @@ export async function deleteFinancialTransaction(id: string) {
   );
 }
 
+export {
+  useAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  toggleAnnouncementStatus,
+} from "./useAnnouncements";
+
+/**
+ * Safe one-time atomic reconciliation for Nabil Alfiansyah's historical approved withdrawal (Rp3.000).
+ *
+ * Checks:
+ * 1. Marker `reconciliation_markers/historical_nabil_wd_3000` to prevent duplicate reconciliation (idempotency).
+ * 2. Locates Nabil Alfiansyah's user document and his approved Rp3.000 withdrawal document.
+ * 3. Verifies withdrawal status is "success" and amount is 3000.
+ * 4. Deducts exactly Rp3.000 from Nabil's balance and saldoUtama while keeping them synchronized.
+ * 5. Writes the reconciliation marker in the same atomic transaction.
+ * 6. Does NOT touch accCount, does NOT alter withdrawal status/amount, does NOT affect any other worker.
+ */
+export async function reconcileHistoricalNabilWithdrawal(
+  targetWorkerId?: string,
+  targetWithdrawalId?: string,
+) {
+  if (!db) throw new Error("Firebase is not configured.");
+  const firestore = db;
+
+  // 1. Locate Nabil Alfiansyah's worker UID if not provided
+  let nabilUid = targetWorkerId || "";
+  let nabilName = "Nabil Alfiansyah";
+
+  if (!nabilUid) {
+    const usersSnap = await getDocs(collection(firestore, "users"));
+    const nabilDoc = usersSnap.docs.find((d) => {
+      const data = d.data();
+      const name = (data.name || "").trim().toLowerCase();
+      return name.includes("nabil alfiansyah") || name.includes("nabil");
+    });
+    if (nabilDoc) {
+      nabilUid = nabilDoc.id;
+      nabilName = nabilDoc.data().name || nabilName;
+    }
+  }
+
+  if (!nabilUid) {
+    throw new Error("Profil Nabil Alfiansyah tidak ditemukan.");
+  }
+
+  // 2. Locate Nabil's Rp3.000 successful withdrawal if not provided
+  let nabilWdId = targetWithdrawalId || "";
+  if (!nabilWdId) {
+    const wdQuery = query(
+      collection(firestore, "withdrawals"),
+      where("workerId", "==", nabilUid),
+      where("status", "==", "success"),
+      where("amount", "==", 3000),
+    );
+    const wdSnaps = await getDocs(wdQuery);
+    if (!wdSnaps.empty) {
+      nabilWdId = wdSnaps.docs[0].id;
+    } else {
+      const allWdQuery = query(
+        collection(firestore, "withdrawals"),
+        where("workerId", "==", nabilUid),
+      );
+      const allWdSnaps = await getDocs(allWdQuery);
+      const match = allWdSnaps.docs.find((d) => {
+        const data = d.data();
+        return Number(data.amount) === 3000 && (data.status === "success" || data.status === "approved");
+      });
+      if (match) {
+        nabilWdId = match.id;
+      }
+    }
+  }
+
+  if (!nabilWdId) {
+    throw new Error("Dokumen penarikan Rp3.000 Nabil Alfiansyah yang berstatus 'success' tidak ditemukan.");
+  }
+
+  const markerDocId = `historical_nabil_wd_3000`;
+  const markerRef = doc(firestore, "reconciliation_markers", markerDocId);
+
+  return await runTransactionWithDiagnostic(
+    firestore,
+    async (tx) => {
+      // --- ALL READS FIRST ---
+
+      // Read 1: reconciliation marker
+      const markerSnap = await tx.get(markerRef);
+      if (markerSnap.exists() && markerSnap.data()?.reconciled === true) {
+        return {
+          status: "already_reconciled",
+          message: "Penarikan Rp3.000 Nabil Alfiansyah sudah pernah direkonsiliasi sebelumnya.",
+          reconciled: true,
+          reconciledAt: markerSnap.data()?.reconciledAt,
+        };
+      }
+
+      // Read 2: Nabil's user profile
+      const userRef = doc(firestore, "users", nabilUid);
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists()) {
+        throw new Error(`Profil worker (${nabilUid}) tidak ditemukan.`);
+      }
+
+      const userData = userSnap.data() as PortalUser;
+
+      // Verify worker name/identity is indeed Nabil Alfiansyah (unless explicit ID override was supplied)
+      const uName = (userData.name || "").trim().toLowerCase();
+      if (!targetWorkerId && !uName.includes("nabil")) {
+        throw new Error("Worker ID tidak cocok dengan profil Nabil Alfiansyah.");
+      }
+
+      // Read 3: Nabil's withdrawal document
+      const wdRef = doc(firestore, "withdrawals", nabilWdId);
+      const wdSnap = await tx.get(wdRef);
+      if (!wdSnap.exists()) {
+        throw new Error(`Dokumen penarikan (${nabilWdId}) tidak ditemukan.`);
+      }
+
+      const wdData = wdSnap.data() as Withdrawal;
+      if (wdData.workerId !== nabilUid) {
+        throw new Error("Dokumen penarikan tidak cocok dengan ID worker Nabil Alfiansyah.");
+      }
+
+      if (wdData.status !== "success") {
+        throw new Error(`Penarikan ini berstatus '${wdData.status}', hanya penarikan berstatus 'success' yang direkonsiliasi.`);
+      }
+
+      if (Number(wdData.amount) !== 3000) {
+        throw new Error(`Nominal penarikan adalah Rp${wdData.amount}, bukan Rp3.000.`);
+      }
+
+      // Read 4: Check if there's any ledger/marker doc for this specific withdrawal
+      const ledgerCheckRef = doc(firestore, "reconciliation_logs", `reconcile_${nabilWdId}`);
+      const ledgerCheckSnap = await tx.get(ledgerCheckRef);
+      if (ledgerCheckSnap.exists()) {
+        return {
+          status: "already_reconciled",
+          message: "Penarikan ini sudah memiliki catatan rekonsiliasi terdahulu.",
+          reconciled: true,
+        };
+      }
+
+      const currentBalance = Number(userData.balance ?? userData.saldoUtama ?? 0);
+      const deductionAmount = 3000;
+
+      // Calculate new balance atomically
+      const newBalance = Math.max(0, currentBalance - deductionAmount);
+
+      // --- ALL WRITES AFTER READS ---
+
+      // Write 1: Update Nabil's user balance and saldoUtama (keep synchronized)
+      tx.update(userRef, {
+        balance: newBalance,
+        saldoUtama: newBalance,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Write 2: Record audit reconciliation marker doc
+      const timestamp = serverTimestamp();
+      const currentUserUid = auth?.currentUser?.uid || "admin";
+
+      tx.set(markerRef, {
+        id: markerDocId,
+        workerId: nabilUid,
+        workerName: userData.name || nabilName,
+        withdrawalId: nabilWdId,
+        amount: deductionAmount,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+        reconciled: true,
+        reconciledAt: timestamp,
+        reconciledBy: currentUserUid,
+        note: "Safe one-time historical withdrawal reconciliation for Nabil Alfiansyah (Rp3.000 undeducted withdrawal on 18 Sep 2026)",
+      });
+
+      // Write 3: Record audit log in reconciliation_logs
+      tx.set(ledgerCheckRef, {
+        id: `reconcile_${nabilWdId}`,
+        workerId: nabilUid,
+        workerName: userData.name || nabilName,
+        withdrawalId: nabilWdId,
+        deductedAmount: deductionAmount,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+        executedAt: timestamp,
+        executedBy: currentUserUid,
+      });
+
+      return {
+        status: "success",
+        message: `Berhasil merekonsiliasi penarikan Rp3.000 Nabil Alfiansyah. Saldo disesuaikan dari ${formatMoney(currentBalance)} menjadi ${formatMoney(newBalance)}.`,
+        reconciled: true,
+        workerId: nabilUid,
+        withdrawalId: nabilWdId,
+        previousBalance: currentBalance,
+        newBalance: newBalance,
+      };
+    },
+    "reconcileHistoricalNabilWithdrawal",
+    `reconciliation_markers/${markerDocId}`,
+  );
+}
+
 export function useFinancialData(selectedPeriod?: string) {
   const constraints: QueryConstraint[] = selectedPeriod
     ? [where("period", "==", selectedPeriod)]
@@ -1795,4 +3136,616 @@ export function useFinancialData(selectedPeriod?: string) {
   }, [data]);
 
   return { transactions: data, summary, loading, error };
+}
+
+export function useReferralTransactions(uid?: string) {
+  const constraints: QueryConstraint[] = uid ? [where("uplineId", "==", uid)] : [];
+  return useCollection<import("@/lib/portal-types").ReferralTransaction>(
+    "referral_transactions",
+    constraints,
+    !!db,
+    { field: "createdAt", direction: "desc" },
+  );
+}
+
+export function useDownlineWorkers(uid?: string) {
+  const [data, setData] = useState<PortalUser[]>([]);
+  const [loading, setLoading] = useState(!!uid && uid !== "worker_demo" && !!db);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!db || !uid || uid === "worker_demo") {
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    let referredByUsers: PortalUser[] = [];
+    let reciprocalUsers: PortalUser[] = [];
+
+    const mergeAndSetData = () => {
+      if (!isMounted) return;
+      const userMap = new Map<string, PortalUser>();
+      referredByUsers.forEach((u) => userMap.set(u.uid, u));
+      reciprocalUsers.forEach((u) => userMap.set(u.uid, u));
+
+      const merged = Array.from(userMap.values()).sort((a, b) => {
+        const av = a.createdAt;
+        const bv = b.createdAt;
+        const at = av && typeof av === "object" && "toMillis" in av ? (av as { toMillis: () => number }).toMillis() : Number(av) || 0;
+        const bt = bv && typeof bv === "object" && "toMillis" in bv ? (bv as { toMillis: () => number }).toMillis() : Number(bv) || 0;
+        return bt - at;
+      });
+
+      setData(merged);
+      setLoading(false);
+    };
+
+    const q1 = query(collection(db, "users"), where("referredBy", "==", uid));
+    const unsub1 = onSnapshot(
+      q1,
+      (snap) => {
+        referredByUsers = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...(docSnap.data() as Omit<PortalUser, "uid">) }));
+        mergeAndSetData();
+      },
+      (err) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: "users",
+          collection: "users",
+          query: [where("referredBy", "==", uid)],
+          hook: "useDownlineWorkers:referredBy",
+          error: err,
+        });
+        setError(err instanceof Error ? err.message : "Gagal membaca downline.");
+        setLoading(false);
+      }
+    );
+
+    const q2 = query(collection(db, "users"), where("reciprocalPartner", "==", uid));
+    const unsub2 = onSnapshot(
+      q2,
+      (snap) => {
+        reciprocalUsers = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...(docSnap.data() as Omit<PortalUser, "uid">) }));
+        mergeAndSetData();
+      },
+      (err) => {
+        if (!isMounted) return;
+        logFirestoreDiagnostic({
+          operation: "onSnapshot",
+          path: "users",
+          collection: "users",
+          query: [where("reciprocalPartner", "==", uid)],
+          hook: "useDownlineWorkers:reciprocalPartner",
+          error: err,
+        });
+        // Non-fatal error fallback
+        mergeAndSetData();
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsub1();
+      unsub2();
+    };
+  }, [uid]);
+
+  return { data, loading, error };
+}
+
+/**
+ * Logika Eksekusi Master Reset dengan Proteksi Type Consistency & Whitespace Trim
+ */
+export async function executeMasterReset(inputPin: string) {
+  if (!db) throw new Error("Firebase is not configured.");
+
+  // 1. Ambil dokumen pengaturan sistem dari Firestore
+  const settingsRef = doc(db, "settings", "general");
+  const settingsSnap = await getDoc(settingsRef);
+
+  let dbPin = "123456";
+  if (settingsSnap.exists()) {
+    const settingsData = settingsSnap.data();
+    // 2. Ambil PIN Admin dari database (fallback ke beberapa nama field potensial)
+    dbPin = settingsData.adminPin ?? settingsData.masterResetPin ?? settingsData.pin ?? "123456";
+  } else {
+    // Check fallback in rules settings or environment if general settings doc does not exist yet
+    const rulesRef = doc(db, "settings", "rules");
+    const rulesSnap = await getDoc(rulesRef);
+    if (rulesSnap.exists()) {
+      const rulesData = rulesSnap.data();
+      dbPin = rulesData.adminPin ?? rulesData.masterResetPin ?? rulesData.pin ?? "123456";
+    }
+  }
+
+  // 3. PAKAI KONVERSI String() DAN .trim() AGAR MATCHING 100% PERSISI
+  const cleanInputPin = String(inputPin).trim();
+  const cleanDbPin = String(dbPin).trim();
+
+  // Validasi pencocokan PIN
+  if (cleanInputPin !== cleanDbPin) {
+    throw new Error("Password / PIN Admin tidak cocok. Master Reset dibatalkan.");
+  }
+
+  // 4. Jalankan Proses Master Reset jika PIN Valid
+  const firestore = db;
+
+  // Delete all documents in emailSubmissions
+  const subSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "emailSubmissions"),
+    [],
+    "masterReset:emailSubmissions",
+    "emailSubmissions"
+  );
+  for (const docSnap of subSnaps?.docs ?? []) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteSubmission");
+  }
+
+  // Delete all documents in withdrawals
+  const wdSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "withdrawals"),
+    [],
+    "masterReset:withdrawals",
+    "withdrawals"
+  );
+  for (const docSnap of wdSnaps?.docs ?? []) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteWithdrawal");
+  }
+
+  // Delete all documents in referral_transactions
+  const refTxSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "referral_transactions"),
+    [],
+    "masterReset:referral_transactions",
+    "referral_transactions"
+  );
+  for (const docSnap of refTxSnaps?.docs ?? []) {
+    await deleteDocWithDiagnostic(docSnap.ref, "masterReset:deleteReferralTransaction");
+  }
+
+  // Reset worker stats to 0 in users collection
+  const userSnaps = await getDocsWithDiagnostic(
+    collection(firestore, "users"),
+    [],
+    "masterReset:users",
+    "users"
+  );
+  for (const docSnap of userSnaps?.docs ?? []) {
+    const userData = docSnap.data() as PortalUser;
+    if (userData.role === "worker") {
+      await updateDocWithDiagnostic(
+        docSnap.ref,
+        {
+          balance: 0,
+          accCount: 0,
+          totalReferralEarned: 0,
+          teamAccCount: 0,
+          updatedAt: serverTimestamp(),
+        },
+        "masterReset:resetUserStats"
+      );
+    }
+  }
+
+  // Log audit entry
+  try {
+    await addDoc(collection(db, "audit_logs"), {
+      action: "EXECUTE_MASTER_RESET",
+      status: "SUCCESS",
+      executedAt: serverTimestamp(),
+    });
+  } catch (auditErr) {
+    console.warn("[executeMasterReset] Audit log recording notice:", auditErr);
+  }
+
+  return { success: true, message: "Master Reset berhasil dieksekusi!" };
+}
+
+/**
+ * Master Reset Operasional (Admin Dashboard backwards compatibility wrapper)
+ */
+export async function masterResetOperasional(adminPassword: string) {
+  const res = await executeMasterReset(adminPassword);
+  return {
+    status: "ok",
+    message: res.message || "Master Reset Operasional Berhasil! Seluruh setoran, penarikan, dan saldo worker telah di-reset.",
+  };
+}
+
+/**
+ * Custom hook wrapper combining authentication state and referral operations
+ * for ReferralSection and component consumers.
+ */
+export function usePortal() {
+  const portalAuth = usePortalAuth();
+
+  const bindReferralCode = async (code: string) => {
+    if (!portalAuth.profile?.uid) {
+      throw new Error("Sesi pengguna tidak terautentikasi.");
+    }
+    return await bindReferral(portalAuth.profile.uid, code);
+  };
+
+  return {
+    ...portalAuth,
+    currentUser: portalAuth.profile,
+    bindReferralCode,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// REAL-TIME PRIVATE CHAT SERVICES & HOOKS (Worker ↔ Admin)
+// ---------------------------------------------------------------------------
+
+import {
+  type ChatMessage,
+  type ChatMessageType,
+  type DisappearingTimer,
+  type Conversation,
+} from "@/lib/portal-types";
+
+/**
+ * Real-time hook for a Worker to listen to their single private conversation metadata with Admin.
+ */
+export function useWorkerChat(workerUid?: string) {
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!workerUid) {
+      setConversation(null);
+      setLoading(false);
+      return;
+    }
+
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const convRef = doc(db, "conversations", workerUid);
+    const unsub = onSnapshot(
+      convRef,
+      (snap) => {
+        const exists = snap && typeof snap.exists === "function" ? snap.exists() : false;
+        if (exists) {
+          setConversation({ id: snap.id, ...snap.data() } as Conversation);
+        } else {
+          setConversation(null);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useWorkerChat snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [workerUid]);
+
+  return { conversation, loading };
+}
+
+/**
+ * Real-time hook for Admin to listen to all active worker conversations.
+ */
+export function useAdminConversations() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const colRef = collection(db, "conversations");
+    const q = query(colRef, orderBy("lastMessageAt", "desc"));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Conversation[] = [];
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Conversation);
+          });
+        }
+        setConversations(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useAdminConversations snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  const totalAdminUnread = useMemo(
+    () => conversations.reduce((sum, c) => sum + (c.adminUnread || 0), 0),
+    [conversations]
+  );
+
+  return { conversations, totalAdminUnread, loading };
+}
+
+/**
+ * Real-time hook to listen to messages in a specific worker conversation subcollection.
+ */
+export function useConversationMessages(conversationId: string | null) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const messagesRef = collection(db, "conversations", conversationId, "messages");
+    const q = query(messagesRef, orderBy("createdAt", "asc"));
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: ChatMessage[] = [];
+        if (snap && typeof snap.forEach === "function") {
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+          });
+        }
+        setMessages(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("useConversationMessages snapshot error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [conversationId]);
+
+  return { messages, loading };
+}
+
+/**
+ * Initiates or updates a worker conversation doc (used when Admin starts a conversation directly).
+ */
+export async function initiateWorkerConversation(worker: {
+  uid: string;
+  name?: string;
+  email?: string;
+}) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const convRef = doc(db, "conversations", worker.uid);
+
+  const existing = await getDoc(convRef);
+  if (!existing.exists()) {
+    await setDoc(
+      convRef,
+      {
+        workerId: worker.uid,
+        workerName: worker.name || "Worker " + worker.uid.slice(0, 6),
+        workerEmail: worker.email || "",
+        lastMessage: "",
+        lastMessageAt: serverTimestamp(),
+        workerUnread: 0,
+        adminUnread: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+}
+
+
+/**
+ * Calculates server expiration timestamp based on DisappearingTimer setting.
+ */
+export function calculateExpirationTimestamp(timer?: DisappearingTimer): Date | null {
+  if (!timer || timer === "off") return null;
+  const now = Date.now();
+  if (timer === "24h") return new Date(now + 24 * 60 * 60 * 1000);
+  if (timer === "7d") return new Date(now + 7 * 24 * 60 * 60 * 1000);
+  if (timer === "30d") return new Date(now + 30 * 24 * 60 * 60 * 1000);
+  return null;
+}
+
+/**
+ * Sends a chat message in conversations/{conversationId}/messages and updates conversation metadata atomically.
+ * Supports text and expiring timer.
+ */
+export async function sendChatMessage(params: {
+  conversationId: string; // workerId
+  senderId: string;
+  senderRole: "admin" | "worker";
+  senderName?: string;
+  senderEmail?: string;
+  text: string;
+  type?: ChatMessageType;
+  disappearingTimer?: DisappearingTimer;
+}) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const trimmed = params.text.trim();
+
+  if (!trimmed) {
+    throw new Error("Pesan tidak boleh kosong.");
+  }
+
+  const msgType: ChatMessageType = "text";
+  const convRef = doc(db, "conversations", params.conversationId);
+  const messagesColRef = collection(db, "conversations", params.conversationId, "messages");
+
+  // Calculate expiration date if disappearing timer active
+  const expiresAtDate = calculateExpirationTimestamp(params.disappearingTimer);
+
+  await runTransaction(db, async (tx) => {
+    const convSnap = await tx.get(convRef);
+    let currentWorkerUnread = 0;
+    let currentAdminUnread = 0;
+
+    if (convSnap.exists()) {
+      const data = convSnap.data();
+      currentWorkerUnread = data.workerUnread || 0;
+      currentAdminUnread = data.adminUnread || 0;
+    }
+
+    const isWorker = params.senderRole === "worker";
+
+    // Summary text for lastMessage in conversation metadata
+    const lastMsgText = trimmed;
+
+    // Create message doc inside subcollection
+    const msgRef = doc(messagesColRef);
+    const msgPayload: Record<string, any> = {
+      senderId: params.senderId,
+      senderRole: params.senderRole,
+      senderName: params.senderName || (isWorker ? "Worker" : "Admin"),
+      senderEmail: params.senderEmail || "",
+      text: trimmed,
+      type: msgType,
+      createdAt: serverTimestamp(),
+    };
+
+    if (params.disappearingTimer && params.disappearingTimer !== "off") {
+      msgPayload.disappearingTimer = params.disappearingTimer;
+      if (expiresAtDate) {
+        msgPayload.expiresAt = Timestamp.fromDate(expiresAtDate);
+      }
+    }
+
+    tx.set(msgRef, msgPayload);
+
+    // Update conversation metadata & unread counters
+    const updatePayload: Record<string, any> = {
+      workerId: params.conversationId,
+      lastMessage: lastMsgText,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (isWorker) {
+      updatePayload.adminUnread = currentAdminUnread + 1;
+      if (params.senderName) updatePayload.workerName = params.senderName;
+      if (params.senderEmail) updatePayload.workerEmail = params.senderEmail;
+    } else {
+      updatePayload.workerUnread = currentWorkerUnread + 1;
+      updatePayload.adminId = params.senderId;
+    }
+
+    if (!convSnap.exists()) {
+      updatePayload.createdAt = serverTimestamp();
+      if (!isWorker) {
+        updatePayload.workerUnread = 1;
+        updatePayload.adminUnread = 0;
+      } else {
+        updatePayload.workerUnread = 0;
+        updatePayload.adminUnread = 1;
+      }
+    }
+
+    tx.set(convRef, updatePayload, { merge: true });
+  });
+}
+
+/**
+ * Hapus pesan untuk saya ("Hapus untuk saya").
+ * Adds user's UID to deletedFor array.
+ */
+export async function deleteMessageForMe(conversationId: string, messageId: string, currentUid: string) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const msgRef = doc(db, "conversations", conversationId, "messages", messageId);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(msgRef);
+    if (!snap.exists()) throw new Error("Pesan tidak ditemukan.");
+    const data = snap.data();
+    const existingDeletedFor: string[] = Array.isArray(data.deletedFor) ? data.deletedFor : [];
+
+    if (!existingDeletedFor.includes(currentUid)) {
+      tx.update(msgRef, {
+        deletedFor: [...existingDeletedFor, currentUid],
+      });
+    }
+  });
+}
+
+/**
+ * Hapus pesan untuk semua ("Hapus untuk semua").
+ * Sets deletedAt timestamp and deletedBy user UID.
+ */
+export async function deleteMessageForAll(conversationId: string, messageId: string, currentUid: string) {
+  if (!db) throw new Error("Firestore DB instance not initialized");
+  const msgRef = doc(db, "conversations", conversationId, "messages", messageId);
+
+  await updateDoc(msgRef, {
+    deletedAt: serverTimestamp(),
+    deletedBy: currentUid,
+  });
+}
+
+/**
+ * Marks conversation unread count as read for either "worker" or "admin".
+ */
+export async function markConversationAsRead(
+  conversationId: string,
+  readerRole: "admin" | "worker"
+) {
+  if (!db) return;
+  const convRef = doc(db, "conversations", conversationId);
+
+  try {
+    const fieldToReset = readerRole === "admin" ? "adminUnread" : "workerUnread";
+    await updateDoc(convRef, {
+      [fieldToReset]: 0,
+      updatedAt: serverTimestamp(),
+    });
+
+    // Mark unread messages sent by opposite role in subcollection as read
+    const targetSenderRole = readerRole === "admin" ? "worker" : "admin";
+    const messagesColRef = collection(db, "conversations", conversationId, "messages");
+    const unreadMsgsQuery = query(
+      messagesColRef,
+      where("senderRole", "==", targetSenderRole)
+    );
+
+    const snap = await getDocsWithDiagnostic(
+      unreadMsgsQuery,
+      [where("senderRole", "==", targetSenderRole)],
+      "markConversationAsRead",
+      `conversations/${conversationId}/messages`
+    );
+    if (snap && !snap.empty) {
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.forEach((msgDoc) => {
+        const data = msgDoc.data() as Record<string, any>;
+        if (!data.readAt) {
+          batch.update(msgDoc.ref, { readAt: serverTimestamp() });
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+  } catch (err) {
+    // If document doesn't exist yet, ignore
+    console.warn("markConversationAsRead error:", err);
+  }
 }

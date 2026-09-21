@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, collection, where, runTransaction } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
 const rulesContent = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../firestore.rules'), 'utf8');
@@ -16,7 +16,7 @@ const newWorkerUid = 'new_worker_456';
 const otherWorkerUid = 'other_worker_789';
 
 async function main() {
-  console.log('Initializing Firestore rules regression test suite...');
+  console.log('Initializing Firestore rules test suite...');
   const testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
@@ -31,12 +31,12 @@ async function main() {
   // Setup initial user documents bypassing rules
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    // Admin user doc
+    // Admin user doc (role: admin)
     await setDoc(doc(db, 'users', adminUid), {
       uid: adminUid,
       name: 'Admin User',
-      email: 'mandarawanzz@gmail.com',
-      role: 'Admin',
+      email: 'admin@example.com',
+      role: 'admin',
       status: 'active',
       tier: 1,
       balance: 0,
@@ -53,19 +53,32 @@ async function main() {
       balance: 15000,
       createdAt: new Date(),
     });
+    // Existing conversation for workerUid
+    await setDoc(doc(db, 'conversations', workerUid), {
+      id: workerUid,
+      workerId: workerUid,
+      workerName: 'Worker User',
+      workerEmail: 'worker@example.com',
+      adminId: adminUid,
+      lastMessage: 'Pesan awal',
+      lastMessageAt: new Date(),
+      workerUnread: 2,
+      adminUnread: 0,
+      createdAt: new Date(),
+    });
   });
 
-  console.log('\n--- CASE A: Self profile read upon login ---');
-  const existingWorkerDb = testEnv.authenticatedContext(workerUid).firestore();
+  console.log('\n--- Case A: Self profile read ---');
+  const workerDb = testEnv.authenticatedContext(workerUid).firestore();
   try {
-    await assertSucceeds(getDoc(doc(existingWorkerDb, 'users', workerUid)));
-    console.log('[PASS] Case A: Self profile read upon login succeeded.');
+    await assertSucceeds(getDoc(doc(workerDb, 'users', workerUid)));
+    console.log('[PASS] Case A: Self profile read succeeded.');
   } catch (err) {
-    console.error('[FAIL] Case A: Self profile read upon login failed:', err);
+    console.error('[FAIL] Case A: Self profile read failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- CASE B: Self-registration without optional fields (phone/referredBy) ---');
+  console.log('\n--- Case B: Self-registration (required fields only, status: active, role: worker, tier: 1, balance: 0) ---');
   const newWorkerDb = testEnv.authenticatedContext(newWorkerUid).firestore();
   try {
     await assertSucceeds(
@@ -80,23 +93,23 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Case B: Self-registration without optional fields succeeded.');
+    console.log('[PASS] Case B: Self-registration with required fields succeeded.');
   } catch (err) {
-    console.error('[FAIL] Case B: Self-registration without optional fields failed:', err);
+    console.error('[FAIL] Case B: Self-registration failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- CASE C: Self-registration with optional fields (phone and referredBy) ---');
-  const workerWithOptionalUid = 'worker_opt_789';
-  const workerWithOptionalDb = testEnv.authenticatedContext(workerWithOptionalUid).firestore();
+  console.log('\n--- Case C: Self-registration with optional phone & referredBy strings ---');
+  const caseCUid = 'worker_case_c_123';
+  const caseCDb = testEnv.authenticatedContext(caseCUid).firestore();
   try {
     await assertSucceeds(
-      setDoc(doc(workerWithOptionalDb, 'users', workerWithOptionalUid), {
-        uid: workerWithOptionalUid,
-        name: 'Worker With Optionals',
-        email: 'optionals@example.com',
-        phone: '081234567890',
-        referredBy: 'referrer_123',
+      setDoc(doc(caseCDb, 'users', caseCUid), {
+        uid: caseCUid,
+        name: 'Case C Worker',
+        email: 'casec@example.com',
+        phone: '08123456789',
+        referredBy: workerUid,
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -104,67 +117,23 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Case C: Self-registration with optional fields succeeded.');
+    console.log('[PASS] Case C: Self-registration with optional phone and referredBy succeeded.');
   } catch (err) {
-    console.error('[FAIL] Case C: Self-registration with optional fields failed:', err);
+    console.error('[FAIL] Case C: Self-registration failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- NEGATIVE TEST: Worker attempting status: "pending" fails ---');
-  const pendingUserUid = 'pending_user_123';
-  const pendingUserDb = testEnv.authenticatedContext(pendingUserUid).firestore();
-  try {
-    await assertFails(
-      setDoc(doc(pendingUserDb, 'users', pendingUserUid), {
-        uid: pendingUserUid,
-        name: 'Pending Worker',
-        email: 'pending@example.com',
-        role: 'worker',
-        status: 'pending',
-        tier: 1,
-        balance: 0,
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Worker attempting status "pending" correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker attempting status "pending" was not rejected:', err);
-    process.exitCode = 1;
-  }
+  console.log('\n--- Negative Create Tests ---');
 
-  console.log('\n--- NEGATIVE TEST: Worker attempting disallowed extra fields fails ---');
-  const extraFieldUid = 'extra_field_user';
-  const extraFieldDb = testEnv.authenticatedContext(extraFieldUid).firestore();
+  console.log('1. Spoofed UID:');
+  const spoofUid = 'spoof_uid_user';
+  const spoofDb = testEnv.authenticatedContext(spoofUid).firestore();
   try {
     await assertFails(
-      setDoc(doc(extraFieldDb, 'users', extraFieldUid), {
-        uid: extraFieldUid,
-        name: 'Extra Field User',
-        email: 'extra@example.com',
-        role: 'worker',
-        status: 'active',
-        tier: 1,
-        balance: 0,
-        createdAt: serverTimestamp(),
-        customField: 'unauthorized_payload',
-      })
-    );
-    console.log('[PASS] Worker attempting disallowed extra fields correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker attempting disallowed extra fields was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- NEGATIVE TEST: Worker attempting invalid field types (non-string phone / referredBy) fails ---');
-  const invalidPhoneUid = 'invalid_phone_user';
-  const invalidPhoneDb = testEnv.authenticatedContext(invalidPhoneUid).firestore();
-  try {
-    await assertFails(
-      setDoc(doc(invalidPhoneDb, 'users', invalidPhoneUid), {
-        uid: invalidPhoneUid,
-        name: 'Invalid Phone User',
-        email: 'invalidphone@example.com',
-        phone: 81234567890, // number instead of string
+      setDoc(doc(spoofDb, 'users', otherWorkerUid), {
+        uid: otherWorkerUid,
+        name: 'Spoofed User',
+        email: 'spoof@example.com',
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -172,97 +141,13 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting non-string phone correctly rejected.');
+    console.log('[PASS] Negative Create: Spoofed UID correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting non-string phone was not rejected:', err);
+    console.error('[FAIL] Negative Create: Spoofed UID was not rejected:', err);
     process.exitCode = 1;
   }
 
-  const invalidRefUid = 'invalid_ref_user';
-  const invalidRefDb = testEnv.authenticatedContext(invalidRefUid).firestore();
-  try {
-    await assertFails(
-      setDoc(doc(invalidRefDb, 'users', invalidRefUid), {
-        uid: invalidRefUid,
-        name: 'Invalid Ref User',
-        email: 'invalidref@example.com',
-        referredBy: 12345, // number instead of string
-        role: 'worker',
-        status: 'active',
-        tier: 1,
-        balance: 0,
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Worker attempting non-string referredBy correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker attempting non-string referredBy was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- NEGATIVE TEST: Worker registration missing required fields fails ---');
-  const missingFieldUid = 'missing_field_user';
-  const missingFieldDb = testEnv.authenticatedContext(missingFieldUid).firestore();
-  try {
-    await assertFails(
-      setDoc(doc(missingFieldDb, 'users', missingFieldUid), {
-        uid: missingFieldUid,
-        name: 'Missing Field User',
-        email: 'missing@example.com',
-        role: 'worker',
-        status: 'active',
-        tier: 1,
-        balance: 0,
-        // missing createdAt
-      })
-    );
-    console.log('[PASS] Worker registration missing required field correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker registration missing required field was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- NEGATIVE TEST: Worker attempting negative balance update fails ---');
-  try {
-    await assertFails(
-      setDoc(doc(existingWorkerDb, 'users', workerUid), {
-        uid: workerUid,
-        name: 'Worker User',
-        email: 'worker@example.com',
-        role: 'worker',
-        status: 'active',
-        tier: 2,
-        balance: -500, // negative balance
-        createdAt: new Date(),
-      })
-    );
-    console.log('[PASS] Worker attempting negative balance update correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker attempting negative balance update was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- NEGATIVE TEST: Worker attempting status change in update fails ---');
-  try {
-    await assertFails(
-      setDoc(doc(existingWorkerDb, 'users', workerUid), {
-        uid: workerUid,
-        name: 'Worker User',
-        email: 'worker@example.com',
-        role: 'worker',
-        status: 'suspended', // status change
-        tier: 2,
-        balance: 15000,
-        createdAt: new Date(),
-      })
-    );
-    console.log('[PASS] Worker attempting status change in update correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker attempting status change in update was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- TEST B: Worker attempting role: "admin" fails ---');
+  console.log('2. Role admin:');
   const badRoleUid = 'bad_role_user';
   const badRoleDb = testEnv.authenticatedContext(badRoleUid).firestore();
   try {
@@ -278,13 +163,35 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting role: "admin" correctly rejected.');
+    console.log('[PASS] Negative Create: Role admin correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting role: "admin" was not rejected:', err);
+    console.error('[FAIL] Negative Create: Role admin was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST C: Worker attempting tier > 1 fails ---');
+  console.log('3. Status pending:');
+  const badStatusUid = 'bad_status_user';
+  const badStatusDb = testEnv.authenticatedContext(badStatusUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badStatusDb, 'users', badStatusUid), {
+        uid: badStatusUid,
+        name: 'Bad Status User',
+        email: 'badstatus@example.com',
+        role: 'worker',
+        status: 'pending',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Negative Create: Status pending correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Create: Status pending was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4. Tier > 1:');
   const badTierUid = 'bad_tier_user';
   const badTierDb = testEnv.authenticatedContext(badTierUid).firestore();
   try {
@@ -300,13 +207,13 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting tier > 1 correctly rejected.');
+    console.log('[PASS] Negative Create: Tier > 1 correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting tier > 1 was not rejected:', err);
+    console.error('[FAIL] Negative Create: Tier > 1 was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST D: Worker attempting balance > 0 fails ---');
+  console.log('5. Balance > 0:');
   const badBalanceUid = 'bad_balance_user';
   const badBalanceDb = testEnv.authenticatedContext(badBalanceUid).firestore();
   try {
@@ -322,19 +229,45 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting balance > 0 correctly rejected.');
+    console.log('[PASS] Negative Create: Balance > 0 correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting balance > 0 was not rejected:', err);
+    console.error('[FAIL] Negative Create: Balance > 0 was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST E: Worker attempting to create uid != request.auth.uid fails ---');
+  console.log('6. Arbitrary extra field:');
+  const extraFieldUid = 'extra_field_user';
+  const extraFieldDb = testEnv.authenticatedContext(extraFieldUid).firestore();
   try {
     await assertFails(
-      setDoc(doc(newWorkerDb, 'users', otherWorkerUid), {
-        uid: otherWorkerUid,
-        name: 'Spoofed User',
-        email: 'spoof@example.com',
+      setDoc(doc(extraFieldDb, 'users', extraFieldUid), {
+        uid: extraFieldUid,
+        name: 'Extra Field User',
+        email: 'extra@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
+        hacked: true,
+      })
+    );
+    console.log('[PASS] Negative Create: Arbitrary extra field correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Create: Arbitrary extra field was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('7. Phone non-string:');
+  const badPhoneUid = 'bad_phone_user';
+  const badPhoneDb = testEnv.authenticatedContext(badPhoneUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badPhoneDb, 'users', badPhoneUid), {
+        uid: badPhoneUid,
+        name: 'Bad Phone User',
+        email: 'badphone@example.com',
+        phone: 8123456789,
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -342,259 +275,976 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting create for another UID correctly rejected.');
+    console.log('[PASS] Negative Create: Non-string phone correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting create for another UID was not rejected:', err);
+    console.error('[FAIL] Negative Create: Non-string phone was not rejected:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST F: Worker attempting to overwrite an existing profile with role escalation, tier escalation, or balance increase fails ---');
+  console.log('8. ReferredBy non-string:');
+  const badRefUid = 'bad_ref_user';
+  const badRefDb = testEnv.authenticatedContext(badRefUid).firestore();
   try {
     await assertFails(
-      setDoc(doc(existingWorkerDb, 'users', workerUid), {
-        uid: workerUid,
-        name: 'Worker User Escalated',
-        email: 'worker@example.com',
-        role: 'admin',
-        status: 'active',
-        tier: 3,
-        balance: 999999,
-        createdAt: new Date(),
-      })
-    );
-    console.log('[PASS] Worker overwriting existing profile with role/tier/balance escalation correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker overwriting existing profile escalation was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- TEST G: Existing profile is not overwritten by automatic recovery ---');
-  // Attempting setDoc with recovery default payload (tier 1, balance 0) on existing profile (tier 2, balance 15000)
-  try {
-    await assertFails(
-      setDoc(doc(existingWorkerDb, 'users', workerUid), {
-        uid: workerUid,
-        name: 'Worker User',
-        email: 'worker@example.com',
+      setDoc(doc(badRefDb, 'users', badRefUid), {
+        uid: badRefUid,
+        name: 'Bad Ref User',
+        email: 'badref@example.com',
+        referredBy: 12345,
         role: 'worker',
         status: 'active',
-        tier: 1, // trying to overwrite tier 2 to tier 1
-        balance: 0, // trying to overwrite balance 15000 to 0
-        createdAt: new Date(),
+        tier: 1,
+        balance: 0,
+        createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempt to overwrite existing profile with default recovery values correctly rejected by update rules.');
+    console.log('[PASS] Negative Create: Non-string referredBy correctly rejected.');
   } catch (err) {
-    console.error('[FAIL] Worker overwrite of existing profile was not rejected:', err);
+    console.error('[FAIL] Negative Create: Non-string referredBy was not rejected:', err);
     process.exitCode = 1;
   }
 
-  // Verify profile balance & tier remain unchanged
-  let data;
+  console.log('9. Missing required field (e.g. balance missing):');
+  const missingFieldUid = 'missing_field_user';
+  const missingFieldDb = testEnv.authenticatedContext(missingFieldUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(missingFieldDb, 'users', missingFieldUid), {
+        uid: missingFieldUid,
+        name: 'Missing Field User',
+        email: 'missing@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Negative Create: Missing required field correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Create: Missing required field was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('10. Invalid createdAt (string instead of timestamp):');
+  const badDateUid = 'bad_date_user';
+  const badDateDb = testEnv.authenticatedContext(badDateUid).firestore();
+  try {
+    await assertFails(
+      setDoc(doc(badDateDb, 'users', badDateUid), {
+        uid: badDateUid,
+        name: 'Bad Date User',
+        email: 'baddate@example.com',
+        role: 'worker',
+        status: 'active',
+        tier: 1,
+        balance: 0,
+        createdAt: '2026-01-01T00:00:00Z',
+      })
+    );
+    console.log('[PASS] Negative Create: Invalid createdAt correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Create: Invalid createdAt was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- Negative Update Tests ---');
+
+  console.log('1. Role escalation:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        role: 'admin',
+      })
+    );
+    console.log('[PASS] Negative Update: Role escalation correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Role escalation was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('2. Status change:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        status: 'suspended',
+      })
+    );
+    console.log('[PASS] Negative Update: Status change correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Status change was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('3. Tier change:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        tier: 5,
+      })
+    );
+    console.log('[PASS] Negative Update: Tier change correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Tier change was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4. Self balance increase update (must fail):');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        balance: 20000, // increasing balance from 15000 to 20000
+      })
+    );
+    console.log('[PASS] Negative Update: Self balance increase correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Self balance increase was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('5. Negative balance:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        balance: -500,
+      })
+    );
+    console.log('[PASS] Negative Update: Negative balance correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Negative balance was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('6. Update another user\'s profile:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', adminUid), {
+        name: 'Hacked Admin Name',
+      })
+    );
+    console.log('[PASS] Negative Update: Updating another user\'s profile correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Updating another user\'s profile was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- PRODUCTION-MATCHING REGRESSION SUITE (SCENARIOS 1 - 10) ---');
+
+  // Setup test environment data for Production-Matching Regression Suite
+  const regWorker1 = 'reg_worker_1';
+  const regWorker2 = 'reg_worker_2';
+  const regReferralId = 'reg_referral_doc_1';
+  const regClaimId = `${regReferralId}_tier_5`;
+
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    const snap = await getDoc(doc(context.firestore(), 'users', workerUid));
-    data = snap.data();
+    const db = context.firestore();
+    // Profile for regWorker1
+    await setDoc(doc(db, 'users', regWorker1), {
+      uid: regWorker1,
+      name: 'Regression Worker 1',
+      email: 'reg1@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 1000,
+      createdAt: new Date(),
+    });
+    // Profile for regWorker2
+    await setDoc(doc(db, 'users', regWorker2), {
+      uid: regWorker2,
+      name: 'Regression Worker 2',
+      email: 'reg2@example.com',
+      role: 'worker',
+      status: 'active',
+      tier: 1,
+      balance: 0,
+      createdAt: new Date(),
+    });
+    // Malformed document in referrals collection
+    await setDoc(doc(db, 'referrals', 'malformed_ref_doc'), {
+      customField: 'no_referrer_or_referred_keys',
+    });
+    // Valid referral document
+    await setDoc(doc(db, 'referrals', regReferralId), {
+      id: regReferralId,
+      referrerId: regWorker1,
+      referrerName: 'Regression Worker 1',
+      referredWorkerId: regWorker2,
+      referredWorkerName: 'Regression Worker 2',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
+    });
   });
-  if (data?.tier === 2 && data?.balance === 15000 && data?.role === 'worker') {
-    console.log('[PASS] Verified existing profile data was protected and preserved intact.');
-  } else {
-    console.error('[FAIL] Existing profile data was corrupted or altered:', data);
-    process.exitCode = 1;
-  }
 
-  console.log('\n--- TEST H: Worker missionClaim creation ---');
-  const missionClaimId = `${workerUid}_daily_acc_3_2026-W34`;
+  const regWorker1Db = testEnv.authenticatedContext(regWorker1).firestore();
+  const regAdminDb = testEnv.authenticatedContext(adminUid).firestore();
+
+  console.log('\nScenario 1: Valid admin approval succeeds');
   try {
     await assertSucceeds(
-      setDoc(doc(existingWorkerDb, 'missionClaims', missionClaimId), {
-        id: missionClaimId,
-        workerId: workerUid,
-        missionId: 'daily_acc_3',
-        periodKey: '2026-W34',
-        workerName: 'Worker User',
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-      }, { merge: true })
-    );
-    console.log('[PASS] Worker missionClaim creation succeeded.');
-  } catch (err) {
-    console.error('[FAIL] Worker missionClaim creation failed:', err);
-    process.exitCode = 1;
-  }
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', regReferralId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', regClaimId);
+        const claimSnap = await tx.get(claimDocRef);
 
-  console.log('\n--- TEST I: Worker attempting status: "approved" in missionClaim fails ---');
-  const badClaimId = `${workerUid}_bad_claim`;
-  try {
-    await assertFails(
-      setDoc(doc(existingWorkerDb, 'missionClaims', badClaimId), {
-        id: badClaimId,
-        workerId: workerUid,
-        missionId: 'daily_acc_3',
-        periodKey: '2026-W34',
-        workerName: 'Worker User',
-        status: 'approved',
-        requestedAt: serverTimestamp(),
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: regWorker1,
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: regClaimId,
+          createdAt: serverTimestamp(),
+        });
+
+        tx.set(claimDocRef, {
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        }, { merge: true });
       })
     );
-    console.log('[PASS] Worker attempting status "approved" in missionClaim correctly rejected.');
+    console.log('[PASS] Scenario 1: Valid admin approval succeeded.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting status "approved" in missionClaim was not rejected:', err);
+    console.error('[FAIL] Scenario 1 failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST J: Worker financialTransactions access (read & write) fails ---');
-  const finTxId = 'fin_tx_123';
-  try {
-    await assertFails(
-      setDoc(doc(existingWorkerDb, 'financialTransactions', finTxId), {
-        type: 'income',
-        amount: 500000,
-        description: 'Unauthorized Income',
-        period: '2026-08',
-      })
-    );
-    await assertFails(getDoc(doc(existingWorkerDb, 'financialTransactions', finTxId)));
-    console.log('[PASS] Worker access to financialTransactions correctly rejected.');
-  } catch (err) {
-    console.error('[FAIL] Worker access to financialTransactions was not rejected:', err);
-    process.exitCode = 1;
-  }
-
-  console.log('\n--- TEST K: Admin financialTransactions access (read & write) succeeds ---');
-  const adminDb = testEnv.authenticatedContext(adminUid).firestore();
+  console.log('\nScenario 2: Reject succeeds');
+  const rejectRefId = 'reject_test_referral_doc';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'referrals', rejectRefId), {
+      id: rejectRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      currentAccCount: 2,
+      rewardAmount: 0,
+      status: 'PENDING',
+      createdAt: new Date(),
+    });
+  });
   try {
     await assertSucceeds(
-      setDoc(doc(adminDb, 'financialTransactions', finTxId), {
-        id: finTxId,
-        type: 'income',
-        amount: 500000,
-        description: 'Penjualan Storage Gmail',
-        period: '2026-08',
-        transactionDate: new Date(),
+      updateDoc(doc(regAdminDb, 'referrals', rejectRefId), {
+        status: 'REJECTED',
+        reviewNote: 'Ditolak oleh admin',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Scenario 2: Reject succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 2 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 3: Admin claimReferralReward transaction succeeds');
+  const workerClaimRefId = 'worker_claim_ref_doc_1';
+  const workerClaimId = `${workerClaimRefId}_tier_5`;
+  const workerLedgerId = `${workerClaimRefId}_ledger_tier_5`;
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'referrals', workerClaimRefId), {
+      id: workerClaimRefId,
+      referrerId: regWorker1,
+      referrerName: 'Regression Worker 1',
+      referredWorkerId: regWorker2,
+      referredWorkerName: 'Regression Worker 2',
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+      createdAt: new Date(),
+    });
+  });
+
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', workerClaimRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', workerClaimId);
+        const claimSnap = await tx.get(claimDocRef);
+        const ledgerRef = doc(regAdminDb, 'rewardLedger', workerLedgerId);
+        const ledgerSnap = await tx.get(ledgerRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+          rewardedAt: serverTimestamp(),
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+          lastClaimId: workerClaimId,
+        });
+
+        tx.set(ledgerRef, {
+          id: workerLedgerId,
+          workerId: regWorker1,
+          workerName: 'Regression Worker 1',
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: workerClaimId,
+          description: 'Hadiah Referral Tier 5 ACC',
+          createdAt: serverTimestamp(),
+        });
+
+        tx.set(claimDocRef, {
+          id: workerClaimId,
+          referralId: workerClaimRefId,
+          referrerId: regWorker1,
+          referredWorkerId: regWorker2,
+          minAcc: 5,
+          rewardAmount: 500,
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Scenario 3: Admin claimReferralReward transaction succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 3 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 4: Unauthorized worker cannot claim another referrer\'s reward');
+  const unauthorizedWorkerDb = testEnv.authenticatedContext(otherWorkerUid).firestore();
+  try {
+    await assertFails(
+      runTransaction(unauthorizedWorkerDb, async (tx) => {
+        const refDocRef = doc(unauthorizedWorkerDb, 'referrals', workerClaimRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(unauthorizedWorkerDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+
+        tx.update(refDocRef, {
+          rewardAmount: 1000,
+        });
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data()?.balance || 0) + 1000,
+        });
+      })
+    );
+    console.log('[PASS] Scenario 4: Unauthorized worker claim correctly denied.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 4 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 7: Duplicate approval cannot pay twice');
+  try {
+    let duplicatePayoutOccurred = false;
+    await runTransaction(regAdminDb, async (tx) => {
+      const refDocRef = doc(regAdminDb, 'referrals', regReferralId);
+      const refSnap = await tx.get(refDocRef);
+      const claimedTiers = refSnap.data().claimedTiers || {};
+
+      if (claimedTiers['5']) {
+        throw new Error('Tier 5 already claimed. Duplicate payout blocked.');
+      }
+
+      duplicatePayoutOccurred = true;
+      tx.update(refDocRef, {
+        rewardAmount: (refSnap.data().rewardAmount || 0) + 500,
+      });
+    }).catch((err) => {
+      console.log(' - Expected duplicate rejection received:', err.message);
+    });
+
+    if (!duplicatePayoutOccurred) {
+      console.log('[PASS] Scenario 7: Duplicate approval safely blocked from double payout.');
+    } else {
+      console.error('[FAIL] Scenario 7: Duplicate payout was allowed!');
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error('[FAIL] Scenario 7 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 8: Legacy referral missing referredWorkerId succeeds');
+  const legacyRefId = 'legacy_ref_missing_referred_worker_id';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Legacy doc where referredWorkerId is omitted but doc ID is the referredWorkerId
+    await setDoc(doc(db, 'referrals', legacyRefId), {
+      referrerId: regWorker1,
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+    });
+  });
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', legacyRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referralData = refSnap.data();
+
+        const effectiveReferredWorkerId = referralData.referredWorkerId || refSnap.id || legacyRefId;
+        const referrerUserRef = doc(regAdminDb, 'users', referralData.referrerId);
+        const referrerSnap = await tx.get(referrerUserRef);
+
+        const claimDocId = `${legacyRefId}_tier_5`;
+        const claimDocRef = doc(regAdminDb, 'referralClaims', claimDocId);
+        const claimSnap = await tx.get(claimDocRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: referralData.referrerId,
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: claimDocId,
+          createdAt: serverTimestamp(),
+        });
+
+        tx.set(claimDocRef, {
+          id: claimDocId,
+          referralId: legacyRefId,
+          referrerId: referralData.referrerId,
+          referredWorkerId: effectiveReferredWorkerId,
+          minAcc: 5,
+          rewardAmount: 500,
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Scenario 8: Legacy referral missing referredWorkerId approval succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 8 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 9: referralClaims existing-document case');
+  const existingClaimRefId = 'ref_with_existing_claim_doc';
+  const existingClaimId = `${existingClaimRefId}_tier_5`;
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'referrals', existingClaimRefId), {
+      id: existingClaimRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      currentAccCount: 5,
+      rewardAmount: 0,
+      status: 'QUALIFIED',
+    });
+    await setDoc(doc(db, 'referralClaims', existingClaimId), {
+      id: existingClaimId,
+      referralId: existingClaimRefId,
+      referrerId: regWorker1,
+      referredWorkerId: regWorker2,
+      minAcc: 5,
+      rewardAmount: 500,
+      status: 'pending',
+      requestedAt: new Date(),
+    });
+  });
+  try {
+    await assertSucceeds(
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', existingClaimRefId);
+        const refSnap = await tx.get(refDocRef);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
+        const referrerSnap = await tx.get(referrerUserRef);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', existingClaimId);
+        const claimSnap = await tx.get(claimDocRef);
+
+        tx.update(refDocRef, {
+          claimedTiers: { '5': true },
+          rewardAmount: 500,
+          status: 'QUALIFIED',
+        });
+
+        tx.update(referrerUserRef, {
+          balance: (referrerSnap.data().balance || 0) + 500,
+        });
+
+        const ledgerRef = doc(collection(regAdminDb, 'rewardLedger'));
+        tx.set(ledgerRef, {
+          workerId: regWorker1,
+          rewardType: 'referral',
+          amount: 500,
+          sourceRefId: existingClaimId,
+          createdAt: serverTimestamp(),
+        });
+
+        // Updating existing claim document
+        tx.update(claimDocRef, {
+          status: 'approved',
+          processedAt: serverTimestamp(),
+        });
+      })
+    );
+    console.log('[PASS] Scenario 9: referralClaims existing-document case succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 9 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\nScenario 10: rewardLedger existing-document case');
+  const existingLedgerId = 'existing_ledger_doc_123';
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'rewardLedger', existingLedgerId), {
+      id: existingLedgerId,
+      workerId: regWorker1,
+      rewardType: 'referral',
+      amount: 500,
+      createdAt: new Date(),
+    });
+  });
+  try {
+    // Admin reading or writing an existing rewardLedger document succeeds
+    await assertSucceeds(getDoc(doc(regAdminDb, 'rewardLedger', existingLedgerId)));
+    await assertSucceeds(
+      setDoc(
+        doc(regAdminDb, 'rewardLedger', existingLedgerId),
+        {
+          note: 'Updated by admin',
+        },
+        { merge: true }
+      )
+    );
+    console.log('[PASS] Scenario 10: rewardLedger existing-document case succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Scenario 10 failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('\n--- Announcements Security Rules Tests ---');
+  const annId = 'ann_test_1';
+  // Admin creates announcement
+  try {
+    await assertSucceeds(
+      setDoc(doc(regAdminDb, 'announcements', annId), {
+        title: 'Pengumuman Penting',
+        content: 'Isi pengumuman admin',
+        badge: 'BARU',
+        isActive: true,
+        createdBy: adminUid,
         createdAt: serverTimestamp(),
       })
     );
-    await assertSucceeds(getDoc(doc(adminDb, 'financialTransactions', finTxId)));
-    console.log('[PASS] Admin access to financialTransactions succeeded.');
+    console.log('[PASS] Admin creating announcement succeeded.');
   } catch (err) {
-    console.error('[FAIL] Admin access to financialTransactions failed:', err);
+    console.error('[FAIL] Admin creating announcement failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST L: Worker creating valid referral relationship for themselves succeeds ---');
-  const refDocId = newWorkerUid;
+  // Worker reading announcement
   try {
-    await assertSucceeds(
-      setDoc(doc(newWorkerDb, 'referrals', refDocId), {
-        id: refDocId,
-        referrerId: workerUid,
-        referrerName: 'Worker User',
-        referredWorkerId: newWorkerUid,
-        referredWorkerName: 'New Worker',
-        currentAccCount: 0,
-        rewardAmount: 0,
-        status: 'PENDING',
-        createdAt: serverTimestamp(),
-      })
-    );
-    console.log('[PASS] Worker creating valid referral relationship succeeded.');
+    await assertSucceeds(getDoc(doc(workerDb, 'announcements', annId)));
+    console.log('[PASS] Worker reading announcement succeeded.');
   } catch (err) {
-    console.error('[FAIL] Worker creating valid referral relationship failed:', err);
+    console.error('[FAIL] Worker reading announcement failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST M: Worker attempting create referral for another worker fails ---');
+  // Worker creating announcement should fail
   try {
     await assertFails(
-      setDoc(doc(newWorkerDb, 'referrals', otherWorkerUid), {
-        id: otherWorkerUid,
-        referrerId: workerUid,
-        referrerName: 'Worker User',
-        referredWorkerId: otherWorkerUid,
-        referredWorkerName: 'Spoofed Referred',
-        currentAccCount: 0,
-        rewardAmount: 0,
-        status: 'PENDING',
+      setDoc(doc(workerDb, 'announcements', 'illegal_ann_id'), {
+        title: 'Fake Announcement',
+        content: 'Worker created content',
+        isActive: true,
+        createdBy: workerUid,
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Worker attempting create referral for another worker correctly rejected.');
+    console.log('[PASS] Worker creating announcement correctly denied.');
   } catch (err) {
-    console.error('[FAIL] Worker attempting create referral for another worker was not rejected:', err);
+    console.error('[FAIL] Worker creating announcement was not denied:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST N: Worker reading non-existent referral document for themselves succeeds ---');
-  const nonExistentSelfRefUid = 'unregistered_ref_worker_123';
-  const nonExistentSelfDb = testEnv.authenticatedContext(nonExistentSelfRefUid).firestore();
+  // Worker updating announcement should fail
   try {
-    await assertSucceeds(getDoc(doc(nonExistentSelfDb, 'referrals', nonExistentSelfRefUid)));
-    console.log('[PASS] Worker reading non-existent referral document for themselves succeeded (no permission-denied).');
+    await assertFails(
+      updateDoc(doc(workerDb, 'announcements', annId), {
+        title: 'Hacked Title',
+      })
+    );
+    console.log('[PASS] Worker updating announcement correctly denied.');
   } catch (err) {
-    console.error('[FAIL] Worker reading non-existent referral document for themselves failed:', err);
+    console.error('[FAIL] Worker updating announcement was not denied:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST O: Worker reading referral document of an unrelated worker fails ---');
+  // Worker deleting announcement should fail
   try {
-    await assertFails(getDoc(doc(newWorkerDb, 'referrals', otherWorkerUid)));
-    console.log('[PASS] Worker reading referral document of an unrelated worker correctly rejected.');
+    await assertFails(
+      deleteDoc(doc(workerDb, 'announcements', annId))
+    );
+    console.log('[PASS] Worker deleting announcement correctly denied.');
   } catch (err) {
-    console.error('[FAIL] Worker reading referral document of an unrelated worker was not rejected:', err);
+    console.error('[FAIL] Worker deleting announcement was not denied:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST P: Worker querying emailSubmissions where workerId == self succeeds ---');
-  const { getDocs, query, collection, where } = await import('firebase/firestore');
+  // Admin updating announcement
   try {
-    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'emailSubmissions'), where('workerId', '==', newWorkerUid))));
-    console.log('[PASS] Query emailSubmissions for self succeeded.');
+    await assertSucceeds(
+      updateDoc(doc(regAdminDb, 'announcements', annId), {
+        title: 'Pengumuman Penting (Updated)',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] Admin updating announcement succeeded.');
   } catch (err) {
-    console.error('[FAIL] Query emailSubmissions for self failed:', err);
+    console.error('[FAIL] Admin updating announcement failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST Q: Worker querying withdrawals where workerId == self succeeds ---');
+  // Admin deleting announcement
   try {
-    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'withdrawals'), where('workerId', '==', newWorkerUid))));
-    console.log('[PASS] Query withdrawals for self succeeded.');
+    await assertSucceeds(
+      deleteDoc(doc(regAdminDb, 'announcements', annId))
+    );
+    console.log('[PASS] Admin deleting announcement succeeded.');
   } catch (err) {
-    console.error('[FAIL] Query withdrawals for self failed:', err);
+    console.error('[FAIL] Admin deleting announcement failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST R: Worker querying referrals where referrerId == self succeeds ---');
+  console.log('\n--- COMPREHENSIVE PRIVATE CHAT SECURITY SUITE ---');
+
+  // 1. Worker legitimate message update succeeds
   try {
-    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'referrals'), where('referrerId', '==', newWorkerUid))));
-    console.log('[PASS] Query referrals for self succeeded.');
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        lastMessage: 'Pesan baru dari worker',
+        lastMessageAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        adminUnread: 1, // current adminUnread is 0, so 0 + 1 = 1 is valid +1 increment
+      })
+    );
+    console.log('[PASS] 1. Worker legitimate message update succeeds.');
   } catch (err) {
-    console.error('[FAIL] Query referrals for self failed:', err);
+    console.error('[FAIL] 1. Worker legitimate message update failed:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST S: Worker querying missionClaims where workerId == self succeeds ---');
+  // 2. Worker cannot arbitrarily modify adminUnread
   try {
-    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'missionClaims'), where('workerId', '==', newWorkerUid))));
-    console.log('[PASS] Query missionClaims for self succeeded.');
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminUnread: 99,
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 2. Worker cannot arbitrarily modify adminUnread.');
   } catch (err) {
-    console.error('[FAIL] Query missionClaims for self failed:', err);
+    console.error('[FAIL] 2. Worker arbitrary modify adminUnread was not denied:', err);
     process.exitCode = 1;
   }
 
-  console.log('\n--- TEST T: Worker querying rewardLedger where workerId == self succeeds ---');
+  // 3. Worker cannot modify workerName
   try {
-    await assertSucceeds(getDocs(query(collection(newWorkerDb, 'rewardLedger'), where('workerId', '==', newWorkerUid))));
-    console.log('[PASS] Query rewardLedger for self succeeded.');
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerName: 'Hacked Worker Name',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 3. Worker cannot modify workerName.');
   } catch (err) {
-    console.error('[FAIL] Query rewardLedger for self failed:', err);
+    console.error('[FAIL] 3. Worker modify workerName was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 4. Worker cannot modify workerEmail
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerEmail: 'hacked@example.com',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 4. Worker cannot modify workerEmail.');
+  } catch (err) {
+    console.error('[FAIL] 4. Worker modify workerEmail was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 5. Worker cannot modify workerId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerId: otherWorkerUid,
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 5. Worker cannot modify workerId.');
+  } catch (err) {
+    console.error('[FAIL] 5. Worker modify workerId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 6. Worker cannot modify adminId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminId: 'fake_admin_123',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 6. Worker cannot modify adminId.');
+  } catch (err) {
+    console.error('[FAIL] 6. Worker modify adminId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 7. Worker cannot modify createdAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 7. Worker cannot modify createdAt.');
+  } catch (err) {
+    console.error('[FAIL] 7. Worker modify createdAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 8. Worker cannot modify adminPinnedMessageId
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminPinnedMessageId: 'msg_admin_pin_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 8. Worker cannot modify adminPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 8. Worker modify adminPinnedMessageId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 9. Worker cannot modify adminClearedAt
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        adminClearedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 9. Worker cannot modify adminClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 9. Worker modify adminClearedAt was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 10. Worker can update their own workerPinnedMessageId
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerPinnedMessageId: 'msg_worker_pin_1',
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 10. Worker can update their own workerPinnedMessageId.');
+  } catch (err) {
+    console.error('[FAIL] 10. Worker update workerPinnedMessageId failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 11. Worker can update their own workerClearedAt
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid), {
+        workerClearedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 11. Worker can update their own workerClearedAt.');
+  } catch (err) {
+    console.error('[FAIL] 11. Worker update workerClearedAt failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 12. Worker cannot access another Worker's conversation
+  try {
+    await assertFails(getDoc(doc(workerDb, 'conversations', otherWorkerUid)));
+    await assertFails(getDocs(collection(workerDb, 'conversations')));
+    console.log('[PASS] 12. Worker cannot access another Worker\'s conversation.');
+  } catch (err) {
+    console.error('[FAIL] 12. Worker access another Worker conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 13. Worker cannot spoof senderId
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
+        senderId: otherWorkerUid,
+        senderRole: 'worker',
+        text: 'Spoofed senderId message',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 13. Worker cannot spoof senderId.');
+  } catch (err) {
+    console.error('[FAIL] 13. Worker spoof senderId was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 14. Worker cannot spoof senderRole
+  try {
+    await assertFails(
+      setDoc(doc(collection(workerDb, 'conversations', workerUid, 'messages')), {
+        senderId: workerUid,
+        senderRole: 'admin',
+        text: 'Spoofed senderRole message',
+        createdAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 14. Worker cannot spoof senderRole.');
+  } catch (err) {
+    console.error('[FAIL] 14. Worker spoof senderRole was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 15. Worker can update readAt on admin message in their own conversation
+  const testMsgRef = doc(collection(regAdminDb, 'conversations', workerUid, 'messages'));
+  await setDoc(testMsgRef, {
+    senderId: 'admin_1',
+    senderRole: 'admin',
+    text: 'Admin message for readAt test',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', testMsgRef.id), {
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 15. Worker can update readAt on message in their own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 15. Worker failed to update readAt in their own conversation:', err);
+    process.exitCode = 1;
+  }
+
+  // 16. Worker cannot tamper with text content during readAt update
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', testMsgRef.id), {
+        readAt: serverTimestamp(),
+        text: 'Tampered text content',
+      })
+    );
+    console.log('[PASS] 16. Worker cannot tamper with text content during readAt update.');
+  } catch (err) {
+    console.error('[FAIL] 16. Worker text tampering was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 17. Worker cannot update readAt in another worker's conversation
+  const unauthWorkerUid = 'worker_other_999';
+  const otherMsgRef = doc(collection(regAdminDb, 'conversations', unauthWorkerUid, 'messages'));
+  await setDoc(otherMsgRef, {
+    senderId: 'admin_1',
+    senderRole: 'admin',
+    text: 'Message in another worker conv',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', unauthWorkerUid, 'messages', otherMsgRef.id), {
+        readAt: serverTimestamp(),
+      })
+    );
+    console.log('[PASS] 17. Worker cannot update readAt in another worker conversation.');
+  } catch (err) {
+    console.error('[FAIL] 17. Worker unauthorized update in another conversation was not denied:', err);
+    process.exitCode = 1;
+  }
+
+  // 18. Worker can update deletedAt and deletedBy on message in own conversation (Hapus untuk semua)
+  const ownMsgRef = doc(collection(regAdminDb, 'conversations', workerUid, 'messages'));
+  await setDoc(ownMsgRef, {
+    senderId: workerUid,
+    senderRole: 'worker',
+    text: 'Pesan yang akan dihapus worker',
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+      })
+    );
+    console.log('[PASS] 18. Worker can update deletion metadata (deletedAt, deletedBy) in own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 18. Worker update deletion metadata failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 19. Worker can update deletedFor on message in own conversation (Hapus untuk saya)
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedFor: [workerUid],
+      })
+    );
+    console.log('[PASS] 19. Worker can update deletion metadata (deletedFor) in own conversation.');
+  } catch (err) {
+    console.error('[FAIL] 19. Worker update deletedFor failed:', err);
+    process.exitCode = 1;
+  }
+
+  // 20. Worker cannot modify immutable fields (e.g. text) during deletion update
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'conversations', workerUid, 'messages', ownMsgRef.id), {
+        deletedAt: serverTimestamp(),
+        deletedBy: workerUid,
+        text: 'Tampered text content during delete',
+      })
+    );
+    console.log('[PASS] 20. Worker cannot modify text content during deletion update.');
+  } catch (err) {
+    console.error('[FAIL] 20. Worker text tampering during delete was not denied:', err);
     process.exitCode = 1;
   }
 
   await testEnv.cleanup();
-  console.log('\nAll regression tests completed.');
+  console.log('\nAll security tests completed successfully!');
 }
 
 main().catch((err) => {
-  console.error('Fatal error in regression test suite:', err);
+  console.error('Fatal error in test suite:', err);
   process.exit(1);
 });

@@ -4,7 +4,10 @@ import { Loader2, Clock, ShieldOff, ShieldAlert } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { usePortalAuth } from "@/hooks/use-portal";
+import { usePortalAuth, useSettings } from "@/hooks/use-portal";
+import { DEFAULT_MAINTENANCE } from "@/lib/portal-types";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { AutoUpdateBanner } from "@/components/AutoUpdateBanner";
 import LoginPage from "@/pages/login";
 import WorkerDashboard from "@/pages/worker-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -37,13 +40,20 @@ function FullScreenMessage({
 
 export function PortalGate() {
   const { firebaseUser, profile, loading, isReady, error, configured, logout } = usePortalAuth();
+  const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
+  const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
+
+  useEffect(() => {
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "not-set";
+    console.log(`[Stage 5: PortalGate] Auth UID: ${firebaseUser?.uid ?? 'none'}, Profile UID: ${profile?.uid ?? 'none'}, Role: ${profile?.role ?? 'none'}, Status: ${profile?.status ?? 'none'}, Loading: ${loading}, IsReady: ${isReady}, Error: ${error || 'none'}, ProjectID: ${projectId}`);
+  }, [firebaseUser, profile, loading, isReady, error]);
 
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   if (urlParams && urlParams.get("preview") === "admin") {
     const mockAdminProfile: import("@/lib/portal-types").PortalUser = {
       uid: "admin_demo",
       name: "Admin Demo",
-      email: "mandarawanzz@gmail.com",
+      email: "admin@example.com",
       role: "admin",
       status: "active",
       tier: 1,
@@ -124,6 +134,12 @@ export function PortalGate() {
   const userRole = typeof profile.role === "string" ? profile.role.trim().toLowerCase() : profile.role;
   const userStatus = typeof profile.status === "string" ? profile.status.trim().toLowerCase() : profile.status;
 
+  // ROOT-LEVEL MAINTENANCE GUARD:
+  // Intercept any non-admin user when maintenance mode is active before rendering worker dashboard
+  if (maintenance?.enabled && userRole !== "admin") {
+    return <MaintenanceScreen maintenance={maintenance} onLogout={() => logout()} />;
+  }
+
   if (userStatus === "pending") {
     if (userRole === "worker") {
       // Self-registered workers enter WorkerDashboard immediately without waiting for admin approval
@@ -187,8 +203,10 @@ export function PortalGate() {
 export default function App() {
   return (
     <>
+      <AutoUpdateBanner />
       <Switch>
         <Route path="/" component={PortalGate} />
+        <Route path="/login" component={PortalGate} />
         <Route path="/register" component={PortalGate} />
         <Route path="/dashboard" component={PortalGate} />
         <Route path="/admin" component={PortalGate} />
