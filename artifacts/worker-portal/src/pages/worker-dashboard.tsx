@@ -936,64 +936,27 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
           {/* ==================== 2. JOB GMAIL / SETOR EMAIL VIEW ==================== */}
           {activeView === "submit" && (
-            <div className="space-y-4">
-              {/* CURRENT RATE DISPLAY CARD */}
-              <Card className="bg-white border-blue-100 shadow-xs">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-blue-600" />
-                      Informasi Rate Harga Setor
-                    </CardTitle>
-                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-900 border-blue-300 font-bold">
-                      RATE AKTIF
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-xs text-gray-600">
-                    Harga komisi per akun valid yang berlaku saat ini ditentukan oleh Admin secara transparan.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-500/10 via-amber-50/80 to-indigo-500/10 text-center shadow-xs">
-                    <div className="flex items-center justify-center gap-1.5 mb-1 text-blue-900 font-medium text-xs">
-                      <Tag className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Rate Akun Valid</span>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight my-1">
-                      {formatMoney(currentTierConfig.pricePerItem)} <span className="text-xs sm:text-sm font-semibold text-blue-900/80">/ akun valid</span>
-                    </p>
-                    <p className="text-[11px] text-blue-900/80 mt-1.5 font-medium">
-                      Komisi langsung masuk ke saldo utama setiap email selesai diverifikasi ACC.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-r from-blue-50 via-orange-50/60 to-blue-100/40 border-blue-200/90 shadow-2xs">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-blue-950 font-bold text-xs">
-                      <ShieldAlert className="w-4 h-4 text-blue-600 shrink-0" />
-                      Aturan Setor Email
-                    </div>
-                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-[10px] border-0 shadow-2xs">
-                      Rate: {formatMoney(currentTierConfig.pricePerItem)} / akun
-                    </Badge>
-                  </div>
-                  <ul className="space-y-1 text-xs text-blue-900/90 list-disc list-inside whitespace-pre-wrap leading-relaxed">
-                    {rules.data.submissionNotes.map((note, idx) => (
-                      <li key={idx} className="whitespace-pre-wrap">{note}</li>
-                    ))}
-                    <li>Harga komisi aktif saat ini: <strong className="text-blue-950 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
-                  </ul>
-                </CardContent>
-              </Card>
+            <div className="space-y-5">
+              {/* 1. PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Setor Email
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Setor akun Gmail Anda untuk diproses dan dapatkan komisi saldo.
+                  </p>
+                </div>
+              </div>
 
               {/* OPERATIONAL CLOSED WARNING BANNER */}
               {isSubmissionClosed && (
-                <Card className="bg-rose-50 border-rose-200 shadow-xs">
+                <Card className="bg-rose-50 border-rose-200 shadow-xs rounded-2xl">
                   <CardContent className="p-4 flex items-start gap-3">
-                    <div className="p-1.5 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
+                    <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 mt-0.5">
                       <AlertCircle className="w-4 h-4" />
                     </div>
                     <div>
@@ -1006,60 +969,214 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 </Card>
               )}
 
-              <Card className="bg-white border-blue-100 shadow-xs">
-                <CardHeader>
-                  <CardTitle className="text-base font-bold text-gray-900">Detail Batch Setoran</CardTitle>
-                  <CardDescription className="text-xs text-gray-600">Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitEmails} className="space-y-4">
-                    <fieldset disabled={isSubmissionClosed} className="space-y-4 disabled:opacity-60 disabled:pointer-events-none">
-                      <div>
-                        <Label htmlFor="emails" className="text-xs font-bold text-gray-800">
-                          Daftar Alamat Email ({emailList.length} item)
-                        </Label>
-                        <Textarea
-                          id="emails"
-                          rows={6}
-                          value={emailsText}
-                          onChange={(e) => setEmailsText(e.target.value)}
-                          placeholder={"item1@example.com\nitem2@example.com\nitem3@example.com"}
-                          className="mt-1.5 font-mono text-sm border-gray-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl"
-                          required
-                        />
-                        <p className="text-[11px] text-gray-400 mt-1">
-                          Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch.
+              {/* RESPONSIVE LAYOUT: 2-COLUMNS ON DESKTOP, 1-COLUMN ON MOBILE */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* LEFT COLUMN (lg:col-span-7): FORM & BATCH PREVIEW */}
+                <div className="lg:col-span-7 space-y-4">
+                  {/* EMAIL SUBMISSION FORM CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Send className="w-4 h-4 text-blue-600" />
+                            Detail Batch Setoran
+                          </CardTitle>
+                          <CardDescription className="text-xs text-slate-500">
+                            Masukkan satu atau banyak email sekaligus. Seluruh item akan dikirim sebagai 1 batch.
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                          Batch Mode
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleSubmitEmails} className="space-y-4">
+                        <fieldset disabled={isSubmissionClosed} className="space-y-4 disabled:opacity-60 disabled:pointer-events-none">
+                          {/* Email Textarea */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="emails" className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                              <span>Daftar Alamat Email ({emailList.length} item)</span>
+                              {emailsText.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEmailsText("")}
+                                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                                >
+                                  Bersihkan
+                                </button>
+                              )}
+                            </Label>
+                            <Textarea
+                              id="emails"
+                              rows={6}
+                              value={emailsText}
+                              onChange={(e) => setEmailsText(e.target.value)}
+                              placeholder={"item1@gmail.com\nitem2@gmail.com\nitem3@gmail.com"}
+                              className="font-mono text-xs sm:text-sm border-slate-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl bg-slate-50/50 p-3"
+                              required
+                            />
+                            <p className="text-[11px] text-slate-500">
+                              Pisahkan setiap email dengan baris baru. Multi-item akan otomatis digabung dalam 1 batch setoran.
+                            </p>
+                          </div>
+
+                          {/* Password Input */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="password" className="text-xs font-bold text-slate-800 block">
+                              Kata Sandi Akun
+                            </Label>
+                            <Input
+                              id="password"
+                              type="password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="Kata sandi untuk seluruh email di atas"
+                              className="border-slate-200 focus-visible:ring-blue-500 rounded-xl h-11 text-xs sm:text-sm min-h-[44px]"
+                              required
+                            />
+                          </div>
+
+                          {/* BATCH PREVIEW ITEM CARDS (If emailList.length > 0) */}
+                          {emailList.length > 0 && (
+                            <div className="space-y-2 pt-1">
+                              <Label className="text-xs font-bold text-slate-800 block">
+                                Pratinjau Item Setoran ({emailList.length} Email)
+                              </Label>
+                              <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                                {emailList.map((emailItem, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2.5 rounded-lg bg-white border border-slate-200/80 text-xs font-mono flex items-center justify-between gap-2 shadow-2xs"
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="text-slate-900 truncate font-semibold">{emailItem}</span>
+                                    </div>
+                                    <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 font-bold">
+                                      Valid Format
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SUBMISSION SUMMARY */}
+                          <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between text-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-slate-600 font-medium block">Estimasi Total Setoran</span>
+                              <strong className="text-slate-900 font-bold">
+                                {emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}
+                              </strong>
+                            </div>
+                            <span className="font-black text-blue-600 text-sm sm:text-base">
+                              {formatMoney(emailList.length * currentTierConfig.pricePerItem)}
+                            </span>
+                          </div>
+                        </fieldset>
+
+                        {/* MAIN SUBMIT BUTTON */}
+                        <Button
+                          type="submit"
+                          disabled={submitting || isSubmissionClosed}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm h-11 min-h-[44px] rounded-xl shadow-xs gap-2 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {submitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          <span>
+                            {isSubmissionClosed
+                              ? "Setoran Sedang Ditutup"
+                              : `Setor Email (${emailList.length} Item)`}
+                          </span>
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* RIGHT COLUMN (lg:col-span-5): RATE CARD, SCREENING NOTICE, RULES CARD */}
+                <div className="lg:col-span-5 space-y-4">
+                  {/* RATE / EARNING CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-blue-600" />
+                          Informasi Rate Harga Setor
+                        </CardTitle>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-[10px]">
+                          RATE AKTIF
+                        </Badge>
+                      </div>
+                      <CardDescription className="text-xs text-slate-500">
+                        Harga komisi per akun valid ditentukan secara transparan.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50 text-center space-y-1">
+                        <p className="text-xs text-slate-500 font-medium flex items-center justify-center gap-1">
+                          <Tag className="w-3.5 h-3.5 text-blue-600" />
+                          Rate Akun Valid
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
+                          {formatMoney(currentTierConfig.pricePerItem)} <span className="text-xs sm:text-sm font-semibold text-slate-500">/ akun valid</span>
                         </p>
                       </div>
-                      <div>
-                        <Label htmlFor="password" className="text-xs font-bold text-gray-800">Kata Sandi Akun</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Kata sandi untuk seluruh email di atas"
-                          className="mt-1.5 border-gray-200 focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-xl"
-                          required
-                        />
-                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed text-center">
+                        Komisi dikreditkan ke Saldo Utama secara otomatis setelah email selesai diverifikasi & disetujui ACC oleh Admin.
+                      </p>
+                    </CardContent>
+                  </Card>
 
-                      <div className="p-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-200/80 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="text-gray-600 font-medium">Estimasi Total Setoran: </span>
-                          <strong className="text-gray-900 font-bold">{emailList.length} item × {formatMoney(currentTierConfig.pricePerItem)}</strong>
+                  {/* SCREENING EMAIL NOTICE */}
+                  <Card
+                    onClick={() => setActiveView("checker")}
+                    className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer group"
+                  >
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                          <SearchCheck className="w-5 h-5" />
                         </div>
-                        <span className="font-black text-blue-700 text-sm">{formatMoney(emailList.length * currentTierConfig.pricePerItem)}</span>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            Screening Email
+                          </p>
+                          <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                            Gunakan Screening Email sebelum setor untuk mengecek email berdasarkan aturan sistem.
+                          </p>
+                        </div>
                       </div>
-                    </fieldset>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </CardContent>
+                  </Card>
 
-                    <Button type="submit" disabled={submitting || isSubmissionClosed} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold h-10 gap-2 rounded-xl shadow-sm border border-blue-400/20 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
-                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      {isSubmissionClosed ? "Setoran Sedang Ditutup" : `Kirim Batch (${emailList.length} Item)`}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+                  {/* SUBMISSION RULES CARD */}
+                  <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-blue-600" />
+                        Aturan Setor Email
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <ul className="space-y-1.5 text-xs text-slate-600 list-disc list-inside leading-relaxed">
+                        {rules.data.submissionNotes.map((note, idx) => (
+                          <li key={idx} className="whitespace-pre-wrap">{note}</li>
+                        ))}
+                        <li>Harga komisi aktif saat ini: <strong className="text-slate-900 font-bold">{formatMoney(currentTierConfig.pricePerItem)}</strong> per akun valid.</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </div>
           )}
 
