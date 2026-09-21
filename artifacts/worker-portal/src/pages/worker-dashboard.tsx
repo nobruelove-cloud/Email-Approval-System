@@ -42,6 +42,7 @@ import {
   X,
   MoreVertical,
   Timer,
+  Bell,
 } from "lucide-react";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { EmailChecker } from "@/components/EmailChecker";
@@ -649,7 +650,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F0F4F9] flex flex-col md:flex-row">
       {/* REUSABLE SIDEBAR NAVIGATION */}
       <SidebarNavigation
         activeView={activeView}
@@ -667,257 +668,257 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
 
       {/* MAIN LAYOUT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* GLOBAL TOP BAR HEADER WITH HAMBURGER BUTTON */}
-        <header className="bg-white/95 backdrop-blur-md border-b border-blue-100 sticky top-0 z-30 shadow-xs">
-          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              {/* HAMBURGER TOGGLE BUTTON FOR SIDEBAR */}
+        {/* 1. TOP HEADER */}
+        <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+          <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+            {/* Left: Worker avatar + Brand Identity */}
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 hover:bg-blue-100 transition-colors focus:outline-none flex items-center justify-center min-h-[44px] min-w-[44px]"
-                title="Buka Menu Sidebar"
+                className="relative rounded-full focus:outline-none ring-2 ring-blue-500/20 active:scale-95 transition-transform"
+                title="Buka Profil / Menu"
               >
-                <Menu className="w-5 h-5 text-blue-800" />
-              </button>
-
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-extrabold flex items-center justify-center text-xs shadow-2xs">
+                <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-xs">
                   {profile.name?.charAt(0).toUpperCase() || "W"}
                 </div>
-                <div className="hidden sm:block">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-bold text-gray-900 text-xs leading-tight">{displayName}</p>
-                    <Badge variant="outline" className="text-[10px] bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border-blue-300 font-bold px-1.5 py-0">
-                      Rate: {formatMoney(currentTierConfig.pricePerItem)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <span className="font-mono">
-                      {isEmailVisible ? displayEmail : "*".repeat(Math.min(10, displayEmail.length || 8))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsEmailVisible(!isEmailVisible)}
-                      className="text-gray-400 hover:text-blue-600 transition-colors p-0.5 rounded focus:outline-none"
-                      title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
-                    >
-                      {isEmailVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    </button>
-                  </div>
-                </div>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+              </button>
+
+              <div>
+                <h1 className="font-black text-slate-900 text-sm tracking-tight flex items-center gap-1.5 leading-tight">
+                  GMAIL JOB ID
+                </h1>
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">
+                  Worker Portal
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div
-                onClick={() => setActiveView("withdraw")}
-                className="text-right bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-2.5 py-1 rounded-xl border border-blue-200/80 cursor-pointer hover:border-blue-300 transition-colors"
+            {/* Right: Actions (Notification Bell + Menu/Profile action) */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveView("announcements")}
+                className="relative p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                title="Pengumuman / Notifikasi"
               >
-                <p className="text-[9px] text-blue-800 font-bold uppercase tracking-wider">Saldo</p>
-                <p className="font-black text-blue-700 text-xs sm:text-sm">{formatMoney(profile.balance)}</p>
-              </div>
-              <Button variant="outline" size="icon" onClick={onLogout} title="Keluar" className="w-8 h-8 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700">
-                <LogOut className="w-3.5 h-3.5" />
-              </Button>
+                <Bell className="w-5 h-5" />
+                {announcements.data.length > 0 && (
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
+                title="Buka Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </header>
 
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-4 pb-24 md:pb-8 space-y-4">
-          {/* SUB-PAGE TOP NAVIGATION BAR (Show on dedicated views) */}
+          {/* SUB-PAGE TOP NAVIGATION BAR (Show on dedicated sub-views) */}
           {activeView !== "home" && (
-            <div className="flex items-center justify-between pb-2 border-b border-blue-200/60 mb-2">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setActiveView("home")}
-                className="gap-1.5 text-xs font-bold text-blue-900 hover:text-blue-950 hover:bg-blue-100/80 px-2.5 h-8 rounded-xl"
+                className="gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50 px-2.5 h-8 rounded-xl"
               >
                 <ArrowLeft className="w-4 h-4 text-blue-600" />
                 <span>Kembali ke Home</span>
               </Button>
-              <Badge variant="outline" className="text-[11px] bg-blue-50/90 text-blue-950 border-blue-300/80 font-bold px-2.5 py-0.5 shadow-2xs">
+              <Badge variant="outline" className="text-[11px] bg-white text-slate-800 border-slate-200 font-bold px-2.5 py-0.5 shadow-2xs">
                 {getViewTitle(activeView)}
               </Badge>
             </div>
           )}
 
-          {/* ==================== 1. HOME VIEW ==================== */}
+          {/* ==================== HOME VIEW ==================== */}
           {activeView === "home" && (
             <div className="space-y-4">
-              {/* SALDO UTAMA HIGHLIGHT CARD */}
-              <Card className="bg-gradient-to-r from-blue-500 via-orange-500 to-blue-600 text-white border-blue-400/50 shadow-md overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                    <div className="space-y-0.5">
-                      <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Wallet className="w-3.5 h-3.5 text-blue-200" /> Saldo Utamaku
+              {/* 2. GREETING SECTION */}
+              <section className="flex items-center justify-between gap-3 pt-1">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    Hallo, {displayName} 👋
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Selamat datang kembali! Siap menyetor email hari ini?
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs px-2.5 py-1 rounded-full shrink-0">
+                  Rate: {formatMoney(currentTierConfig.pricePerItem)} / email
+                </Badge>
+              </section>
+
+              {/* 3. BALANCE CARD */}
+              <Card className="bg-blue-600 text-white border-0 shadow-md rounded-[20px] overflow-hidden">
+                <CardContent className="p-4 sm:p-5 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-blue-100 font-medium flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5 text-blue-200" />
+                        Saldo Utama
                       </p>
-                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
+                      <p className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
                         {formatMoney(profile.balance)}
                       </p>
-                      <p className="text-[11px] text-blue-100/90 font-medium">
-                        Total Setoran ACC: <strong className="text-white font-bold">{profile.accCount ?? 0} Email</strong>
-                      </p>
                     </div>
+                    <Badge className="bg-blue-700/80 text-blue-100 border-0 font-medium text-xs px-2.5 py-0.5 rounded-full">
+                      Total Setoran ACC: {profile.accCount ?? 0} Email
+                    </Badge>
+                  </div>
 
-                    <div className="flex items-center gap-2 pt-1 sm:pt-0">
-                      <Button
-                        type="button"
-                        onClick={() => setActiveView("withdraw")}
-                        className="flex-1 sm:flex-initial bg-white text-blue-900 hover:bg-blue-50 font-extrabold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5 transition-transform active:scale-95"
-                      >
-                        <Wallet className="w-3.5 h-3.5 text-blue-600" />
-                        Tarik Saldo
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => setActiveView("submit")}
-                        className="flex-1 sm:flex-initial bg-blue-950/40 hover:bg-blue-950/60 backdrop-blur-md text-blue-100 font-extrabold text-xs h-9 px-3.5 rounded-xl border border-blue-300/30 gap-1.5 transition-transform active:scale-95"
-                      >
-                        <PlusCircle className="w-3.5 h-3.5 text-blue-300" />
-                        Setor Email
-                      </Button>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2.5 pt-1">
+                    <Button
+                      type="button"
+                      onClick={() => setActiveView("withdraw")}
+                      className="bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs h-10 rounded-xl shadow-xs gap-1.5 transition-all active:scale-95"
+                    >
+                      <Wallet className="w-4 h-4 text-blue-600" />
+                      Tarik Saldo
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setActiveView("submit")}
+                      className="bg-blue-700/60 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl border border-blue-400/30 gap-1.5 transition-all active:scale-95"
+                    >
+                      <PlusCircle className="w-4 h-4 text-blue-200" />
+                      Setor Email
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* COMPACT LAYANAN CEPAT GRID (8 ITEMS / 4 COLUMNS) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              {/* 4. LAYANAN CEPAT (4-COLUMN SERVICE GRID) */}
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between px-0.5">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
                     Layanan Cepat
                   </h3>
-                  <span className="text-[10px] text-gray-500 font-medium">Pilih Menu</span>
+                  <span className="text-xs text-slate-400 font-medium">Pilih Menu</span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+                <div className="grid grid-cols-4 gap-2.5">
                   {[
                     {
                       id: "submit" as DashboardView,
                       label: "Job Gmail",
-                      subtext: "Setor Email",
-                      icon: <Send className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <Send className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "checker" as DashboardView,
-                      label: "Status ACC",
-                      subtext: "Checker",
-                      icon: <SearchCheck className="w-4 h-4 text-orange-600" />,
-                      badgeBg: "bg-orange-50 border-orange-200/80",
+                      label: "Screening Email",
+                      icon: <SearchCheck className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "leaderboard" as DashboardView,
                       label: "Klasemen",
-                      subtext: "Top Worker",
-                      icon: <Trophy className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <Trophy className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "referral" as DashboardView,
                       label: "Referral",
-                      subtext: "Pasif Income",
-                      icon: <Users className="w-4 h-4 text-blue-700" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <Users className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "withdraw" as DashboardView,
                       label: "Tarik Saldo",
-                      subtext: "Pencairan",
-                      icon: <Wallet className="w-4 h-4 text-emerald-600" />,
-                      badgeBg: "bg-emerald-50 border-emerald-200/80",
+                      icon: <Wallet className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "history" as DashboardView,
-                      label: "Riwayat Job",
-                      subtext: "Log Setoran",
-                      icon: <History className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      label: "Riwayat",
+                      icon: <History className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "cs" as DashboardView,
                       label: "Bantuan CS",
-                      subtext: "Pusat Bantuan",
-                      icon: <HelpCircle className="w-4 h-4 text-blue-600" />,
-                      badgeBg: "bg-blue-50 border-blue-200/80",
+                      icon: <HelpCircle className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       id: "announcements" as DashboardView,
                       label: "Info Resmi",
-                      subtext: "Pengumuman",
-                      icon: <Megaphone className="w-4 h-4 text-rose-600" />,
-                      badgeBg: "bg-rose-50 border-rose-200/80",
+                      icon: <Megaphone className="w-5 h-5 text-blue-600" />,
                     },
                   ].map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => setActiveView(item.id)}
-                      className="p-2 sm:p-2.5 bg-white border border-blue-100/80 rounded-2xl shadow-2xs hover:border-blue-300 hover:bg-blue-50/40 text-center flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 group cursor-pointer"
+                      className="bg-white border border-slate-200/80 rounded-2xl p-2.5 flex flex-col items-center justify-center text-center shadow-xs hover:border-blue-300 hover:shadow-sm transition-all active:scale-95 group cursor-pointer min-h-[82px]"
                     >
-                      <div className={`p-2 rounded-xl border ${item.badgeBg} group-hover:scale-105 transition-transform shadow-2xs`}>
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-1.5 group-hover:bg-blue-100 transition-colors">
                         {item.icon}
                       </div>
-                      <div className="w-full">
-                        <p className="text-[11px] font-bold text-gray-800 leading-tight truncate w-full group-hover:text-blue-900">
-                          {item.label}
-                        </p>
-                        <p className="text-[9px] text-gray-400 font-medium truncate w-full hidden sm:block">
-                          {item.subtext}
-                        </p>
-                      </div>
+                      <span className="text-[11px] font-semibold text-slate-800 leading-tight group-hover:text-blue-600">
+                        {item.label}
+                      </span>
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              {/* JAM OPERASIONAL COMPACT CARD */}
-              <Card className="bg-gradient-to-br from-blue-50/90 via-orange-50/40 to-blue-100/30 border-blue-200/80 shadow-xs relative overflow-hidden">
-                <CardHeader className="p-3.5 pb-2">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Jam Operasional Layanan</span>
-                    </CardTitle>
-                    <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-2xs border ${
+              {/* 5. OPERATIONAL HOURS */}
+              <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900">Jam Operasional Layanan</h4>
+                    </div>
+
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                       operatingStatus.isOpen
-                        ? "bg-emerald-500 text-white border-emerald-400"
-                        : "bg-rose-500 text-white border-rose-400"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${operatingStatus.isOpen ? "bg-emerald-200" : "bg-rose-200"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${operatingStatus.isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
                       {operatingStatus.statusText}
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="p-3.5 pt-0">
-                  <p className="text-[11px] text-gray-600">
+
+                  <p className="text-xs text-slate-500 leading-relaxed pl-10">
                     Layanan setoran & verifikasi diproses sesuai jadwal operasional WIB (Asia/Jakarta).
                   </p>
                 </CardContent>
               </Card>
 
-              {/* LATEST ANNOUNCEMENT / INFO SINGKAT CARD */}
+              {/* 6. OFFICIAL ANNOUNCEMENT */}
               {announcements.data.length > 0 && (
                 <Card
                   onClick={() => setActiveView("announcements")}
-                  className="bg-white border-blue-200/80 shadow-2xs hover:border-blue-300 transition-colors cursor-pointer p-3.5 flex items-center justify-between gap-3"
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-200/60 shrink-0">
-                      <Megaphone className="w-4 h-4" />
+                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Megaphone className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                          INFO RESMI TERBARU
+                        </p>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {announcements.data[0].title}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {announcements.data[0].content}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Info Resmi Terbaru</p>
-                      <p className="text-xs font-bold text-gray-900 truncate">{announcements.data[0].title}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{announcements.data[0].content}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  </CardContent>
                 </Card>
               )}
             </div>
@@ -2032,22 +2033,19 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </div>
           )}
 
-          {/* FIXED BOTTOM NAVIGATION BAR FOR MOBILE QUICK ACCESS */}
-          <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-200 shadow-2xl px-2 py-1.5 flex items-center justify-around">
+          {/* 7. MOBILE BOTTOM NAVIGATION */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg px-2 py-1 flex items-center justify-around">
             {/* 1. HOME */}
             <button
               type="button"
               onClick={() => setActiveView("home")}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
                 activeView === "home"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              {activeView === "home" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
-              )}
-              <Home className="w-5 h-5 mb-0.5" />
+              <Home className={`w-5 h-5 mb-0.5 ${activeView === "home" ? "text-blue-600 stroke-[2.5]" : ""}`} />
               <span className="text-[10px] tracking-tight">Home</span>
             </button>
 
@@ -2055,60 +2053,52 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             <button
               type="button"
               onClick={() => setActiveView("submit")}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
                 activeView === "submit"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <div className="p-1 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-slate-950 shadow-md shadow-blue-500/20 mb-0.5">
-                <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-              </div>
-              <span className="text-[10px] tracking-tight font-semibold">Setor</span>
+              <PlusCircle className={`w-5 h-5 mb-0.5 ${activeView === "submit" ? "text-blue-600 stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] tracking-tight">Setor</span>
             </button>
 
             {/* 3. WITHDRAW */}
             <button
               type="button"
               onClick={() => setActiveView("withdraw")}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
                 activeView === "withdraw"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              {activeView === "withdraw" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
-              )}
-              <Wallet className="w-5 h-5 mb-0.5" />
+              <Wallet className={`w-5 h-5 mb-0.5 ${activeView === "withdraw" ? "text-blue-600 stroke-[2.5]" : ""}`} />
               <span className="text-[10px] tracking-tight">Withdraw</span>
             </button>
 
-            {/* 4. BANTUAN CS */}
+            {/* 4. CS */}
             <button
               type="button"
               onClick={() => setActiveView("cs")}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-colors min-h-[44px] min-w-[44px] ${
                 activeView === "cs"
-                  ? "text-blue-400 font-bold scale-105"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              {activeView === "cs" && (
-                <span className="absolute -top-1.5 w-7 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.8)]" />
-              )}
-              <HelpCircle className="w-5 h-5 mb-0.5" />
+              <HelpCircle className={`w-5 h-5 mb-0.5 ${activeView === "cs" ? "text-blue-600 stroke-[2.5]" : ""}`} />
               <span className="text-[10px] tracking-tight">CS</span>
             </button>
 
-            {/* 5. SIDEBAR TRIGGER / AKUN */}
+            {/* 5. MENU */}
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-h-[44px] min-w-[44px] text-slate-400 hover:text-slate-200"
+              className="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-600 transition-colors min-h-[44px] min-w-[44px]"
             >
-              <Menu className="w-5 h-5 mb-0.5 text-blue-400" />
-              <span className="text-[10px] tracking-tight font-semibold">Menu</span>
+              <Menu className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] tracking-tight">Menu</span>
             </button>
           </nav>
 
