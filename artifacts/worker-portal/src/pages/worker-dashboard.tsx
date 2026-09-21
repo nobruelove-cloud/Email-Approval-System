@@ -2263,74 +2263,113 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {/* ==================== 9. PENGUMUMAN / INFO RESMI VIEW ==================== */}
           {activeView === "announcements" && (
             <div className="space-y-4">
-              <Card className="bg-white border-gray-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2 text-gray-900">
-                    <Megaphone className="w-4 h-4 text-blue-600" />
-                    Pusat Pengumuman & Informasi Resmi
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Informasi resmi langsung dari admin.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {announcements.loading && (
-                    <p className="text-xs text-gray-400 text-center py-8">Memuat pengumuman...</p>
-                  )}
-                  {announcements.error && (
-                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl text-center">
-                      Gagal memuat pengumuman: {announcements.error}
-                    </div>
-                  )}
-                  {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
-                    <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400">
-                      Belum ada pengumuman resmi saat ini.
-                    </div>
-                  )}
-                  {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
-                    <div className="space-y-3">
-                      {announcements.data.map((item) => {
-                        const badgeUpper = item.badge?.toUpperCase().trim() || "";
-                        let badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                        if (badgeUpper === "BARU" || badgeUpper === "PENTING") {
-                          badgeStyle = "bg-red-100 text-red-800 hover:bg-red-100";
-                        } else if (badgeUpper === "IMPORTANT" || badgeUpper === "PERHATIAN") {
-                          badgeStyle = "bg-blue-100 text-blue-800 hover:bg-blue-100";
-                        } else if (badgeUpper === "INFO") {
-                          badgeStyle = "bg-sky-100 text-sky-800 hover:bg-sky-100";
-                        }
+              {/* PAGE HEADER */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Info Resmi
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Informasi dan pengumuman resmi dari GMAIL JOB ID.
+                  </p>
+                </div>
+              </div>
 
-                        return (
-                          <Card key={item.id} className="bg-white border-gray-200/80 shadow-2xs hover:border-gray-300 transition-colors">
-                            <CardHeader className="pb-2">
-                              <div className="flex items-start justify-between gap-3 flex-wrap">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <CardTitle className="text-sm font-bold text-gray-900">{item.title}</CardTitle>
-                                    {item.badge && (
-                                      <Badge className={`text-[10px] font-bold ${badgeStyle}`}>
-                                        {item.badge}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-gray-400">
-                                    {formatDateTime(item.updatedAt || item.createdAt)}
-                                  </p>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
-                                {item.content}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+              {/* ANNOUNCEMENT LIST / STATES */}
+              {announcements.loading && (
+                <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>Memuat informasi resmi...</span>
+                  </div>
+                </Card>
+              )}
+
+              {announcements.error && (
+                <Card className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-xs p-4">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Gagal memuat pengumuman: {announcements.error}</span>
+                  </div>
+                </Card>
+              )}
+
+              {!announcements.loading && !announcements.error && announcements.data.length === 0 && (
+                <Card className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 sm:p-10 text-center shadow-xs">
+                  <CardContent className="p-0 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto">
+                      <Megaphone className="w-6 h-6" />
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    <div className="space-y-1">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                        Belum Ada Pengumuman
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                        Belum ada informasi resmi yang tersedia saat ini.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!announcements.loading && !announcements.error && announcements.data.length > 0 && (
+                <div className="space-y-3.5">
+                  {announcements.data.map((item) => {
+                    const badgeUpper = item.badge?.toUpperCase().trim() || "";
+                    let badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+                    if (badgeUpper === "BARU" || badgeUpper === "PENTING" || badgeUpper === "IMPORTANT") {
+                      badgeStyle = "bg-rose-50 text-rose-700 border-rose-200";
+                    } else if (badgeUpper === "PERHATIAN") {
+                      badgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
+                    } else if (badgeUpper === "INFO") {
+                      badgeStyle = "bg-sky-50 text-sky-700 border-sky-200";
+                    }
+
+                    return (
+                      <Card
+                        key={item.id}
+                        className="bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-blue-300 transition-colors"
+                      >
+                        <CardHeader className="p-4 sm:p-5 pb-2">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 mt-0.5">
+                                <Megaphone className="w-4 h-4" />
+                              </div>
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
+                                    {item.title}
+                                  </CardTitle>
+                                  {item.badge && (
+                                    <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeStyle}`}>
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <span>{formatDateTime(item.updatedAt || item.createdAt)}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4 sm:p-5 pt-1">
+                          <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/60">
+                            <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                              {item.content}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
