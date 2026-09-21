@@ -1884,6 +1884,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 rules={rules.data}
                 userTier={profile.tier}
                 onViewDetail={setDetailSubmission}
+                onGoToSubmit={() => setActiveView("submit")}
               />
             </div>
           )}
