@@ -651,7 +651,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       case "cs":
         return "Bantuan CS & Komunitas";
       case "announcements":
-        return "Informasi Resmi Admin";
+        return "Notifikasi";
       case "chat":
         return "Pesan Admin / Live Chat";
       default:
@@ -2260,30 +2260,30 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
             </div>
           )}
 
-          {/* ==================== 9. PENGUMUMAN / INFO RESMI VIEW ==================== */}
+          {/* ==================== 9. NOTIFIKASI / INFO RESMI VIEW ==================== */}
           {activeView === "announcements" && (
             <div className="space-y-4">
               {/* PAGE HEADER */}
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                  <Megaphone className="w-5 h-5" />
+                  <Bell className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                    Info Resmi
+                    Notifikasi
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Informasi dan pengumuman resmi dari GMAIL JOB ID.
+                    Informasi terbaru untuk akun Anda.
                   </p>
                 </div>
               </div>
 
-              {/* ANNOUNCEMENT LIST / STATES */}
+              {/* NOTIFICATION LIST / STATES */}
               {announcements.loading && (
                 <Card className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-8 text-center">
                   <div className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <span>Memuat informasi resmi...</span>
+                    <span>Memuat notifikasi...</span>
                   </div>
                 </Card>
               )}
@@ -2292,7 +2292,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <Card className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-xs p-4">
                   <div className="flex items-center gap-2 text-xs font-medium">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>Gagal memuat pengumuman: {announcements.error}</span>
+                    <span>Gagal memuat notifikasi: {announcements.error}</span>
                   </div>
                 </Card>
               )}
@@ -2301,14 +2301,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <Card className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 sm:p-10 text-center shadow-xs">
                   <CardContent className="p-0 space-y-3">
                     <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto">
-                      <Megaphone className="w-6 h-6" />
+                      <Bell className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                        Belum Ada Pengumuman
+                        Belum Ada Notifikasi
                       </h3>
                       <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                        Belum ada informasi resmi yang tersedia saat ini.
+                        Belum ada notifikasi untuk Anda saat ini.
                       </p>
                     </div>
                   </CardContent>
@@ -2337,7 +2337,7 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 mt-0.5">
-                                <Megaphone className="w-4 h-4" />
+                                <Bell className="w-4 h-4" />
                               </div>
                               <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
