@@ -85,6 +85,7 @@ match /users/{uid} {
   allow delete: if isAdmin();
 }
 
+
     // ---- emailSubmissions/{id} ----
     match /emailSubmissions/{id} {
       allow read: if isSignedIn();
