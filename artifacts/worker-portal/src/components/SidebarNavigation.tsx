@@ -181,7 +181,7 @@ export function SidebarNavigation({
 
       {/* ==================== SIDEBAR / DRAWER CONTAINER ==================== */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen max-h-screen overflow-hidden bg-[#F0F4F9] border-r border-slate-200/80 shadow-2xl md:shadow-none flex flex-col justify-between transition-all duration-300 ease-in-out ${
+        className={`fixed md:sticky top-0 left-0 z-50 h-[100dvh] max-h-[100dvh] flex flex-col p-0 overflow-hidden bg-[#F0F4F9] border-r border-slate-200/80 shadow-2xl md:shadow-none justify-between transition-all duration-300 ease-in-out ${
           // Mobile state: slide in drawer (88% width, max 340px)
           isOpenMobile
             ? "translate-x-0 w-[88vw] max-w-[340px]"
@@ -192,7 +192,7 @@ export function SidebarNavigation({
         }`}
       >
         {/* SIDEBAR HEADER BRANDING */}
-        <div className="p-3.5 sm:p-4 border-b border-slate-200/80 flex items-center justify-between bg-white shrink-0">
+        <div className="shrink-0 p-4 border-b border-slate-200/80 flex items-center justify-between bg-white">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-xs shrink-0">
               <Mail className="w-5 h-5 text-white" />
@@ -235,7 +235,7 @@ export function SidebarNavigation({
         </div>
 
         {/* SIDEBAR MENU NAVIGATION */}
-        <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 space-y-1.5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 space-y-2 custom-scrollbar">
           {menuItems.map((item) => {
             const isActive = activeView === item.id;
             return (
@@ -302,9 +302,9 @@ export function SidebarNavigation({
         </div>
 
         {/* WORKER PROFILE & LOGOUT AREA */}
-        <div className="p-3 border-t border-slate-200/80 bg-white space-y-2 shrink-0">
+        <div className="shrink-0 p-4 border-t border-slate-200/80 bg-white mt-auto space-y-2">
           {(!isCollapsedDesktop || isOpenMobile) ? (
-            <div className="space-y-2">
+            <div>
               <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-[#F0F4F9] border border-slate-200/80">
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-2xs shrink-0">
                   {displayName.charAt(0).toUpperCase()}
@@ -336,14 +336,14 @@ export function SidebarNavigation({
                 </div>
               </div>
 
-              <Button
-                variant="outline"
+              <button
+                type="button"
                 onClick={onLogout}
-                className="w-full h-10 min-h-[44px] bg-white hover:bg-rose-50 border-rose-200 text-rose-600 hover:text-rose-700 font-bold text-xs gap-2 rounded-xl transition-colors shadow-2xs cursor-pointer active:scale-95"
+                className="w-full mt-3 min-h-[44px] flex items-center justify-center gap-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl font-medium text-sm transition-colors cursor-pointer active:scale-95"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4 text-red-600" />
                 <span>Keluar Akun</span>
-              </Button>
+              </button>
             </div>
           ) : (
             <div className="flex flex-col items-center space-y-2">
