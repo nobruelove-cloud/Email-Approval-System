@@ -35,7 +35,6 @@ service cloud.firestore {
                get(/databases/$(database)/documents/settings/rules).data.referralTiers.exists(t, t.minAcc == minAcc && t.reward == rewardAmount)
              );
     }
-
   
     // ---- emailSubmissions/{id} ----
     match /emailSubmissions/{id} {
