@@ -110,9 +110,6 @@ async function main() {
         email: 'casec@example.com',
         phone: '08123456789',
         referredBy: workerUid,
-        referralCode: 'REF123',
-        hasUsedReferral: true,
-        reciprocalPartner: 'partner_456',
         role: 'worker',
         status: 'active',
         tier: 1,
@@ -120,7 +117,7 @@ async function main() {
         createdAt: serverTimestamp(),
       })
     );
-    console.log('[PASS] Case C: Self-registration with optional phone, referredBy, referralCode, hasUsedReferral, reciprocalPartner succeeded.');
+    console.log('[PASS] Case C: Self-registration with optional phone & referredBy succeeded.');
   } catch (err) {
     console.error('[FAIL] Case C: Self-registration failed:', err);
     process.exitCode = 1;
@@ -391,16 +388,29 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('4. Self balance update (permitted under simplified self update rule):');
+  console.log('4. Worker cannot increase balance:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        balance: 20000, // current balance is 15000, 20000 > 15000 must fail
+      })
+    );
+    console.log('[PASS] Negative Update: Worker cannot increase balance correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Negative Update: Worker increasing balance was not rejected:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4b. Worker can decrease balance:');
   try {
     await assertSucceeds(
       updateDoc(doc(workerDb, 'users', workerUid), {
-        balance: 20000,
+        balance: 10000, // current balance is 15000, 10000 <= 15000 succeeded
       })
     );
-    console.log('[PASS] Self balance update succeeded as permitted by security rules.');
+    console.log('[PASS] Worker decreasing balance succeeded.');
   } catch (err) {
-    console.error('[FAIL] Self balance update failed:', err);
+    console.error('[FAIL] Worker decreasing balance failed:', err);
     process.exitCode = 1;
   }
 
@@ -553,7 +563,7 @@ async function main() {
     process.exitCode = 1;
   }
 
-  console.log('\nScenario 3: Worker (referrer) claimReferralReward transaction succeeds');
+  console.log('\nScenario 3: Admin referral/reward transaction crediting worker balance succeeds');
   const workerClaimRefId = 'worker_claim_ref_doc_1';
   const workerClaimId = `${workerClaimRefId}_tier_5`;
   const workerLedgerId = `${workerClaimRefId}_ledger_tier_5`;
@@ -575,14 +585,14 @@ async function main() {
 
   try {
     await assertSucceeds(
-      runTransaction(regWorker1Db, async (tx) => {
-        const refDocRef = doc(regWorker1Db, 'referrals', workerClaimRefId);
+      runTransaction(regAdminDb, async (tx) => {
+        const refDocRef = doc(regAdminDb, 'referrals', workerClaimRefId);
         const refSnap = await tx.get(refDocRef);
-        const referrerUserRef = doc(regWorker1Db, 'users', regWorker1);
+        const referrerUserRef = doc(regAdminDb, 'users', regWorker1);
         const referrerSnap = await tx.get(referrerUserRef);
-        const claimDocRef = doc(regWorker1Db, 'referralClaims', workerClaimId);
+        const claimDocRef = doc(regAdminDb, 'referralClaims', workerClaimId);
         const claimSnap = await tx.get(claimDocRef);
-        const ledgerRef = doc(regWorker1Db, 'rewardLedger', workerLedgerId);
+        const ledgerRef = doc(regAdminDb, 'rewardLedger', workerLedgerId);
         const ledgerSnap = await tx.get(ledgerRef);
 
         tx.update(refDocRef, {
@@ -594,7 +604,6 @@ async function main() {
 
         tx.update(referrerUserRef, {
           balance: (referrerSnap.data().balance || 0) + 500,
-          lastClaimId: workerClaimId,
         });
 
         tx.set(ledgerRef, {
@@ -620,7 +629,7 @@ async function main() {
         });
       })
     );
-    console.log('[PASS] Scenario 3: Worker claimReferralReward transaction succeeded.');
+    console.log('[PASS] Scenario 3: Admin referral/reward transaction crediting worker balance succeeded.');
   } catch (err) {
     console.error('[FAIL] Scenario 3 failed:', err);
     process.exitCode = 1;
