@@ -56,6 +56,119 @@ import { DEFAULT_RULES, type ReferralTierConfig } from "@/lib/portal-types";
 import { formatMoney } from "@/lib/portal-utils";
 import { LiveWithdrawalTicker } from "@/components/LiveWithdrawalTicker";
 
+function AnimeMascotSVG({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 200 280" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <defs>
+        <linearGradient id="hairGrad" x1="0" y1="0" x2="200" y2="280" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#1e1b4b" />
+          <stop offset="50%" stopColor="#2563eb" />
+          <stop offset="100%" stopColor="#0891b2" />
+        </linearGradient>
+        <linearGradient id="jacketGrad" x1="0" y1="100" x2="200" y2="280" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0f172a" />
+          <stop offset="100%" stopColor="#1e293b" />
+        </linearGradient>
+        <linearGradient id="accentGrad" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#06b6d4" />
+          <stop offset="100%" stopColor="#38bdf8" />
+        </linearGradient>
+        <radialGradient id="skinGlow" cx="100" cy="90" r="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#fef3c7" />
+          <stop offset="100%" stopColor="#fde68a" />
+        </radialGradient>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      {/* Ambient Back Glow */}
+      <circle cx="100" cy="110" r="70" fill="#0284c7" opacity="0.25" filter="url(#glow)" />
+
+      {/* Back Hair */}
+      <path
+        d="M 45 90 C 30 130 35 180 40 220 C 55 210 65 190 70 160 Z M 155 90 C 170 130 165 180 160 220 C 145 210 135 190 130 160 Z"
+        fill="url(#hairGrad)"
+      />
+
+      {/* Neck & Shoulders Base */}
+      <path d="M 88 120 L 112 120 L 115 140 L 85 140 Z" fill="#fde68a" />
+      <path d="M 60 140 C 70 135 130 135 140 140 L 165 240 L 35 240 Z" fill="url(#jacketGrad)" stroke="#334155" strokeWidth="2" />
+
+      {/* Jacket Collar & Zipper Accent */}
+      <path d="M 75 140 L 100 175 L 125 140" fill="none" stroke="url(#accentGrad)" strokeWidth="3" strokeLinecap="round" />
+      <path d="M 100 175 L 100 240" fill="none" stroke="#06b6d4" strokeWidth="2" strokeDasharray="4 2" />
+
+      {/* Head / Face */}
+      <path
+        d="M 65 75 C 65 45 135 45 135 75 C 135 105 115 125 100 125 C 85 125 65 105 65 75 Z"
+        fill="url(#skinGlow)"
+      />
+
+      {/* Blush */}
+      <ellipse cx="78" cy="92" rx="6" ry="3" fill="#f43f5e" opacity="0.35" />
+      <ellipse cx="122" cy="92" rx="6" ry="3" fill="#f43f5e" opacity="0.35" />
+
+      {/* Eyes (Anime Style) */}
+      <path d="M 72 82 C 75 77 87 77 90 82" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
+      <ellipse cx="81" cy="86" rx="4.5" ry="6.5" fill="#0f172a" />
+      <ellipse cx="81" cy="86" rx="3" ry="4.5" fill="#0284c7" />
+      <circle cx="79.5" cy="83.5" r="1.5" fill="#ffffff" />
+      <circle cx="82.5" cy="88" r="0.8" fill="#ffffff" />
+
+      <path d="M 110 82 C 113 77 125 77 128 82" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
+      <ellipse cx="119" cy="86" rx="4.5" ry="6.5" fill="#0f172a" />
+      <ellipse cx="119" cy="86" rx="3" ry="4.5" fill="#0284c7" />
+      <circle cx="117.5" cy="83.5" r="1.5" fill="#ffffff" />
+      <circle cx="120.5" cy="88" r="0.8" fill="#ffffff" />
+
+      {/* Eyebrows */}
+      <path d="M 73 75 Q 81 72 88 75" fill="none" stroke="#1e1b4b" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M 112 75 Q 119 72 127 75" fill="none" stroke="#1e1b4b" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* Nose & Smile */}
+      <circle cx="100" cy="95" r="0.8" fill="#d97706" />
+      <path d="M 94 102 Q 100 107 106 102" fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" />
+
+      {/* Tech Headset */}
+      <path d="M 60 70 C 60 40 140 40 140 70" fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+      <rect x="54" y="66" width="10" height="20" rx="4" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
+      <rect x="136" y="66" width="10" height="20" rx="4" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
+      <circle cx="59" cy="76" r="2" fill="#22c55e" />
+
+      {/* Front Hair / Bangs */}
+      <path
+        d="M 62 65 C 70 42 130 42 138 65 C 125 55 110 65 100 68 C 90 65 75 55 62 65 Z"
+        fill="url(#hairGrad)"
+      />
+      <path d="M 80 55 C 75 72 70 80 65 82" fill="none" stroke="#0284c7" strokeWidth="1.5" opacity="0.6" />
+      <path d="M 120 55 C 125 72 130 80 135 82" fill="none" stroke="#0284c7" strokeWidth="1.5" opacity="0.6" />
+
+      {/* Gesturing Arm pointing right */}
+      <path
+        d="M 140 160 Q 165 150 185 135"
+        fill="none"
+        stroke="url(#jacketGrad)"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 140 160 Q 165 150 185 135"
+        fill="none"
+        stroke="#06b6d4"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx="188" cy="133" r="6" fill="#fde68a" />
+      <path d="M 188 133 L 196 130" stroke="#fde68a" strokeWidth="3" strokeLinecap="round" />
+
+      {/* Hologram sparkle */}
+      <path d="M 194 120 L 196 124 L 200 126 L 196 128 L 194 132 L 192 128 L 188 126 L 192 124 Z" fill="#38bdf8" />
+    </svg>
+  );
+}
+
 function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
     "auth/invalid-email": "Format email tidak valid.",
@@ -309,7 +422,7 @@ export default function LoginPage() {
             className="flex items-center gap-2.5 group focus:outline-none"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 fill-white" />
+              <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
             <div className="flex flex-col text-left">
               <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
@@ -622,7 +735,7 @@ export default function LoginPage() {
           {/* Logo */}
           <a href="#hero" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 fill-white" />
+              <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
@@ -819,110 +932,133 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Lightweight Code-Based Animated Dashboard Visual */}
-            <div className="lg:col-span-5 relative mt-6 lg:mt-0">
-              {/* Outer Glow Container */}
-              <div className="relative rounded-3xl p-1 bg-gradient-to-b from-cyan-500/30 via-blue-600/20 to-slate-900/90 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-hero-float">
-                <div className="bg-slate-950/95 backdrop-blur-xl rounded-[22px] border border-blue-900/50 p-4 sm:p-5 space-y-4">
-                  {/* Visual Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                      <span className="text-[11px] font-mono text-cyan-400 font-semibold ml-2">LIVE WORKER MONITOR</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-                      <Activity className="w-3 h-3 text-cyan-400 animate-pulse" /> REALTIME
-                    </span>
+            {/* RIGHT COLUMN: Enhanced Code-Based Animated Hero Composition (Smartphone Mockup + Anime Mascot + Floating Badges) */}
+            <div className="lg:col-span-5 relative mt-8 lg:mt-0 flex items-center justify-center">
+              {/* Outer Deep Blue/Cyan Glow Backdrop */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/30 via-cyan-500/20 to-amber-500/10 blur-[90px] rounded-full pointer-events-none animate-hero-pulse" />
+
+              {/* Main Visual Container */}
+              <div className="relative w-full max-w-[420px] sm:max-w-[440px] pt-4 pb-2 px-2 flex items-center justify-center min-h-[460px]">
+
+                {/* 1. Original Anime Mascot SVG Visual Element (Left-rear floating position) */}
+                <div className="absolute left-[-20px] sm:left-[-35px] bottom-4 w-[140px] sm:w-[170px] z-10 animate-hero-float-slow pointer-events-none opacity-90 sm:opacity-100">
+                  <AnimeMascotSVG className="w-full h-auto drop-shadow-[0_15px_30px_rgba(2,132,199,0.4)]" />
+                </div>
+
+                {/* 2. Smartphone Device Mockup Rendering Warm Amber Worker Dashboard */}
+                <div className="relative z-20 w-[270px] sm:w-[300px] rounded-[38px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-slate-700/80 animate-hero-float">
+
+                  {/* Speaker notch / Camera pill */}
+                  <div className="w-24 h-4 bg-slate-950 rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 border border-slate-800">
+                    <div className="w-2 h-2 rounded-full bg-slate-800" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/60" />
                   </div>
 
-                  {/* Dynamic Balance Card */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950 border border-cyan-500/30 relative overflow-hidden">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-xs text-slate-400 font-medium">Saldo Utama Siap Cair</p>
-                        <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 font-mono transition-all duration-300">
-                          {formatMoney(heroCounterBalance)}
-                        </p>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-blue-500/20 text-cyan-300 border border-blue-400/30">
-                        <Wallet className="w-5 h-5" />
-                      </div>
-                    </div>
+                  {/* Smartphone Screen Inner Content */}
+                  <div className="bg-slate-950 text-slate-100 rounded-[30px] p-3.5 space-y-3 font-sans border border-slate-800/90 overflow-hidden relative">
 
-                    <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-slate-800/80">
-                      <span className="text-cyan-400 font-medium flex items-center gap-1">
-                        <TrendingUp className="w-3.5 h-3.5" /> +Rp 3.000 baru saja
-                      </span>
-                      <span className="text-slate-400 font-mono">{heroAccCount} Email ACC</span>
-                    </div>
-                  </div>
-
-                  {/* Animated Activity Curve Chart Mockup */}
-                  <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/90 space-y-2">
-                    <div className="flex justify-between items-center text-xs text-slate-300">
-                      <span className="font-semibold text-slate-200">Aktivitas Penyetoran Email</span>
-                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                        +98.4% Verifikasi
+                    {/* Worker Dashboard Header Replica */}
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-sm">
+                          W
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-extrabold text-white leading-tight">Worker Portal</p>
+                          <p className="text-[9px] text-amber-400 font-semibold">Tier 2 Active</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                        <Activity className="w-2.5 h-2.5 text-amber-400 animate-pulse" /> ONLINE
                       </span>
                     </div>
 
-                    {/* SVG Line Chart */}
-                    <div className="h-20 w-full pt-1">
-                      <svg viewBox="0 0 300 60" className="w-full h-full overflow-visible">
-                        <defs>
-                          <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
-                            <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        <path
-                          d="M 0 50 Q 40 35, 80 40 T 160 20 T 240 25 T 300 8 L 300 60 L 0 60 Z"
-                          fill="url(#cyanGradient)"
-                        />
-                        <path
-                          d="M 0 50 Q 40 35, 80 40 T 160 20 T 240 25 T 300 8"
-                          fill="none"
-                          stroke="#38bdf8"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
-                        <circle cx="300" cy="8" r="4" fill="#38bdf8" className="animate-ping" />
-                        <circle cx="300" cy="8" r="3" fill="#ffffff" />
-                      </svg>
-                    </div>
-                  </div>
+                    {/* Warm Amber Balance Card */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/20 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
 
-                  {/* Floating Live Notification Popups */}
-                  <div className="space-y-2">
-                    <div className="p-2.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 flex items-center justify-between text-xs backdrop-blur-md shadow-md animate-hero-float-slow">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </div>
+                      <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold text-white">Gmail Job Setor ACC</p>
-                          <p className="text-[10px] text-slate-400">worker.acc49@gmail.com</p>
+                          <span className="text-[10px] font-bold text-slate-900/80 uppercase tracking-wide">Saldo Utama Worker</span>
+                          <p className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight mt-0.5 font-mono">
+                            {formatMoney(heroCounterBalance)}
+                          </p>
+                        </div>
+                        <div className="p-1.5 rounded-xl bg-slate-950/20 text-slate-950 backdrop-blur-sm">
+                          <Wallet className="w-4 h-4" />
                         </div>
                       </div>
-                      <span className="font-mono font-bold text-emerald-400">+Rp 3.000</span>
+
+                      <div className="mt-2.5 pt-2 border-t border-slate-950/15 flex items-center justify-between text-[10px] font-extrabold text-slate-950">
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" /> +Rp 3.000 (Setor ACC)
+                        </span>
+                        <span className="bg-slate-950/20 px-1.5 py-0.5 rounded font-mono">{heroAccCount} ACC</span>
+                      </div>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-900/95 border border-blue-500/30 flex items-center justify-between text-xs backdrop-blur-md shadow-md">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-cyan-400 flex items-center justify-center shrink-0 border border-blue-500/20">
-                          <Zap className="w-4 h-4" />
+                    {/* Quick Layanan Cepat Grid */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-200">
+                      <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                        <div className="p-1 rounded-lg bg-blue-500/20 text-cyan-400">
+                          <Send className="w-3 h-3" />
                         </div>
-                        <div>
-                          <p className="font-semibold text-white">Penarikan DANA Sukses</p>
-                          <p className="text-[10px] text-slate-400">Diproses dalam 2 menit</p>
-                        </div>
+                        <span>Setor Email</span>
                       </div>
-                      <span className="font-mono font-bold text-cyan-400">Rp 50.000</span>
+                      <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                        <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400">
+                          <Zap className="w-3 h-3" />
+                        </div>
+                        <span>Penarikan</span>
+                      </div>
                     </div>
+
+                    {/* ACC Activity Ticker Item inside phone */}
+                    <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-center justify-between text-[10px]">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-slate-300 font-medium truncate max-w-[120px]">gmail.job.acc88@gmail.com</span>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400 text-[11px]">+Rp 3k</span>
+                    </div>
+
                   </div>
                 </div>
+
+                {/* 3. Floating Card 1: Email Setor ACC Verified Badge (Top Right Floating) */}
+                <div className="absolute top-2 right-[-10px] sm:right-[-25px] z-30 p-2.5 rounded-2xl bg-slate-900/95 border border-emerald-500/40 text-xs backdrop-blur-xl shadow-xl shadow-black/60 flex items-center gap-2.5 animate-hero-float-slow max-w-[210px]">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <p className="font-extrabold text-white text-[11px]">Email Setor ACC</p>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    </div>
+                    <p className="text-[10px] text-emerald-400 font-mono font-bold mt-0.5">+Rp 3.000 Masuk Saldo</p>
+                  </div>
+                </div>
+
+                {/* 4. Floating Card 2: Penarikan DANA Real-time Success (Bottom Right Floating) */}
+                <div className="absolute bottom-6 right-[-15px] sm:right-[-30px] z-30 p-2.5 rounded-2xl bg-slate-900/95 border border-cyan-500/40 text-xs backdrop-blur-xl shadow-xl shadow-black/60 flex items-center gap-2.5 animate-hero-float max-w-[220px]">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-white text-[11px]">Penarikan DANA Sukses</p>
+                    <p className="text-[10px] text-cyan-300 font-mono font-bold mt-0.5">Rp 50.000 • 2 Menit</p>
+                  </div>
+                </div>
+
+                {/* 5. Floating Badge 3: Realtime Status Indicator Pill (Top Left) */}
+                <div className="absolute top-12 left-[10px] z-30 px-3 py-1 rounded-full bg-slate-950/90 border border-blue-500/40 text-cyan-400 text-[10px] font-bold backdrop-blur-md shadow-lg flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                  </span>
+                  <span>Realtime Platform Activity</span>
+                </div>
+
               </div>
             </div>
           </div>
