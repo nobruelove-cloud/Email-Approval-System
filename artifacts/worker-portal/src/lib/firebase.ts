@@ -23,7 +23,8 @@ export const firebaseConfigured = Boolean(
     firebaseConfig.appId,
 );
 
-let app: FirebaseApp | undefined;
+export { firebaseConfig };
+export let app: FirebaseApp | undefined;
 export let auth: Auth | undefined;
 export let db: Firestore | undefined;
 

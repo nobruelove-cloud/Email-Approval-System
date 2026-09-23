@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, collection, where, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, collection, where, runTransaction, arrayUnion } from 'firebase/firestore';
 
 const PROJECT_ID = 'creat-2c127';
 const rulesContent = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../firestore.rules'), 'utf8');
@@ -411,6 +411,32 @@ async function main() {
     console.log('[PASS] Worker decreasing balance succeeded.');
   } catch (err) {
     console.error('[FAIL] Worker decreasing balance failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4c. Worker can update fcmTokens with arrayUnion:');
+  try {
+    await assertSucceeds(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        fcmTokens: arrayUnion('sample_fcm_token_123'),
+      })
+    );
+    console.log('[PASS] Worker updating fcmTokens with arrayUnion succeeded.');
+  } catch (err) {
+    console.error('[FAIL] Worker updating fcmTokens with arrayUnion failed:', err);
+    process.exitCode = 1;
+  }
+
+  console.log('4d. Worker updating fcmTokens with non-array is rejected:');
+  try {
+    await assertFails(
+      updateDoc(doc(workerDb, 'users', workerUid), {
+        fcmTokens: 'invalid_string_token',
+      })
+    );
+    console.log('[PASS] Worker updating fcmTokens with non-array correctly rejected.');
+  } catch (err) {
+    console.error('[FAIL] Worker updating fcmTokens with non-array was not rejected:', err);
     process.exitCode = 1;
   }
 

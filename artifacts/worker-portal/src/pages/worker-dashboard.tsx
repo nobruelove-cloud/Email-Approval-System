@@ -100,6 +100,7 @@ import {
   calculateWithdrawalFee,
   formatFeeBadge,
 } from "@/lib/portal-utils";
+import { requestNotificationPermission } from "@/lib/firebase/messaging";
 
 function TelegramIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
@@ -141,6 +142,15 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const announcements = useAnnouncements();
 
   // Maintenance Mode real-time countdown & unlock logic
+  // Request Push Notification (FCM) Permission on login / mount
+  useEffect(() => {
+    if (profile?.uid) {
+      requestNotificationPermission(profile.uid).catch((err) => {
+        console.warn("[WorkerDashboard] FCM permission error:", err);
+      });
+    }
+  }, [profile?.uid]);
+
   const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
   const isMaintenanceActive = maintenance.enabled && profile.role !== "admin";
 

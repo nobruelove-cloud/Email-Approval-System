@@ -48,7 +48,7 @@ service cloud.firestore {
           'tier', 'balance', 'createdAt'
         ]) &&
         request.resource.data.keys().hasOnly([
-          'uid', 'name', 'email', 'phone', 'referredBy',
+          'uid', 'name', 'email', 'phone', 'referredBy', 'fcmTokens',
           'role', 'status', 'tier', 'balance', 'createdAt'
         ]) &&
         request.resource.data.uid == uid &&
@@ -61,6 +61,8 @@ service cloud.firestore {
           request.resource.data.phone is string) &&
         (!('referredBy' in request.resource.data) ||
           request.resource.data.referredBy is string) &&
+        (!('fcmTokens' in request.resource.data) ||
+          request.resource.data.fcmTokens is list) &&
         request.resource.data.role == 'worker' &&
         request.resource.data.status == 'active' &&
         request.resource.data.tier == 1 &&
@@ -80,7 +82,9 @@ service cloud.firestore {
         (!('status' in request.resource.data) ||
           request.resource.data.status == resource.data.status) &&
         (!('tier' in request.resource.data) ||
-          request.resource.data.tier == resource.data.tier)
+          request.resource.data.tier == resource.data.tier) &&
+        (!('fcmTokens' in request.resource.data) ||
+          request.resource.data.fcmTokens is list)
       );
 
       allow delete: if isAdmin();
