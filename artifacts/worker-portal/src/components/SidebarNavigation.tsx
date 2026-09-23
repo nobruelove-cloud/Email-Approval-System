@@ -119,12 +119,6 @@ export function SidebarNavigation({
       icon: <SearchCheck className="w-5 h-5 shrink-0 text-blue-600" />,
     },
     {
-      id: "messages",
-      label: "Manajemen Pesan",
-      description: "Kelola, Filter & Hapus Pesan Email",
-      icon: <Mail className="w-5 h-5 shrink-0 text-blue-600" />,
-    },
-    {
       id: "leaderboard",
       label: "Klasemen",
       description: "Peringkat Worker & Hadiah Mingguan",

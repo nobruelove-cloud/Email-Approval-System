@@ -64,6 +64,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
   useWorkerData,
   useWorkerEngagementData,
   useSettings,
@@ -140,6 +145,33 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const maintenanceHook = useSettings("maintenance", DEFAULT_MAINTENANCE);
   const myReferral = useMyReferral(profile.uid);
   const announcements = useAnnouncements();
+
+  // Dismissed notifications state (stored per worker in localStorage)
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined" && profile?.uid) {
+      try {
+        const saved = localStorage.getItem(`worker_dismissed_notifs_${profile.uid}`);
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && profile?.uid) {
+      try {
+        localStorage.setItem(`worker_dismissed_notifs_${profile.uid}`, JSON.stringify(dismissedNotificationIds));
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [dismissedNotificationIds, profile?.uid]);
+
+  const activeAnnouncements = useMemo(() => {
+    return announcements.data.filter((item) => !dismissedNotificationIds.includes(item.id));
+  }, [announcements.data, dismissedNotificationIds]);
 
   // Maintenance Mode real-time countdown & unlock logic
   const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
@@ -708,19 +740,144 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </div>
             </div>
 
-            {/* Right: Actions (Notification Bell + Menu/Profile action) */}
+            {/* Right: Actions (Notification Bell Dropdown + Menu/Profile action) */}
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveView("announcements")}
-                className="relative p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                title="Pengumuman / Notifikasi"
-              >
-                <Bell className="w-5 h-5" />
-                {announcements.data.length > 0 && (
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-                )}
-              </button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="notification-bell-btn"
+                    className="relative p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer"
+                    title="Pengumuman & Notifikasi"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {activeAnnouncements.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-2xs">
+                        {activeAnnouncements.length}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[90vw] max-w-[380px] p-0 rounded-2xl bg-white border border-slate-200/80 shadow-xl z-50">
+                  {/* DROPDOWN HEADER */}
+                  <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 rounded-t-2xl">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                        <Bell className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 leading-tight">Pemberitahuan</h4>
+                        <p className="text-[10px] text-slate-500 font-medium">
+                          {activeAnnouncements.length > 0 ? `${activeAnnouncements.length} belum dibaca` : "Tidak ada pemberitahuan baru"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {activeAnnouncements.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid="clear-all-notifs-btn"
+                        onClick={() => {
+                          const allIds = announcements.data.map((item) => item.id);
+                          setDismissedNotificationIds(allIds);
+                          toast.success("Seluruh notifikasi berhasil dibersihkan.");
+                        }}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 px-2.5 rounded-xl gap-1 transition-colors cursor-pointer min-h-[36px]"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Bersihkan Semua</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* NOTIFICATION LIST BODY */}
+                  <div className="max-h-[360px] overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+                    {announcements.loading ? (
+                      <div className="py-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                        <span>Memuat notifikasi...</span>
+                      </div>
+                    ) : activeAnnouncements.length === 0 ? (
+                      <div className="py-8 px-4 text-center space-y-2">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100">
+                          <Bell className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-800">Belum Ada Notifikasi</p>
+                        <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
+                          Tidak ada notifikasi atau pengumuman baru untuk Anda saat ini.
+                        </p>
+                      </div>
+                    ) : (
+                      activeAnnouncements.map((item) => {
+                        const badgeUpper = item.badge?.toUpperCase().trim() || "";
+                        let badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+                        if (badgeUpper === "BARU" || badgeUpper === "PENTING" || badgeUpper === "IMPORTANT") {
+                          badgeStyle = "bg-rose-50 text-rose-700 border-rose-200";
+                        } else if (badgeUpper === "PERHATIAN") {
+                          badgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
+                        } else if (badgeUpper === "INFO") {
+                          badgeStyle = "bg-sky-50 text-sky-700 border-sky-200";
+                        }
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50/60 transition-colors flex items-start justify-between gap-2.5 shadow-2xs group"
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-xs text-slate-900 leading-snug truncate">
+                                  {item.title}
+                                </span>
+                                {item.badge && (
+                                  <Badge variant="outline" className={`text-[9px] font-bold px-1.5 py-0 rounded-md ${badgeStyle}`}>
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                                {item.content}
+                              </p>
+                              <p className="text-[9px] font-mono text-slate-400 flex items-center gap-1 pt-0.5">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>{formatDateTime(item.updatedAt || item.createdAt)}</span>
+                              </p>
+                            </div>
+
+                            {/* INDIVIDUAL TRASH DELETE ICON */}
+                            <button
+                              type="button"
+                              data-testid={`delete-notif-${item.id}`}
+                              onClick={() => {
+                                setDismissedNotificationIds((prev) => [...prev, item.id]);
+                                toast.success("Notifikasi berhasil dihapus.");
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                              title="Hapus Notifikasi Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* FOOTER SHORTCUT */}
+                  <div className="p-2 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl text-center">
+                    <button
+                      type="button"
+                      onClick={() => setActiveView("announcements")}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline w-full py-1 min-h-[36px] inline-flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span>Lihat Seluruh Info Resmi</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               <button
                 type="button"
@@ -1187,13 +1344,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "checker" && (
             <div className="space-y-4">
               <EmailChecker isAdminView={false} />
-            </div>
-          )}
-
-          {/* ==================== MANAJEMEN PESAN / EMAIL VIEW ==================== */}
-          {activeView === "messages" && (
-            <div className="space-y-4">
-              <MessageManager />
             </div>
           )}
 
