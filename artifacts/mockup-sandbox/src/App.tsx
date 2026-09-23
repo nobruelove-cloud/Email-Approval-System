@@ -96,6 +96,7 @@ function getPreviewExamplePath(): string {
   return `${basePath}/preview/ComponentName`;
 }
 
+import { NotificationBellDropdown } from "./components/NotificationBellDropdown";
 import { MessageManager } from "./components/MessageManager";
 
 function Gallery() {
@@ -115,6 +116,10 @@ function Gallery() {
               {getPreviewExamplePath()}
             </code>
           </p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <NotificationBellDropdown />
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
