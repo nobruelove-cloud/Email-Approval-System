@@ -147,6 +147,7 @@ import {
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
 import { sendTelegramNotification } from "@/lib/telegram-bot";
+import { sendFCMNotification } from "@/lib/firebase/admin-notifications";
 import {
   formatDate,
   formatDateTime,
@@ -1653,6 +1654,16 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         );
       }
 
+      // Send FCM Push Notification to worker
+      sendFCMNotification({
+        workerId: sub.workerId,
+        title: "GMAIL JOB ID - Status Tugas",
+        body: `Batch setoran Anda (${approvedCount} ACC, ${rejectedCount} ditolak) telah selesai diverifikasi. Total: ${formatMoney(totalCredit)}.`,
+        data: { type: "batch_review", submissionId: sub.id },
+      }).catch((e) =>
+        console.warn("[AdminDashboard] FCM notification notice:", e)
+      );
+
       toast.success(
         `Finalisasi batch berhasil! ${approvedCount} ACC (${activeTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
       );
@@ -1707,7 +1718,26 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
   async function handleWithdrawalDecision(id: string, status: "processing" | "success" | "rejected") {
     setBusyId(id);
     try {
+      const wdItem = withdrawals.data.find((w) => w.id === id);
       await reviewWithdrawal(id, status, notes[id] ?? "");
+
+      if (wdItem) {
+        const statusMsg =
+          status === "rejected"
+            ? "Permintaan pencairan saldo Anda ditolak."
+            : status === "success"
+              ? "Permintaan pencairan saldo Anda telah berhasil ditransfer!"
+              : "Permintaan pencairan saldo Anda sedang diproses.";
+        sendFCMNotification({
+          workerId: wdItem.workerId,
+          title: "GMAIL JOB ID - Pencairan Saldo",
+          body: statusMsg,
+          data: { type: "withdrawal", withdrawalId: id, status },
+        }).catch((e) =>
+          console.warn("[AdminDashboard] FCM notification notice:", e)
+        );
+      }
+
       toast.success(
         status === "rejected"
           ? "Penarikan ditolak, saldo pekerja dikembalikan."
