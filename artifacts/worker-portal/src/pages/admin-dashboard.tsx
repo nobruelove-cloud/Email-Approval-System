@@ -147,6 +147,7 @@ import {
 import { type Announcement } from "@/lib/portal-types";
 import { DEFAULT_RULES, DEFAULT_TIERS, DEFAULT_OPERATING_HOURS, DEFAULT_WITHDRAWAL_SETTINGS, DEFAULT_PAYMENT_METHOD_FEES, DEFAULT_MAINTENANCE, DEFAULT_TELEGRAM_CONFIG, DEFAULT_GENERAL_SETTINGS, type EmailSubmission, type PortalUser, type TierConfig, type UserStatus, type UserTier, type SupportConfig, type OperatingHoursConfig, type FinancialTransaction, type FinancialTransactionType, type PaymentMethodFeeConfig, type WithdrawalSettings, type MethodFeeType, type MaintenanceConfig, type TelegramConfig, type GeneralSettings } from "@/lib/portal-types";
 import { sendTelegramNotification } from "@/lib/telegram-bot";
+import { sendFCMNotification } from "@/lib/firebase/admin-notifications";
 import {
   formatDate,
   formatDateTime,
@@ -1657,6 +1658,22 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
         `Finalisasi batch berhasil! ${approvedCount} ACC (${activeTierCfg.name}), ${rejectedCount} ditolak. Saldo dicairkan: ${formatMoney(totalCredit)}.`,
       );
       setDetailSubmission(null);
+
+      // Trigger FCM Push Notification non-blockingly
+      const notifMessage = decision === "approved"
+        ? `Batch akun kamu telah disetujui! Saldo ditambahkan (${formatMoney(totalCredit)}).`
+        : `Batch akun kamu ditolak. Silakan periksa catatan admin.`;
+
+      sendFCMNotification({
+        workerId: sub.workerId,
+        title: "GMAIL JOB ID - Status Tugas",
+        body: notifMessage,
+        data: {
+          type: "batch_review",
+          submissionId: sub.id,
+          decision,
+        },
+      }).catch((e) => console.warn("[AdminDashboard] FCM batch review notification error:", e));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses setoran.");
     } finally {
@@ -1715,6 +1732,29 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             ? "Penarikan ditandai berhasil."
             : "Penarikan sedang diproses.",
       );
+
+      // Trigger FCM Push Notification non-blockingly
+      const targetWithdrawal = withdrawals.data.find((w) => w.id === id);
+      if (targetWithdrawal && targetWithdrawal.workerId) {
+        const amountFormatted = formatMoney(targetWithdrawal.amount);
+        let notifBody = `Pengajuan penarikan saldo sebesar ${amountFormatted} sedang diproses.`;
+        if (status === "success") {
+          notifBody = `Pengajuan penarikan saldo sebesar ${amountFormatted} telah disetujui! Saldo telah dicairkan.`;
+        } else if (status === "rejected") {
+          notifBody = `Pengajuan penarikan saldo sebesar ${amountFormatted} ditolak. Saldo telah dikembalikan ke akun Anda.`;
+        }
+
+        sendFCMNotification({
+          workerId: targetWithdrawal.workerId,
+          title: "GMAIL JOB ID - Pencairan Saldo",
+          body: notifBody,
+          data: {
+            type: "withdrawal_status",
+            withdrawalId: id,
+            status,
+          },
+        }).catch((e) => console.warn("[AdminDashboard] FCM withdrawal notification error:", e));
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memproses penarikan.");
     } finally {
