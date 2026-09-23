@@ -28,6 +28,7 @@ export type DashboardView =
   | "home"
   | "submit"
   | "checker"
+  | "messages"
   | "leaderboard"
   | "referral"
   | "withdraw"
@@ -116,6 +117,12 @@ export function SidebarNavigation({
       label: "Screening Email",
       description: "Cek Validasi Email Sebelum Setor",
       icon: <SearchCheck className="w-5 h-5 shrink-0 text-blue-600" />,
+    },
+    {
+      id: "messages",
+      label: "Manajemen Pesan",
+      description: "Kelola, Filter & Hapus Pesan Email",
+      icon: <Mail className="w-5 h-5 shrink-0 text-blue-600" />,
     },
     {
       id: "leaderboard",

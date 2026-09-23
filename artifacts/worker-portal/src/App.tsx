@@ -8,10 +8,33 @@ import { usePortalAuth, useSettings } from "@/hooks/use-portal";
 import { DEFAULT_MAINTENANCE } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { AutoUpdateBanner } from "@/components/AutoUpdateBanner";
+import { MessageManager } from "@/components/MessageManager";
 import LoginPage from "@/pages/login";
 import WorkerDashboard from "@/pages/worker-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import NotFound from "@/pages/not-found";
+
+function MessageManagerPage() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <div className="min-h-screen bg-[#F0F4F9] p-4 sm:p-6 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/")}
+            className="text-xs font-bold text-blue-700 hover:bg-blue-50"
+          >
+            ← Kembali ke Dashboard
+          </Button>
+        </div>
+        <MessageManager />
+      </div>
+    </div>
+  );
+}
 
 function FullScreenMessage({
   icon,
@@ -208,6 +231,7 @@ export default function App() {
         <Route path="/" component={PortalGate} />
         <Route path="/login" component={PortalGate} />
         <Route path="/register" component={PortalGate} />
+        <Route path="/messages" component={MessageManagerPage} />
         <Route path="/dashboard" component={PortalGate} />
         <Route path="/admin" component={PortalGate} />
         <Route component={NotFound} />

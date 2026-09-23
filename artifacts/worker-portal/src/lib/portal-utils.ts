@@ -1049,13 +1049,15 @@ export function calculateLeaderboardStandings(
 export function parseAndCheckEmailLine(
   rawLine: string,
   rulesConfig?: CheckerRulesConfig | null,
-  masterPassword?: string
+  masterPassword?: string,
+  lineIndex = 0
 ): CheckedEmailItem {
   const activeRules = rulesConfig ?? DEFAULT_CHECKER_RULES;
   const line = (rawLine || "").trim();
 
   if (!line) {
     return {
+      lineIndex,
       originalLine: rawLine,
       email: "",
       username: "",
@@ -1147,6 +1149,7 @@ export function parseAndCheckEmailLine(
   }
 
   return {
+    lineIndex,
     originalLine: line,
     email: emailPart,
     password: effectivePassword,
@@ -1177,7 +1180,7 @@ export function bulkCheckEmails(
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  const items = lines.map((line) => parseAndCheckEmailLine(line, rulesConfig, masterPassword));
+  const items = lines.map((line, index) => parseAndCheckEmailLine(line, rulesConfig, masterPassword, index));
   const goodCount = items.filter((i) => i.status === "GOOD").length;
   const badCount = items.length - goodCount;
 
