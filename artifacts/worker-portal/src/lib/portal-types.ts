@@ -1,3 +1,17 @@
+export type NotificationType = "submission" | "withdrawal" | "referral" | "leaderboard" | "admin";
+
+export interface PortalNotification {
+  id: string;
+  workerId: string; // "all" for broadcast or target worker UID
+  type: NotificationType;
+  title: string;
+  content: string;
+  badge: string; // e.g., "SETORAN", "PENARIKAN", "REFERRAL", "KLASMEN", "ADMIN"
+  status?: "success" | "rejected" | "info";
+  createdAt: any;
+  readAt?: any;
+}
+
 export interface Announcement {
   id: string;
   title: string;

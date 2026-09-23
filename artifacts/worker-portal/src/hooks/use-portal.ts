@@ -35,6 +35,8 @@ import {
   type FinancialTransaction,
   type FinancialTransactionType,
   type OperatingHoursConfig,
+  type PortalNotification,
+  type NotificationType,
 } from "@/lib/portal-types";
 import { getItemCountOfSubmission, getRecommendedTier, getReferralRewardForAccCount, getMonthlyPeriodKey, shortId, formatMoney, validateReferralTiers, formatDateTime, getOperatingStatus } from "@/lib/portal-utils";
 import { sendRemoteDiagnostic } from "@/lib/remote-diagnostics";
@@ -1312,6 +1314,36 @@ export async function reviewSubmission(
     `emailSubmissions/${submissionId}`
   );
 
+  // Trigger Notifications outside transaction
+  try {
+    const submissionRef = doc(firestore, "emailSubmissions", submissionId);
+    const snap = await getDoc(submissionRef);
+    if (snap.exists()) {
+      const subData = snap.data() as EmailSubmission;
+      if (decision === "approved" || decision === "available") {
+        await createWorkerNotification({
+          workerId: subData.workerId,
+          type: "submission",
+          title: "Setoran Email Berhasil",
+          content: `Setoran email Anda (#${shortId(submissionId)}) sebanyak ${subData.approvedItemCount ?? getItemCountOfSubmission(subData) ?? 1} item telah BERHASIL diverifikasi (ACC). Komisi telah masuk ke Saldo Utama.`,
+          badge: "SETORAN",
+          status: "success",
+        });
+      } else if (decision === "rejected") {
+        await createWorkerNotification({
+          workerId: subData.workerId,
+          type: "submission",
+          title: "Setoran Email Ditolak",
+          content: `Setoran email Anda (#${shortId(submissionId)}) DITOLAK.${reviewNote ? ` Alasan: ${reviewNote}` : ""}`,
+          badge: "SETORAN",
+          status: "rejected",
+        });
+      }
+    }
+  } catch (notifErr) {
+    console.warn("[reviewSubmission] Notification trigger error:", notifErr);
+  }
+
   // Automatically evaluate referral qualification if worker has a pending referral
   if (workerIdToEvaluate) {
     try {
@@ -1527,6 +1559,36 @@ export async function reviewWithdrawal(withdrawalId: string, status: WithdrawalS
     "reviewWithdrawal",
     `withdrawals/${withdrawalId}`
   );
+
+  // Trigger Notifications outside transaction
+  try {
+    const withdrawalRef = doc(firestore, "withdrawals", withdrawalId);
+    const snap = await getDoc(withdrawalRef);
+    if (snap.exists()) {
+      const wd = snap.data() as Withdrawal;
+      if (status === "success") {
+        await createWorkerNotification({
+          workerId: wd.workerId,
+          type: "withdrawal",
+          title: "Penarikan Saldo Berhasil",
+          content: `Penarikan saldo sebesar ${formatMoney(wd.amount)} via ${wd.method} (${wd.account}) telah CAIR/BERHASIL ditransfer.${note ? ` Catatan: ${note}` : ""}`,
+          badge: "PENARIKAN",
+          status: "success",
+        });
+      } else if (status === "rejected") {
+        await createWorkerNotification({
+          workerId: wd.workerId,
+          type: "withdrawal",
+          title: "Penarikan Saldo Ditolak",
+          content: `Penarikan saldo sebesar ${formatMoney(wd.amount)} via ${wd.method} DITOLAK.${note ? ` Alasan: ${note}` : ""}`,
+          badge: "PENARIKAN",
+          status: "rejected",
+        });
+      }
+    }
+  } catch (notifErr) {
+    console.warn("[reviewWithdrawal] Notification trigger error:", notifErr);
+  }
 }
 
 export async function updatePortalUser(uid: string, data: Partial<PortalUser>) {
@@ -1887,6 +1949,39 @@ export async function processEmailACC(submissionId: string) {
     "processEmailACC",
     `emailSubmissions/${submissionId}`
   );
+
+  // Trigger Upline Notification outside transaction for passive income
+  try {
+    const submissionDoc = await getDoc(submissionRef);
+    if (submissionDoc.exists()) {
+      const subData = submissionDoc.data() as EmailSubmission;
+      const count = subData.approvedItemCount ?? getItemCountOfSubmission(subData) ?? 1;
+
+      const userRef = doc(firestore, "users", subData.workerId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const wData = userSnap.data() as PortalUser;
+        const uplineId = wData.referredBy || wData.reciprocalPartner;
+        if (uplineId) {
+          const rulesRef = doc(firestore, "settings", "rules");
+          const rulesSnap = await getDoc(rulesRef);
+          const commPerAcc = rulesSnap.exists() ? (rulesSnap.data().referralCommissionPerAcc ?? 100) : 100;
+          const commTotal = count * commPerAcc;
+
+          await createWorkerNotification({
+            workerId: uplineId,
+            type: "referral",
+            title: "Bonus Referral Terkredit",
+            content: `Bonus referral sebesar ${formatMoney(commTotal)} telah dikreditkan ke saldo Anda dari setoran downline (${wData.name || shortId(subData.workerId)}).`,
+            badge: "REFERRAL",
+            status: "info",
+          });
+        }
+      }
+    }
+  } catch (notifErr) {
+    console.warn("[processEmailACC] Upline notification trigger error:", notifErr);
+  }
 
   return { success: true, message: "Email berhasil di-ACC, gaji dan pasif income otomatis terdistribusi!" };
 }
@@ -2738,6 +2833,20 @@ export async function distributeLeaderboardReward(
     "distributeLeaderboardReward",
     `leaderboardPayouts/${periodKey}_rank${rank}_${workerId}`
   );
+
+  // Trigger Notification for Leaderboard Winner
+  try {
+    await createWorkerNotification({
+      workerId,
+      type: "leaderboard",
+      title: "Hadiah Klasmen Terkredit",
+      content: `Selamat! Hadiah Klasmen Juara #${rank} (${periodKey}) sebesar ${formatMoney(rewardAmount)} telah dikreditkan ke Saldo Utama Anda.`,
+      badge: "KLASMEN",
+      status: "info",
+    });
+  } catch (notifErr) {
+    console.warn("[distributeLeaderboardReward] Notification trigger error:", notifErr);
+  }
 }
 
 export function useSettings<T>(name: string, initial: T) {
@@ -3748,4 +3857,84 @@ export async function markConversationAsRead(
     // If document doesn't exist yet, ignore
     console.warn("markConversationAsRead error:", err);
   }
+}
+
+/**
+ * Creates an event-driven notification in the `notifications` collection.
+ */
+export async function createWorkerNotification(payload: {
+  workerId: string; // Target worker UID or "all"
+  type: NotificationType;
+  title: string;
+  content: string;
+  badge: string; // "SETORAN", "PENARIKAN", "REFERRAL", "KLASMEN", "ADMIN"
+  status?: "success" | "rejected" | "info";
+}) {
+  if (!db) return null;
+  try {
+    const notifRef = doc(collection(db, "notifications"));
+    const dataToSave: Record<string, unknown> = {
+      id: notifRef.id,
+      workerId: payload.workerId,
+      type: payload.type,
+      title: payload.title.trim(),
+      content: payload.content.trim(),
+      badge: payload.badge.trim().toUpperCase(),
+      status: payload.status || "info",
+      createdAt: serverTimestamp(),
+    };
+
+    await setDocWithDiagnostic(notifRef, dataToSave, undefined, "createWorkerNotification");
+    return notifRef.id;
+  } catch (err) {
+    console.warn("[createWorkerNotification] Error creating notification:", err);
+    return null;
+  }
+}
+
+/**
+ * Real-time hook to subscribe to worker notifications (both user-specific and global/broadcast).
+ */
+export function useWorkerNotifications(workerId?: string) {
+  const [data, setData] = useState<PortalNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!db || !workerId) {
+      setData([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const colRef = collection(db, "notifications");
+    // Listen for all notifications sorted by createdAt desc
+    const q = query(colRef, orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items: PortalNotification[] = [];
+        snapshot.forEach((docSnap) => {
+          const item = docSnap.data() as PortalNotification;
+          if (item.workerId === workerId || item.workerId === "all") {
+            items.push(item);
+          }
+        });
+        setData(items);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.warn("[useWorkerNotifications] Snapshot error:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [workerId]);
+
+  return { data, loading, error };
 }

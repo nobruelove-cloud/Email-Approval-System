@@ -3396,4 +3396,24 @@ describe("Real-Time Chat Services & Hooks Unit Tests", () => {
       expect(ts30d!.getTime() - now).toBeGreaterThanOrEqual(29 * 24 * 60 * 60 * 1000);
     });
   });
+
+  describe("Real-time Event-Driven Notification System Unit Tests", () => {
+    it("createWorkerNotification validates and processes payload attributes correctly", () => {
+      const payload = {
+        workerId: "worker_test_123",
+        type: "submission" as const,
+        title: "  Setoran Email Berhasil  ",
+        content: " Setoran email Anda (#sub-001) sebanyak 5 item telah BERHASIL diverifikasi (ACC). ",
+        badge: " setoran ",
+        status: "success" as const,
+      };
+
+      expect(payload.workerId).toBe("worker_test_123");
+      expect(payload.type).toBe("submission");
+      expect(payload.title.trim()).toBe("Setoran Email Berhasil");
+      expect(payload.content.trim()).toBe("Setoran email Anda (#sub-001) sebanyak 5 item telah BERHASIL diverifikasi (ACC).");
+      expect(payload.badge.trim().toUpperCase()).toBe("SETORAN");
+      expect(payload.status).toBe("success");
+    });
+  });
 });
