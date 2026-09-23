@@ -55,119 +55,7 @@ import { createPortalUser, registerReferral, useSettings } from "@/hooks/use-por
 import { DEFAULT_RULES, type ReferralTierConfig } from "@/lib/portal-types";
 import { formatMoney } from "@/lib/portal-utils";
 import { LiveWithdrawalTicker } from "@/components/LiveWithdrawalTicker";
-
-function AnimeMascotSVG({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 200 280" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <defs>
-        <linearGradient id="hairGrad" x1="0" y1="0" x2="200" y2="280" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#1e1b4b" />
-          <stop offset="50%" stopColor="#2563eb" />
-          <stop offset="100%" stopColor="#0891b2" />
-        </linearGradient>
-        <linearGradient id="jacketGrad" x1="0" y1="100" x2="200" y2="280" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0f172a" />
-          <stop offset="100%" stopColor="#1e293b" />
-        </linearGradient>
-        <linearGradient id="accentGrad" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#38bdf8" />
-        </linearGradient>
-        <radialGradient id="skinGlow" cx="100" cy="90" r="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#fef3c7" />
-          <stop offset="100%" stopColor="#fde68a" />
-        </radialGradient>
-        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="6" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
-
-      {/* Ambient Back Glow */}
-      <circle cx="100" cy="110" r="70" fill="#0284c7" opacity="0.25" filter="url(#glow)" />
-
-      {/* Back Hair */}
-      <path
-        d="M 45 90 C 30 130 35 180 40 220 C 55 210 65 190 70 160 Z M 155 90 C 170 130 165 180 160 220 C 145 210 135 190 130 160 Z"
-        fill="url(#hairGrad)"
-      />
-
-      {/* Neck & Shoulders Base */}
-      <path d="M 88 120 L 112 120 L 115 140 L 85 140 Z" fill="#fde68a" />
-      <path d="M 60 140 C 70 135 130 135 140 140 L 165 240 L 35 240 Z" fill="url(#jacketGrad)" stroke="#334155" strokeWidth="2" />
-
-      {/* Jacket Collar & Zipper Accent */}
-      <path d="M 75 140 L 100 175 L 125 140" fill="none" stroke="url(#accentGrad)" strokeWidth="3" strokeLinecap="round" />
-      <path d="M 100 175 L 100 240" fill="none" stroke="#06b6d4" strokeWidth="2" strokeDasharray="4 2" />
-
-      {/* Head / Face */}
-      <path
-        d="M 65 75 C 65 45 135 45 135 75 C 135 105 115 125 100 125 C 85 125 65 105 65 75 Z"
-        fill="url(#skinGlow)"
-      />
-
-      {/* Blush */}
-      <ellipse cx="78" cy="92" rx="6" ry="3" fill="#f43f5e" opacity="0.35" />
-      <ellipse cx="122" cy="92" rx="6" ry="3" fill="#f43f5e" opacity="0.35" />
-
-      {/* Eyes (Anime Style) */}
-      <path d="M 72 82 C 75 77 87 77 90 82" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="81" cy="86" rx="4.5" ry="6.5" fill="#0f172a" />
-      <ellipse cx="81" cy="86" rx="3" ry="4.5" fill="#0284c7" />
-      <circle cx="79.5" cy="83.5" r="1.5" fill="#ffffff" />
-      <circle cx="82.5" cy="88" r="0.8" fill="#ffffff" />
-
-      <path d="M 110 82 C 113 77 125 77 128 82" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="119" cy="86" rx="4.5" ry="6.5" fill="#0f172a" />
-      <ellipse cx="119" cy="86" rx="3" ry="4.5" fill="#0284c7" />
-      <circle cx="117.5" cy="83.5" r="1.5" fill="#ffffff" />
-      <circle cx="120.5" cy="88" r="0.8" fill="#ffffff" />
-
-      {/* Eyebrows */}
-      <path d="M 73 75 Q 81 72 88 75" fill="none" stroke="#1e1b4b" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M 112 75 Q 119 72 127 75" fill="none" stroke="#1e1b4b" strokeWidth="1.5" strokeLinecap="round" />
-
-      {/* Nose & Smile */}
-      <circle cx="100" cy="95" r="0.8" fill="#d97706" />
-      <path d="M 94 102 Q 100 107 106 102" fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" />
-
-      {/* Tech Headset */}
-      <path d="M 60 70 C 60 40 140 40 140 70" fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
-      <rect x="54" y="66" width="10" height="20" rx="4" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
-      <rect x="136" y="66" width="10" height="20" rx="4" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
-      <circle cx="59" cy="76" r="2" fill="#22c55e" />
-
-      {/* Front Hair / Bangs */}
-      <path
-        d="M 62 65 C 70 42 130 42 138 65 C 125 55 110 65 100 68 C 90 65 75 55 62 65 Z"
-        fill="url(#hairGrad)"
-      />
-      <path d="M 80 55 C 75 72 70 80 65 82" fill="none" stroke="#0284c7" strokeWidth="1.5" opacity="0.6" />
-      <path d="M 120 55 C 125 72 130 80 135 82" fill="none" stroke="#0284c7" strokeWidth="1.5" opacity="0.6" />
-
-      {/* Gesturing Arm pointing right */}
-      <path
-        d="M 140 160 Q 165 150 185 135"
-        fill="none"
-        stroke="url(#jacketGrad)"
-        strokeWidth="16"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 140 160 Q 165 150 185 135"
-        fill="none"
-        stroke="#06b6d4"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="188" cy="133" r="6" fill="#fde68a" />
-      <path d="M 188 133 L 196 130" stroke="#fde68a" strokeWidth="3" strokeLinecap="round" />
-
-      {/* Hologram sparkle */}
-      <path d="M 194 120 L 196 124 L 200 126 L 196 128 L 194 132 L 192 128 L 188 126 L 192 124 Z" fill="#38bdf8" />
-    </svg>
-  );
-}
+import heroMascotImg from "@/assets/hero-anime-mascot.png";
 
 function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
@@ -940,9 +828,13 @@ export default function LoginPage() {
               {/* Main Visual Container */}
               <div className="relative w-full max-w-[420px] sm:max-w-[440px] pt-4 pb-2 px-2 flex items-center justify-center min-h-[460px]">
 
-                {/* 1. Original Anime Mascot SVG Visual Element (Left-rear floating position) */}
-                <div className="absolute left-[-20px] sm:left-[-35px] bottom-4 w-[140px] sm:w-[170px] z-10 animate-hero-float-slow pointer-events-none opacity-90 sm:opacity-100">
-                  <AnimeMascotSVG className="w-full h-auto drop-shadow-[0_15px_30px_rgba(2,132,199,0.4)]" />
+                {/* 1. Anime Artwork Image Asset (Left-rear floating position) */}
+                <div className="absolute left-[-25px] sm:left-[-45px] bottom-0 sm:bottom-2 w-[150px] sm:w-[190px] z-10 animate-hero-float-slow pointer-events-none opacity-95 sm:opacity-100">
+                  <img
+                    src={heroMascotImg}
+                    alt="Gmail Job ID Anime Mascot"
+                    className="w-full h-auto drop-shadow-[0_20px_35px_rgba(2,132,199,0.5)] object-contain"
+                  />
                 </div>
 
                 {/* 2. Smartphone Device Mockup Rendering Warm Amber Worker Dashboard */}
