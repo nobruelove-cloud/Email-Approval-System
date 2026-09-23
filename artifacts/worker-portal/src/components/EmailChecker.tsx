@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useSettings, saveSettings } from "@/hooks/use-portal";
 import { DEFAULT_RULES, DEFAULT_CHECKER_RULES, type CheckerRulesConfig } from "@/lib/portal-types";
 import { bulkCheckEmails, formatGoodEmailsForCopy } from "@/lib/portal-utils";
@@ -44,6 +46,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
   const [filterTab, setFilterTab] = useState<"ALL" | "GOOD" | "BAD" | "ACTIVE">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
+  const [selectedLineIndexes, setSelectedLineIndexes] = useState<Set<number>>(new Set());
 
   // Sync masterPasswordInput when remote requiredPassword changes unless user edited it
   React.useEffect(() => {
@@ -160,6 +163,76 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
       return true;
     });
   }, [checkResult.items, filterTab, searchQuery]);
+
+  // Selection state helpers
+  const isAllSelected = useMemo(() => {
+    if (displayedItems.length === 0) return false;
+    return displayedItems.every((item) => selectedLineIndexes.has(item.lineIndex));
+  }, [displayedItems, selectedLineIndexes]);
+
+  function handleToggleSelectAll() {
+    const updated = new Set(selectedLineIndexes);
+    if (isAllSelected) {
+      displayedItems.forEach((item) => updated.delete(item.lineIndex));
+    } else {
+      displayedItems.forEach((item) => updated.add(item.lineIndex));
+    }
+    setSelectedLineIndexes(updated);
+  }
+
+  function handleToggleLine(lineIndex: number) {
+    const updated = new Set(selectedLineIndexes);
+    if (updated.has(lineIndex)) {
+      updated.delete(lineIndex);
+    } else {
+      updated.add(lineIndex);
+    }
+    setSelectedLineIndexes(updated);
+  }
+
+  // Individual item delete
+  function handleDeleteSingleLine(lineIndex: number) {
+    const lines = rawText.split("\n");
+    const targetEmail = checkResult.items.find((it) => it.lineIndex === lineIndex)?.email || "Email";
+    if (lineIndex >= 0 && lineIndex < lines.length) {
+      lines.splice(lineIndex, 1);
+      const newText = lines.join("\n");
+      setRawText(newText);
+
+      const updatedSelected = new Set(selectedLineIndexes);
+      updatedSelected.delete(lineIndex);
+      setSelectedLineIndexes(updatedSelected);
+
+      toast.success(`Baris email "${targetEmail}" berhasil dihapus.`);
+    }
+  }
+
+  // Mass Delete selected
+  function handleDeleteSelectedLines() {
+    if (selectedLineIndexes.size === 0) {
+      toast.error("Pilih minimal satu email untuk dihapus.");
+      return;
+    }
+
+    const lines = rawText.split("\n");
+    const count = selectedLineIndexes.size;
+    const remainingLines = lines.filter((_, idx) => !selectedLineIndexes.has(idx));
+
+    setRawText(remainingLines.join("\n"));
+    setSelectedLineIndexes(new Set());
+    toast.success(`${count} baris email berhasil dihapus dari daftar.`);
+  }
+
+  // Clear All lines
+  function handleClearAllLines() {
+    if (!rawText.trim()) {
+      toast.error("Daftar email sudah kosong.");
+      return;
+    }
+    setRawText("");
+    setSelectedLineIndexes(new Set());
+    toast.success("Seluruh daftar baris email berhasil dibersihkan.");
+  }
 
   function handleCopyGoodEmails() {
     const goodText = formatGoodEmailsForCopy(checkResult.items, true, masterPasswordInput);
@@ -460,7 +533,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
               {rawText.trim() && (
                 <button
                   type="button"
-                  onClick={() => setRawText("")}
+                  onClick={handleClearAllLines}
                   className="text-[11px] text-rose-600 hover:underline inline-flex items-center gap-1 font-semibold min-h-[44px] py-2 px-1 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Bersihkan Input
@@ -520,7 +593,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
         </Card>
       )}
 
-      {/* 5. SUMMARY STATS CHIPS & FILTER CONTROLS */}
+      {/* 5. SUMMARY STATS CHIPS, FILTER CONTROLS & MASS DELETE BAR */}
       {checkResult.total > 0 && (
         <Card className={isAdminView ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-xl rounded-2xl" : "bg-white border-slate-200/80 rounded-2xl shadow-xs"}>
           <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -547,7 +620,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("ALL")}
-                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center rounded-lg transition-all ${
+                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center rounded-lg transition-all cursor-pointer ${
                     filterTab === "ALL"
                       ? "bg-blue-600 text-white shadow-xs"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
@@ -558,7 +631,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("GOOD")}
-                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all ${
+                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all cursor-pointer ${
                     filterTab === "GOOD" || filterTab === "ACTIVE"
                       ? "bg-emerald-600 text-white shadow-xs"
                       : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50"
@@ -570,7 +643,7 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 <button
                   type="button"
                   onClick={() => setFilterTab("BAD")}
-                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all ${
+                  className={`flex-1 sm:flex-none px-3 py-2 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg transition-all cursor-pointer ${
                     filterTab === "BAD"
                       ? "bg-rose-600 text-white shadow-xs"
                       : "text-rose-700 dark:text-rose-400 hover:bg-rose-50"
@@ -596,9 +669,63 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                 />
               </div>
             </div>
+
+            {/* MASS DELETE & SELECT ALL CONTROL TOOLBAR */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div
+                  onClick={handleToggleSelectAll}
+                  className="flex items-center gap-2 cursor-pointer select-none py-1.5 px-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={handleToggleSelectAll}
+                    id="select-all-emails"
+                    className="cursor-pointer border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                  />
+                  <label
+                    htmlFor="select-all-emails"
+                    className={`text-xs font-bold cursor-pointer pointer-events-none ${
+                      isAdminView ? "text-slate-200" : "text-slate-800"
+                    }`}
+                  >
+                    Select All / Pilih Semua ({displayedItems.length})
+                  </label>
+                </div>
+
+                {selectedLineIndexes.size > 0 && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-bold">
+                    {selectedLineIndexes.size} Dipilih
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedLineIndexes.size > 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleDeleteSelectedLines}
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 min-h-[44px] px-4 rounded-xl shadow-xs gap-1.5 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Hapus yang Dipilih ({selectedLineIndexes.size})</span>
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={handleClearAllLines}
+                  variant="outline"
+                  className="bg-white dark:bg-slate-900 hover:bg-rose-50 text-rose-600 border-rose-200 font-bold text-xs h-10 min-h-[44px] px-3.5 rounded-xl gap-1.5 active:scale-95 transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Bersihkan Semua</span>
+                </Button>
+              </div>
+            </div>
           </CardHeader>
 
-          {/* 6. RESULTS LIST / TABLE (NO PASSWORDS EXPOSED) */}
+          {/* 6. RESULTS LIST / TABLE WITH INDIVIDUAL DELETE TRASH ICONS */}
           <CardContent className="pt-4">
             {displayedItems.length === 0 ? (
               <p className="text-xs text-slate-500 text-center py-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
@@ -614,60 +741,91 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
                         isAdminView ? "bg-slate-955 border-slate-800 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-800"
                       }`}>
                         <tr>
+                          <th className="px-3 py-2.5 w-10 text-center">
+                            <Checkbox
+                              checked={isAllSelected}
+                              onCheckedChange={handleToggleSelectAll}
+                              className="cursor-pointer border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            />
+                          </th>
                           <th className="px-3.5 py-2.5">#</th>
                           <th className="px-3.5 py-2.5">Alamat Email</th>
                           <th className="px-3.5 py-2.5">Username</th>
                           <th className="px-3.5 py-2.5 text-center">Detail Rules</th>
                           <th className="px-3.5 py-2.5 text-center">Status</th>
                           <th className="px-3.5 py-2.5">Keterangan / Catatan</th>
+                          <th className="px-3.5 py-2.5 text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                        {displayedItems.map((item, idx) => (
-                          <tr
-                            key={idx}
-                            className={`transition-colors ${
-                              item.status === "GOOD"
-                                ? "bg-emerald-50/20 dark:bg-emerald-500/5 hover:bg-emerald-50/40"
-                                : "bg-rose-50/20 dark:bg-rose-500/5 hover:bg-rose-50/40"
-                            }`}
-                          >
-                            <td className="px-3.5 py-2.5 text-slate-400 font-sans">{idx + 1}</td>
-                            <td className="px-3.5 py-2.5">
-                              <p className="font-bold text-slate-900 dark:text-slate-100">{item.email}</p>
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-300">
-                              <span>{item.username}</span>
-                            </td>
-                            <td className="px-3.5 py-2.5 text-center font-sans text-[11px] text-slate-500">
-                              <span>Digits: {item.digitCountDetected}{item.birthYearDetected ? ` · Thn: ${item.birthYearDetected}` : ""}</span>
-                            </td>
-                            <td className="px-3.5 py-2.5 text-center font-sans">
-                              {item.status === "GOOD" ? (
-                                <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px] gap-1">
-                                  <CheckCircle2 className="w-3 h-3" /> ACTIVE / GOOD
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] gap-1">
-                                  <XCircle className="w-3 h-3" /> BAD / DEAD
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="px-3.5 py-2.5 font-sans">
-                              {item.status === "GOOD" ? (
-                                <span className="text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-                                  ✓ Lolos rules screening awal
-                                </span>
-                              ) : (
-                                <div className="space-y-0.5 text-xs text-rose-700 dark:text-rose-400">
-                                  {item.reasons.map((r, rIdx) => (
-                                    <p key={rIdx}>• {r}</p>
-                                  ))}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {displayedItems.map((item, idx) => {
+                          const isSelected = selectedLineIndexes.has(item.lineIndex);
+
+                          return (
+                            <tr
+                              key={item.lineIndex}
+                              className={`transition-colors ${
+                                isSelected
+                                  ? "bg-blue-50/60 dark:bg-blue-900/20"
+                                  : item.status === "GOOD"
+                                  ? "bg-emerald-50/20 dark:bg-emerald-500/5 hover:bg-emerald-50/40"
+                                  : "bg-rose-50/20 dark:bg-rose-500/5 hover:bg-rose-50/40"
+                              }`}
+                            >
+                              <td className="px-3 py-2.5 text-center">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleToggleLine(item.lineIndex)}
+                                  className="cursor-pointer border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                />
+                              </td>
+                              <td className="px-3.5 py-2.5 text-slate-400 font-sans">{idx + 1}</td>
+                              <td className="px-3.5 py-2.5">
+                                <p className="font-bold text-slate-900 dark:text-slate-100">{item.email}</p>
+                              </td>
+                              <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-300">
+                                <span>{item.username}</span>
+                              </td>
+                              <td className="px-3.5 py-2.5 text-center font-sans text-[11px] text-slate-500">
+                                <span>Digits: {item.digitCountDetected}{item.birthYearDetected ? ` · Thn: ${item.birthYearDetected}` : ""}</span>
+                              </td>
+                              <td className="px-3.5 py-2.5 text-center font-sans">
+                                {item.status === "GOOD" ? (
+                                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px] gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> ACTIVE / GOOD
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] gap-1">
+                                    <XCircle className="w-3 h-3" /> BAD / DEAD
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="px-3.5 py-2.5 font-sans">
+                                {item.status === "GOOD" ? (
+                                  <span className="text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                                    ✓ Lolos rules screening awal
+                                  </span>
+                                ) : (
+                                  <div className="space-y-0.5 text-xs text-rose-700 dark:text-rose-400">
+                                    {item.reasons.map((r, rIdx) => (
+                                      <p key={rIdx}>• {r}</p>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-center font-sans">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSingleLine(item.lineIndex)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center min-h-[36px] min-w-[36px]"
+                                  title="Hapus Baris Email Ini"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -675,52 +833,75 @@ export function EmailChecker({ isAdminView = false }: EmailCheckerProps) {
 
                 {/* Mobile Cards (sm:hidden) */}
                 <div className="sm:hidden space-y-2.5 font-mono">
-                  {displayedItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3.5 rounded-xl border space-y-2 text-xs ${
-                        item.status === "GOOD"
-                          ? "bg-emerald-50/20 border-emerald-200"
-                          : "bg-rose-50/20 border-rose-200"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
-                            {idx + 1}. {item.email}
-                          </p>
-                        </div>
-                        {item.status === "GOOD" ? (
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px] gap-1 shrink-0">
-                            <CheckCircle2 className="w-3 h-3" /> GOOD
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] gap-1 shrink-0">
-                            <XCircle className="w-3 h-3" /> BAD
-                          </Badge>
-                        )}
-                      </div>
+                  {displayedItems.map((item, idx) => {
+                    const isSelected = selectedLineIndexes.has(item.lineIndex);
 
-                      <div className="text-[11px] text-slate-500 font-sans flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
-                        <span>User: {item.username}</span>
-                        <span>Digits: {item.digitCountDetected}{item.birthYearDetected ? ` · Thn: ${item.birthYearDetected}` : ""}</span>
-                      </div>
-
-                      <div className="pt-1 font-sans text-xs">
-                        {item.status === "GOOD" ? (
-                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                            ✓ Lolos rules screening awal
-                          </span>
-                        ) : (
-                          <div className="space-y-0.5 text-rose-700 dark:text-rose-400">
-                            {item.reasons.map((r, rIdx) => (
-                              <p key={rIdx}>• {r}</p>
-                            ))}
+                    return (
+                      <div
+                        key={item.lineIndex}
+                        className={`p-3.5 rounded-xl border space-y-2 text-xs transition-colors ${
+                          isSelected
+                            ? "bg-blue-50/80 border-blue-300"
+                            : item.status === "GOOD"
+                            ? "bg-emerald-50/20 border-emerald-200"
+                            : "bg-rose-50/20 border-rose-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleToggleLine(item.lineIndex)}
+                              className="cursor-pointer border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 shrink-0 min-h-[20px] min-w-[20px]"
+                            />
+                            <p className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
+                              {idx + 1}. {item.email}
+                            </p>
                           </div>
-                        )}
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {item.status === "GOOD" ? (
+                              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> GOOD
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] gap-1">
+                                <XCircle className="w-3 h-3" /> BAD
+                              </Badge>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSingleLine(item.lineIndex)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              title="Hapus Baris Ini"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 font-sans flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                          <span>User: {item.username}</span>
+                          <span>Digits: {item.digitCountDetected}{item.birthYearDetected ? ` · Thn: ${item.birthYearDetected}` : ""}</span>
+                        </div>
+
+                        <div className="pt-1 font-sans text-xs">
+                          {item.status === "GOOD" ? (
+                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                              ✓ Lolos rules screening awal
+                            </span>
+                          ) : (
+                            <div className="space-y-0.5 text-rose-700 dark:text-rose-400">
+                              {item.reasons.map((r, rIdx) => (
+                                <p key={rIdx}>• {r}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}

@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { EmailChecker } from "@/components/EmailChecker";
+import { MessageManager } from "@/components/MessageManager";
 import { Leaderboard } from "@/components/Leaderboard";
 import { SidebarNavigation, type DashboardView } from "@/components/SidebarNavigation";
 import { Button } from "@/components/ui/button";
@@ -100,7 +101,6 @@ import {
   calculateWithdrawalFee,
   formatFeeBadge,
 } from "@/lib/portal-utils";
-import { requestNotificationPermission } from "@/lib/firebase/messaging";
 
 function TelegramIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
@@ -142,15 +142,6 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
   const announcements = useAnnouncements();
 
   // Maintenance Mode real-time countdown & unlock logic
-  // Request Push Notification (FCM) Permission on login / mount
-  useEffect(() => {
-    if (profile?.uid) {
-      requestNotificationPermission(profile.uid).catch((err) => {
-        console.warn("[WorkerDashboard] FCM permission error:", err);
-      });
-    }
-  }, [profile?.uid]);
-
   const maintenance = maintenanceHook.data ?? DEFAULT_MAINTENANCE;
   const isMaintenanceActive = maintenance.enabled && profile.role !== "admin";
 
@@ -650,6 +641,8 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         return "Job Gmail / Setor Email";
       case "checker":
         return "Status ACC & Checker Email";
+      case "messages":
+        return "Manajemen Pesan & Email";
       case "leaderboard":
         return "Klasemen Worker & Reward";
       case "referral":
@@ -1194,6 +1187,13 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
           {activeView === "checker" && (
             <div className="space-y-4">
               <EmailChecker isAdminView={false} />
+            </div>
+          )}
+
+          {/* ==================== MANAJEMEN PESAN / EMAIL VIEW ==================== */}
+          {activeView === "messages" && (
+            <div className="space-y-4">
+              <MessageManager />
             </div>
           )}
 

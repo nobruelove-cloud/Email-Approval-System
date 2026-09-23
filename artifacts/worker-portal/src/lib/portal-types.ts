@@ -368,6 +368,7 @@ export const DEFAULT_CHECKER_RULES: CheckerRulesConfig = {
 };
 
 export type CheckedEmailItem = {
+  lineIndex: number;
   originalLine: string;
   email: string;
   password?: string;
