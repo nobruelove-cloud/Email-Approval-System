@@ -55,7 +55,6 @@ import { createPortalUser, registerReferral, useSettings } from "@/hooks/use-por
 import { DEFAULT_RULES, type ReferralTierConfig } from "@/lib/portal-types";
 import { formatMoney } from "@/lib/portal-utils";
 import { LiveWithdrawalTicker } from "@/components/LiveWithdrawalTicker";
-import heroMascotImg from "@/assets/hero-anime-mascot.png";
 
 function friendlyAuthError(code: string, context: "login" | "register" | "reset" = "login") {
   const map: Record<string, string> = {
@@ -820,27 +819,13 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Large Anime Background Banner + Smartphone Foreground Layered */}
-            <div className="lg:col-span-5 relative mt-6 lg:mt-0 flex items-center justify-center min-h-[520px] sm:min-h-[600px] lg:min-h-[640px]">
-              {/* Outer Deep Blue/Cyan Glow Backdrop */}
-              <div className="absolute -inset-6 sm:-inset-10 bg-gradient-to-tr from-blue-600/30 via-cyan-500/20 to-blue-500/15 blur-[120px] rounded-full pointer-events-none" />
-
-              {/* FULL-AREA UNBORDERED ANIME ARTWORK BACKGROUND */}
-              <div className="absolute -inset-x-4 -inset-y-6 sm:-inset-x-8 sm:-inset-y-10 z-0 pointer-events-none overflow-hidden flex items-center justify-center">
-                <img
-                  src={heroMascotImg}
-                  alt="Gmail Job ID Anime Mascot Banner"
-                  className="w-full h-full object-cover object-top sm:object-center opacity-90 scale-105 sm:scale-110 filter drop-shadow-[0_20px_50px_rgba(37,99,235,0.25)]"
-                />
-                {/* Multi-directional Gradient Edge Masks - Fades artwork edges directly into background (#080e1a / slate-955) without boxes or borders */}
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/40 to-slate-950/80 w-full h-full" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/70 w-full h-full" />
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-transparent to-slate-950 w-full h-full" />
-                <div className="absolute inset-0 bg-blue-600/10 mix-blend-color-dodge pointer-events-none" />
-              </div>
+            {/* RIGHT COLUMN: Clean Blue/Cyan Smartphone Visual Composition */}
+            <div className="lg:col-span-5 relative mt-8 lg:mt-0 flex items-center justify-center py-6 sm:py-8">
+              {/* Radial Cyan & Deep Blue Glow Backdrop */}
+              <div className="absolute inset-0 max-w-[360px] sm:max-w-[420px] mx-auto bg-gradient-to-tr from-blue-600/35 via-cyan-500/25 to-blue-500/20 blur-[100px] rounded-full pointer-events-none animate-hero-pulse" />
 
               {/* FOREGROUND ANIMATED SMARTPHONE & BADGES COMPOSITION */}
-              <div className="relative z-20 w-full max-w-[320px] sm:max-w-[380px] flex items-center justify-center my-auto">
+              <div className="relative z-20 w-full max-w-[320px] sm:max-w-[380px] flex items-center justify-center">
 
                 {/* Animated Smartphone Mockup */}
                 <div className="relative z-20 animate-hero-float my-auto">
