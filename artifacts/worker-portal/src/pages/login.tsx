@@ -820,33 +820,33 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Large Anime Background Banner + Smartphone Foreground (Animated Together) */}
-            <div className="lg:col-span-5 relative mt-8 lg:mt-0 flex items-center justify-center">
+            {/* RIGHT COLUMN: Large Anime Background Banner + Smartphone Foreground Layered */}
+            <div className="lg:col-span-5 relative mt-6 lg:mt-0 flex items-center justify-center min-h-[520px] sm:min-h-[600px] lg:min-h-[640px]">
               {/* Outer Deep Blue/Cyan Glow Backdrop */}
-              <div className="absolute -inset-10 bg-gradient-to-tr from-blue-600/35 via-cyan-500/25 to-blue-500/15 blur-[100px] rounded-full pointer-events-none" />
+              <div className="absolute -inset-6 sm:-inset-10 bg-gradient-to-tr from-blue-600/30 via-cyan-500/20 to-blue-500/15 blur-[120px] rounded-full pointer-events-none" />
 
-              {/* Main Visual Container */}
-              <div className="relative w-full max-w-[480px] sm:max-w-[540px] flex items-center justify-center min-h-[500px] sm:min-h-[560px]">
+              {/* FULL-AREA UNBORDERED ANIME ARTWORK BACKGROUND */}
+              <div className="absolute -inset-x-4 -inset-y-6 sm:-inset-x-8 sm:-inset-y-10 z-0 pointer-events-none overflow-hidden flex items-center justify-center">
+                <img
+                  src={heroMascotImg}
+                  alt="Gmail Job ID Anime Mascot Banner"
+                  className="w-full h-full object-cover object-top sm:object-center opacity-90 scale-105 sm:scale-110 filter drop-shadow-[0_20px_50px_rgba(37,99,235,0.25)]"
+                />
+                {/* Multi-directional Gradient Edge Masks - Fades artwork edges directly into background (#080e1a / slate-955) without boxes or borders */}
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/40 to-slate-950/80 w-full h-full" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/70 w-full h-full" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-transparent to-slate-950 w-full h-full" />
+                <div className="absolute inset-0 bg-blue-600/10 mix-blend-color-dodge pointer-events-none" />
+              </div>
 
-                {/* 1. COHESIVE ANIMATED OBJECT: Large Anime Banner + Smartphone Foreground moving together */}
-                <div className="relative w-full h-full flex items-center justify-center animate-hero-float">
+              {/* FOREGROUND ANIMATED SMARTPHONE & BADGES COMPOSITION */}
+              <div className="relative z-20 w-full max-w-[320px] sm:max-w-[380px] flex items-center justify-center my-auto">
 
-                  {/* LARGE ANIME ARTWORK BACKGROUND BANNER (No card borders - fills right hero area naturally) */}
-                  <div className="absolute -inset-4 sm:-inset-8 z-0 pointer-events-none flex items-center justify-center overflow-hidden">
-                    <img
-                      src={heroMascotImg}
-                      alt="Gmail Job ID Anime Mascot Banner"
-                      className="w-full h-full object-cover object-center scale-110 sm:scale-115 opacity-90 filter drop-shadow-[0_20px_40px_rgba(37,99,235,0.3)]"
-                    />
-                    {/* Seamless Gradient Edge Blending Overlay - Fades image edges directly into Navy Background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/30 to-transparent w-full h-full" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/50 w-full h-full" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-transparent to-slate-950 w-full h-full" />
-                    <div className="absolute inset-0 bg-blue-600/10 mix-blend-color-dodge pointer-events-none" />
-                  </div>
+                {/* Animated Smartphone Mockup */}
+                <div className="relative z-20 animate-hero-float my-auto">
 
                   {/* SMARTPHONE DEVICE MOCKUP IN FOREGROUND */}
-                  <div className="relative z-20 w-[265px] sm:w-[295px] my-auto rounded-[38px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 shadow-[0_30px_70px_rgba(0,0,0,0.95)] border border-cyan-500/30 backdrop-blur-md">
+                  <div className="w-[255px] sm:w-[285px] my-auto rounded-[38px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 shadow-[0_30px_70px_rgba(0,0,0,0.95)] border border-cyan-500/30 backdrop-blur-md">
 
                     {/* Speaker notch / Camera pill */}
                     <div className="w-24 h-4 bg-slate-950 rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 border border-slate-800">
