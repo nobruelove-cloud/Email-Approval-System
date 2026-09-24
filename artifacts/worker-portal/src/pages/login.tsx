@@ -837,7 +837,7 @@ export default function LoginPage() {
                   />
                 </div>
 
-                {/* 2. Smartphone Device Mockup Rendering Warm Amber Worker Dashboard */}
+                {/* 2. Smartphone Device Mockup Rendering Navy/Blue/Cyan Worker Dashboard */}
                 <div className="relative z-20 w-[270px] sm:w-[300px] rounded-[38px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-slate-700/80 animate-hero-float">
 
                   {/* Speaker notch / Camera pill */}
@@ -852,40 +852,40 @@ export default function LoginPage() {
                     {/* Worker Dashboard Header Replica */}
                     <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-sm">
+                        <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white font-black text-xs flex items-center justify-center shadow-sm">
                           W
                         </div>
                         <div>
                           <p className="text-[11px] font-extrabold text-white leading-tight">Worker Portal</p>
-                          <p className="text-[9px] text-amber-400 font-semibold">Tier 2 Active</p>
+                          <p className="text-[9px] text-cyan-400 font-semibold">Tier 2 Active</p>
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                        <Activity className="w-2.5 h-2.5 text-amber-400 animate-pulse" /> ONLINE
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                        <Activity className="w-2.5 h-2.5 text-cyan-400 animate-pulse" /> ONLINE
                       </span>
                     </div>
 
-                    {/* Warm Amber Balance Card */}
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/20 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
+                    {/* Blue & Cyan Balance Card */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-600 text-white shadow-lg shadow-blue-600/30 relative overflow-hidden border border-cyan-400/30">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-xl pointer-events-none" />
 
                       <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-900/80 uppercase tracking-wide">Saldo Utama Worker</span>
-                          <p className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight mt-0.5 font-mono">
+                          <span className="text-[10px] font-bold text-cyan-100/90 uppercase tracking-wide">Saldo Utama Worker</span>
+                          <p className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5 font-mono">
                             {formatMoney(heroCounterBalance)}
                           </p>
                         </div>
-                        <div className="p-1.5 rounded-xl bg-slate-950/20 text-slate-950 backdrop-blur-sm">
+                        <div className="p-1.5 rounded-xl bg-slate-950/30 text-cyan-300 backdrop-blur-sm border border-cyan-400/20">
                           <Wallet className="w-4 h-4" />
                         </div>
                       </div>
 
-                      <div className="mt-2.5 pt-2 border-t border-slate-950/15 flex items-center justify-between text-[10px] font-extrabold text-slate-950">
+                      <div className="mt-2.5 pt-2 border-t border-white/20 flex items-center justify-between text-[10px] font-extrabold text-cyan-100">
                         <span className="flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> +Rp 3.000 (Setor ACC)
+                          <TrendingUp className="w-3 h-3 text-cyan-300" /> +Rp 3.000 (Setor ACC)
                         </span>
-                        <span className="bg-slate-950/20 px-1.5 py-0.5 rounded font-mono">{heroAccCount} ACC</span>
+                        <span className="bg-slate-950/30 px-1.5 py-0.5 rounded font-mono text-white border border-cyan-400/20">{heroAccCount} ACC</span>
                       </div>
                     </div>
 
@@ -898,7 +898,7 @@ export default function LoginPage() {
                         <span>Setor Email</span>
                       </div>
                       <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
-                        <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400">
+                        <div className="p-1 rounded-lg bg-cyan-500/20 text-cyan-300">
                           <Zap className="w-3 h-3" />
                         </div>
                         <span>Penarikan</span>
