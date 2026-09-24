@@ -101,6 +101,18 @@ export default function LoginPage() {
   // Interactive Mockup Tab State
   const [mockupTab, setMockupTab] = useState<"overview" | "submissions" | "withdraw" | "referral">("overview");
 
+  // Live Animated Hero Counter & Notifications
+  const [heroCounterBalance, setHeroCounterBalance] = useState<number>(142000);
+  const [heroAccCount, setHeroAccCount] = useState<number>(48);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroCounterBalance((prev) => prev + 3000);
+      setHeroAccCount((prev) => prev + 1);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
   // Earning Estimator State
   const [estDailyAcc, setEstDailyAcc] = useState<number>(30);
   const [selectedRate, setSelectedRate] = useState<number>(2800);
@@ -284,11 +296,11 @@ export default function LoginPage() {
 
   if (isDedicatedAuthRoute) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/20 selection:text-amber-300 flex flex-col justify-between relative overflow-hidden">
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500/20 selection:text-cyan-300 flex flex-col justify-between relative overflow-hidden">
         {/* Glow backdrop decorative elements */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-amber-500/20 via-orange-500/15 to-transparent blur-[140px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/3 left-10 w-72 h-72 bg-amber-500/10 blur-[100px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-blue-600/20 via-cyan-500/15 to-transparent blur-[140px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/3 left-10 w-72 h-72 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
 
         {/* Top Header */}
         <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
@@ -296,21 +308,21 @@ export default function LoginPage() {
             onClick={() => setLocation("/")}
             className="flex items-center gap-2.5 group focus:outline-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 fill-slate-950" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
             <div className="flex flex-col text-left">
               <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
-              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
+              <span className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
             </div>
           </button>
 
           <Button
             variant="ghost"
             onClick={() => setLocation("/")}
-            className="text-slate-400 hover:text-amber-400 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4"
+            className="text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4 min-h-[44px]"
           >
-            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <ArrowLeft className="w-4 h-4 text-cyan-400" />
             <span>Kembali ke Beranda</span>
           </Button>
         </header>
@@ -318,8 +330,8 @@ export default function LoginPage() {
         {/* Dedicated Centered Auth Layout */}
         <main className="w-full max-w-md mx-auto px-4 py-8 relative z-10 my-auto">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3 shadow-lg backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-cyan-400 text-xs font-semibold mb-3 shadow-lg backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
               <span>Akses Portal Terenkripsi</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -348,7 +360,7 @@ export default function LoginPage() {
 
           {/* Obsidian Command Center Glassmorphism Auth Card */}
           <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-slate-100 relative overflow-hidden rounded-2xl">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600" />
 
             <CardHeader className="pb-4">
               <Tabs
@@ -366,13 +378,13 @@ export default function LoginPage() {
                 <TabsList className="grid grid-cols-2 w-full bg-slate-950/90 border border-slate-800/80 rounded-xl p-1">
                   <TabsTrigger
                     value="login"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-slate-950 font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all min-h-[40px]"
                   >
                     Masuk
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-slate-950 font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-extrabold text-xs sm:text-sm text-slate-400 rounded-lg transition-all min-h-[40px]"
                   >
                     Daftar
                   </TabsTrigger>
@@ -384,7 +396,7 @@ export default function LoginPage() {
               {mode === "login" ? (
                 <>
                   <CardTitle className="text-lg font-bold mb-1 text-white flex items-center gap-2">
-                    <LogIn className="w-5 h-5 text-amber-400" />
+                    <LogIn className="w-5 h-5 text-cyan-400" />
                     <span>Masuk ke Akun Worker</span>
                   </CardTitle>
                   <CardDescription className="mb-4 text-slate-400 text-xs">
@@ -404,7 +416,7 @@ export default function LoginPage() {
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           placeholder="nama@email.com"
-                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                       </div>
                     </div>
@@ -421,7 +433,7 @@ export default function LoginPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="pl-9 pr-10 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 pr-10 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                         <button
                           type="button"
@@ -439,7 +451,7 @@ export default function LoginPage() {
                         type="button"
                         disabled={resetBusy || busy || !firebaseConfigured}
                         onClick={handleForgotPassword}
-                        className="text-xs text-amber-400 hover:text-amber-300 hover:underline disabled:opacity-50 font-medium transition-colors"
+                        className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline disabled:opacity-50 font-medium transition-colors"
                       >
                         {resetBusy ? "Mengirim tautan reset..." : "Lupa kata sandi?"}
                       </button>
@@ -448,9 +460,9 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       disabled={busy || !firebaseConfigured}
-                      className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl"
+                      className="w-full bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold shadow-lg shadow-blue-600/30 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl min-h-[44px]"
                     >
-                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-slate-950" /> : <LogIn className="w-4 h-4 mr-2 text-slate-950" />}
+                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-white" /> : <LogIn className="w-4 h-4 mr-2 text-white" />}
                       Masuk ke Dashboard
                     </Button>
                   </form>
@@ -458,7 +470,7 @@ export default function LoginPage() {
               ) : (
                 <>
                   <CardTitle className="text-lg font-bold mb-1 text-white flex items-center gap-2">
-                    <UserPlus className="w-5 h-5 text-amber-400" />
+                    <UserPlus className="w-5 h-5 text-cyan-400" />
                     <span>Pendaftaran Akun Baru</span>
                   </CardTitle>
                   <CardDescription className="mb-4 text-slate-400 text-xs">
@@ -477,7 +489,7 @@ export default function LoginPage() {
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Nama Lengkap Anda"
-                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                       </div>
                     </div>
@@ -492,7 +504,7 @@ export default function LoginPage() {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="08xxxxxxxxxx"
-                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                       </div>
                     </div>
@@ -507,7 +519,7 @@ export default function LoginPage() {
                           value={refCode}
                           onChange={(e) => setRefCode(e.target.value)}
                           placeholder="Contoh: WORKER123"
-                          className="pl-9 font-mono text-xs bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 font-mono text-xs bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                       </div>
                     </div>
@@ -524,7 +536,7 @@ export default function LoginPage() {
                           value={regEmail}
                           onChange={(e) => setRegEmail(e.target.value)}
                           placeholder="nama@email.com"
-                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 focus-visible:ring-amber-500/20"
+                          className="pl-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 focus-visible:ring-cyan-500/20"
                         />
                       </div>
                     </div>
@@ -541,7 +553,7 @@ export default function LoginPage() {
                             value={regPassword}
                             onChange={(e) => setRegPassword(e.target.value)}
                             placeholder="Min. 6 karakter"
-                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 text-xs"
+                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 text-xs"
                           />
                           <button
                             type="button"
@@ -565,7 +577,7 @@ export default function LoginPage() {
                             value={regConfirm}
                             onChange={(e) => setRegConfirm(e.target.value)}
                             placeholder="Ulangi kata sandi"
-                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20 text-xs"
+                            className="pr-9 bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20 text-xs"
                           />
                           <button
                             type="button"
@@ -582,9 +594,9 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       disabled={busy || !firebaseConfigured}
-                      className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl"
+                      className="w-full bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold shadow-lg shadow-blue-600/30 active:scale-[0.99] transition-all duration-200 h-11 text-sm rounded-xl min-h-[44px]"
                     >
-                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-slate-950" /> : <UserPlus className="w-4 h-4 mr-2 text-slate-950" />}
+                      {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-white" /> : <UserPlus className="w-4 h-4 mr-2 text-white" />}
                       Daftar Akun Worker
                     </Button>
                   </form>
@@ -603,29 +615,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/20 selection:text-amber-300">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500/20 selection:text-cyan-300">
       {/* 1. Header Navigation Bar */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/80 shadow-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <a href="#hero" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 fill-slate-950" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
-              <span className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
+              <span className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
             </div>
           </a>
 
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#hero" className="hover:text-amber-400 transition-colors">Beranda</a>
-            <a href="#preview" className="hover:text-amber-400 transition-colors">Dashboard Preview</a>
-            <a href="#cara-kerja" className="hover:text-amber-400 transition-colors">Cara Kerja</a>
-            <a href="#keuntungan" className="hover:text-amber-400 transition-colors">Keunggulan</a>
-            <a href="#simulasi" className="hover:text-amber-400 transition-colors">Simulasi Saldo</a>
-            <a href="#faq" className="hover:text-amber-400 transition-colors">FAQ</a>
+            <a href="#hero" className="hover:text-cyan-400 transition-colors">Beranda</a>
+            <a href="#preview" className="hover:text-cyan-400 transition-colors">Dashboard Preview</a>
+            <a href="#cara-kerja" className="hover:text-cyan-400 transition-colors">Cara Kerja</a>
+            <a href="#keuntungan" className="hover:text-cyan-400 transition-colors">Keunggulan</a>
+            <a href="#simulasi" className="hover:text-cyan-400 transition-colors">Simulasi Saldo</a>
+            <a href="#faq" className="hover:text-cyan-400 transition-colors">FAQ</a>
           </nav>
 
           {/* Desktop Auth Buttons */}
@@ -633,15 +645,15 @@ export default function LoginPage() {
             <Button
               variant="ghost"
               onClick={() => goToAuth("login")}
-              className="text-slate-300 hover:text-amber-400 hover:bg-slate-900 border border-transparent hover:border-slate-800"
+              className="text-slate-300 hover:text-cyan-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 min-h-[44px]"
             >
               Masuk
             </Button>
             <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl blur-sm opacity-60 group-hover:opacity-100 transition duration-300" />
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl blur-sm opacity-60 group-hover:opacity-100 transition duration-300" />
               <Button
                 onClick={() => goToAuth("register")}
-                className="relative bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md px-5"
+                className="relative bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold shadow-md px-5 min-h-[44px]"
               >
                 Daftar Sekarang
               </Button>
@@ -653,13 +665,13 @@ export default function LoginPage() {
             <Button
               size="sm"
               onClick={() => goToAuth("register")}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3 h-8 shadow-sm"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 min-h-[36px] shadow-sm"
             >
               Daftar
             </Button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-300 hover:bg-slate-900 focus:outline-none"
+              className="p-2 rounded-lg text-slate-300 hover:bg-slate-900 focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -673,42 +685,42 @@ export default function LoginPage() {
             <a
               href="#hero"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               Beranda
             </a>
             <a
               href="#preview"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               Dashboard Preview
             </a>
             <a
               href="#cara-kerja"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               Cara Kerja
             </a>
             <a
               href="#keuntungan"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               Keunggulan
             </a>
             <a
               href="#simulasi"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               Simulasi Penghasilan
             </a>
             <a
               href="#faq"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-slate-300 hover:text-amber-400 font-medium text-sm"
+              className="block py-2 text-slate-300 hover:text-cyan-400 font-medium text-sm"
             >
               FAQ
             </a>
@@ -716,13 +728,13 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 onClick={() => goToAuth("login")}
-                className="w-full justify-center border-slate-800 bg-slate-900 text-slate-200 hover:text-amber-400 font-semibold"
+                className="w-full justify-center border-slate-800 bg-slate-900 text-slate-200 hover:text-cyan-400 font-semibold min-h-[44px]"
               >
                 Masuk ke Akun
               </Button>
               <Button
                 onClick={() => goToAuth("register")}
-                className="w-full justify-center bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold shadow-md"
+                className="w-full justify-center bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-extrabold shadow-md min-h-[44px]"
               >
                 Daftar Akun Baru
               </Button>
@@ -734,61 +746,215 @@ export default function LoginPage() {
       {/* Live Withdrawal Ticker Bar */}
       <LiveWithdrawalTicker />
 
-      {/* 2. Hero Section & Dashboard Mockup Preview */}
-      <section id="hero" className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden">
-        {/* Glow backdrop decorative elements */}
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-amber-500/20 via-orange-500/15 to-transparent blur-[140px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/3 left-10 w-72 h-72 bg-amber-500/10 blur-[100px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/2 right-10 w-80 h-80 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none" />
+      {/* 2. Hero Section & Animated SaaS Banner Visual */}
+      <section id="hero" className="relative pt-10 pb-16 md:pt-16 md:pb-24 overflow-hidden">
+        {/* Deep Blue & Cyan Glow backdrop decorative elements */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-tr from-blue-600/25 via-cyan-500/20 to-transparent blur-[140px] rounded-full pointer-events-none animate-hero-pulse" />
+        <div className="absolute top-1/4 left-5 w-80 h-80 bg-blue-500/15 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-10 right-5 w-96 h-96 bg-cyan-500/15 blur-[140px] rounded-full pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            {/* Tag Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-400 text-xs font-semibold tracking-wide uppercase shadow-lg shadow-amber-500/5 backdrop-blur-md">
-              <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>Fintech Platform Kerja Sampingan Terpercaya</span>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            {/* LEFT COLUMN: Headline & CTAs */}
+            <div className="lg:col-span-7 space-y-6 text-left">
+              {/* Tag Badge */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-950/80 border border-cyan-500/30 text-cyan-400 text-xs font-semibold tracking-wide uppercase shadow-lg shadow-blue-500/10 backdrop-blur-md">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                </span>
+                <span>Fintech Platform Kerja Sampingan Real-Time</span>
+              </div>
 
-            {/* Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
-              Maksimalkan Penghasilan Anda Secara <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-orange-500 bg-clip-text text-transparent">Real-Time & Otomatis</span>
-            </h1>
+              {/* Exact Hero Headline Required */}
+              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-extrabold tracking-tight text-white leading-[1.15]">
+                Maksimalkan Penghasilan Anda Secara Real-time dari Job Gmail
+              </h1>
 
-            {/* Supporting Text */}
-            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-              Setor pekerjaan email terverifikasi, pantau saldo langsung di dashboard interaktif, dan ajukan pencairan instan ke E-Wallet atau Rekening Bank Anda kapan saja.
-            </p>
+              {/* Supporting Text */}
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl">
+                Setor pekerjaan email terverifikasi, pantau saldo langsung di dashboard interaktif, dan ajukan pencairan instan ke E-Wallet atau Rekening Bank Anda kapan saja.
+              </p>
 
-            {/* CTA Buttons with Subtle Amber Glow Effect */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <div className="relative group w-full sm:w-auto">
-                <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-300 group-hover:blur-lg" />
+              {/* CTA Buttons with Cyan/Blue SaaS Glow Effect */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+                <div className="relative group min-h-[44px]">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-500 rounded-xl blur-md opacity-70 group-hover:opacity-100 transition duration-300 group-hover:blur-lg" />
+                  <Button
+                    size="lg"
+                    onClick={() => goToAuth("register")}
+                    className="relative w-full sm:w-auto bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold px-7 min-h-[44px] text-sm sm:text-base rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30"
+                  >
+                    <UserPlus className="w-5 h-5 text-white" />
+                    <span>Daftar Worker Sekarang</span>
+                    <ArrowRight className="w-4 h-4 text-white ml-1 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </div>
+
                 <Button
                   size="lg"
-                  onClick={() => goToAuth("register")}
-                  className="relative w-full sm:w-auto bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-8 h-13 text-base rounded-xl transition-all duration-200 flex items-center justify-center gap-2.5"
+                  variant="outline"
+                  onClick={() => goToAuth("login")}
+                  className="w-full sm:w-auto border-slate-700/80 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-cyan-300 px-6 min-h-[44px] text-sm sm:text-base rounded-xl transition-all flex items-center justify-center gap-2 backdrop-blur-md"
                 >
-                  <UserPlus className="w-5 h-5 text-slate-950" />
-                  <span>Daftar Worker Sekarang</span>
-                  <ArrowRight className="w-4 h-4 text-slate-950 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <LogIn className="w-5 h-5 text-cyan-400" />
+                  <span>Masuk ke Dashboard</span>
                 </Button>
               </div>
 
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => goToAuth("login")}
-                className="w-full sm:w-auto border-slate-800 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 px-7 h-13 text-base rounded-xl transition-all flex items-center justify-center gap-2 backdrop-blur-md"
-              >
-                <LogIn className="w-5 h-5 text-amber-400" />
-                <span>Masuk ke Dashboard</span>
-              </Button>
+              {/* Real-time Indicator Stats Pill */}
+              <div className="pt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400 border-t border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Proses ACC 1-2 Hari</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                  <span>Cairkan 1–5 Menit</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-blue-400" />
+                  <span>Tanpa Biaya Tersembunyi</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Clean Blue/Cyan Smartphone Visual Composition */}
+            <div className="lg:col-span-5 relative mt-8 lg:mt-0 flex items-center justify-center py-6 sm:py-8">
+              {/* Radial Cyan & Deep Blue Glow Backdrop */}
+              <div className="absolute inset-0 max-w-[360px] sm:max-w-[420px] mx-auto bg-gradient-to-tr from-blue-600/35 via-cyan-500/25 to-blue-500/20 blur-[100px] rounded-full pointer-events-none animate-hero-pulse" />
+
+              {/* FOREGROUND ANIMATED SMARTPHONE & BADGES COMPOSITION */}
+              <div className="relative z-20 w-full max-w-[320px] sm:max-w-[380px] flex items-center justify-center">
+
+                {/* Animated Smartphone Mockup */}
+                <div className="relative z-20 animate-hero-float my-auto">
+
+                  {/* SMARTPHONE DEVICE MOCKUP IN FOREGROUND */}
+                  <div className="w-[255px] sm:w-[285px] my-auto rounded-[38px] p-2.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 shadow-[0_30px_70px_rgba(0,0,0,0.95)] border border-cyan-500/30 backdrop-blur-md">
+
+                    {/* Speaker notch / Camera pill */}
+                    <div className="w-24 h-4 bg-slate-950 rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 border border-slate-800">
+                      <div className="w-2 h-2 rounded-full bg-slate-800" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500/60" />
+                    </div>
+
+                    {/* Smartphone Screen Inner Content */}
+                    <div className="bg-slate-950 text-slate-100 rounded-[30px] p-3.5 space-y-3 font-sans border border-slate-800/90 overflow-hidden relative">
+
+                      {/* Worker Dashboard Header Replica */}
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white font-black text-xs flex items-center justify-center shadow-sm">
+                            W
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-extrabold text-white leading-tight">Worker Portal</p>
+                            <p className="text-[9px] text-cyan-400 font-semibold">Tier 2 Active</p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                          <Activity className="w-2.5 h-2.5 text-cyan-400 animate-pulse" /> ONLINE
+                        </span>
+                      </div>
+
+                      {/* Blue & Cyan Balance Card */}
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-600 text-white shadow-lg shadow-blue-600/30 relative overflow-hidden border border-cyan-400/30">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-xl pointer-events-none" />
+
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] font-bold text-cyan-100/90 uppercase tracking-wide">Saldo Utama Worker</span>
+                            <p className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5 font-mono">
+                              {formatMoney(heroCounterBalance)}
+                            </p>
+                          </div>
+                          <div className="p-1.5 rounded-xl bg-slate-950/30 text-cyan-300 backdrop-blur-sm border border-cyan-400/20">
+                            <Wallet className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 pt-2 border-t border-white/20 flex items-center justify-between text-[10px] font-extrabold text-cyan-100">
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3 text-cyan-300" /> +Rp 3.000 (Setor ACC)
+                          </span>
+                          <span className="bg-slate-950/30 px-1.5 py-0.5 rounded font-mono text-white border border-cyan-400/20">{heroAccCount} ACC</span>
+                        </div>
+                      </div>
+
+                      {/* Quick Layanan Cepat Grid */}
+                      <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-200">
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                          <div className="p-1 rounded-lg bg-blue-500/20 text-cyan-400">
+                            <Send className="w-3 h-3" />
+                          </div>
+                          <span>Setor Email</span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                          <div className="p-1 rounded-lg bg-cyan-500/20 text-cyan-300">
+                            <Zap className="w-3 h-3" />
+                          </div>
+                          <span>Penarikan</span>
+                        </div>
+                      </div>
+
+                      {/* ACC Activity Ticker Item inside phone */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-center justify-between text-[10px]">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="text-slate-300 font-medium truncate max-w-[110px]">gmail.job.acc88@gmail.com</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400 text-[11px]">+Rp 3k</span>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* STATIC NOTIFICATION CARDS (Not Floating) */}
+
+                {/* 2. Static Card 1: Email Setor ACC Verified Badge (Top Right) */}
+                <div className="absolute top-1 right-[-5px] sm:right-[-15px] z-30 p-2.5 rounded-2xl bg-slate-900/95 border border-emerald-500/40 text-xs backdrop-blur-xl shadow-xl shadow-black/70 flex items-center gap-2.5 max-w-[210px]">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <p className="font-extrabold text-white text-[11px]">Email Setor ACC</p>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    </div>
+                    <p className="text-[10px] text-emerald-400 font-mono font-bold mt-0.5">+Rp 3.000 Masuk Saldo</p>
+                  </div>
+                </div>
+
+                {/* 3. Static Card 2: Penarikan DANA Real-time Success (Bottom Right) */}
+                <div className="absolute bottom-4 right-[-10px] sm:right-[-20px] z-30 p-2.5 rounded-2xl bg-slate-900/95 border border-cyan-500/40 text-xs backdrop-blur-xl shadow-xl shadow-black/70 flex items-center gap-2.5 max-w-[220px]">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-white text-[11px]">Penarikan DANA Sukses</p>
+                    <p className="text-[10px] text-cyan-300 font-mono font-bold mt-0.5">Rp 50.000 • 2 Menit</p>
+                  </div>
+                </div>
+
+                {/* 4. Static Badge 3: Realtime Status Indicator Pill (Top Left) */}
+                <div className="absolute top-10 left-[0px] sm:left-[-10px] z-30 px-3 py-1 rounded-full bg-slate-950/95 border border-blue-500/40 text-cyan-400 text-[10px] font-bold backdrop-blur-md shadow-lg flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                  </span>
+                  <span>Realtime Platform Activity</span>
+                </div>
+
+              </div>
             </div>
           </div>
 
           {/* Glassmorphism Worker Dashboard Mockup Preview */}
           <div id="preview" className="mt-14 max-w-5xl mx-auto scroll-mt-24">
-            <div className="relative rounded-3xl p-1 bg-gradient-to-b from-amber-500/30 via-slate-800/40 to-slate-900/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+            <div className="relative rounded-3xl p-1 bg-gradient-to-b from-blue-500/30 via-slate-800/40 to-slate-900/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
               <div className="bg-slate-950/90 backdrop-blur-xl rounded-[22px] border border-slate-800/80 p-4 sm:p-6 overflow-hidden">
                 {/* Mockup Header Bar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4 mb-5">
@@ -807,9 +973,9 @@ export default function LoginPage() {
                   <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-1 rounded-xl text-xs font-medium">
                     <button
                       onClick={() => setMockupTab("overview")}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] ${
                         mockupTab === "overview"
-                          ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -817,9 +983,9 @@ export default function LoginPage() {
                     </button>
                     <button
                       onClick={() => setMockupTab("submissions")}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] ${
                         mockupTab === "submissions"
-                          ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -827,9 +993,9 @@ export default function LoginPage() {
                     </button>
                     <button
                       onClick={() => setMockupTab("withdraw")}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] ${
                         mockupTab === "withdraw"
-                          ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -837,9 +1003,9 @@ export default function LoginPage() {
                     </button>
                     <button
                       onClick={() => setMockupTab("referral")}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] ${
                         mockupTab === "referral"
-                          ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -853,15 +1019,15 @@ export default function LoginPage() {
                   <div className="space-y-4 animate-in fade-in duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Saldo Highlight Card */}
-                      <div className="bg-gradient-to-br from-slate-900 via-amber-950/20 to-slate-900 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="bg-gradient-to-br from-slate-900 via-blue-950/30 to-slate-900 border border-blue-500/30 rounded-2xl p-5 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-3">
                           <span className="text-xs text-slate-400 font-medium">Total Saldo Terseedia</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">SIAP CAIR</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">SIAP CAIR</span>
                         </div>
                         <p className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                           Rp 385.000
                         </p>
-                        <p className="text-xs text-amber-400/90 mt-2 flex items-center gap-1 font-medium">
+                        <p className="text-xs text-cyan-300/90 mt-2 flex items-center gap-1 font-medium">
                           <TrendingUp className="w-3.5 h-3.5" /> +Rp 90.000 hari ini dari 30 Email ACC
                         </p>
                       </div>
@@ -888,11 +1054,11 @@ export default function LoginPage() {
                       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
                         <div className="flex justify-between items-start mb-3">
                           <span className="text-xs text-slate-400 font-medium">Level Tier Worker</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">TIER 2</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-cyan-300">TIER 2</span>
                         </div>
                         <p className="text-lg font-bold text-white">Rp 3.000 / Email ACC</p>
                         <div className="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-                          <div className="bg-gradient-to-r from-amber-500 to-orange-500 h-full w-[75%]" />
+                          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 h-full w-[75%]" />
                         </div>
                         <p className="text-[11px] text-slate-400 mt-2">Setor 26 email lagi untuk capai Tier 3</p>
                       </div>
@@ -901,7 +1067,7 @@ export default function LoginPage() {
                     {/* Quick Mockup Action Banner */}
                     <div className="flex flex-wrap items-center justify-between p-4 rounded-2xl bg-slate-900/60 border border-slate-800 gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-cyan-400">
                           <Activity className="w-5 h-5" />
                         </div>
                         <div>
@@ -912,7 +1078,7 @@ export default function LoginPage() {
                       <Button
                         size="sm"
                         onClick={() => goToAuth("register")}
-                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs min-h-[36px]"
                       >
                         Mulai Coba Sekarang
                       </Button>
@@ -925,7 +1091,7 @@ export default function LoginPage() {
                     <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs font-semibold text-white">Form Input Massal Storan Email</span>
-                        <span className="text-[10px] text-amber-400 font-mono">Format: email|password</span>
+                        <span className="text-[10px] text-cyan-400 font-mono">Format: email|password</span>
                       </div>
                       <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 space-y-1 opacity-90">
                         <p className="text-slate-400"># Contoh format penyetoran:</p>
@@ -942,7 +1108,7 @@ export default function LoginPage() {
                         <p className="text-[10px]">Lolos ACC</p>
                         <p className="font-bold text-sm">135</p>
                       </div>
-                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-cyan-400">
                         <p className="text-[10px]">Sedang Diperiksa</p>
                         <p className="font-bold text-sm">12</p>
                       </div>
@@ -960,13 +1126,13 @@ export default function LoginPage() {
                       <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
                         <span className="text-xs font-semibold text-white">Metode Pembayaran Tersedia</span>
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center text-xs font-bold">DANA</div>
+                          <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-cyan-400 text-center text-xs font-bold">DANA</div>
                           <div className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-center text-xs font-medium">OVO</div>
                           <div className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-center text-xs font-medium">GoPay</div>
                         </div>
                         <div className="text-xs space-y-1 text-slate-300 pt-1">
                           <p className="text-slate-400 text-[11px]">Nominal Penarikan</p>
-                          <p className="font-mono text-amber-400 font-bold text-base">Rp 250.000</p>
+                          <p className="font-mono text-cyan-400 font-bold text-base">Rp 250.000</p>
                         </div>
                       </div>
 
@@ -993,12 +1159,12 @@ export default function LoginPage() {
 
                 {mockupTab === "referral" && (
                   <div className="space-y-3 animate-in fade-in duration-300">
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-orange-500/10 border border-amber-500/20 flex flex-wrap justify-between items-center gap-3">
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-600/10 via-slate-900 to-cyan-500/10 border border-blue-500/20 flex flex-wrap justify-between items-center gap-3">
                       <div>
-                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Link Referral Anda</span>
+                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Link Referral Anda</span>
                         <p className="text-xs font-mono text-white mt-1">https://worker-portal.app/register?ref=WORKER88</p>
                       </div>
-                      <Button size="sm" className="bg-amber-500 text-slate-950 font-bold text-xs h-8">
+                      <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs h-8">
                         Salin Link
                       </Button>
                     </div>
@@ -1009,9 +1175,9 @@ export default function LoginPage() {
                       </div>
                       <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
                         <p className="text-slate-400 text-[10px]">Total ACC Tim</p>
-                        <p className="font-bold text-amber-400 text-sm">240 Email</p>
+                        <p className="font-bold text-cyan-400 text-sm">240 Email</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-cyan-300">
                         <p className="text-[10px]">Bonus Tersedia Klaim</p>
                         <p className="font-bold text-sm">Rp 150.000</p>
                       </div>
@@ -1026,7 +1192,7 @@ export default function LoginPage() {
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
               <div className="flex justify-center mb-2">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-cyan-400">
                   <Users className="w-5 h-5" />
                 </div>
               </div>
@@ -1036,17 +1202,17 @@ export default function LoginPage() {
 
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
               <div className="flex justify-center mb-2">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-cyan-400">
                   <Clock className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-amber-400 tracking-tight">1 – 5 Menit</p>
+              <p className="text-2xl font-black text-cyan-400 tracking-tight">1 – 5 Menit</p>
               <p className="text-xs text-slate-400 mt-1 font-medium">Proses Pencairan Saldo</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 text-center backdrop-blur-md shadow-lg shadow-black/20">
               <div className="flex justify-center mb-2">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-cyan-400">
                   <Wallet className="w-5 h-5" />
                 </div>
               </div>
@@ -1061,7 +1227,7 @@ export default function LoginPage() {
       <section id="cara-kerja" className="py-20 bg-slate-900/40 border-y border-slate-800/80 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-cyan-400 text-xs font-semibold mb-3">
               <Layers className="w-3.5 h-3.5" />
               <span>Panduan Alur Kerja</span>
             </div>
@@ -1073,10 +1239,10 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Step 01 */}
-            <div className="bg-slate-900/90 rounded-2xl p-7 border border-slate-800 relative hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl">
+            <div className="bg-slate-900/90 rounded-2xl p-7 border border-slate-800 relative hover:border-blue-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <span className="text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-mono">01</span>
-                <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
+                <span className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent font-mono">01</span>
+                <div className="p-3 rounded-2xl bg-blue-500/10 text-cyan-400 border border-blue-500/20 group-hover:scale-110 transition-transform">
                   <UserPlus className="w-6 h-6" />
                 </div>
               </div>
@@ -1087,10 +1253,10 @@ export default function LoginPage() {
             </div>
 
             {/* Step 02 */}
-            <div className="bg-slate-900/90 rounded-2xl p-7 border border-amber-500/30 relative hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl shadow-amber-500/5 space-y-3">
+            <div className="bg-slate-900/90 rounded-2xl p-7 border border-blue-500/30 relative hover:border-blue-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl shadow-blue-500/5 space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-mono">02</span>
-                <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
+                <span className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent font-mono">02</span>
+                <div className="p-3 rounded-2xl bg-blue-500/10 text-cyan-400 border border-blue-500/20 group-hover:scale-110 transition-transform">
                   <Send className="w-6 h-6" />
                 </div>
               </div>
@@ -1100,9 +1266,9 @@ export default function LoginPage() {
               </p>
               {/* Badge Transparansi Estimasi ACC */}
               <div className="pt-2 border-t border-slate-800/80">
-                <div className="bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-xl text-xs text-amber-300 space-y-1">
+                <div className="bg-blue-950/40 border border-blue-800/40 p-2.5 rounded-xl text-xs text-cyan-300 space-y-1">
                   <p className="font-semibold flex items-center gap-1.5 text-xs">
-                    <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     Estimasi ACC Verifikasi:
                   </p>
                   <p className="text-slate-300 text-[11px] pl-5 leading-normal">
@@ -1114,10 +1280,10 @@ export default function LoginPage() {
             </div>
 
             {/* Step 03 */}
-            <div className="bg-slate-900/90 rounded-2xl p-7 border border-slate-800 relative hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl">
+            <div className="bg-slate-900/90 rounded-2xl p-7 border border-slate-800 relative hover:border-blue-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-xl">
               <div className="flex items-center justify-between mb-5">
-                <span className="text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent font-mono">03</span>
-                <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
+                <span className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent font-mono">03</span>
+                <div className="p-3 rounded-2xl bg-blue-500/10 text-cyan-400 border border-blue-500/20 group-hover:scale-110 transition-transform">
                   <Zap className="w-6 h-6" />
                 </div>
               </div>
@@ -1134,7 +1300,7 @@ export default function LoginPage() {
       <section id="keuntungan" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-cyan-400 text-xs font-semibold mb-3">
               <Award className="w-3.5 h-3.5" />
               <span>Keunggulan Platform</span>
             </div>
@@ -1146,8 +1312,8 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Benefit 1 */}
-            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-amber-500/40 transition-all duration-200">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-blue-500/40 transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Wallet className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-white mb-2">Pencairan Saldo Kilat (1–5 Menit)</h3>
@@ -1157,8 +1323,8 @@ export default function LoginPage() {
             </div>
 
             {/* Benefit 2 */}
-            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-amber-500/40 transition-all duration-200">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-blue-500/40 transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Gift className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-white mb-2">Sistem Referral Pasif Income</h3>
@@ -1168,8 +1334,8 @@ export default function LoginPage() {
             </div>
 
             {/* Benefit 3 */}
-            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-amber-500/40 transition-all duration-200">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-blue-500/40 transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Percent className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-white mb-2">Biaya Admin Transparan</h3>
@@ -1179,8 +1345,8 @@ export default function LoginPage() {
             </div>
 
             {/* Benefit 4 */}
-            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-amber-500/40 transition-all duration-200">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 hover:border-blue-500/40 transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-cyan-400 mb-4">
                 <Headphones className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-white mb-2">Layanan Bantuan 24/7</h3>
@@ -1195,14 +1361,14 @@ export default function LoginPage() {
       {/* 5. Earnings Estimator ("Simulasi Penghasilan") */}
       <section id="simulasi" className="py-20 bg-slate-900/50 border-y border-slate-800/80 scroll-mt-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 rounded-3xl p-8 sm:p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 blur-[100px] pointer-events-none" />
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/40 rounded-3xl p-8 sm:p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 blur-[100px] pointer-events-none" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
               {/* Left Column Controls */}
               <div className="lg:col-span-7 space-y-6">
                 <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-cyan-400 text-xs font-semibold mb-3">
                     <Calculator className="w-3.5 h-3.5" />
                     <span>Simulasi Penghasilan</span>
                   </div>
@@ -1221,9 +1387,9 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedRate(2800)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all min-h-[44px] ${
                           selectedRate === 2800
-                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                            ? "bg-blue-600 text-white border-cyan-400 shadow-md shadow-blue-600/30"
                             : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
                         }`}
                       >
@@ -1232,9 +1398,9 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedRate(3000)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all min-h-[44px] ${
                           selectedRate === 3000
-                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                            ? "bg-blue-600 text-white border-cyan-400 shadow-md shadow-blue-600/30"
                             : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
                         }`}
                       >
@@ -1245,7 +1411,7 @@ export default function LoginPage() {
 
                   <div className="flex justify-between items-center pt-2 border-t border-slate-800/80">
                     <label htmlFor="daily-acc-slider" className="text-xs font-medium text-slate-300">Target Email ACC / Hari:</label>
-                    <span className="text-lg font-black text-amber-400 font-mono">{estDailyAcc} ACC</span>
+                    <span className="text-lg font-black text-cyan-400 font-mono">{estDailyAcc} ACC</span>
                   </div>
                   <input
                     id="daily-acc-slider"
@@ -1255,7 +1421,7 @@ export default function LoginPage() {
                     step={5}
                     value={estDailyAcc}
                     onChange={(e) => setEstDailyAcc(Number(e.target.value))}
-                    className="w-full accent-amber-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
+                    className="w-full accent-blue-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
                   />
                   <div className="flex justify-between text-[11px] text-slate-500 font-mono">
                     <span>5 ACC/hari</span>
@@ -1265,16 +1431,16 @@ export default function LoginPage() {
 
                   <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800/80">
                     <span className="text-slate-400">Rate Tier Aktif:</span>
-                    <span className="text-amber-300 font-semibold">{formatMoney(selectedRate)} / email ACC</span>
+                    <span className="text-cyan-300 font-semibold">{formatMoney(selectedRate)} / email ACC</span>
                   </div>
                 </div>
               </div>
 
               {/* Right Column Calculated Earnings Card */}
-              <div className="lg:col-span-5 bg-gradient-to-br from-amber-500/10 via-slate-950 to-slate-900 p-6 rounded-2xl border border-amber-500/30 shadow-xl space-y-6">
+              <div className="lg:col-span-5 bg-gradient-to-br from-blue-950/40 via-slate-950 to-slate-900 p-6 rounded-2xl border border-blue-500/30 shadow-xl space-y-6">
                 <div>
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimasi Harian</span>
-                  <p className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-cyan-400 tracking-tight mt-1">
                     {formatMoney(estimatedDailyEarnings)}
                   </p>
                 </div>
@@ -1291,7 +1457,7 @@ export default function LoginPage() {
 
                 <Button
                   onClick={() => goToAuth("register")}
-                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold h-12 rounded-xl shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all duration-200"
+                  className="w-full bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold h-12 rounded-xl shadow-lg shadow-blue-600/30 active:scale-[0.99] transition-all duration-200 min-h-[44px]"
                 >
                   Mulai Kumpulkan Saldo Sekarang
                 </Button>
@@ -1304,9 +1470,9 @@ export default function LoginPage() {
       {/* 6. Referral Program Highlights */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-950 p-8 sm:p-12 rounded-3xl border border-slate-800 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="bg-gradient-to-br from-blue-600/10 via-slate-900 to-slate-950 p-8 sm:p-12 rounded-3xl border border-slate-800 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-semibold">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-cyan-400 border border-blue-500/30 text-xs font-semibold">
                 <Gift className="w-3.5 h-3.5" />
                 <span>Program Kemitraan</span>
               </div>
@@ -1317,7 +1483,7 @@ export default function LoginPage() {
               <div className="pt-2">
                 <Button
                   onClick={() => goToAuth("register")}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 h-11 rounded-xl"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 h-11 rounded-xl min-h-[44px]"
                 >
                   Dapatkan Link Referral Anda
                 </Button>
@@ -1327,18 +1493,18 @@ export default function LoginPage() {
             {/* Dynamic Referral Tiers Card */}
             <div className="lg:col-span-5 bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl">
               <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-400" />
+                <Users className="w-4 h-4 text-cyan-400" />
                 <span>Tingkat Reward Referral Aktif</span>
               </h3>
               <div className="space-y-3">
                 {referralTiers && referralTiers.length > 0 ? (
                   referralTiers.map((t, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
                       <div className="flex items-center gap-2.5">
-                        <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
                         <span className="text-xs font-semibold text-slate-200">{t.minAcc} Email ACC Referral</span>
                       </div>
-                      <span className="text-xs font-black text-amber-400 font-mono">{formatMoney(t.reward)}</span>
+                      <span className="text-xs font-black text-cyan-400 font-mono">{formatMoney(t.reward)}</span>
                     </div>
                   ))
                 ) : (
@@ -1354,8 +1520,8 @@ export default function LoginPage() {
       <section id="faq" className="py-20 bg-slate-900/40 border-t border-slate-800/80">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3">
-              <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-cyan-400 text-xs font-semibold mb-3">
+              <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
               <span>Pusat Informasi</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">Pertanyaan Sering Diajukan</h2>
@@ -1364,7 +1530,7 @@ export default function LoginPage() {
 
           <Accordion type="single" collapsible className="w-full space-y-4">
             <AccordionItem value="item-1" className="bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+              <AccordionTrigger className="text-white hover:text-cyan-400 font-semibold text-sm sm:text-base text-left min-h-[44px]">
                 Bagaimana cara mendaftar sebagai worker?
               </AccordionTrigger>
               <AccordionContent className="text-slate-300 text-xs sm:text-sm leading-relaxed">
@@ -1373,7 +1539,7 @@ export default function LoginPage() {
             </AccordionItem>
 
             <AccordionItem value="item-2" className="bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+              <AccordionTrigger className="text-white hover:text-cyan-400 font-semibold text-sm sm:text-base text-left min-h-[44px]">
                 Berapa batas minimum penarikan saldo (withdrawal)?
               </AccordionTrigger>
               <AccordionContent className="text-slate-300 text-xs sm:text-sm leading-relaxed">
@@ -1382,7 +1548,7 @@ export default function LoginPage() {
             </AccordionItem>
 
             <AccordionItem value="item-3" className="bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+              <AccordionTrigger className="text-white hover:text-cyan-400 font-semibold text-sm sm:text-base text-left min-h-[44px]">
                 Metode pembayaran apa saja yang didukung?
               </AccordionTrigger>
               <AccordionContent className="text-slate-300 text-xs sm:text-sm leading-relaxed">
@@ -1391,7 +1557,7 @@ export default function LoginPage() {
             </AccordionItem>
 
             <AccordionItem value="item-4" className="bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+              <AccordionTrigger className="text-white hover:text-cyan-400 font-semibold text-sm sm:text-base text-left min-h-[44px]">
                 Mengapa pemeriksaan penyetoran email membutuhkan waktu 1–2 hari kerja?
               </AccordionTrigger>
               <AccordionContent className="text-slate-300 text-xs sm:text-sm leading-relaxed space-y-2">
@@ -1408,7 +1574,7 @@ export default function LoginPage() {
             </AccordionItem>
 
             <AccordionItem value="item-5" className="bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-1">
-              <AccordionTrigger className="text-white hover:text-amber-400 font-semibold text-sm sm:text-base text-left">
+              <AccordionTrigger className="text-white hover:text-cyan-400 font-semibold text-sm sm:text-base text-left min-h-[44px]">
                 Bagaimana cara kerja bonus referral?
               </AccordionTrigger>
               <AccordionContent className="text-slate-300 text-xs sm:text-sm leading-relaxed">
@@ -1421,14 +1587,14 @@ export default function LoginPage() {
 
       {/* 8. Clean CTA Footer Section */}
       <section className="py-20 bg-slate-950 border-t border-slate-800/80 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(245,158,11,0.15),rgba(255,255,255,0))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(37,99,235,0.2),rgba(255,255,255,0))]" />
 
         <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
           <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/80 border border-slate-800/90 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600" />
 
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-4">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-cyan-400 text-xs font-semibold mb-4">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
               <span>Akses Portal Worker</span>
             </div>
 

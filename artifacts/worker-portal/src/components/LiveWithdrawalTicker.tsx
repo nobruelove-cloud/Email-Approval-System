@@ -46,9 +46,9 @@ export function LiveWithdrawalTicker() {
             {tickerItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs text-slate-300 whitespace-nowrap shrink-0 shadow-sm hover:border-emerald-500/40 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs text-slate-300 whitespace-nowrap shrink-0 shadow-sm hover:border-cyan-500/40 transition-colors"
               >
-                <span className="text-amber-400 font-medium font-mono">{item.worker}</span>
+                <span className="text-cyan-400 font-medium font-mono">{item.worker}</span>
                 <span className="text-slate-500">mencairkan</span>
                 <span className="text-emerald-400 font-bold">{item.amount}</span>
                 <span className="text-[10px] bg-slate-800/90 border border-slate-700/60 text-slate-200 px-1.5 py-0.5 rounded font-semibold">
