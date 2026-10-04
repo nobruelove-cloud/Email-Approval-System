@@ -199,14 +199,9 @@ export function SidebarNavigation({
               <Mail className="w-5 h-5 text-white" />
             </div>
             {(!isCollapsedDesktop || isOpenMobile) && (
-              <div className="min-w-0 flex-1">
-                <h1 className="font-black text-slate-900 text-sm tracking-tight leading-none truncate">
-                  GMAIL JOB ID
-                </h1>
-                <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">
-                  Worker Portal
-                </p>
-              </div>
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate min-w-0">
+                GMAIL JOB ID
+              </span>
             )}
           </div>
 

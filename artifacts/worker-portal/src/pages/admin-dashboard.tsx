@@ -1958,14 +1958,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-indigo-500/20 selection:text-indigo-700 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border flex flex-col md:flex-row">
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 min-h-screen sticky top-0 shrink-0 z-30 shadow-xs">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
               G
             </div>
-            <div>
-              <h1 className="font-bold text-slate-900 text-sm tracking-tight leading-tight">GMAIL JOB ID</h1>
-              <p className="text-[11px] text-slate-500 font-medium">Admin Portal v2.0</p>
-            </div>
+            <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate">
+              GMAIL JOB ID
+            </span>
           </div>
         </div>
 

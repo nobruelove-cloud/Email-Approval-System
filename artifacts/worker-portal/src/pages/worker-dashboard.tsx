@@ -718,11 +718,11 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
         <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
           <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
             {/* Left: Worker avatar + Brand Identity */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="relative rounded-full focus:outline-none ring-2 ring-blue-500/20 active:scale-95 transition-transform"
+                className="relative rounded-full focus:outline-none ring-2 ring-blue-500/20 active:scale-95 transition-transform shrink-0"
                 title="Buka Profil / Menu"
               >
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-xs">
@@ -731,14 +731,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
               </button>
 
-              <div>
-                <h1 className="font-black text-slate-900 text-sm tracking-tight flex items-center gap-1.5 leading-tight">
-                  GMAIL JOB ID
-                </h1>
-                <p className="text-[10px] font-semibold text-slate-500 leading-tight">
-                  Worker Portal
-                </p>
-              </div>
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate">
+                GMAIL JOB ID
+              </span>
             </div>
 
             {/* Right: Actions (ViewModeToggle + Notification Bell Dropdown + Menu/Profile action) */}

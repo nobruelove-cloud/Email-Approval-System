@@ -307,15 +307,14 @@ export default function LoginPage() {
         <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-2.5 group focus:outline-none"
+            className="flex items-center gap-2.5 group focus:outline-none shrink-0"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
               <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
-            <div className="flex flex-col text-left">
-              <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
-              <span className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
-            </div>
+            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap">
+              GMAIL JOB ID
+            </span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -624,14 +623,13 @@ export default function LoginPage() {
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/80 shadow-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
-          <a href="#hero" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+          <a href="#hero" className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
               <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-base text-white leading-none tracking-tight">Portal Worker</span>
-              <span className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase mt-0.5">Email Approval System</span>
-            </div>
+            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap">
+              GMAIL JOB ID
+            </span>
           </a>
 
           {/* Desktop Nav Links */}
