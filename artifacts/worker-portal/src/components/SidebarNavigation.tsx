@@ -194,12 +194,12 @@ export function SidebarNavigation({
       >
         {/* SIDEBAR HEADER BRANDING */}
         <div className="p-3.5 sm:p-4 border-b border-slate-200/80 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 shrink-0">
             <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-xs shrink-0">
               <Mail className="w-5 h-5 text-white" />
             </div>
             {(!isCollapsedDesktop || isOpenMobile) && (
-              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate min-w-0">
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap shrink-0">
                 GMAIL JOB ID
               </span>
             )}

@@ -63,7 +63,7 @@ export function ViewModeToggle({ className }: { className?: string }) {
       size="sm"
       data-testid="view-mode-toggle-btn"
       onClick={toggleViewMode}
-      className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200/80 bg-white text-slate-800 hover:bg-slate-100 hover:text-slate-900 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${className || ""}`}
+      className={`min-h-[44px] sm:min-h-[36px] px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold rounded-xl border border-slate-200/80 bg-white text-slate-800 hover:bg-slate-100 hover:text-slate-900 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap ${className || ""}`}
       title={isDesktopView ? "Switch to Mobile View" : "Switch to Desktop View"}
     >
       <span>{isDesktopView ? "📱 Mode Mobile" : "🖥️ Mode Desktop"}</span>

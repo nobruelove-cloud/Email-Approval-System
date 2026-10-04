@@ -304,27 +304,27 @@ export default function LoginPage() {
         <div className="absolute bottom-10 right-10 w-80 h-80 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
 
         {/* Top Header */}
-        <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative z-10">
+        <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3 relative z-10 overflow-x-auto">
           <button
             onClick={() => setLocation("/")}
-            className="flex items-center gap-2.5 group focus:outline-none shrink-0"
+            className="flex items-center gap-2.5 sm:gap-3 group focus:outline-none shrink-0 mr-2"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
               <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
-            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap">
+            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap shrink-0">
               GMAIL JOB ID
             </span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <ViewModeToggle />
+          <div className="flex items-center gap-2 shrink-0">
+            <ViewModeToggle className="shrink-0" />
             <Button
               variant="ghost"
               onClick={() => setLocation("/")}
-              className="text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4 min-h-[44px]"
+              className="text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-3 sm:px-4 min-h-[44px] shrink-0 whitespace-nowrap"
             >
-              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <ArrowLeft className="w-4 h-4 text-cyan-400 shrink-0" />
               <span>Kembali ke Beranda</span>
             </Button>
           </div>
@@ -621,42 +621,42 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500/20 selection:text-cyan-300">
       {/* 1. Header Navigation Bar */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/80 shadow-md transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 overflow-x-auto">
           {/* Logo */}
-          <a href="#hero" className="flex items-center gap-2.5 group shrink-0">
+          <a href="#hero" className="flex items-center gap-2.5 sm:gap-3 group shrink-0 mr-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
               <Mail className="w-5 h-5 text-white stroke-[2.2]" />
             </div>
-            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap">
+            <span className="font-extrabold text-base sm:text-lg text-white leading-none tracking-tight whitespace-nowrap shrink-0">
               GMAIL JOB ID
             </span>
           </a>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#hero" className="hover:text-cyan-400 transition-colors">Beranda</a>
-            <a href="#preview" className="hover:text-cyan-400 transition-colors">Dashboard Preview</a>
-            <a href="#cara-kerja" className="hover:text-cyan-400 transition-colors">Cara Kerja</a>
-            <a href="#keuntungan" className="hover:text-cyan-400 transition-colors">Keunggulan</a>
-            <a href="#simulasi" className="hover:text-cyan-400 transition-colors">Simulasi Saldo</a>
-            <a href="#faq" className="hover:text-cyan-400 transition-colors">FAQ</a>
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-sm font-medium text-slate-300 shrink-0">
+            <a href="#hero" className="hover:text-cyan-400 transition-colors whitespace-nowrap">Beranda</a>
+            <a href="#preview" className="hover:text-cyan-400 transition-colors whitespace-nowrap">Dashboard Preview</a>
+            <a href="#cara-kerja" className="hover:text-cyan-400 transition-colors whitespace-nowrap">Cara Kerja</a>
+            <a href="#keuntungan" className="hover:text-cyan-400 transition-colors whitespace-nowrap">Keunggulan</a>
+            <a href="#simulasi" className="hover:text-cyan-400 transition-colors whitespace-nowrap">Simulasi Saldo</a>
+            <a href="#faq" className="hover:text-cyan-400 transition-colors whitespace-nowrap">FAQ</a>
           </nav>
 
           {/* Desktop Auth Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            <ViewModeToggle />
+          <div className="hidden md:flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <ViewModeToggle className="shrink-0" />
             <Button
               variant="ghost"
               onClick={() => goToAuth("login")}
-              className="text-slate-300 hover:text-cyan-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 min-h-[44px]"
+              className="text-slate-300 hover:text-cyan-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 min-h-[44px] shrink-0 whitespace-nowrap"
             >
               Masuk
             </Button>
-            <div className="relative group">
+            <div className="relative group shrink-0">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl blur-sm opacity-60 group-hover:opacity-100 transition duration-300" />
               <Button
                 onClick={() => goToAuth("register")}
-                className="relative bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold shadow-md px-5 min-h-[44px]"
+                className="relative bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold shadow-md px-5 min-h-[44px] shrink-0 whitespace-nowrap"
               >
                 Daftar Sekarang
               </Button>
@@ -664,18 +664,18 @@ export default function LoginPage() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
-            <ViewModeToggle />
+          <div className="flex md:hidden items-center gap-2 shrink-0">
+            <ViewModeToggle className="shrink-0" />
             <Button
               size="sm"
               onClick={() => goToAuth("register")}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 min-h-[36px] shadow-sm"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-2.5 sm:px-3 min-h-[36px] shadow-sm shrink-0 whitespace-nowrap"
             >
               Daftar
             </Button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-300 hover:bg-slate-900 focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-lg text-slate-300 hover:bg-slate-900 focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

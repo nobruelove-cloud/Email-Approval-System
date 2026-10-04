@@ -716,9 +716,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* 1. TOP HEADER */}
         <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
-          <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2 overflow-x-auto">
             {/* Left: Worker avatar + Brand Identity */}
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 mr-1">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
@@ -731,14 +731,14 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
               </button>
 
-              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate">
+              <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap shrink-0">
                 GMAIL JOB ID
               </span>
             </div>
 
             {/* Right: Actions (ViewModeToggle + Notification Bell Dropdown + Menu/Profile action) */}
-            <div className="flex items-center gap-1.5">
-              <ViewModeToggle />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <ViewModeToggle className="shrink-0" />
               <Popover>
                 <PopoverTrigger asChild>
                   <button
