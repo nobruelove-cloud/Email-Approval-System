@@ -9,7 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
   }>;
   prompt(): Promise<void>;
 }
-import { Loader2, Clock, ShieldOff, ShieldAlert } from "lucide-react";
+import { Loader2, Clock, ShieldOff, ShieldAlert, X } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -30,16 +30,16 @@ function MessageManagerPage() {
   return (
     <div className="min-h-screen bg-[#F0F4F9] p-4 sm:p-6 md:p-8">
       <div className="max-w-4xl mx-auto space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-200 overflow-x-auto">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setLocation("/")}
-            className="text-xs font-bold text-blue-700 hover:bg-blue-50"
+            className="text-xs font-bold text-blue-700 hover:bg-blue-50 shrink-0 whitespace-nowrap"
           >
             ← Kembali ke Dashboard
           </Button>
-          <ViewModeToggle />
+          <ViewModeToggle className="shrink-0" />
         </div>
         <MessageManager />
       </div>
@@ -236,6 +236,12 @@ export function PortalGate() {
 
 export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("pwa_banner_dismissed") === "true";
+    }
+    return false;
+  });
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -264,21 +270,41 @@ export default function App() {
     setDeferredPrompt(null);
   };
 
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("pwa_banner_dismissed", "true");
+    }
+  };
+
   return (
     <ViewModeProvider>
       <AutoUpdateBanner />
-      {deferredPrompt && (
-        <div className="bg-blue-600 text-white px-4 py-2.5 shadow-md flex items-center justify-between z-50 sticky top-0">
-          <div className="flex items-center space-x-2 text-sm font-medium">
-            <span>Pasang aplikasi di perangkat Anda untuk akses lebih cepat</span>
+      {deferredPrompt && !isDismissed && (
+        <div className="bg-blue-600/95 backdrop-blur-md text-white px-3 py-1.5 sm:px-4 sm:py-2 shadow-md flex items-center justify-between z-50 sticky top-0 w-full text-xs sm:text-sm border-b border-blue-500/50">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <span className="truncate font-medium">
+              Pasang aplikasi untuk akses lebih cepat
+            </span>
           </div>
-          <Button
-            onClick={handleInstallClick}
-            size="sm"
-            className="bg-white text-blue-600 hover:bg-blue-50 font-bold border-0 shadow-sm min-h-[44px] px-4 rounded-xl text-sm transition-colors cursor-pointer shrink-0"
-          >
-            📲 Install Aplikasi Gmail Job ID
-          </Button>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button
+              onClick={handleInstallClick}
+              size="sm"
+              className="bg-white text-blue-600 hover:bg-blue-50 font-bold border-0 shadow-2xs h-7 sm:h-8 min-h-0 px-2.5 sm:px-3 rounded-lg text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              📲 Install
+            </Button>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="p-1 rounded-md text-blue-100 hover:text-white hover:bg-blue-700/60 transition-colors focus:outline-none min-h-[32px] min-w-[32px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center shrink-0"
+              aria-label="Tutup prompt install"
+              title="Tutup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
       <Switch>

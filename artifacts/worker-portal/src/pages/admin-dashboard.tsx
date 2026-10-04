@@ -1958,14 +1958,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
     <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-indigo-500/20 selection:text-indigo-700 pb-20 sm:pb-8 w-full max-w-full overflow-x-hidden box-border flex flex-col md:flex-row">
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 min-h-screen sticky top-0 shrink-0 z-30 shadow-xs">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
               G
             </div>
-            <div>
-              <h1 className="font-bold text-slate-900 text-sm tracking-tight leading-tight">GMAIL JOB ID</h1>
-              <p className="text-[11px] text-slate-500 font-medium">Admin Portal v2.0</p>
-            </div>
+            <span className="font-black text-slate-900 text-sm sm:text-base tracking-tight leading-none whitespace-nowrap truncate">
+              GMAIL JOB ID
+            </span>
           </div>
         </div>
 
@@ -2045,14 +2044,14 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <div className="flex-1 flex flex-col min-w-0 w-full">
 <header className="bg-white/90 border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md shadow-2xs w-full max-w-full box-border">
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 w-full max-w-full box-border">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2.5 w-full max-w-full box-border overflow-x-auto">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 mr-1">
             <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-2xs shrink-0">
               <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="shrink-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <p className="font-bold text-slate-900 text-sm sm:text-lg tracking-tight truncate">Command Center</p>
+                <p className="font-bold text-slate-900 text-sm sm:text-lg tracking-tight whitespace-nowrap">Command Center</p>
                 <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 uppercase tracking-wider shrink-0">
                   ADMIN
                 </span>
@@ -2060,15 +2059,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                   <button
                     type="button"
                     onClick={() => setActiveTab("chat")}
-                    className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px] sm:text-xs rounded-full flex items-center gap-1 shadow-2xs hover:bg-amber-100 transition-colors shrink-0"
+                    className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px] sm:text-xs rounded-full flex items-center gap-1 shadow-2xs hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
                   >
-                    <MessageSquare className="w-3 h-3 text-amber-600" />
+                    <MessageSquare className="w-3 h-3 text-amber-600 shrink-0" />
                     <span>{adminChatData.totalAdminUnread} Pesan</span>
                   </button>
                 )}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-mono mt-0.5">
-                <span className="truncate max-w-[130px] sm:max-w-xs">
+                <span className="whitespace-nowrap">
                   {isEmailVisible
                     ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
                     : "*".repeat((profile.email && profile.email.trim() ? profile.email.trim() : "-").length)}
@@ -2085,7 +2084,7 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <ViewModeToggle />
+            <ViewModeToggle className="shrink-0" />
             <Button
               variant="outline"
               size="icon"
