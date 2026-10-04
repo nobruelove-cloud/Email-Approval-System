@@ -1,5 +1,14 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
 import { Loader2, Clock, ShieldOff, ShieldAlert } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
@@ -224,9 +233,52 @@ export function PortalGate() {
 }
 
 export default function App() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    try {
+      const choiceResult = await deferredPrompt.userChoice;
+      if (choiceResult?.outcome === "accepted") {
+        console.log("User accepted the install prompt");
+      }
+    } catch (err) {
+      console.error("Install prompt error:", err);
+    }
+    setDeferredPrompt(null);
+  };
+
   return (
     <>
       <AutoUpdateBanner />
+      {deferredPrompt && (
+        <div className="bg-blue-600 text-white px-4 py-2.5 shadow-md flex items-center justify-between z-50 sticky top-0">
+          <div className="flex items-center space-x-2 text-sm font-medium">
+            <span>Pasang aplikasi di perangkat Anda untuk akses lebih cepat</span>
+          </div>
+          <Button
+            onClick={handleInstallClick}
+            size="sm"
+            className="bg-white text-blue-600 hover:bg-blue-50 font-bold border-0 shadow-sm min-h-[44px] px-4 rounded-xl text-sm transition-colors cursor-pointer shrink-0"
+          >
+            📲 Install Aplikasi Gmail Job ID
+          </Button>
+        </div>
+      )}
       <Switch>
         <Route path="/" component={PortalGate} />
         <Route path="/login" component={PortalGate} />
