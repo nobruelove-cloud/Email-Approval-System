@@ -18,6 +18,7 @@ import { DEFAULT_MAINTENANCE } from "@/lib/portal-types";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { AutoUpdateBanner } from "@/components/AutoUpdateBanner";
 import { MessageManager } from "@/components/MessageManager";
+import { ViewModeProvider, ViewModeToggle } from "@/components/ViewModeContext";
 import LoginPage from "@/pages/login";
 import WorkerDashboard from "@/pages/worker-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -38,6 +39,7 @@ function MessageManagerPage() {
           >
             ← Kembali ke Dashboard
           </Button>
+          <ViewModeToggle />
         </div>
         <MessageManager />
       </div>
@@ -263,7 +265,7 @@ export default function App() {
   };
 
   return (
-    <>
+    <ViewModeProvider>
       <AutoUpdateBanner />
       {deferredPrompt && (
         <div className="bg-blue-600 text-white px-4 py-2.5 shadow-md flex items-center justify-between z-50 sticky top-0">
@@ -290,6 +292,6 @@ export default function App() {
       </Switch>
       <Toaster />
       <SonnerToaster />
-    </>
+    </ViewModeProvider>
   );
 }

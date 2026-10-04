@@ -40,6 +40,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ViewModeToggle } from "@/components/ViewModeContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -317,14 +318,17 @@ export default function LoginPage() {
             </div>
           </button>
 
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/")}
-            className="text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4 min-h-[44px]"
-          >
-            <ArrowLeft className="w-4 h-4 text-cyan-400" />
-            <span>Kembali ke Beranda</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ViewModeToggle />
+            <Button
+              variant="ghost"
+              onClick={() => setLocation("/")}
+              className="text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 px-4 min-h-[44px]"
+            >
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <span>Kembali ke Beranda</span>
+            </Button>
+          </div>
         </header>
 
         {/* Dedicated Centered Auth Layout */}
@@ -642,6 +646,7 @@ export default function LoginPage() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <ViewModeToggle />
             <Button
               variant="ghost"
               onClick={() => goToAuth("login")}
@@ -662,6 +667,7 @@ export default function LoginPage() {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
+            <ViewModeToggle />
             <Button
               size="sm"
               onClick={() => goToAuth("register")}
