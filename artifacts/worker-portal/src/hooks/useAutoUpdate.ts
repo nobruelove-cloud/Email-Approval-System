@@ -4,13 +4,16 @@ import { useLocation } from "wouter";
 const CURRENT_BUILD_ID = (import.meta.env.VITE_APP_BUILD_ID as string) || "dev";
 
 export async function clearAppCachesAndUnregisterSW(): Promise<void> {
-  // 1. Unregister Service Workers if present
+  // 1. Unregister legacy/unsupported Service Workers if present (preserve /sw.js)
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     try {
       const registrations = await navigator.serviceWorker.getRegistrations();
       for (const reg of registrations) {
+        if (reg.active?.scriptURL.endsWith('/sw.js') || reg.installing?.scriptURL.endsWith('/sw.js') || reg.waiting?.scriptURL.endsWith('/sw.js')) {
+          continue;
+        }
         await reg.unregister();
-        console.log("[AutoUpdate] Unregistered ServiceWorker:", reg);
+        console.log("[AutoUpdate] Unregistered non-PWA ServiceWorker:", reg);
       }
     } catch (err) {
       console.warn("[AutoUpdate] SW unregister notice:", err);
