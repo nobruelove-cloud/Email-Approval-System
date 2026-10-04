@@ -72,6 +72,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmailChecker } from "@/components/EmailChecker";
 import { MasterResetModal } from "@/components/MasterResetModal";
+import { ViewModeToggle } from "@/components/ViewModeContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
@@ -2083,15 +2084,18 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onLogout}
-            title="Keluar"
-            className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
-          >
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <ViewModeToggle />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onLogout}
+              title="Keluar"
+              className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </header>
 

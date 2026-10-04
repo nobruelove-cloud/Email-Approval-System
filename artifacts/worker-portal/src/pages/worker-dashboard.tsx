@@ -45,6 +45,7 @@ import {
   Bell,
 } from "lucide-react";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { ViewModeToggle } from "@/components/ViewModeContext";
 import { EmailChecker } from "@/components/EmailChecker";
 import { MessageManager } from "@/components/MessageManager";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -740,8 +741,9 @@ export default function WorkerDashboard({ profile, onLogout }: { profile: Portal
               </div>
             </div>
 
-            {/* Right: Actions (Notification Bell Dropdown + Menu/Profile action) */}
+            {/* Right: Actions (ViewModeToggle + Notification Bell Dropdown + Menu/Profile action) */}
             <div className="flex items-center gap-1.5">
+              <ViewModeToggle />
               <Popover>
                 <PopoverTrigger asChild>
                   <button
