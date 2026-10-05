@@ -2494,158 +2494,158 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <span className="text-xs text-slate-500">Pilih menu untuk verifikasi & pengelolaan</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
                 {/* PROMINENT PESAN WORKER SHORTCUT CARD */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("chat")}
-                  className="p-4 rounded-xl bg-white border border-indigo-200 shadow-2xs hover:shadow-md hover:border-indigo-400 transition-all text-left flex flex-col justify-between group relative overflow-hidden"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-indigo-200 shadow-2xs hover:shadow-md hover:border-indigo-400 transition-all text-left flex flex-col justify-between group relative overflow-hidden"
                 >
                   <div className="flex items-start justify-between w-full">
-                    <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                      <MessageSquare className="w-5 h-5" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     {adminChatData.totalAdminUnread > 0 ? (
-                      <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-rose-500 text-white animate-bounce shadow-2xs">
+                      <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full bg-rose-500 text-white animate-bounce shadow-2xs">
                         {adminChatData.totalAdminUnread} BARU
                       </span>
                     ) : (
-                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 sm:px-2 py-0.5 rounded-md">
                         Aktif
                       </span>
                     )}
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors flex items-center gap-1">
                       Pesan Worker
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Chat langsung realtime dengan worker</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Chat langsung realtime dengan worker</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("submissions")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
                   <div className="flex items-start justify-between w-full">
-                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                      <FileText className="w-5 h-5" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                      <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     {stats.pendingSubmissions > 0 && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">
+                      <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">
                         {stats.pendingSubmissions} Batch
                       </span>
                     )}
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Batch Review
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Verifikasi setoran email masal</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Verifikasi setoran email masal</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("withdrawals")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all text-left flex flex-col justify-between group"
                 >
                   <div className="flex items-start justify-between w-full">
-                    <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                      <Wallet className="w-5 h-5" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                      <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     {stats.pendingWithdrawals > 0 && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                      <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
                         {stats.pendingWithdrawals} Req
                       </span>
                     )}
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-amber-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
                       Penarikan Saldo
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Persetujuan cashout DANA, OVO, dll</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Persetujuan cashout DANA, OVO, dll</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("checker")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
-                    <SearchCheck className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                    <SearchCheck className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Screening Email
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Master riset & email checker</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Master riset & email checker</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("finance")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
-                    <DollarSign className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Keuangan Platform
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Ledger profit vendor & komisi</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Ledger profit vendor & komisi</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("workers")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
-                    <Users className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Kelola Worker
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Daftar anggota & status online</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Daftar anggota & status online</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("rewards")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
-                    <Gift className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                    <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Rewards & Referral
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Bonus klasemen & komisi referral</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Bonus klasemen & komisi referral</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab("rules")}
-                  className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
+                  className="p-2.5 sm:p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all text-left flex flex-col justify-between group"
                 >
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors w-fit">
-                    <SettingsIcon className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                    <SettingsIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div className="mt-3">
-                    <p className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Aturan & Operating
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Jam operasional & rate komisi</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-2 mt-0.5">Jam operasional & rate komisi</p>
                   </div>
                 </button>
               </div>
