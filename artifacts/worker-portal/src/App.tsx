@@ -107,6 +107,14 @@ export function PortalGate() {
     };
     return <WorkerDashboard profile={mockWorkerProfile} onLogout={() => {}} />;
   }
+  if (urlParams && urlParams.get("preview") === "maintenance") {
+    const mockMaintenance = {
+      enabled: true,
+      targetEndTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      message: "Kami sedang melakukan proses pemeliharaan sistem untuk memberikan performa terbaik. Mohon tunggu beberapa saat lagi.",
+    };
+    return <MaintenanceScreen maintenance={mockMaintenance} onLogout={() => {}} />;
+  }
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
