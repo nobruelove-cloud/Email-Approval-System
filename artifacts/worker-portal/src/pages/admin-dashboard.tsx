@@ -2044,29 +2044,29 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
 
       <div className="flex-1 flex flex-col min-w-0 w-full">
 <header className="bg-white/90 border-b border-slate-200/80 sticky top-0 z-20 backdrop-blur-md shadow-2xs w-full max-w-full box-border">
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2.5 w-full max-w-full box-border overflow-x-auto">
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 mr-1">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-2xs shrink-0">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-4 flex items-center justify-between gap-2.5 w-full max-w-full box-border overflow-x-auto">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 mr-1">
+            <div className="p-1.5 sm:p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 shadow-2xs shrink-0">
               <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="shrink-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <p className="font-bold text-slate-900 text-sm sm:text-lg tracking-tight whitespace-nowrap">Command Center</p>
-                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 uppercase tracking-wider shrink-0">
+                <p className="font-bold text-slate-900 text-xs sm:text-lg tracking-tight whitespace-nowrap">Command Center</p>
+                <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 uppercase tracking-wider shrink-0">
                   ADMIN
                 </span>
                 {adminChatData.totalAdminUnread > 0 && (
                   <button
                     type="button"
                     onClick={() => setActiveTab("chat")}
-                    className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px] sm:text-xs rounded-full flex items-center gap-1 shadow-2xs hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
+                    className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[9px] sm:text-xs rounded-full flex items-center gap-1 shadow-2xs hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
                   >
                     <MessageSquare className="w-3 h-3 text-amber-600 shrink-0" />
                     <span>{adminChatData.totalAdminUnread} Pesan</span>
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-mono mt-0.5">
+              <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 font-mono mt-0.5">
                 <span className="whitespace-nowrap">
                   {isEmailVisible
                     ? (profile.email && profile.email.trim() ? profile.email.trim() : "-")
@@ -2075,15 +2075,15 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
                 <button
                   type="button"
                   onClick={() => setIsEmailVisible(!isEmailVisible)}
-                  className="text-slate-500 hover:text-indigo-600 transition-colors p-1 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
+                  className="text-slate-500 hover:text-indigo-600 transition-colors p-0.5 rounded focus:outline-none min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 flex items-center justify-center shrink-0"
                   title={isEmailVisible ? "Sembunyikan Email" : "Tampilkan Email"}
                 >
-                  {isEmailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {isEmailVisible ? <EyeOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 </button>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <ViewModeToggle className="shrink-0" />
             <Button
               variant="outline"
@@ -2092,13 +2092,13 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
               title="Keluar"
               className="border-slate-200/80 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 shrink-0"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 w-full max-w-full overflow-x-hidden box-border">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-6 space-y-3 sm:space-y-6 w-full max-w-full overflow-x-hidden box-border">
         {/* SUB-PAGE TOP NAVIGATION BAR (Shows on dedicated feature pages on mobile) */}
         {activeTab !== "overview" && (
           <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
@@ -2407,80 +2407,80 @@ export default function AdminDashboard({ profile, onLogout }: { profile: PortalU
           {/* RINGKASAN / COMMAND CENTER */}
           <TabsContent value="overview" className="space-y-6">
             {/* ADMIN HERO WELCOME BANNER */}
-            <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-3.5 sm:p-6 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Selamat Datang, Admin!</h2>
-                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-2xl font-bold text-slate-900 tracking-tight">Selamat Datang, Admin!</h2>
+                  <span className="px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">
                     System Control
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-500">
+                <p className="hidden sm:block text-xs sm:text-sm text-slate-500">
                   Pantau performa setoran email, tinjau penarikan worker, dan kelola operasional platform secara realtime.
                 </p>
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 pt-1">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono text-slate-500 pt-0.5 sm:pt-1">
+                  <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600" />
                   <span>{new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
                 </div>
               </div>
-              <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-4">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status Operasional</p>
-                <div className="flex items-center gap-2 mt-0.5 sm:justify-end">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-extrabold text-emerald-600">Sistem Berjalan Normal</span>
+              <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-2 sm:pt-0 sm:pl-4 flex sm:flex-col items-center sm:items-end justify-between sm:justify-start">
+                <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status Operasional</p>
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-0 sm:mt-0.5">
+                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] sm:text-xs font-extrabold text-emerald-600">Sistem Berjalan Normal</span>
                 </div>
               </div>
             </div>
 
             {/* SUMMARY STATISTIC CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
-              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
-                <CardContent className="p-0 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Batch Review
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-5">
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-2.5 sm:p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-0.5 sm:space-y-1">
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5">
+                    <FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" /> Batch Review
                   </p>
-                  <p className="text-2xl font-bold text-slate-900">{stats.pendingSubmissions}</p>
-                  <p className="text-[11px] text-amber-600 font-medium">Menunggu verifikasi</p>
+                  <p className="text-lg sm:text-2xl font-extrabold text-slate-900">{stats.pendingSubmissions}</p>
+                  <p className="text-[10px] sm:text-xs text-amber-600 font-medium">Menunggu verifikasi</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
-                <CardContent className="p-0 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <SearchCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Stok Email
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-2.5 sm:p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-0.5 sm:space-y-1">
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5">
+                    <SearchCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" /> Stok Email
                   </p>
-                  <p className="text-2xl font-bold text-slate-900">{stats.availableStock}</p>
-                  <p className="text-[11px] text-indigo-600 font-medium">Siap dijual ke vendor</p>
+                  <p className="text-lg sm:text-2xl font-extrabold text-slate-900">{stats.availableStock}</p>
+                  <p className="text-[10px] sm:text-xs text-indigo-600 font-medium">Siap dijual ke vendor</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
-                <CardContent className="p-0 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Pekerja Aktif
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-2.5 sm:p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-0.5 sm:space-y-1">
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5">
+                    <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" /> Pekerja Aktif
                   </p>
-                  <p className="text-2xl font-bold text-slate-900">{stats.activeWorkers}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Total: {stats.totalWorkers} pekerja</p>
+                  <p className="text-lg sm:text-2xl font-extrabold text-slate-900">{stats.activeWorkers}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 font-medium">Total: {stats.totalWorkers} pekerja</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow">
-                <CardContent className="p-0 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Wallet className="w-3.5 h-3.5 text-amber-600 shrink-0" /> Penarikan Pending
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-2.5 sm:p-4 rounded-xl hover:shadow-xs transition-shadow">
+                <CardContent className="p-0 space-y-0.5 sm:space-y-1">
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5">
+                    <Wallet className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 shrink-0" /> Penarikan Pending
                   </p>
-                  <p className="text-2xl font-bold text-slate-900">{stats.pendingWithdrawals}</p>
-                  <p className="text-[11px] text-amber-600 font-medium truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
+                  <p className="text-lg sm:text-2xl font-extrabold text-slate-900">{stats.pendingWithdrawals}</p>
+                  <p className="text-[10px] sm:text-xs text-amber-600 font-medium truncate">{formatMoney(stats.pendingWithdrawalAmount)}</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-slate-200/80 shadow-2xs p-4 rounded-xl hover:shadow-xs transition-shadow col-span-2 sm:col-span-1">
-                <CardContent className="p-0 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Total Saldo
+              <Card className="bg-white border-slate-200/80 shadow-2xs p-2.5 sm:p-4 rounded-xl hover:shadow-xs transition-shadow col-span-2 sm:col-span-1">
+                <CardContent className="p-0 space-y-0.5 sm:space-y-1">
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5">
+                    <DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" /> Total Saldo
                   </p>
-                  <p className="text-lg sm:text-xl font-bold text-slate-900 truncate">{formatMoney(stats.totalBalance)}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Dompet seluruh pekerja</p>
+                  <p className="text-base sm:text-xl font-extrabold text-slate-900 truncate">{formatMoney(stats.totalBalance)}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 font-medium">Dompet seluruh pekerja</p>
                 </CardContent>
               </Card>
             </div>
